@@ -3,7 +3,29 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
-import { useAuth, LoginCredentials } from '../../lib/auth';
+
+// Define local types and auth implementation
+interface LoginCredentials {
+  username: string;
+  password: string;
+}
+
+// Local auth implementation
+const useAuth = () => {
+  const login = async (credentials: LoginCredentials) => {
+    // Mock login for development
+    console.log('Mock login with:', credentials);
+    return { 
+      user: { 
+        id: 1, 
+        username: credentials.username,
+        email: `${credentials.username}@example.com`,
+      } 
+    };
+  };
+  
+  return { login };
+};
 
 const Login: React.FC = () => {
   const navigate = useNavigate();

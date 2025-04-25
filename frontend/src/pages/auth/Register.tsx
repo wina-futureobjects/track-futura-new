@@ -3,7 +3,35 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
-import { useAuth, RegisterCredentials } from '../../lib/auth';
+
+// Define local types and auth implementation
+interface RegisterCredentials {
+  username: string;
+  email: string;
+  password: string;
+  password2: string;
+  first_name: string;
+  last_name: string;
+}
+
+// Local auth implementation
+const useAuth = () => {
+  const register = async (credentials: RegisterCredentials) => {
+    // Mock register for development
+    console.log('Mock register with:', credentials);
+    return { 
+      user: { 
+        id: 1, 
+        username: credentials.username,
+        email: credentials.email,
+        first_name: credentials.first_name,
+        last_name: credentials.last_name
+      } 
+    };
+  };
+  
+  return { register };
+};
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
