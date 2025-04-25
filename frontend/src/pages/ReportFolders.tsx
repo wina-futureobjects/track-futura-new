@@ -24,7 +24,31 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FolderIcon from '@mui/icons-material/Folder';
-import { api } from '@/lib/api';
+import axios from 'axios';
+
+// Inline implementation of the API client to avoid path resolution issues
+const api = axios.create({
+  baseURL: '',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  withCredentials: true,
+});
+
+// Add request interceptor to include CSRF token
+api.interceptors.request.use((config) => {
+  // Get CSRF token from cookie if it exists
+  const csrfToken = document.cookie
+    .split('; ')
+    .find(row => row.startsWith('csrftoken='))
+    ?.split('=')[1];
+
+  if (csrfToken) {
+    config.headers['X-CSRFToken'] = csrfToken;
+  }
+
+  return config;
+});
 
 type Report = {
   id: number;
