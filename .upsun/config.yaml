@@ -148,7 +148,7 @@ applications:
 routes:
   "https://{default}/":
     type: upstream
-    upstream: "c-users-zhiel-documents-track-futura:http"
+    upstream: "track-futura:http"
   # A basic redirect definition
   # More information: https://docs.upsun.com/define-routes.html#basic-redirect-definition
   "https://www.{default}":
