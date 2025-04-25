@@ -32,8 +32,32 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import SearchIcon from '@mui/icons-material/Search';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import InstagramIcon from '@mui/icons-material/Instagram';
-import { api } from '@/lib/api';
+import axios from 'axios';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+
+// Inline implementation of the API client to avoid path resolution issues
+const api = axios.create({
+  baseURL: '',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  withCredentials: true,
+});
+
+// Add request interceptor to include CSRF token
+api.interceptors.request.use((config) => {
+  // Get CSRF token from cookie if it exists
+  const csrfToken = document.cookie
+    .split('; ')
+    .find(row => row.startsWith('csrftoken='))
+    ?.split('=')[1];
+
+  if (csrfToken) {
+    config.headers['X-CSRFToken'] = csrfToken;
+  }
+
+  return config;
+});
 
 interface InstagramFolder {
   id: number;
