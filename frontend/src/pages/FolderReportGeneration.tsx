@@ -22,7 +22,7 @@ import HomeIcon from '@mui/icons-material/Home';
 import FolderIcon from '@mui/icons-material/Folder';
 import DownloadIcon from '@mui/icons-material/Download';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { api } from '../lib/api';
+import { api } from '@/lib/api';
 
 interface Folder {
   id: number;

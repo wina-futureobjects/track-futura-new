@@ -24,7 +24,7 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FolderIcon from '@mui/icons-material/Folder';
-import { api } from '../lib/api';
+import { api } from '@/lib/api';
 
 type Report = {
   id: number;
