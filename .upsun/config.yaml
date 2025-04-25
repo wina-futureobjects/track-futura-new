@@ -29,12 +29,22 @@ applications:
     type: "nodejs:18"
     web:
       commands:
-        start: "npx serve -s dist"  # or `npm run preview` if using Vite
+        start: "npm run start"
       upstream:
         socket_family: tcp
       locations:
         "/":
-          passthru: true
+          root: "dist"
+          index:
+            - "index.html"
+          expires: -1
+          scripts: false
+          allow: true
+        "/assets":
+          root: "dist/assets"
+          expires: 365d
+          scripts: false
+          allow: true
     build:
       flavor: none
     hooks:
@@ -50,3 +60,7 @@ routes:
   "https://{default}/":
     type: upstream
     upstream: "frontend:http"
+    cache:
+      enabled: true
+      default_ttl: 0
+      cookies: ['*']
