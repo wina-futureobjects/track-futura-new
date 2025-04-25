@@ -4,7 +4,8 @@ applications:
       root: "backend"
     type: "python:3.11"
     resources:
-      profile_size: "XS"
+      base_memory: 512
+      memory_ratio: 256
     web:
       commands:
         start: "gunicorn config.wsgi --bind=unix:$SOCKET"
@@ -30,7 +31,8 @@ applications:
       root: "frontend"
     type: "nodejs:18"
     resources:
-      profile_size: "XS"
+      base_memory: 512
+      memory_ratio: 256
     web:
       commands:
         start: "npx serve -s dist"  # or `npm run preview` if using Vite
