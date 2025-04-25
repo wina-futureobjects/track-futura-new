@@ -32,7 +32,7 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import SearchIcon from '@mui/icons-material/Search';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import InstagramIcon from '@mui/icons-material/Instagram';
-import { api } from './lib/api';
+import { api } from '@/lib/api';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 
 interface InstagramFolder {
