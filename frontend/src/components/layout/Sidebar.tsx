@@ -25,7 +25,14 @@ import {
   ChevronRight as ChevronRightIcon,
   Notifications as NotificationsIcon,
   CloudQueue as CloudQueueIcon,
-  Logout as LogoutIcon
+  Logout as LogoutIcon,
+  AccountBox as AccountBoxIcon,
+  Description as DescriptionIcon,
+  Mood as MoodIcon,
+  Assessment as AssessmentIcon,
+  Instagram as InstagramIcon,
+  Analytics as AnalyticsIcon,
+  TrackChanges as TrackChangesIcon
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
@@ -55,13 +62,16 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
   const { logout } = useAuth();
   
   const menuItems = [
-    { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
-    { text: 'Instagram Data', icon: <CloudQueueIcon />, path: '/instagram-folders' },
-    { text: 'Social Analysis', icon: <MessageIcon />, path: '/social-analysis' },
-    { text: 'Web Presence', icon: <LanguageIcon />, path: '/web-presence' },
-    { text: 'Sentiment Analysis', icon: <TimelineIcon />, path: '/sentiment' },
-    { text: 'Word Cloud', icon: <CloudQueueIcon />, path: '/wordcloud' },
-    { text: 'NPS Reports', icon: <BarChartIcon />, path: '/nps-reports' },
+    { text: 'Dashboard', path: '/', icon: <DashboardIcon /> },
+    { text: 'Track Accounts', path: '/track-accounts', icon: <TrackChangesIcon /> },
+    { text: 'Instagram Data', path: '/instagram-data', icon: <InstagramIcon /> },
+    { text: 'Social Analysis', path: '/social-analysis', icon: <AnalyticsIcon /> },
+    { text: 'Web Presence', path: '/web-presence', icon: <LanguageIcon /> },
+    { text: 'Sentiment Analysis', path: '/sentiment', icon: <MoodIcon /> },
+    { text: 'Word Cloud', path: '/word-cloud', icon: <CloudQueueIcon /> },
+    { text: 'NPS Reports', path: '/nps', icon: <AssessmentIcon /> },
+    { text: 'Report Folders', path: '/report-folders', icon: <DescriptionIcon /> },
+    { text: 'Settings', path: '/settings', icon: <SettingsIcon /> },
   ];
 
   const handleNavigate = (path: string) => {

@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "data_collector",
     "query_builder",
     "instagram_data",
+    "track_accounts",
 ]
 
 MIDDLEWARE = [

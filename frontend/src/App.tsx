@@ -7,9 +7,16 @@ import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import InstagramDataUpload from './pages/InstagramDataUpload';
 import InstagramFolders from './pages/InstagramFolders';
+import TrackAccountFolders from './pages/TrackAccountFolders';
+import TrackAccountFolderDetail from './pages/TrackAccountFolderDetail';
+import TrackAccountUpload from './pages/TrackAccountUpload';
+import ReportFolders from './pages/ReportFolders';
+import ReportDetail from './pages/ReportDetail';
+import FolderReportGeneration from './pages/FolderReportGeneration';
 import theme from './theme';
 import CssBaseline from '@mui/material/CssBaseline';
 import { isAuthenticated } from './lib/auth';
+import InstagramFolderSelector from './FolderSelectionReportGenerator';
 
 // Route guard component for protected routes
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -50,6 +57,33 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <InstagramDataUpload />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          {/* Track Account routes */}
+          <Route path="/track-accounts" element={
+            <ProtectedRoute>
+              <Navigate to="/track-accounts/folders" replace />
+            </ProtectedRoute>
+          } />
+          <Route path="/track-accounts/folders" element={
+            <ProtectedRoute>
+              <Layout>
+                <TrackAccountFolders />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/track-accounts/folders/:folderId" element={
+            <ProtectedRoute>
+              <Layout>
+                <TrackAccountFolderDetail />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/track-accounts/folders/:folderId/upload" element={
+            <ProtectedRoute>
+              <Layout>
+                <TrackAccountUpload />
               </Layout>
             </ProtectedRoute>
           } />
@@ -95,6 +129,35 @@ function App() {
               </Layout>
             </ProtectedRoute>
           } />
+          <Route path="/reports" element={
+            <ProtectedRoute>
+              <Navigate to="/report-folders" replace />
+            </ProtectedRoute>
+          } />
+          
+          {/* Report Folder Routes */}
+          <Route path="/report-folders" element={
+            <ProtectedRoute>
+              <Layout>
+                <ReportFolders />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/report-folders/:reportId" element={
+            <ProtectedRoute>
+              <Layout>
+                <ReportDetail />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/report-folders/:reportId/instagram-data" element={
+            <ProtectedRoute>
+              <Layout>
+                <InstagramFolderSelector />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
           <Route path="*" element={<div>404 - Page Not Found</div>} />
         </Routes>
       </Router>

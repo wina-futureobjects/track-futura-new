@@ -23,5 +23,6 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/users/", include("users.urls")),
     path("api/instagram/", include("instagram_data.urls")),
+    path("api/track-accounts/", include("track_accounts.urls")),
     path("api/", RedirectView.as_view(url="/api/users/", permanent=False)),
 ]
