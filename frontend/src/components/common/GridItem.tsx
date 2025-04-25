@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { Grid, GridProps } from '@mui/material';
+import { Grid } from '@mui/material';
 
 interface GridItemProps {
   children: ReactNode;
@@ -12,7 +12,7 @@ interface GridItemProps {
 
 const GridItem: React.FC<GridItemProps> = ({ children, xs, sm, md, lg, xl }) => {
   return (
-    <Grid item xs={xs} sm={sm} md={md} lg={lg} xl={xl}>
+    <Grid xs={xs} sm={sm} md={md} lg={lg} xl={xl}>
       {children}
     </Grid>
   );

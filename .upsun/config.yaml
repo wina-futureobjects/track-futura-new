@@ -3,6 +3,8 @@ applications:
     source:
       root: "backend"
     type: "python:3.11"
+    resources:
+      profile_size: "XS"
     web:
       commands:
         start: "gunicorn config.wsgi --bind=unix:$SOCKET"
@@ -27,6 +29,8 @@ applications:
     source:
       root: "frontend"
     type: "nodejs:18"
+    resources:
+      profile_size: "XS"
     web:
       commands:
         start: "npx serve -s dist"  # or `npm run preview` if using Vite

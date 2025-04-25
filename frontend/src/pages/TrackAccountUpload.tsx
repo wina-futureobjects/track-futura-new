@@ -71,7 +71,6 @@ const TrackAccountUpload = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filteredAccounts, setFilteredAccounts] = useState<TrackAccount[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [currentFolder, setCurrentFolder] = useState<Folder | null>(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -96,18 +95,15 @@ const TrackAccountUpload = () => {
       
       if (data && typeof data === 'object' && 'results' in data) {
         setAccounts(data.results || []);
-        setFilteredAccounts(data.results || []);
         setTotalCount(data.count || 0);
       } else {
         console.error('API returned unexpected data format:', data);
         setAccounts([]);
-        setFilteredAccounts([]);
         setTotalCount(0);
       }
     } catch (error) {
       console.error('Error fetching accounts:', error);
       setAccounts([]);
-      setFilteredAccounts([]);
       setTotalCount(0);
     } finally {
       setIsLoading(false);

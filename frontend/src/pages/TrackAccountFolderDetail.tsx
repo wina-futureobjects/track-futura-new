@@ -19,14 +19,21 @@ import {
   Link,
   Snackbar,
   Alert,
-  Divider,
 } from '@mui/material';
 import HomeIcon from '@mui/icons-material/Home';
 import FolderIcon from '@mui/icons-material/Folder';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import AddIcon from '@mui/icons-material/Add';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { api } from '../lib/api';
+import axios from 'axios';
+
+const api = axios.create({
+  baseURL: '',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  withCredentials: true,
+});
 
 interface Folder {
   id: number;
