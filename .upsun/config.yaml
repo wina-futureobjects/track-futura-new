@@ -19,6 +19,8 @@ applications:
         python manage.py collectstatic --noinput
       deploy: |
         python manage.py migrate
+    relationships:
+      database: "db:postgresql"
     variables:
       env:
         DJANGO_SETTINGS_MODULE: "config.settings"

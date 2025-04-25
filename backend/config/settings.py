@@ -88,6 +88,7 @@ WSGI_APPLICATION = "config.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# Default to SQLite for development
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
@@ -95,8 +96,25 @@ DATABASES = {
     }
 }
 
-# Override database settings if DATABASE_URL is present (for Upsun/production)
-if 'DATABASE_URL' in os.environ:
+# Check for Upsun environment
+if 'UPSUN_APPLICATION' in os.environ:
+    # Parse Upsun database relationship
+    import json
+    relationships = json.loads(os.environ['UPSUN_RELATIONSHIPS'])
+    db_settings = relationships['database'][0]
+    
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': db_settings['path'],
+            'USER': db_settings['username'],
+            'PASSWORD': db_settings['password'],
+            'HOST': db_settings['host'],
+            'PORT': db_settings['port'],
+        }
+    }
+# Otherwise, check for DATABASE_URL (for other deployment environments)
+elif 'DATABASE_URL' in os.environ:
     import dj_database_url
     DATABASES['default'] = dj_database_url.config(
         conn_max_age=600,
