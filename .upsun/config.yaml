@@ -5,7 +5,7 @@ applications:
     type: "python:3.11"
     web:
       commands:
-        start: "gunicorn backend.wsgi --bind=unix:$SOCKET"
+        start: "gunicorn config.wsgi --bind=unix:$SOCKET"
       upstream:
         socket_family: unix
       locations:
