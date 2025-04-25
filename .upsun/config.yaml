@@ -18,12 +18,10 @@ applications:
     # to the application in the PLATFORM_RELATIONSHIPS variable. The right-hand
     # side is in the form `<service name>:<endpoint name>`.
     # More information: https://docs.upsun.com/create-apps/app-reference/single-runtime-image.html#relationships
-    relationships:
-      kafka:
-      mysql:
-      postgresql:
-      redis:
-      
+    
+    # relationships:
+    #   db:
+    
 
     # Mounts define directories that are writable after the build is complete.
     # More information: https://docs.upsun.com/create-apps/app-reference/single-runtime-image.html#mounts
@@ -137,20 +135,10 @@ applications:
 # to power your Upsun project.
 # More information: https://docs.upsun.com/add-services.html
 # Full list of available services: https://docs.upsun.com/add-services.html#available-services
-services:
-  mysql:
-    type: mysql:10.6 # All available versions are: 10.6, 10.5, 10.4, 10.3
+# services:
+#   db:
+#     type: postgresql:14
 
-  postgresql:
-    type: postgresql:15 # All available versions are: 15, 14, 13, 12, 11
-
-  redis:
-    type: redis:7.0 # All available versions are: 7.0, 6.2
-
-  kafka:
-    type: kafka:3.2 # All available versions are: 3.2
-
-  
 
 # The routes of the project.
 #
