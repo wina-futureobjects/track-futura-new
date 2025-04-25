@@ -1,7 +1,0 @@
-db:
-  type: postgresql:15
-  disk: 1024
-  configuration:
-    extensions:
-      - pg_trgm
-      - unaccent 
