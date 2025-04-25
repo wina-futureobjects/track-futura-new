@@ -35,7 +35,16 @@ import {
   TrackChanges as TrackChangesIcon
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../lib/auth';
+
+// Inline minimal implementation of useAuth to avoid path resolution issues
+const useAuth = () => {
+  const logout = () => {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+  };
+  
+  return { logout };
+};
 
 const drawerWidth = 240;
 const miniDrawerWidth = 65;
