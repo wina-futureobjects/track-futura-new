@@ -1,6 +1,6 @@
 # Complete list of all available properties: https://docs.upsun.com/create-apps/app-reference/single-runtime-image.html
 applications:
-  c-users-zhiel-documents-track-futura:
+  track-futura:
     # Application source code directory
     source:
       root: "/"
