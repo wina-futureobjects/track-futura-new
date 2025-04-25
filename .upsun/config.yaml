@@ -19,6 +19,9 @@ applications:
         python manage.py collectstatic --noinput
       deploy: |
         python manage.py migrate
+    variables:
+      env:
+        DJANGO_SETTINGS_MODULE: "config.settings"
 
   frontend:
     source:
