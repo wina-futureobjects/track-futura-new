@@ -48,6 +48,7 @@ interface InstagramPost {
   likes: number;
   post_id: string;
   content_type: string | null;
+  platform_type: string | null;
   thumbnail: string | null;
   followers: number | null;
   posts_count: number | null;
@@ -366,7 +367,7 @@ const ReportGeneration = () => {
           '', // Entity
           account?.close_monitoring ? 'Yes' : 'No', // Under Close Monitoring
           post.date_posted, // Posting Date
-          'Instagram Post', // Platform Type
+          post.platform_type || (post.content_type === 'post' ? 'IG Post' : 'IG Reel'), // Platform Type
           post.url, // Post URL
           username, // Username
           '', // Personal/Business

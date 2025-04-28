@@ -40,6 +40,7 @@ class InstagramPost(models.Model):
     discovery_input = models.CharField(max_length=255, null=True, blank=True)
     thumbnail = models.URLField(max_length=500, null=True, blank=True)
     content_type = models.CharField(max_length=50, null=True, blank=True)
+    platform_type = models.CharField(max_length=50, null=True, blank=True)
     engagement_score = models.FloatField(default=0.0)
     tagged_users = models.TextField(null=True, blank=True)
     followers = models.IntegerField(null=True, blank=True)

@@ -315,7 +315,7 @@ class ReportFolderViewSet(viewsets.ModelViewSet):
                     username=username,
                     post_url=post.url,
                     posting_date=post.date_posted,
-                    platform_type='Instagram Post',
+                    platform_type=post.platform_type or ('IG Post' if post.content_type == 'post' else 'IG Reel'),
                     keywords=post.hashtags,
                     content=post.description,
                     post_id=str(post.id)  # Ensure post_id is stored as string for consistency
@@ -427,7 +427,7 @@ class ReportFolderViewSet(viewsets.ModelViewSet):
                     username=username,
                     post_url=post.url,
                     posting_date=post.date_posted,
-                    platform_type='Instagram Post',
+                    platform_type=post.platform_type or ('IG Post' if post.content_type == 'post' else 'IG Reel'),
                     keywords=post.hashtags,
                     content=post.description,
                     post_id=str(post.id)  # Ensure post_id is stored as string for consistency
