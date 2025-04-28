@@ -121,6 +121,17 @@ class InstagramPostViewSet(viewsets.ModelViewSet):
         if not clean_date:
             return None
         
+        # Special handling for ISO format dates (like 2025-04-14T08:27:06.000Z)
+        if 'T' in clean_date and (clean_date.endswith('Z') or '+' in clean_date):
+            try:
+                # Use Python's built-in ISO parser for efficiency
+                from datetime import datetime
+                return datetime.fromisoformat(clean_date.replace('Z', '+00:00'))
+            except (ValueError, TypeError):
+                # If that fails, continue with the regular parsing methods
+                print(f"ISO format detection failed for: {clean_date}")
+                pass
+            
         # Detect and fix common Instagram date formats
         # If it's a Unix timestamp (all digits)
         if clean_date.isdigit() and len(clean_date) >= 10:
@@ -148,22 +159,24 @@ class InstagramPostViewSet(viewsets.ModelViewSet):
             else:
                 # Basic parsing for common formats
                 formats_to_try = [
-                    '%Y-%m-%d',           # 2023-01-31
-                    '%Y-%m-%d %H:%M:%S',  # 2023-01-31 12:30:45
-                    '%Y-%m-%dT%H:%M:%S',  # 2023-01-31T12:30:45
-                    '%Y-%m-%dT%H:%M:%SZ', # 2023-01-31T12:30:45Z (ISO format)
-                    '%Y-%m-%d %H:%M',     # 2023-01-31 12:30
-                    '%d/%m/%Y',           # 31/01/2023
-                    '%m/%d/%Y',           # 01/31/2023
-                    '%Y/%m/%d',           # 2023/01/31
-                    '%d-%m-%Y',           # 31-01-2023
-                    '%m-%d-%Y',           # 01-31-2023
-                    '%d.%m.%Y',           # 31.01.2023
-                    '%m.%d.%Y',           # 01.31.2023
-                    '%b %d, %Y',          # Jan 31, 2023
-                    '%d %b %Y',           # 31 Jan 2023
-                    '%B %d, %Y',          # January 31, 2023
-                    '%d %B %Y',           # 31 January 2023
+                    '%Y-%m-%dT%H:%M:%S.%fZ', # 2025-04-14T08:27:06.000Z
+                    '%Y-%m-%dT%H:%M:%SZ',    # 2025-04-14T08:27:06Z
+                    '%Y-%m-%dT%H:%M:%S.%f',  # 2025-04-14T08:27:06.000
+                    '%Y-%m-%dT%H:%M:%S',     # 2025-04-14T08:27:06
+                    '%Y-%m-%d',              # 2023-01-31
+                    '%Y-%m-%d %H:%M:%S',     # 2023-01-31 12:30:45
+                    '%Y-%m-%d %H:%M',        # 2023-01-31 12:30
+                    '%d/%m/%Y',              # 31/01/2023
+                    '%m/%d/%Y',              # 01/31/2023
+                    '%Y/%m/%d',              # 2023/01/31
+                    '%d-%m-%Y',              # 31-01-2023
+                    '%m-%d-%Y',              # 01-31-2023
+                    '%d.%m.%Y',              # 31.01.2023
+                    '%m.%d.%Y',              # 01.31.2023
+                    '%b %d, %Y',             # Jan 31, 2023
+                    '%d %b %Y',              # 31 Jan 2023
+                    '%B %d, %Y',             # January 31, 2023
+                    '%d %B %Y',              # 31 January 2023
                 ]
                 
                 for fmt in formats_to_try:

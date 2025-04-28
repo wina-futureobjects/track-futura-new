@@ -110,6 +110,7 @@ class ReportEntry(models.Model):
     report = models.ForeignKey(ReportFolder, on_delete=models.CASCADE, related_name='entries')
     
     # Data from the report row
+    sn = models.CharField(max_length=50, blank=True, null=True)  # S/N field, can be left empty
     name = models.CharField(max_length=255, blank=True, null=True)
     iac_no = models.CharField(max_length=100, blank=True, null=True)
     entity = models.CharField(max_length=255, blank=True, null=True)

@@ -361,7 +361,7 @@ const ReportGeneration = () => {
         }
 
         const row = [
-          index + 1, // S/N
+          '', // S/N - leave empty
           account?.name || '', // Name
           account?.iac_no || '', // IAC No
           '', // Entity

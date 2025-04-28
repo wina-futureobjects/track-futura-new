@@ -318,7 +318,8 @@ class ReportFolderViewSet(viewsets.ModelViewSet):
                     platform_type=post.platform_type or ('IG Post' if post.content_type == 'post' else 'IG Reel'),
                     keywords=post.hashtags,
                     content=post.description,
-                    post_id=str(post.id)  # Ensure post_id is stored as string for consistency
+                    post_id=str(post.id),  # Ensure post_id is stored as string for consistency
+                    sn=''  # Set S/N to empty string
                 )
                 
                 # If account is matched, add account data
@@ -430,7 +431,8 @@ class ReportFolderViewSet(viewsets.ModelViewSet):
                     platform_type=post.platform_type or ('IG Post' if post.content_type == 'post' else 'IG Reel'),
                     keywords=post.hashtags,
                     content=post.description,
-                    post_id=str(post.id)  # Ensure post_id is stored as string for consistency
+                    post_id=str(post.id),  # Ensure post_id is stored as string for consistency
+                    sn=''  # Set S/N to empty string
                 )
                 
                 # If account is matched, add account data
