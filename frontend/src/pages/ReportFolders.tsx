@@ -284,14 +284,23 @@ const ReportFolders = () => {
     <Container sx={{ py: 4 }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
         <Typography variant="h4" component="h1">Report Folders</Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog('create')}
-        >
-          New Folder
-        </Button>
+        <Box display="flex" gap={2}>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenDialog('create')}
+          >
+            New Folder
+          </Button>
+          <Button
+            variant="outlined"
+            color="primary"
+            onClick={() => navigate('/report-folders/create/multi-platform')}
+          >
+            Create Multi-Platform Report
+          </Button>
+        </Box>
       </Box>
       
       {error && (

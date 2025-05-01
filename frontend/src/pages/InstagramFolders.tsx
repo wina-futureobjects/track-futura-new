@@ -63,7 +63,7 @@ const InstagramFolders = () => {
   const fetchFolders = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/instagram/folders/');
+      const response = await fetch('/api/instagram-data/folders/');
       if (!response.ok) {
         throw new Error('Failed to fetch folders');
       }
@@ -116,7 +116,7 @@ const InstagramFolders = () => {
     }
 
     try {
-      const response = await fetch('/api/instagram/folders/', {
+      const response = await fetch('/api/instagram-data/folders/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -146,7 +146,7 @@ const InstagramFolders = () => {
     }
 
     try {
-      const response = await fetch(`/api/instagram/folders/${selectedFolder.id}/`, {
+      const response = await fetch(`/api/instagram-data/folders/${selectedFolder.id}/`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -176,7 +176,7 @@ const InstagramFolders = () => {
     }
 
     try {
-      const response = await fetch(`/api/instagram/folders/${folderId}/`, {
+      const response = await fetch(`/api/instagram-data/folders/${folderId}/`, {
         method: 'DELETE',
       });
 

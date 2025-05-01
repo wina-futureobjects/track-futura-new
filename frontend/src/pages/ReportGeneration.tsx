@@ -107,7 +107,7 @@ const ReportGeneration = () => {
     try {
       setLoading(true);
       console.log('Fetching Instagram folders...');
-      const response = await fetch('/api/instagram/folders/');
+      const response = await fetch('/api/instagram-data/folders/');
       console.log('Response status:', response.status);
       
       if (!response.ok) {

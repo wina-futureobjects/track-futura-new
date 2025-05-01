@@ -30,6 +30,7 @@ import AssessmentIcon from '@mui/icons-material/Assessment';
 import DownloadIcon from '@mui/icons-material/Download';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SearchIcon from '@mui/icons-material/Search';
+import EditIcon from '@mui/icons-material/Edit';
 import { format } from 'date-fns';
 
 interface ReportFolder {
@@ -252,9 +253,16 @@ const ReportDetail = () => {
                   color="secondary"
                   startIcon={<AssessmentIcon />}
                   onClick={() => navigate(`/report-folders/${reportId}/instagram-data`)}
-                  sx={{ mr: 1 }}
                 >
                   Add Instagram Data
+                </Button>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<EditIcon />}
+                  onClick={() => navigate(`/report-folders/${reportId}/edit-multi-platform`)}
+                >
+                  Edit Multi-Platform
                 </Button>
                 <Button
                   variant="contained"

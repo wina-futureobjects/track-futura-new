@@ -51,7 +51,10 @@ INSTALLED_APPS = [
     "data_collector",
     "query_builder",
     "instagram_data",
+    "facebook_data",
     "track_accounts",
+    "linkedin_data",
+    "tiktok_data",
 ]
 
 MIDDLEWARE = [
@@ -172,7 +175,7 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.BasicAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.AllowAny',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,

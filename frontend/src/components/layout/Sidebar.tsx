@@ -32,8 +32,11 @@ import {
   Assessment as AssessmentIcon,
   Instagram as InstagramIcon,
   Analytics as AnalyticsIcon,
-  TrackChanges as TrackChangesIcon
+  TrackChanges as TrackChangesIcon,
+  Facebook as FacebookIcon
 } from '@mui/icons-material';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
+import MusicVideoIcon from '@mui/icons-material/MusicVideo';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 // Inline minimal implementation of useAuth to avoid path resolution issues
@@ -74,6 +77,9 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
     { text: 'Dashboard', path: '/', icon: <DashboardIcon /> },
     { text: 'Track Accounts', path: '/track-accounts', icon: <TrackChangesIcon /> },
     { text: 'Instagram Data', path: '/instagram-data', icon: <InstagramIcon /> },
+    { text: 'Facebook Data', path: '/facebook-data', icon: <FacebookIcon /> },
+    { text: 'LinkedIn Data', path: '/linkedin-data', icon: <LinkedInIcon /> },
+    { text: 'TikTok Data', path: '/tiktok-data', icon: <MusicVideoIcon /> },
     { text: 'Social Analysis', path: '/social-analysis', icon: <AnalyticsIcon /> },
     { text: 'Web Presence', path: '/web-presence', icon: <LanguageIcon /> },
     { text: 'Sentiment Analysis', path: '/sentiment', icon: <MoodIcon /> },

@@ -271,16 +271,27 @@ class ReportFolderViewSet(viewsets.ModelViewSet):
     def generate_report(self, request, pk=None):
         """
         Generate a new report and save it to the database
+        Supports all platform types: Instagram, Facebook, LinkedIn, TikTok
         """
         try:
             # Get request data
-            instagram_folder_ids = request.data.get('folder_ids', [])
-            start_date = request.data.get('start_date')  # We'll still accept these params
-            end_date = request.data.get('end_date')      # but not use them for filtering
-            report_name = request.data.get('name', f"Report {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}")
-            report_description = request.data.get('description', 'Generated report')
+            folder_ids_by_platform = request.data.get('platform_folders', {})
+            instagram_folder_ids = folder_ids_by_platform.get('instagram', [])
+            facebook_folder_ids = folder_ids_by_platform.get('facebook', [])
+            linkedin_folder_ids = folder_ids_by_platform.get('linkedin', [])
+            tiktok_folder_ids = folder_ids_by_platform.get('tiktok', [])
             
-            if not instagram_folder_ids:
+            # For backward compatibility
+            if not folder_ids_by_platform and request.data.get('folder_ids'):
+                instagram_folder_ids = request.data.get('folder_ids', [])
+            
+            start_date = request.data.get('start_date')
+            end_date = request.data.get('end_date')
+            report_name = request.data.get('name', f"Multi-Platform Report {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}")
+            report_description = request.data.get('description', 'Generated multi-platform report')
+            
+            all_folder_ids = instagram_folder_ids + facebook_folder_ids + linkedin_folder_ids + tiktok_folder_ids
+            if not all_folder_ids:
                 return Response({'error': 'No folders specified'}, status=status.HTTP_400_BAD_REQUEST)
                 
             # Create the report folder
@@ -289,56 +300,196 @@ class ReportFolderViewSet(viewsets.ModelViewSet):
                 description=report_description,
                 start_date=start_date if start_date else datetime.datetime.now().isoformat(),
                 end_date=end_date if end_date else datetime.datetime.now().isoformat(),
-                source_folders=json.dumps(instagram_folder_ids)
+                source_folders=json.dumps({
+                    'instagram': instagram_folder_ids,
+                    'facebook': facebook_folder_ids,
+                    'linkedin': linkedin_folder_ids,
+                    'tiktok': tiktok_folder_ids
+                })
             )
             
-            # Fetch Instagram posts from the specified folders - NO DATE FILTERING
-            from instagram_data.models import InstagramPost
-            posts = InstagramPost.objects.filter(
-                folder_id__in=instagram_folder_ids
-            )
-            
-            total_posts = posts.count()
+            total_posts = 0
             matched_posts = 0
             
-            # Process each post
-            for post in posts:
-                # Extract username from post data
-                username = self._extract_username_from_discovery_input(post.discovery_input)
+            # Process Instagram posts
+            if instagram_folder_ids:
+                from instagram_data.models import InstagramPost
+                instagram_posts = InstagramPost.objects.filter(folder_id__in=instagram_folder_ids)
+                total_posts += instagram_posts.count()
                 
-                # Find matching account
-                account = self._find_matching_account(username)
+                for post in instagram_posts:
+                    # Extract username from post data
+                    username = self._extract_username_from_discovery_input(post.discovery_input)
+                    
+                    # Find matching account
+                    account = self._find_matching_account(username)
+                    
+                    # Create report entry
+                    entry = ReportEntry(
+                        report=report,
+                        username=username or post.user_posted,
+                        post_url=post.url,
+                        posting_date=post.date_posted,
+                        platform_type=post.platform_type or ('IG Post' if post.content_type == 'post' else 'IG Reel'),
+                        keywords=post.hashtags,
+                        content=post.description,
+                        post_id=f"instagram_{post.id}",
+                        sn=''
+                    )
+                    
+                    if account:
+                        matched_posts += 1
+                        entry.name = account.name
+                        entry.iac_no = account.iac_no
+                        entry.entity = ''
+                        entry.close_monitoring = 'Yes' if account.close_monitoring else 'No'
+                        entry.track_account_id = account.id
+                    else:
+                        entry.name = None
+                        entry.iac_no = None
+                        entry.entity = None
+                        entry.close_monitoring = 'No'
+                        entry.track_account_id = None
+                    
+                    entry.save()
+            
+            # Process Facebook posts
+            if facebook_folder_ids:
+                from facebook_data.models import FacebookPost
+                facebook_posts = FacebookPost.objects.filter(folder_id__in=facebook_folder_ids)
+                total_posts += facebook_posts.count()
                 
-                # Create report entry (always create entry regardless of match)
-                entry = ReportEntry(
-                    report=report,
-                    username=username,
-                    post_url=post.url,
-                    posting_date=post.date_posted,
-                    platform_type=post.platform_type or ('IG Post' if post.content_type == 'post' else 'IG Reel'),
-                    keywords=post.hashtags,
-                    content=post.description,
-                    post_id=str(post.id),  # Ensure post_id is stored as string for consistency
-                    sn=''  # Set S/N to empty string
-                )
+                print(f"Processing {facebook_posts.count()} Facebook posts")
+                for post in facebook_posts:
+                    # Use user_url for matching with facebook_id in track accounts
+                    account = None
+                    if post.user_url and post.user_url.strip():
+                        print(f"Attempting to match Facebook post by user_url: {post.user_url}")
+                        account = self._find_matching_facebook_account(post.user_url)
+                    else:
+                        print(f"Facebook post has no user_url, post_id: {post.post_id}")
+                    
+                    # Fall back to username matching if no match found via URL
+                    if not account:
+                        username = post.user_posted or post.page_name or post.user_username_raw
+                        if username:
+                            print(f"Falling back to username matching for: {username}")
+                            account = self._find_matching_account(username)
+                    
+                    # Create report entry
+                    entry = ReportEntry(
+                        report=report,
+                        username=post.user_posted or post.page_name or post.user_username_raw,
+                        post_url=post.url,
+                        posting_date=post.date_posted,
+                        platform_type=post.platform_type or ('FB Post' if post.content_type == 'post' else 'FB Reel'),
+                        keywords=post.hashtags,
+                        content=post.description or post.content,
+                        post_id=f"facebook_{post.id}",
+                        sn=''
+                    )
+                    
+                    if account:
+                        matched_posts += 1
+                        print(f"Successfully matched Facebook post to account: {account.name}")
+                        entry.name = account.name
+                        entry.iac_no = account.iac_no
+                        entry.entity = ''
+                        entry.close_monitoring = 'Yes' if account.close_monitoring else 'No'
+                        entry.track_account_id = account.id
+                    else:
+                        print(f"No match found for Facebook post: {post.url}")
+                        entry.name = None
+                        entry.iac_no = None
+                        entry.entity = None
+                        entry.close_monitoring = 'No'
+                        entry.track_account_id = None
+                    
+                    entry.save()
+            
+            # Process LinkedIn posts
+            if linkedin_folder_ids:
+                from linkedin_data.models import LinkedInPost
+                linkedin_posts = LinkedInPost.objects.filter(folder_id__in=linkedin_folder_ids)
+                total_posts += linkedin_posts.count()
                 
-                # If account is matched, add account data
-                if account:
-                    matched_posts += 1
-                    entry.name = account.name
-                    entry.iac_no = account.iac_no
-                    entry.entity = ''  # This could be added later
-                    entry.close_monitoring = 'Yes' if account.close_monitoring else 'No'
-                    entry.track_account_id = account.id
-                else:
-                    # For non-matches, leave these fields empty or set to default values
-                    entry.name = None
-                    entry.iac_no = None
-                    entry.entity = None
-                    entry.close_monitoring = 'No'
-                    entry.track_account_id = None
+                for post in linkedin_posts:
+                    # Extract username from LinkedIn data
+                    username = post.user_posted or post.profile_name
+                    
+                    # Find matching account
+                    account = self._find_matching_account(username)
+                    
+                    # Create report entry
+                    entry = ReportEntry(
+                        report=report,
+                        username=username,
+                        post_url=post.url,
+                        posting_date=post.date_posted,
+                        platform_type='LinkedIn Post',
+                        keywords=post.hashtags,
+                        content=post.description,
+                        post_id=f"linkedin_{post.id}",
+                        sn=''
+                    )
+                    
+                    if account:
+                        matched_posts += 1
+                        entry.name = account.name
+                        entry.iac_no = account.iac_no
+                        entry.entity = ''
+                        entry.close_monitoring = 'Yes' if account.close_monitoring else 'No'
+                        entry.track_account_id = account.id
+                    else:
+                        entry.name = None
+                        entry.iac_no = None
+                        entry.entity = None
+                        entry.close_monitoring = 'No'
+                        entry.track_account_id = None
+                    
+                    entry.save()
+            
+            # Process TikTok posts
+            if tiktok_folder_ids:
+                from tiktok_data.models import TikTokPost
+                tiktok_posts = TikTokPost.objects.filter(folder_id__in=tiktok_folder_ids)
+                total_posts += tiktok_posts.count()
                 
-                entry.save()
+                for post in tiktok_posts:
+                    # Extract username from TikTok data
+                    username = post.user_posted
+                    
+                    # Find matching account
+                    account = self._find_matching_account(username)
+                    
+                    # Create report entry
+                    entry = ReportEntry(
+                        report=report,
+                        username=username,
+                        post_url=post.url,
+                        posting_date=post.date_posted,
+                        platform_type='TikTok Video',
+                        keywords=post.hashtags,
+                        content=post.description,
+                        post_id=f"tiktok_{post.id}",
+                        sn=''
+                    )
+                    
+                    if account:
+                        matched_posts += 1
+                        entry.name = account.name
+                        entry.iac_no = account.iac_no
+                        entry.entity = ''
+                        entry.close_monitoring = 'Yes' if account.close_monitoring else 'No'
+                        entry.track_account_id = account.id
+                    else:
+                        entry.name = None
+                        entry.iac_no = None
+                        entry.entity = None
+                        entry.close_monitoring = 'No'
+                        entry.track_account_id = None
+                    
+                    entry.save()
             
             # Update report statistics
             report.total_posts = total_posts
@@ -350,10 +501,19 @@ class ReportFolderViewSet(viewsets.ModelViewSet):
                 'name': report.name,
                 'total_posts': total_posts,
                 'matched_posts': matched_posts,
+                'platforms': {
+                    'instagram': len(instagram_folder_ids) > 0,
+                    'facebook': len(facebook_folder_ids) > 0,
+                    'linkedin': len(linkedin_folder_ids) > 0,
+                    'tiktok': len(tiktok_folder_ids) > 0
+                },
                 'match_percentage': round((matched_posts / total_posts) * 100) if total_posts > 0 else 0
             }, status=status.HTTP_201_CREATED)
             
         except Exception as e:
+            import traceback
+            print(f"Error generating report: {str(e)}")
+            print(traceback.format_exc())
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=True, methods=['POST'])
@@ -655,4 +815,102 @@ class ReportFolderViewSet(viewsets.ModelViewSet):
         
         # No matches found
         print(f"No matching account found for username: '{normalized_username}'")
+        return None
+
+    def _find_matching_facebook_account(self, user_url):
+        """Find matching TrackAccount by Facebook user_url"""
+        if not user_url:
+            return None
+        
+        # Normalize the user_url input
+        normalized_user_url = user_url.lower().strip() if user_url else ''
+        if not normalized_user_url:
+            return None
+            
+        # Debug
+        print(f"Looking for match for Facebook user_url: '{normalized_user_url}'")
+        
+        # MATCHING STRATEGY 1: Direct exact match with facebook_id
+        try:
+            # Direct match with facebook_id field
+            account = TrackAccount.objects.filter(facebook_id__iexact=normalized_user_url).first()
+            if account:
+                print(f"Found direct match with facebook_id: {account.name} (ID: {account.id})")
+                return account
+        except Exception as e:
+            print(f"Error during direct user_url match: {str(e)}")
+        
+        # Extract identifiers from the post user_url
+        import re
+        post_profile_path = None
+        post_numeric_id = None
+        
+        # Extract from https://www.facebook.com/people/name/123456789/ or https://www.facebook.com/username/
+        path_match = re.search(r'facebook\.com\/(?:people\/)?([^\/\?]+)', normalized_user_url)
+        if path_match:
+            post_profile_path = path_match.group(1).lower().strip()
+        
+        # Extract numeric ID if present
+        id_match = re.search(r'\/(\d+)\/?(?:\?|$)', normalized_user_url)
+        if id_match:
+            post_numeric_id = id_match.group(1)
+        
+        # MATCHING STRATEGY 2: Match extracted paths and IDs against track accounts
+        try:
+            # Query accounts with facebook_id that's not null/empty
+            accounts = TrackAccount.objects.exclude(facebook_id__isnull=True).exclude(facebook_id='')
+            
+            for account in accounts:
+                try:
+                    account_fb_id = account.facebook_id.lower().strip()
+                    
+                    # Direct substring check for full URL
+                    if normalized_user_url in account_fb_id or account_fb_id in normalized_user_url:
+                        print(f"Found substring match with facebook_id: {account.name} (ID: {account.id})")
+                        return account
+                    
+                    # Extract profile path from account facebook_id
+                    acc_path_match = re.search(r'facebook\.com\/(?:people\/)?([^\/\?]+)', account_fb_id)
+                    if acc_path_match:
+                        acc_profile_path = acc_path_match.group(1).lower().strip()
+                        
+                        # Compare profile paths if both are available
+                        if post_profile_path and acc_profile_path and post_profile_path == acc_profile_path:
+                            print(f"Found profile path match with facebook_id: {account.name} (ID: {account.id})")
+                            return account
+                    
+                    # Extract numeric ID from account facebook_id
+                    acc_id_match = re.search(r'\/(\d+)\/?(?:\?|$)', account_fb_id)
+                    if acc_id_match:
+                        acc_numeric_id = acc_id_match.group(1)
+                        
+                        # Compare numeric IDs if both are available
+                        if post_numeric_id and acc_numeric_id and post_numeric_id == acc_numeric_id:
+                            print(f"Found numeric ID match with facebook_id: {account.name} (ID: {account.id})")
+                            return account
+                    
+                except Exception as e:
+                    print(f"Error processing account {account.id}: {str(e)}")
+                    continue
+        except Exception as e:
+            print(f"Error during URL extraction match: {str(e)}")
+            
+        # MATCHING STRATEGY 3: More flexible/partial matching
+        try:
+            # Only try this if we have a profile path to match
+            if post_profile_path:
+                accounts = TrackAccount.objects.filter(
+                    Q(facebook_id__icontains=post_profile_path) |
+                    Q(facebook_username__iexact=post_profile_path)
+                )
+                
+                if accounts.exists():
+                    best_match = accounts.first()
+                    print(f"Found partial match: {best_match.name} (ID: {best_match.id})")
+                    return best_match
+        except Exception as e:
+            print(f"Error during partial match: {str(e)}")
+        
+        # No matches found
+        print(f"No matching account found for user_url: '{normalized_user_url}'")
         return None

@@ -133,7 +133,7 @@ const InstagramFolderSelector = () => {
   const fetchInstagramFolders = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/api/instagram/folders/');
+      const response = await api.get('/api/instagram-data/folders/');
       if (response.status === 200) {
         const folderData = response.data.results || response.data;
         console.log('Fetched folders:', folderData); // Debug log
