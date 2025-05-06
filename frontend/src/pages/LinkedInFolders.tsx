@@ -22,13 +22,25 @@ import {
   Snackbar,
   Alert,
   CircularProgress,
+  TableContainer,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  ToggleButtonGroup,
+  ToggleButton,
+  Link,
+  Breadcrumbs,
 } from '@mui/material';
 import {
   Add as AddIcon,
   Folder as FolderIcon,
   Delete as DeleteIcon,
   Edit as EditIcon,
-  UploadFile as UploadFileIcon,
+  Home as HomeIcon,
+  ViewList as ViewListIcon,
+  GridView as GridViewIcon,
 } from '@mui/icons-material';
 
 interface Folder {
@@ -36,6 +48,7 @@ interface Folder {
   name: string;
   description: string | null;
   posts_count?: number;
+  created_at?: string;
 }
 
 const LinkedInFolders = () => {
@@ -54,6 +67,7 @@ const LinkedInFolders = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
 
   // Fetch folders on component mount
   useEffect(() => {
@@ -224,91 +238,223 @@ const LinkedInFolders = () => {
     setOpenDeleteDialog(true);
   };
 
-  return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          LinkedIn Data Folders
-        </Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AddIcon />}
-          onClick={() => setOpenCreateDialog(true)}
+  const handleViewModeChange = (
+    event: React.MouseEvent<HTMLElement>,
+    newViewMode: 'list' | 'grid',
+  ) => {
+    if (newViewMode !== null) {
+      setViewMode(newViewMode);
+    }
+  };
+
+  const renderGridView = () => (
+    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 3, mt: 2 }}>
+      {folders.map((folder) => (
+        <Card key={folder.id} sx={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          height: '100%',
+          transition: 'transform 0.2s, box-shadow 0.2s',
+          '&:hover': {
+            transform: 'translateY(-4px)',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+            cursor: 'pointer'
+          }
+        }}
+          onClick={() => handleOpenFolder(folder)}
         >
-          Create Folder
-        </Button>
-      </Box>
-      
-      {loading ? (
-        <Box display="flex" justifyContent="center" my={4}>
-          <CircularProgress />
+          <CardContent 
+            sx={{ flexGrow: 1 }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <FolderIcon color="primary" sx={{ mr: 1, fontSize: 30 }} />
+              <Typography variant="h6" component="div">
+                {folder.name}
+              </Typography>
+            </Box>
+            
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              {folder.description || 'No description'}
+            </Typography>
+            
+            <Typography variant="body2" color="text.secondary">
+              {folder.posts_count || 0} posts
+            </Typography>
+          </CardContent>
+          <Divider />
+          <CardActions onClick={(e) => e.stopPropagation()}>
+            <Box sx={{ flexGrow: 1 }} />
+            <Tooltip title="Edit">
+              <IconButton 
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenEditDialog(folder);
+                }}
+              >
+                <EditIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Delete">
+              <IconButton 
+                size="small"
+                color="error"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenDeleteDialog(folder);
+                }}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </CardActions>
+        </Card>
+      ))}
+    </Box>
+  );
+
+  const renderListView = () => (
+    <TableContainer component={Paper}>
+      <Table>
+        <TableHead>
+          <TableRow>
+            <TableCell>Name</TableCell>
+            <TableCell>Description</TableCell>
+            <TableCell align="right">Posts</TableCell>
+            <TableCell>Created</TableCell>
+            <TableCell align="center">Actions</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {folders.map((folder) => (
+            <TableRow 
+              key={folder.id}
+              hover
+              onClick={() => handleOpenFolder(folder)}
+              sx={{ cursor: 'pointer' }}
+            >
+              <TableCell>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <FolderIcon color="primary" sx={{ mr: 1 }} />
+                  <Typography variant="body1">{folder.name}</Typography>
+                </Box>
+              </TableCell>
+              <TableCell>{folder.description || 'No description'}</TableCell>
+              <TableCell align="right">{folder.posts_count || 0}</TableCell>
+              <TableCell>{folder.created_at ? new Date(folder.created_at).toLocaleDateString() : 'Unknown'}</TableCell>
+              <TableCell align="center">
+                <IconButton 
+                  size="small" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenEditDialog(folder);
+                  }}
+                >
+                  <EditIcon fontSize="small" />
+                </IconButton>
+                <IconButton 
+                  size="small" 
+                  color="error"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenDeleteDialog(folder);
+                  }}
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+
+  return (
+    <Container maxWidth="xl">
+      <Box sx={{ my: 4 }}>
+        {/* Breadcrumbs */}
+        <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
+          <Link 
+            underline="hover" 
+            sx={{ display: 'flex', alignItems: 'center' }}
+            color="inherit" 
+            href="/"
+          >
+            <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
+            Home
+          </Link>
+          <Typography color="text.primary" sx={{ display: 'flex', alignItems: 'center' }}>
+            <FolderIcon sx={{ mr: 0.5 }} fontSize="inherit" />
+            LinkedIn Data
+          </Typography>
+        </Breadcrumbs>
+
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Typography variant="h4" component="h1" gutterBottom>
+            LinkedIn Data Folders
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <ToggleButtonGroup
+              value={viewMode}
+              exclusive
+              onChange={handleViewModeChange}
+              aria-label="view mode"
+              size="small"
+              sx={{ mr: 2 }}
+            >
+              <ToggleButton value="list" aria-label="list view">
+                <Tooltip title="List View">
+                  <ViewListIcon />
+                </Tooltip>
+              </ToggleButton>
+              <ToggleButton value="grid" aria-label="grid view">
+                <Tooltip title="Grid View">
+                  <GridViewIcon />
+                </Tooltip>
+              </ToggleButton>
+            </ToggleButtonGroup>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<AddIcon />}
+              onClick={() => setOpenCreateDialog(true)}
+            >
+              New Folder
+            </Button>
+          </Box>
         </Box>
-      ) : error ? (
-        <Alert severity="error" sx={{ my: 2 }}>
-          {error}
-        </Alert>
-      ) : (
-        <Grid container spacing={3}>
-          {folders.length === 0 ? (
-            <Grid item xs={12}>
-              <Paper sx={{ p: 3, textAlign: 'center' }}>
-                <Typography variant="body1" color="textSecondary">
-                  No folders found. Create your first folder to get started.
-                </Typography>
-              </Paper>
-            </Grid>
-          ) : (
-            folders.map((folder) => (
-              <Grid item xs={12} sm={6} md={4} key={folder.id}>
-                <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                  <CardContent sx={{ flexGrow: 1 }}>
-                    <Box display="flex" alignItems="center" mb={1}>
-                      <FolderIcon color="primary" sx={{ mr: 1 }} />
-                      <Typography variant="h6" component="h2" noWrap>
-                        {folder.name}
-                      </Typography>
-                    </Box>
-                    <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
-                      {folder.description || 'No description'}
-                    </Typography>
-                    <Typography variant="body2">
-                      <strong>{folder.posts_count || 0}</strong> posts
-                    </Typography>
-                  </CardContent>
-                  <Divider />
-                  <CardActions>
-                    <Button 
-                      size="small" 
-                      startIcon={<UploadFileIcon />}
-                      onClick={() => handleOpenFolder(folder)}
-                    >
-                      Open
-                    </Button>
-                    <Box flexGrow={1} />
-                    <Tooltip title="Edit">
-                      <IconButton 
-                        size="small"
-                        onClick={() => handleOpenEditDialog(folder)}
-                      >
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Delete">
-                      <IconButton 
-                        size="small"
-                        onClick={() => handleOpenDeleteDialog(folder)}
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  </CardActions>
-                </Card>
-              </Grid>
-            ))
-          )}
-        </Grid>
-      )}
+        <Divider sx={{ mb: 4 }} />
+      
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : error ? (
+          <Alert severity="error" sx={{ my: 2 }}>
+            {error}
+          </Alert>
+        ) : folders.length === 0 ? (
+          <Paper sx={{ p: 4, textAlign: 'center' }}>
+            <Typography variant="h6" gutterBottom>
+              No folders yet
+            </Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+              Create a new folder to organize your LinkedIn data
+            </Typography>
+            <Button
+              variant="outlined"
+              color="primary"
+              startIcon={<AddIcon />}
+              onClick={() => setOpenCreateDialog(true)}
+            >
+              Create First Folder
+            </Button>
+          </Paper>
+        ) : (
+          viewMode === 'grid' ? renderGridView() : renderListView()
+        )}
+      </Box>
       
       {/* Create Folder Dialog */}
       <Dialog 

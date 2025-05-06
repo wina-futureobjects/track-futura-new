@@ -203,76 +203,120 @@ const FacebookFolders = () => {
   };
 
   const renderGridView = () => (
-    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 3, mt: 2 }}>
+    <Stack spacing={3} direction="row" useFlexGap flexWrap="wrap">
       {folders.map((folder) => (
-        <Card key={folder.id} sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-          <CardContent sx={{ flexGrow: 1 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-              <FolderIcon color="primary" sx={{ mr: 1 }} />
-              <Typography variant="h6" component="div" noWrap title={folder.name}>
-                {folder.name}
+        <Box key={folder.id} sx={{ width: { xs: '100%', sm: '45%', md: '30%' }, mb: 3 }}>
+          <Card 
+            sx={{ 
+              height: '100%', 
+              display: 'flex', 
+              flexDirection: 'column',
+              transition: 'transform 0.2s, box-shadow 0.2s',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                cursor: 'pointer'
+              }
+            }}
+          >
+            <CardContent 
+              sx={{ flexGrow: 1 }}
+              onClick={() => handleOpenFolder(folder.id)}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <FolderIcon color="primary" sx={{ mr: 1, fontSize: 30 }} />
+                <Typography variant="h6" component="div">
+                  {folder.name}
+                </Typography>
+              </Box>
+              
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                {folder.description || 'No description'}
               </Typography>
-            </Box>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              {folder.description || 'No description'}
-            </Typography>
-            <Typography variant="body2">
-              {folder.post_count} posts
-            </Typography>
-            <Typography variant="caption" color="text.secondary" display="block">
-              Created: {new Date(folder.created_at).toLocaleDateString()}
-            </Typography>
-          </CardContent>
-          <Divider />
-          <CardActions>
-            <Button size="small" onClick={() => handleOpenFolder(folder.id)}>
-              Open
-            </Button>
-            <Box sx={{ flexGrow: 1 }} />
-            <IconButton size="small" aria-label="edit" onClick={() => handleEditFolder(folder)}>
-              <EditIcon fontSize="small" />
-            </IconButton>
-            <IconButton size="small" aria-label="delete" onClick={() => handleDeleteFolder(folder.id)}>
-              <DeleteIcon fontSize="small" />
-            </IconButton>
-          </CardActions>
-        </Card>
+              
+              <Typography variant="body2" color="text.secondary">
+                {folder.post_count} {folder.post_count === 1 ? 'post' : 'posts'}
+              </Typography>
+              
+              <Typography variant="caption" color="text.secondary" display="block">
+                Created: {new Date(folder.created_at).toLocaleDateString()}
+              </Typography>
+            </CardContent>
+            
+            <CardActions sx={{ justifyContent: 'flex-end', p: 1 }}>
+              <IconButton 
+                size="small" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEditFolder(folder);
+                }}
+              >
+                <EditIcon fontSize="small" />
+              </IconButton>
+              <IconButton 
+                size="small" 
+                color="error"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteFolder(folder.id);
+                }}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </CardActions>
+          </Card>
+        </Box>
       ))}
-    </Box>
+    </Stack>
   );
 
   const renderListView = () => (
-    <TableContainer component={Paper} sx={{ mt: 2 }}>
+    <TableContainer component={Paper}>
       <Table>
         <TableHead>
           <TableRow>
             <TableCell>Name</TableCell>
             <TableCell>Description</TableCell>
             <TableCell align="right">Posts</TableCell>
-            <TableCell align="right">Created</TableCell>
-            <TableCell align="right">Actions</TableCell>
+            <TableCell>Created</TableCell>
+            <TableCell align="center">Actions</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
           {folders.map((folder) => (
-            <TableRow key={folder.id} hover>
+            <TableRow 
+              key={folder.id}
+              hover
+              onClick={() => handleOpenFolder(folder.id)}
+              sx={{ cursor: 'pointer' }}
+            >
               <TableCell>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <FolderIcon color="primary" sx={{ mr: 1 }} />
-                  <Typography>{folder.name}</Typography>
+                  <Typography variant="body1">{folder.name}</Typography>
                 </Box>
               </TableCell>
-              <TableCell>{folder.description || '-'}</TableCell>
+              <TableCell>{folder.description || 'No description'}</TableCell>
               <TableCell align="right">{folder.post_count}</TableCell>
-              <TableCell align="right">{new Date(folder.created_at).toLocaleDateString()}</TableCell>
-              <TableCell align="right">
-                <Button size="small" onClick={() => handleOpenFolder(folder.id)}>
-                  Open
-                </Button>
-                <IconButton size="small" aria-label="edit" onClick={() => handleEditFolder(folder)}>
+              <TableCell>{new Date(folder.created_at).toLocaleDateString()}</TableCell>
+              <TableCell align="center">
+                <IconButton 
+                  size="small" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEditFolder(folder);
+                  }}
+                >
                   <EditIcon fontSize="small" />
                 </IconButton>
-                <IconButton size="small" aria-label="delete" onClick={() => handleDeleteFolder(folder.id)}>
+                <IconButton 
+                  size="small" 
+                  color="error"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteFolder(folder.id);
+                  }}
+                >
                   <DeleteIcon fontSize="small" />
                 </IconButton>
               </TableCell>
@@ -284,13 +328,14 @@ const FacebookFolders = () => {
   );
 
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ mt: 4, mb: 4 }}>
-        <Breadcrumbs sx={{ mb: 2 }}>
-          <Link
-            underline="hover"
+    <Container maxWidth="xl">
+      <Box sx={{ my: 4 }}>
+        {/* Breadcrumbs */}
+        <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
+          <Link 
+            underline="hover" 
             sx={{ display: 'flex', alignItems: 'center' }}
-            color="inherit"
+            color="inherit" 
             href="/"
           >
             <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
@@ -302,69 +347,72 @@ const FacebookFolders = () => {
           </Typography>
         </Breadcrumbs>
 
-        <Paper sx={{ p: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography variant="h5" component="h1">
-              Facebook Data Folders
-            </Typography>
-            <Box>
-              <ToggleButtonGroup
-                value={viewMode}
-                exclusive
-                onChange={handleViewModeChange}
-                aria-label="view mode"
-                size="small"
-                sx={{ mr: 2 }}
-              >
-                <ToggleButton value="list" aria-label="list view">
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Typography variant="h4" component="h1" gutterBottom>
+            Facebook Data Folders
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <ToggleButtonGroup
+              value={viewMode}
+              exclusive
+              onChange={handleViewModeChange}
+              aria-label="view mode"
+              size="small"
+              sx={{ mr: 2 }}
+            >
+              <ToggleButton value="list" aria-label="list view">
+                <Tooltip title="List View">
                   <ViewListIcon />
-                </ToggleButton>
-                <ToggleButton value="grid" aria-label="grid view">
+                </Tooltip>
+              </ToggleButton>
+              <ToggleButton value="grid" aria-label="grid view">
+                <Tooltip title="Grid View">
                   <GridViewIcon />
-                </ToggleButton>
-              </ToggleButtonGroup>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={handleNewFolder}
-              >
-                New Folder
-              </Button>
-            </Box>
+                </Tooltip>
+              </ToggleButton>
+            </ToggleButtonGroup>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<AddIcon />}
+              onClick={handleNewFolder}
+            >
+              New Folder
+            </Button>
           </Box>
+        </Box>
+        <Divider sx={{ mb: 4 }} />
 
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
 
-          {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-              <CircularProgress />
-            </Box>
-          ) : folders.length === 0 ? (
-            <Paper sx={{ p: 4, textAlign: 'center' }}>
-              <Typography variant="subtitle1" gutterBottom>
-                No folders found
-              </Typography>
-              <Typography variant="body2" color="text.secondary" paragraph>
-                Create your first folder to start organizing your Facebook data.
-              </Typography>
-              <Button
-                variant="outlined"
-                startIcon={<AddIcon />}
-                onClick={handleNewFolder}
-              >
-                Create Folder
-              </Button>
-            </Paper>
-          ) : viewMode === 'grid' ? (
-            renderGridView()
-          ) : (
-            renderListView()
-          )}
-        </Paper>
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : folders.length === 0 ? (
+          <Paper sx={{ p: 4, textAlign: 'center' }}>
+            <Typography variant="h6" gutterBottom>
+              No folders yet
+            </Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+              Create a new folder to organize your Facebook data
+            </Typography>
+            <Button
+              variant="outlined"
+              color="primary"
+              startIcon={<AddIcon />}
+              onClick={handleNewFolder}
+            >
+              Create First Folder
+            </Button>
+          </Paper>
+        ) : (
+          viewMode === 'grid' ? renderGridView() : renderListView()
+        )}
       </Box>
 
       {/* Create New Folder Dialog */}
