@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import {
   Container,
   Typography,
@@ -19,11 +19,26 @@ import {
   CardContent,
   CardActions,
   IconButton,
+  Divider,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Tooltip,
+  ToggleButtonGroup,
+  ToggleButton,
+  Link,
+  Breadcrumbs,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FolderIcon from '@mui/icons-material/Folder';
+import HomeIcon from '@mui/icons-material/Home';
+import ViewListIcon from '@mui/icons-material/ViewList';
+import GridViewIcon from '@mui/icons-material/GridView';
 import axios from 'axios';
 
 // Inline implementation of the API client to avoid path resolution issues
@@ -57,12 +72,15 @@ type Report = {
   created_at: string;
   updated_at: string;
   report_count?: number;
+  total_posts?: number;
+  matched_posts?: number;
 };
 
 const ReportFolders = () => {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   
   // Create/edit dialog state
   const [openDialog, setOpenDialog] = useState(false);
@@ -271,6 +289,137 @@ const ReportFolders = () => {
     navigate(`/report-folders/${folderId}`);
   };
 
+  const handleViewModeChange = (
+    event: React.MouseEvent<HTMLElement>,
+    newViewMode: 'list' | 'grid',
+  ) => {
+    if (newViewMode !== null) {
+      setViewMode(newViewMode);
+    }
+  };
+
+  const renderGridView = () => (
+    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+      {Array.isArray(reports) && reports.map((report) => (
+        <Box key={report.id} sx={{ width: { xs: '100%', sm: '46%', md: '30%' } }}>
+          <Card>
+            <CardContent sx={{ cursor: 'pointer' }} onClick={() => handleViewFolder(report.id)}>
+              <Box display="flex" alignItems="center" mb={1}>
+                <FolderIcon color="primary" sx={{ mr: 1 }} />
+                <Typography variant="h6" component="div">
+                  {report.name}
+                </Typography>
+              </Box>
+              {report.description && (
+                <Typography variant="body2" color="text.secondary">
+                  {report.description}
+                </Typography>
+              )}
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                Reports: {report.total_posts || 0} total / {report.matched_posts || 0} matched
+              </Typography>
+              <Typography variant="caption" display="block" color="text.secondary">
+                Created: {new Date(report.created_at).toLocaleDateString()}
+              </Typography>
+            </CardContent>
+            <CardActions sx={{ justifyContent: 'space-between' }}>
+              <Box>
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenDialog('edit', report);
+                  }}
+                  aria-label="edit"
+                >
+                  <EditIcon />
+                </IconButton>
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenDeleteDialog(report);
+                  }}
+                  aria-label="delete"
+                  color="error"
+                >
+                  <DeleteIcon />
+                </IconButton>
+              </Box>
+              <Button
+                variant="contained"
+                size="small"
+                color="primary"
+                onClick={() => handleViewFolder(report.id)}
+              >
+                View Details
+              </Button>
+            </CardActions>
+          </Card>
+        </Box>
+      ))}
+    </Box>
+  );
+
+  const renderListView = () => (
+    <TableContainer component={Paper}>
+      <Table>
+        <TableHead>
+          <TableRow>
+            <TableCell>Name</TableCell>
+            <TableCell>Description</TableCell>
+            <TableCell align="right">Total Posts</TableCell>
+            <TableCell align="right">Matched Posts</TableCell>
+            <TableCell>Created</TableCell>
+            <TableCell align="center">Actions</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {reports.map((report) => (
+            <TableRow 
+              key={report.id}
+              hover
+              onClick={() => handleViewFolder(report.id)}
+              sx={{ cursor: 'pointer' }}
+            >
+              <TableCell>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <FolderIcon color="primary" sx={{ mr: 1 }} />
+                  <Typography variant="body1">{report.name}</Typography>
+                </Box>
+              </TableCell>
+              <TableCell>{report.description || 'No description'}</TableCell>
+              <TableCell align="right">{report.total_posts || 0}</TableCell>
+              <TableCell align="right">{report.matched_posts || 0}</TableCell>
+              <TableCell>{new Date(report.created_at).toLocaleDateString()}</TableCell>
+              <TableCell align="center">
+                <IconButton 
+                  size="small" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenDialog('edit', report);
+                  }}
+                >
+                  <EditIcon fontSize="small" />
+                </IconButton>
+                <IconButton 
+                  size="small" 
+                  color="error"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenDeleteDialog(report);
+                  }}
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+
   if (loading && reports.length === 0) {
     return (
       <Container sx={{ mt: 4, textAlign: 'center' }}>
@@ -281,10 +430,47 @@ const ReportFolders = () => {
   }
 
   return (
-    <Container sx={{ py: 4 }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
+    <Container maxWidth="xl" sx={{ py: 4 }}>
+      <Box sx={{ mb: 3 }}>
+        <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
+          <Link 
+            component={RouterLink}
+            to="/"
+            underline="hover" 
+            sx={{ display: 'flex', alignItems: 'center' }}
+            color="inherit"
+          >
+            <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
+            Home
+          </Link>
+          <Typography color="text.primary" sx={{ display: 'flex', alignItems: 'center' }}>
+            <FolderIcon sx={{ mr: 0.5 }} fontSize="inherit" />
+            Report Folders
+          </Typography>
+        </Breadcrumbs>
+      </Box>
+
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4" component="h1">Report Folders</Typography>
-        <Box display="flex" gap={2}>
+        <Box display="flex" gap={2} alignItems="center">
+          <ToggleButtonGroup
+            value={viewMode}
+            exclusive
+            onChange={handleViewModeChange}
+            aria-label="view mode"
+            size="small"
+          >
+            <ToggleButton value="list" aria-label="list view">
+              <Tooltip title="List View">
+                <ViewListIcon />
+              </Tooltip>
+            </ToggleButton>
+            <ToggleButton value="grid" aria-label="grid view">
+              <Tooltip title="Grid View">
+                <GridViewIcon />
+              </Tooltip>
+            </ToggleButton>
+          </ToggleButtonGroup>
           <Button
             variant="contained"
             color="primary"
@@ -302,6 +488,8 @@ const ReportFolders = () => {
           </Button>
         </Box>
       </Box>
+      
+      <Divider sx={{ mb: 3 }} />
       
       {error && (
         <Alert severity="error" sx={{ mb: 4 }}>
@@ -325,60 +513,7 @@ const ReportFolders = () => {
           </Button>
         </Box>
       ) : (
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-          {Array.isArray(reports) && reports.map((report) => (
-            <Box key={report.id} sx={{ width: { xs: '100%', sm: '46%', md: '30%' } }}>
-              <Card>
-                <CardContent>
-                  <Box display="flex" alignItems="center" mb={1}>
-                    <FolderIcon color="primary" sx={{ mr: 1 }} />
-                    <Typography variant="h6" component="div">
-                      {report.name}
-                    </Typography>
-                  </Box>
-                  {report.description && (
-                    <Typography variant="body2" color="text.secondary">
-                      {report.description}
-                    </Typography>
-                  )}
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    Reports: {report.report_count || 0}
-                  </Typography>
-                  <Typography variant="caption" display="block" color="text.secondary">
-                    Created: {new Date(report.created_at).toLocaleDateString()}
-                  </Typography>
-                </CardContent>
-                <CardActions sx={{ justifyContent: 'space-between' }}>
-                  <Box>
-                    <IconButton
-                      size="small"
-                      onClick={() => handleOpenDialog('edit', report)}
-                      aria-label="edit"
-                    >
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={() => handleOpenDeleteDialog(report)}
-                      aria-label="delete"
-                      color="error"
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </Box>
-                  <Button
-                    variant="contained"
-                    size="small"
-                    color="primary"
-                    onClick={() => handleViewFolder(report.id)}
-                  >
-                    View Details
-                  </Button>
-                </CardActions>
-              </Card>
-            </Box>
-          ))}
-        </Box>
+        viewMode === 'grid' ? renderGridView() : renderListView()
       )}
 
       {/* Create/Edit Dialog */}

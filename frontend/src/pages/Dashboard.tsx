@@ -1,149 +1,134 @@
 import React from 'react';
-import { Box, Typography, Paper, Button } from '@mui/material';
-import {
-  TrendingUp as TrendingUpIcon,
-  Public as PublicIcon,
-  Chat as ChatIcon,
-  PeopleAlt as PeopleAltIcon,
-  Timeline as TimelineIcon,
-} from '@mui/icons-material';
-import StatCard from '../components/dashboard/StatCard';
-import SentimentChart from '../components/charts/SentimentChart';
-import WordCloudChart from '../components/charts/WordCloudChart';
-import NPSChart from '../components/charts/NPSChart';
+import { Box, Typography, Grid, Container, Paper } from '@mui/material';
+import TopPerformers from '../components/dashboard/TopPerformers';
+import ActiveRepPercentage from '../components/dashboard/ActiveRepPercentage';
+import LeastActiveRep from '../components/dashboard/LeastActiveRep';
+import CloseMonitoring from '../components/dashboard/CloseMonitoring';
+import PostDistribution from '../components/dashboard/PostDistribution';
+
+// For the KeywordsCloud component, we'll create a simpler version that doesn't depend on external libraries
+const KeywordsCloud = () => {
+  const keywords = [
+    { text: 'Great Wealth Advantage', size: 30 },
+    { text: 'Investment', size: 25 },
+    { text: 'Careshield', size: 22 },
+    { text: 'Prestige Life Rewards', size: 20 },
+    { text: 'LPA', size: 18 },
+    { text: 'Cashback', size: 18 },
+    { text: 'Great Life Advantage', size: 24 },
+    { text: 'Wealth', size: 16 },
+    { text: 'Gift', size: 15 },
+    { text: 'Savings', size: 14 },
+    { text: 'Passive Income', size: 14 },
+    { text: 'Will', size: 13 },
+    { text: 'Great Cancer Guard', size: 20 },
+  ];
+
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        p: 3,
+        borderRadius: 2,
+        border: '1px solid #e0e0e0',
+        height: '100%',
+        mb: 4,
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h6" fontWeight="bold">
+          KEYWORDS CLOUD
+        </Typography>
+      </Box>
+
+      <Box
+        sx={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'center',
+          p: 2,
+          gap: 1.5,
+        }}
+      >
+        {keywords.map((keyword, index) => (
+          <Typography
+            key={index}
+            variant="body1"
+            component="span"
+            sx={{
+              fontSize: `${keyword.size / 2 + 10}px`,
+              color: getRandomColor(),
+              fontWeight: keyword.size > 20 ? 'bold' : 'normal',
+              display: 'inline-block',
+              cursor: 'pointer',
+              transition: 'transform 0.3s ease',
+              '&:hover': {
+                transform: 'scale(1.1)',
+              },
+            }}
+          >
+            {keyword.text}
+          </Typography>
+        ))}
+      </Box>
+    </Paper>
+  );
+};
+
+// Helper function to generate random colors for the keyword cloud
+const getRandomColor = () => {
+  const colors = [
+    '#f44336', // red
+    '#e91e63', // pink
+    '#9c27b0', // purple
+    '#673ab7', // deep purple
+    '#3f51b5', // indigo
+    '#2196f3', // blue
+    '#03a9f4', // light blue
+    '#00bcd4', // cyan
+    '#009688', // teal
+    '#4caf50', // green
+  ];
+  return colors[Math.floor(Math.random() * colors.length)];
+};
 
 const Dashboard: React.FC = () => {
   return (
-    <Box>
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Box>
-          <Typography variant="h4" component="h1" gutterBottom fontWeight={700}>
-            Digital Presence Dashboard
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Overview of your brand's digital presence and sentiment analysis
-          </Typography>
-        </Box>
-        <Button variant="outlined" color="primary">
-          Export Report
-        </Button>
+    <Container maxWidth="xl" sx={{ py: 4 }}>
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" component="h1" gutterBottom fontWeight={700}>
+          Activity Performance
+        </Typography>
+        <Typography variant="subtitle1" color="text.secondary">
+          1 September 2024-30 September 2024
+        </Typography>
       </Box>
 
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, mb: 4 }}>
-        <Box sx={{ flex: '1 1 220px', minWidth: { xs: '100%', sm: 'calc(50% - 16px)', md: 'calc(25% - 18px)' } }}>
-          <StatCard
-            title="Social Mentions"
-            value="8,540"
-            icon={<ChatIcon />}
-            color="primary"
-            change={{ value: 12.5, positive: true }}
-          />
+      {/* Top Performers Section */}
+      <TopPerformers />
+
+      {/* Middle Section - Active Rep % and Least Active */}
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3, mb: 4 }}>
+        <Box sx={{ flex: '1 1 auto', width: { xs: '100%', md: '66.666%' } }}>
+          <ActiveRepPercentage />
         </Box>
-        <Box sx={{ flex: '1 1 220px', minWidth: { xs: '100%', sm: 'calc(50% - 16px)', md: 'calc(25% - 18px)' } }}>
-          <StatCard
-            title="Web Mentions"
-            value="3,215"
-            icon={<PublicIcon />}
-            color="secondary"
-            change={{ value: 8.3, positive: true }}
-          />
-        </Box>
-        <Box sx={{ flex: '1 1 220px', minWidth: { xs: '100%', sm: 'calc(50% - 16px)', md: 'calc(25% - 18px)' } }}>
-          <StatCard
-            title="Sentiment Score"
-            value="72%"
-            icon={<TrendingUpIcon />}
-            color="success"
-            change={{ value: 5.2, positive: true }}
-          />
-        </Box>
-        <Box sx={{ flex: '1 1 220px', minWidth: { xs: '100%', sm: 'calc(50% - 16px)', md: 'calc(25% - 18px)' } }}>
-          <StatCard
-            title="Audience Reach"
-            value="1.2M"
-            icon={<PeopleAltIcon />}
-            color="info"
-            change={{ value: 3.1, positive: false }}
-          />
+        <Box sx={{ flex: '1 1 auto', width: { xs: '100%', md: '33.333%' } }}>
+          <LeastActiveRep />
         </Box>
       </Box>
 
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-        <Box sx={{ flex: '1 1 auto', minWidth: { xs: '100%', md: 'calc(66.666% - 12px)' } }}>
-          <SentimentChart />
-        </Box>
-        <Box sx={{ flex: '1 1 auto', minWidth: { xs: '100%', md: 'calc(33.333% - 12px)' } }}>
-          <WordCloudChart />
-        </Box>
-        <Box sx={{ width: '100%', mt: 3 }}>
-          <NPSChart />
-        </Box>
+      {/* Close Monitoring Section */}
+      <Box sx={{ mb: 4 }}>
+        <CloseMonitoring />
       </Box>
 
-      <Box sx={{ mt: 3 }}>
-        <Paper sx={{ p: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6">Recent Analysis Activity</Typography>
-            <Button variant="text" color="primary">
-              View All
-            </Button>
-          </Box>
+      {/* Post Distribution Section */}
+      <PostDistribution />
 
-          <Box sx={{ 
-            display: 'flex', 
-            flexDirection: 'column',
-            gap: 2
-          }}>
-            {[1, 2, 3].map((item) => (
-              <Box 
-                key={item}
-                sx={{ 
-                  display: 'flex',
-                  alignItems: 'center',
-                  p: 2,
-                  borderRadius: 1,
-                  bgcolor: 'background.default',
-                  '&:hover': { bgcolor: 'action.hover' }
-                }}
-              >
-                <Box 
-                  sx={{ 
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    bgcolor: 'primary.light',
-                    color: 'primary.contrastText',
-                    borderRadius: '50%',
-                    width: 40,
-                    height: 40,
-                    mr: 2,
-                  }}
-                >
-                  <TimelineIcon />
-                </Box>
-                <Box sx={{ flexGrow: 1 }}>
-                  <Typography variant="subtitle2">
-                    {item === 1 ? 'Social Media Analysis Completed' : 
-                     item === 2 ? 'Web Presence Report Generated' : 
-                     'Sentiment Analysis Updated'}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {item === 1 ? 'Analysis of Twitter, Instagram, Facebook' : 
-                     item === 2 ? 'Analysis of top 100 websites mentioning your brand' : 
-                     'Updated sentiment across all platforms'}
-                  </Typography>
-                </Box>
-                <Typography variant="caption" color="text.secondary">
-                  {item === 1 ? '2 hours ago' : 
-                   item === 2 ? 'Yesterday' : 
-                   '3 days ago'}
-                </Typography>
-              </Box>
-            ))}
-          </Box>
-        </Paper>
-      </Box>
-    </Box>
+      {/* Keywords Cloud Section */}
+      <KeywordsCloud />
+    </Container>
   );
 };
 

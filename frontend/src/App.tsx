@@ -26,6 +26,7 @@ import InstagramFolderSelector from './FolderSelectionReportGenerator';
 import TrackAccountCreate from './pages/TrackAccountCreate';
 import TrackAccountEdit from './pages/TrackAccountEdit';
 import TrackAccountsList from './pages/TrackAccountsList';
+import Settings from './pages/Settings';
 
 // Local auth implementation to avoid import issues
 const isAuthenticated = () => {
@@ -236,7 +237,7 @@ function App() {
           <Route path="/settings" element={
             <ProtectedRoute>
               <Layout>
-                <div>Settings Page (Coming Soon)</div>
+                <Settings />
               </Layout>
             </ProtectedRoute>
           } />

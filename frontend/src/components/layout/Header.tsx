@@ -24,6 +24,8 @@ import {
   KeyboardArrowDown,
   MoreVert as MoreIcon,
 } from '@mui/icons-material';
+import GELogo from '../../assets/images/logos/GE-logo.png';
+import GELogoFallback from './GELogoFallback';
 
 const Search = styled('div')(({ theme }) => ({
   position: 'relative',
@@ -87,6 +89,14 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
   const isMenuOpen = Boolean(anchorEl);
   const isNotificationsOpen = Boolean(notificationsAnchorEl);
   const isMobileMenuOpen = Boolean(mobileMenuAnchorEl);
+
+  // State to track if the image failed to load
+  const [imageError, setImageError] = useState(false);
+  
+  // Handle image load error
+  const handleImageError = () => {
+    setImageError(true);
+  };
 
   const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -234,18 +244,27 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
             <MenuIcon />
           </IconButton>
           
-          <Typography
-            variant="h6"
-            component="div"
+          <Box
             sx={{
-              display: { xs: 'none', sm: 'block' },
-              fontWeight: 600,
-              color: 'primary.main',
+              display: { xs: 'none', sm: 'flex' },
+              alignItems: 'center',
               mr: 2
             }}
           >
-            Track Futura
-          </Typography>
+            {!imageError ? (
+              <img 
+                src={GELogo} 
+                alt="Great Eastern Logo" 
+                style={{ 
+                  height: '36px',
+                  marginRight: '8px'
+                }} 
+                onError={handleImageError}
+              />
+            ) : (
+              <GELogoFallback />
+            )}
+          </Box>
           
           {!isSmall && (
             <Box sx={{ display: 'flex', flexGrow: { xs: 1, md: 0 } }}>
