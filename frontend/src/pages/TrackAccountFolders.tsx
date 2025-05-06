@@ -27,6 +27,8 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FolderIcon from '@mui/icons-material/Folder';
+import ViewListIcon from '@mui/icons-material/ViewList';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
 
 interface Folder {
   id: number;
@@ -59,11 +61,20 @@ const TrackAccountFolders = () => {
       if (!response.ok) {
         throw new Error('Failed to fetch folders');
       }
-      const data = await response.json();
+      
+      let data;
+      try {
+        data = await response.json();
+      } catch (e) {
+        console.error('Error parsing JSON response:', e);
+        setFolders([]);
+        throw new Error('Invalid response format');
+      }
+      
       console.log('Fetched folders data:', data);
       
       // Ensure data is an array before setting folders
-      if (data.results && Array.isArray(data.results)) {
+      if (data && data.results && Array.isArray(data.results)) {
         // Handle paginated response
         setFolders(data.results);
       } else if (Array.isArray(data)) {
@@ -145,10 +156,16 @@ const TrackAccountFolders = () => {
       handleCloseDialogs();
       // Update local state with the new folder instead of fetching again
       if (newFolder && newFolder.id) {
-        setFolders(prevFolders => [...prevFolders, {
-          ...newFolder,
-          account_count: 0 // New folder has no accounts initially
-        }]);
+        setFolders(prevFolders => {
+          // Ensure prevFolders is an array before spreading
+          if (!Array.isArray(prevFolders)) {
+            return [{ ...newFolder, account_count: 0 }];
+          }
+          return [...prevFolders, {
+            ...newFolder,
+            account_count: 0 // New folder has no accounts initially
+          }];
+        });
         showSnackbar('Folder created successfully', 'success');
       } else {
         // Fallback to fetching all folders if we don't get a valid response
@@ -189,11 +206,15 @@ const TrackAccountFolders = () => {
       
       // Update the folder in the local state
       if (updatedFolder && updatedFolder.id) {
-        setFolders(prevFolders => 
-          prevFolders.map(folder => 
+        setFolders(prevFolders => {
+          // Ensure prevFolders is an array before mapping
+          if (!Array.isArray(prevFolders)) {
+            return [updatedFolder];
+          }
+          return prevFolders.map(folder => 
             folder.id === updatedFolder.id ? { ...folder, ...updatedFolder } : folder
-          )
-        );
+          );
+        });
         showSnackbar('Folder updated successfully', 'success');
       } else {
         // Fallback to fetching all folders if we don't get a valid response
@@ -223,7 +244,13 @@ const TrackAccountFolders = () => {
       handleCloseDialogs();
       
       // Remove the deleted folder from local state
-      setFolders(prevFolders => prevFolders.filter(folder => folder.id !== currentFolder.id));
+      setFolders(prevFolders => {
+        // Ensure prevFolders is an array before filtering
+        if (!Array.isArray(prevFolders)) {
+          return [];
+        }
+        return prevFolders.filter(folder => folder.id !== currentFolder.id);
+      });
       showSnackbar('Folder deleted successfully', 'success');
     } catch (error) {
       console.error('Error deleting folder:', error);
@@ -257,18 +284,36 @@ const TrackAccountFolders = () => {
         </Typography>
       </Breadcrumbs>
 
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
+      {/* Page title and actions */}
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="h4" gutterBottom>
           Track Account Folders
         </Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AddIcon />}
-          onClick={handleOpenAddDialog}
-        >
-          Create Folder
-        </Button>
+        <Box>
+          <Button
+            variant="outlined"
+            startIcon={<ViewListIcon />}
+            onClick={() => navigate('/track-accounts/accounts')}
+            sx={{ mr: 1 }}
+          >
+            View All Accounts
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<PersonAddIcon />}
+            onClick={() => navigate('/track-accounts/create')}
+            sx={{ mr: 1 }}
+          >
+            Create Account
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={handleOpenAddDialog}
+          >
+            Create Folder
+          </Button>
+        </Box>
       </Box>
 
       {loading ? (
@@ -286,7 +331,8 @@ const TrackAccountFolders = () => {
               </Paper>
             </Box>
           ) : (
-            folders.map((folder) => (
+            // Ensure folders is an array before mapping
+            Array.isArray(folders) && folders.map((folder) => (
               <Box key={folder.id} sx={{ width: { xs: '100%', sm: '50%', md: '33.33%' }, p: 1.5 }}>
                 <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                   <CardContent sx={{ flexGrow: 1, cursor: 'pointer' }} onClick={() => handleFolderClick(folder.id)}>

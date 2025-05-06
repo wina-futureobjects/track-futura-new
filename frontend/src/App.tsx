@@ -23,6 +23,9 @@ import MultiPlatformReportGeneration from './pages/MultiPlatformReportGeneration
 import theme from './theme';
 import CssBaseline from '@mui/material/CssBaseline';
 import InstagramFolderSelector from './FolderSelectionReportGenerator';
+import TrackAccountCreate from './pages/TrackAccountCreate';
+import TrackAccountEdit from './pages/TrackAccountEdit';
+import TrackAccountsList from './pages/TrackAccountsList';
 
 // Local auth implementation to avoid import issues
 const isAuthenticated = () => {
@@ -153,6 +156,13 @@ function App() {
               </Layout>
             </ProtectedRoute>
           } />
+          <Route path="/track-accounts/accounts" element={
+            <ProtectedRoute>
+              <Layout>
+                <TrackAccountsList />
+              </Layout>
+            </ProtectedRoute>
+          } />
           <Route path="/track-accounts/folders/:folderId" element={
             <ProtectedRoute>
               <Layout>
@@ -164,6 +174,27 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <TrackAccountUpload />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/track-accounts/create" element={
+            <ProtectedRoute>
+              <Layout>
+                <TrackAccountCreate />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/track-accounts/folders/:folderId/create" element={
+            <ProtectedRoute>
+              <Layout>
+                <TrackAccountCreate />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/track-accounts/edit/:accountId" element={
+            <ProtectedRoute>
+              <Layout>
+                <TrackAccountEdit />
               </Layout>
             </ProtectedRoute>
           } />

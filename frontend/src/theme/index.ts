@@ -1,19 +1,19 @@
 import { createTheme, responsiveFontSizes } from '@mui/material/styles';
 
-// Create a theme instance with corporate/enterprise look
+// Create a theme instance with the new color scheme
 const baseTheme = createTheme({
   palette: {
     primary: {
-      main: '#2C3E50', // Dark blue/gray
-      light: '#3E5871',
-      dark: '#1A252F',
+      main: '#E1251B', // Red color as requested
+      light: '#E44C43',
+      dark: '#B31D15',
       contrastText: '#fff',
     },
     secondary: {
-      main: '#3498DB', // Bright blue
-      light: '#5DADE2',
-      dark: '#2874A6',
-      contrastText: '#fff',
+      main: '#FFFFFF', // White color as requested
+      light: '#FFFFFF',
+      dark: '#F5F5F5',
+      contrastText: '#000',
     },
     background: {
       default: '#F8F9FA',
@@ -26,7 +26,7 @@ const baseTheme = createTheme({
       main: '#F39C12',
     },
     info: {
-      main: '#3498DB',
+      main: '#0A1F8F', // Using tertiary color as info to keep it in the standard palette
     },
     success: {
       main: '#2ECC71',
@@ -97,12 +97,12 @@ const baseTheme = createTheme({
         },
         containedPrimary: {
           '&:hover': {
-            backgroundColor: '#3E5871',
+            backgroundColor: '#B31D15', // Darker shade of primary
           },
         },
         containedSecondary: {
           '&:hover': {
-            backgroundColor: '#5DADE2',
+            backgroundColor: '#F5F5F5', // Darker shade of secondary
           },
         },
       },

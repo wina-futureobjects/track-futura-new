@@ -19,12 +19,19 @@ import {
   Link,
   Snackbar,
   Alert,
+  Tooltip,
+  IconButton,
 } from '@mui/material';
 import HomeIcon from '@mui/icons-material/Home';
 import FolderIcon from '@mui/icons-material/Folder';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import AddIcon from '@mui/icons-material/Add';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import EditIcon from '@mui/icons-material/Edit';
+import FacebookIcon from '@mui/icons-material/Facebook';
+import InstagramIcon from '@mui/icons-material/Instagram';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
+import MusicNoteIcon from '@mui/icons-material/MusicNote'; // For TikTok
 import axios from 'axios';
 
 const api = axios.create({
@@ -52,6 +59,10 @@ interface Account {
   instagram_username: string | null;
   linkedin_username: string | null;
   tiktok_username: string | null;
+  facebook_id: string | null;
+  instagram_id: string | null;
+  linkedin_id: string | null;
+  tiktok_id: string | null;
   risk_classification: string | null;
   close_monitoring: boolean;
   created_at: string;
@@ -205,8 +216,17 @@ const TrackAccountFolderDetail = () => {
                   color="primary"
                   startIcon={<AssessmentIcon />}
                   onClick={handleGenerateReport}
+                  sx={{ mr: 1 }}
                 >
                   Generate Report
+                </Button>
+                <Button
+                  variant="contained"
+                  color="secondary"
+                  startIcon={<AddIcon />}
+                  onClick={() => navigate(`/track-accounts/folders/${folderId}/create`)}
+                >
+                  Add Account
                 </Button>
               </Box>
             </Box>
@@ -214,23 +234,33 @@ const TrackAccountFolderDetail = () => {
 
           {/* List of accounts */}
           <Paper sx={{ width: '100%', mb: 2 }}>
-            <Box sx={{ p: 2, borderBottom: '1px solid rgba(0, 0, 0, 0.12)' }}>
+            <Box sx={{ p: 2, borderBottom: '1px solid rgba(0, 0, 0, 0.12)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Typography variant="h6">
                 Track Accounts
               </Typography>
+              <Box>
+                <Button 
+                  variant="outlined" 
+                  startIcon={<AddIcon />}
+                  onClick={() => navigate(`/track-accounts/folders/${folderId}/upload`)}
+                  sx={{ mr: 1 }}
+                >
+                  Upload CSV
+                </Button>
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={() => navigate(`/track-accounts/folders/${folderId}/create`)}
+                >
+                  Add Account
+                </Button>
+              </Box>
             </Box>
             {accounts.length === 0 ? (
               <Box sx={{ p: 4, textAlign: 'center' }}>
                 <Typography variant="body1" color="text.secondary" paragraph>
                   No accounts found in this folder.
                 </Typography>
-                <Button 
-                  variant="outlined" 
-                  startIcon={<AddIcon />}
-                  onClick={() => navigate(`/track-accounts/folders/${folderId}/upload`)}
-                >
-                  Upload Accounts
-                </Button>
               </Box>
             ) : (
               <>
@@ -240,10 +270,10 @@ const TrackAccountFolderDetail = () => {
                       <TableRow>
                         <TableCell>Name</TableCell>
                         <TableCell>IAC No.</TableCell>
-                        <TableCell>Instagram</TableCell>
-                        <TableCell>Facebook</TableCell>
+                        <TableCell align="center">Social Media</TableCell>
                         <TableCell>Risk Classification</TableCell>
                         <TableCell>Close Monitoring</TableCell>
+                        <TableCell>Actions</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -251,10 +281,130 @@ const TrackAccountFolderDetail = () => {
                         <TableRow key={account.id}>
                           <TableCell>{account.name}</TableCell>
                           <TableCell>{account.iac_no}</TableCell>
-                          <TableCell>{account.instagram_username || '-'}</TableCell>
-                          <TableCell>{account.facebook_username || '-'}</TableCell>
-                          <TableCell>{account.risk_classification || '-'}</TableCell>
-                          <TableCell>{account.close_monitoring ? 'Yes' : 'No'}</TableCell>
+                          <TableCell align="center">
+                            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
+                              {account.instagram_username && (
+                                <Tooltip title={`Instagram: ${account.instagram_username}`}>
+                                  <IconButton 
+                                    size="small" 
+                                    color="primary"
+                                    onClick={() => {
+                                      if (account.instagram_id) {
+                                        // Ensure URL has proper protocol
+                                        const url = account.instagram_id.startsWith('http') 
+                                          ? account.instagram_id 
+                                          : `https://${account.instagram_id.replace(/^\/\//, '')}`;
+                                        window.open(url, '_blank');
+                                      } else {
+                                        window.open(`https://www.instagram.com/${account.instagram_username}`, '_blank');
+                                      }
+                                    }}
+                                  >
+                                    <InstagramIcon />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
+                              
+                              {account.facebook_username && (
+                                <Tooltip title={`Facebook: ${account.facebook_username}`}>
+                                  <IconButton 
+                                    size="small" 
+                                    color="primary"
+                                    onClick={() => {
+                                      if (account.facebook_id) {
+                                        // Ensure URL has proper protocol
+                                        const url = account.facebook_id.startsWith('http') 
+                                          ? account.facebook_id 
+                                          : `https://${account.facebook_id.replace(/^\/\//, '')}`;
+                                        window.open(url, '_blank');
+                                      } else {
+                                        window.open(`https://www.facebook.com/${account.facebook_username}`, '_blank');
+                                      }
+                                    }}
+                                  >
+                                    <FacebookIcon />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
+                              
+                              {account.linkedin_username && (
+                                <Tooltip title={`LinkedIn: ${account.linkedin_username}`}>
+                                  <IconButton 
+                                    size="small" 
+                                    color="primary"
+                                    onClick={() => {
+                                      if (account.linkedin_id) {
+                                        // Ensure URL has proper protocol
+                                        const url = account.linkedin_id.startsWith('http') 
+                                          ? account.linkedin_id 
+                                          : `https://${account.linkedin_id.replace(/^\/\//, '')}`;
+                                        window.open(url, '_blank');
+                                      } else {
+                                        window.open(`https://www.linkedin.com/in/${account.linkedin_username}`, '_blank');
+                                      }
+                                    }}
+                                  >
+                                    <LinkedInIcon />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
+                              
+                              {account.tiktok_username && (
+                                <Tooltip title={`TikTok: ${account.tiktok_username}`}>
+                                  <IconButton 
+                                    size="small" 
+                                    color="primary"
+                                    onClick={() => {
+                                      if (account.tiktok_id) {
+                                        // Ensure URL has proper protocol
+                                        const url = account.tiktok_id.startsWith('http') 
+                                          ? account.tiktok_id 
+                                          : `https://${account.tiktok_id.replace(/^\/\//, '')}`;
+                                        window.open(url, '_blank');
+                                      } else {
+                                        window.open(`https://www.tiktok.com/@${account.tiktok_username}`, '_blank');
+                                      }
+                                    }}
+                                  >
+                                    <MusicNoteIcon />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
+                              
+                              {!account.instagram_username && !account.facebook_username && 
+                               !account.linkedin_username && !account.tiktok_username && '-'}
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            {account.risk_classification ? (
+                              <Chip 
+                                label={account.risk_classification} 
+                                size="small" 
+                                color={
+                                  account.risk_classification.toLowerCase() === 'high' ? 'error' :
+                                  account.risk_classification.toLowerCase() === 'medium' ? 'warning' : 'success'
+                                }
+                              />
+                            ) : (
+                              '-'
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {account.close_monitoring ? (
+                              <Chip label="Yes" size="small" color="primary" />
+                            ) : (
+                              <Chip label="No" size="small" color="default" variant="outlined" />
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              size="small"
+                              startIcon={<EditIcon />}
+                              onClick={() => navigate(`/track-accounts/edit/${account.id}`)}
+                            >
+                              Edit
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
