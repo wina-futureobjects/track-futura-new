@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { styled, useTheme } from '@mui/material/styles';
 import {
   Drawer,
@@ -75,11 +75,11 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
   
   const menuItems = [
     { text: 'Dashboard', path: '/', icon: <DashboardIcon /> },
-    { text: 'Track Accounts', path: '/track-accounts', icon: <TrackChangesIcon /> },
-    { text: 'Instagram Data', path: '/instagram-data', icon: <InstagramIcon /> },
-    { text: 'Facebook Data', path: '/facebook-data', icon: <FacebookIcon /> },
-    { text: 'LinkedIn Data', path: '/linkedin-data', icon: <LinkedInIcon /> },
-    { text: 'TikTok Data', path: '/tiktok-data', icon: <MusicVideoIcon /> },
+    { text: 'Track Accounts', path: '/track-accounts/folders', icon: <TrackChangesIcon /> },
+    { text: 'Instagram Data', path: '/instagram-folders', icon: <InstagramIcon /> },
+    { text: 'Facebook Data', path: '/facebook-folders', icon: <FacebookIcon /> },
+    { text: 'LinkedIn Data', path: '/linkedin-folders', icon: <LinkedInIcon /> },
+    { text: 'TikTok Data', path: '/tiktok-folders', icon: <MusicVideoIcon /> },
     { text: 'Social Analysis', path: '/social-analysis', icon: <AnalyticsIcon /> },
     { text: 'Web Presence', path: '/web-presence', icon: <LanguageIcon /> },
     { text: 'Sentiment Analysis', path: '/sentiment', icon: <MoodIcon /> },
@@ -89,17 +89,51 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
     { text: 'Settings', path: '/settings', icon: <SettingsIcon /> },
   ];
 
-  const handleNavigate = (path: string) => {
+  // Function to check if a menu item is active based on the current path - memoized for performance
+  const isActive = useCallback((itemPath: string) => {
+    // Special handling for root path
+    if (itemPath === '/') {
+      return location.pathname === '/';
+    }
+    
+    // Special handling for social media data sections
+    if (itemPath === '/instagram-folders') {
+      return location.pathname.startsWith('/instagram');
+    }
+    if (itemPath === '/facebook-folders') {
+      return location.pathname.startsWith('/facebook');
+    }
+    if (itemPath === '/linkedin-folders') {
+      return location.pathname.startsWith('/linkedin');
+    }
+    if (itemPath === '/tiktok-folders') {
+      return location.pathname.startsWith('/tiktok');
+    }
+    if (itemPath === '/track-accounts/folders') {
+      return location.pathname.startsWith('/track-accounts');
+    }
+    
+    // For other paths, check if the current path starts with the menu item path
+    return location.pathname.startsWith(itemPath);
+  }, [location.pathname]);
+
+  const handleNavigate = useCallback((path: string) => {
+    // Prevent navigation if already on the same path or subpath
+    if (location.pathname === path || 
+        (path !== '/' && location.pathname.startsWith(path))) {
+      return;
+    }
+    
     navigate(path);
     if (isMobile) {
       onClose();
     }
-  };
+  }, [location.pathname, navigate, isMobile, onClose]);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     logout();
     navigate('/login');
-  };
+  }, [logout, navigate]);
 
   return (
     <Drawer
@@ -157,7 +191,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
                 justifyContent: open ? 'initial' : 'center',
                 px: open ? 2 : 1.5,
                 borderRadius: 1,
-                backgroundColor: location.pathname === item.path ? 'rgba(52, 152, 219, 0.1)' : 'transparent',
+                backgroundColor: isActive(item.path) ? 'rgba(52, 152, 219, 0.1)' : 'transparent',
                 '&:hover': {
                   backgroundColor: 'rgba(52, 152, 219, 0.05)',
                 },
@@ -170,7 +204,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
                     minWidth: 0,
                     mr: open ? 2 : 'auto',
                     justifyContent: 'center',
-                    color: location.pathname === item.path ? 'primary.main' : 'text.secondary',
+                    color: isActive(item.path) ? 'primary.main' : 'text.secondary',
                   }}
                 >
                   {item.icon}
@@ -181,7 +215,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
                   primary={item.text} 
                   sx={{ 
                     opacity: 1,
-                    color: location.pathname === item.path ? 'primary.main' : 'text.primary',
+                    color: isActive(item.path) ? 'primary.main' : 'text.primary',
                   }} 
                 />
               )}
@@ -198,7 +232,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
               justifyContent: open ? 'initial' : 'center',
               px: open ? 2 : 1.5,
               borderRadius: 1,
-              backgroundColor: location.pathname === '/settings' ? 'rgba(52, 152, 219, 0.1)' : 'transparent',
+              backgroundColor: isActive('/settings') ? 'rgba(52, 152, 219, 0.1)' : 'transparent',
             }}
             onClick={() => handleNavigate('/settings')}
           >
@@ -208,7 +242,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
                   minWidth: 0,
                   mr: open ? 2 : 'auto',
                   justifyContent: 'center',
-                  color: location.pathname === '/settings' ? 'primary.main' : 'text.secondary',
+                  color: isActive('/settings') ? 'primary.main' : 'text.secondary',
                 }}
               >
                 <SettingsIcon />
@@ -219,7 +253,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
                 primary="Settings" 
                 sx={{ 
                   opacity: 1,
-                  color: location.pathname === '/settings' ? 'primary.main' : 'text.primary',
+                  color: isActive('/settings') ? 'primary.main' : 'text.primary',
                 }}
               />
             )}
