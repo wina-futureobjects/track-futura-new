@@ -11,9 +11,26 @@ import {
   MenuItem,
   CircularProgress,
   Alert,
-  Divider
+  Divider,
+  Card,
+  CardContent,
+  InputAdornment,
+  Avatar,
+  Tooltip,
+  useTheme
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
+import FacebookIcon from '@mui/icons-material/Facebook';
+import InstagramIcon from '@mui/icons-material/Instagram';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
+import MusicNoteIcon from '@mui/icons-material/MusicNote'; // For TikTok
+import PersonIcon from '@mui/icons-material/Person';
+import FolderIcon from '@mui/icons-material/Folder';
+import WarningIcon from '@mui/icons-material/Warning';
+import LinkIcon from '@mui/icons-material/Link';
+import InfoIcon from '@mui/icons-material/Info';
+import SaveIcon from '@mui/icons-material/Save';
+import CancelIcon from '@mui/icons-material/Cancel';
 
 // Types
 interface TrackAccountFormProps {
@@ -67,6 +84,7 @@ const postingFrequencies = [
 
 const TrackAccountForm: React.FC<TrackAccountFormProps> = ({ accountId, folderId, onSuccess }) => {
   const navigate = useNavigate();
+  const theme = useTheme();
   const [loading, setLoading] = useState(false);
   const [loadingAccount, setLoadingAccount] = useState(!!accountId);
   const [loadingFolders, setLoadingFolders] = useState(true);
@@ -283,6 +301,23 @@ const TrackAccountForm: React.FC<TrackAccountFormProps> = ({ accountId, folderId
     }
   };
 
+  // Get color based on risk classification
+  const getRiskColor = (risk: string | null) => {
+    if (!risk) return theme.palette.grey[500];
+    
+    switch (risk.toLowerCase()) {
+      case 'high':
+      case 'critical':
+        return theme.palette.error.main;
+      case 'medium':
+        return theme.palette.warning.main;
+      case 'low':
+        return theme.palette.success.main;
+      default:
+        return theme.palette.grey[500];
+    }
+  };
+
   if (loadingAccount) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
@@ -292,276 +327,466 @@ const TrackAccountForm: React.FC<TrackAccountFormProps> = ({ accountId, folderId
   }
 
   return (
-    <Paper sx={{ p: { xs: 2, sm: 3 } }}>
-      <Typography variant="h6" mb={2}>
-        {accountId ? 'Edit Track Account' : 'Create New Track Account'}
-      </Typography>
+    <Paper 
+      elevation={3} 
+      sx={{ 
+        p: { xs: 2, sm: 4 },
+        borderRadius: 2,
+        backgroundColor: theme.palette.background.default
+      }}
+    >
+      <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Avatar
+          sx={{
+            bgcolor: accountId ? theme.palette.primary.main : theme.palette.secondary.main,
+            width: 48,
+            height: 48
+          }}
+        >
+          <PersonIcon />
+        </Avatar>
+        <Box>
+          <Typography variant="h5" fontWeight="bold" color="primary">
+            {accountId ? 'Edit Track Account' : 'Create New Track Account'}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {accountId ? 'Update account details below' : 'Fill in the details to create a new account'}
+          </Typography>
+        </Box>
+      </Box>
       
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert 
+          severity="error" 
+          sx={{ mb: 3, borderRadius: 1.5 }}
+          variant="filled"
+        >
           {error}
         </Alert>
       )}
       
       {success && (
-        <Alert severity="success" sx={{ mb: 2 }}>
+        <Alert 
+          severity="success" 
+          sx={{ mb: 3, borderRadius: 1.5 }}
+          variant="filled"
+        >
           {success}
         </Alert>
       )}
       
       <form onSubmit={handleSubmit}>
-        <Grid container spacing={2}>
+        <Grid container spacing={3}>
           {/* Account Basic Information */}
           <Grid item xs={12}>
-            <Typography variant="subtitle1" fontWeight="bold">
-              Basic Information
-            </Typography>
-            <Divider sx={{ mb: 2, mt: 0.5 }} />
+            <Card elevation={1} sx={{ mb: 3, borderRadius: 2, overflow: 'visible' }}>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <PersonIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
+                  <Typography variant="h6" fontWeight="bold" color="primary">
+                    Basic Information
+                  </Typography>
+                </Box>
+                <Divider sx={{ mb: 3 }} />
+                
+                <Grid container spacing={3}>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Name"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleChange}
+                      error={!!formErrors.name}
+                      helperText={formErrors.name}
+                      required
+                      variant="outlined"
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <PersonIcon fontSize="small" />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
+                  
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="IAC Number"
+                      name="iac_no"
+                      value={formData.iac_no}
+                      onChange={handleChange}
+                      error={!!formErrors.iac_no}
+                      helperText={formErrors.iac_no}
+                      required
+                      variant="outlined"
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <InfoIcon fontSize="small" />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
+                  
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      select
+                      label="Risk Classification"
+                      name="risk_classification"
+                      value={formData.risk_classification || ''}
+                      onChange={handleSelectChange}
+                      variant="outlined"
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <WarningIcon fontSize="small" color={formData.risk_classification ? 
+                              (formData.risk_classification.toLowerCase() === 'high' || formData.risk_classification.toLowerCase() === 'critical' ? 'error' : 
+                              formData.risk_classification.toLowerCase() === 'medium' ? 'warning' : 'success') : 'action'} 
+                            />
+                          </InputAdornment>
+                        ),
+                      }}
+                    >
+                      <MenuItem value="">None</MenuItem>
+                      {riskClassifications.map(option => (
+                        <MenuItem key={option} value={option}>
+                          {option}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+                  
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      select
+                      label="Posting Frequency"
+                      name="posting_frequency"
+                      value={formData.posting_frequency || ''}
+                      onChange={handleSelectChange}
+                      variant="outlined"
+                    >
+                      <MenuItem value="">None</MenuItem>
+                      {postingFrequencies.map(option => (
+                        <MenuItem key={option} value={option}>
+                          {option}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+                  
+                  <Grid item xs={12} sm={6}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={formData.close_monitoring}
+                          onChange={handleSwitchChange}
+                          name="close_monitoring"
+                          color="primary"
+                        />
+                      }
+                      label={
+                        <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Typography sx={{ mr: 1 }}>Close Monitoring</Typography>
+                          <Tooltip title="Enable to actively monitor this account">
+                            <InfoIcon fontSize="small" color="action" />
+                          </Tooltip>
+                        </Box>
+                      }
+                    />
+                  </Grid>
+                  
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      select
+                      label="Folder"
+                      name="folder"
+                      value={formData.folder || ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setFormData(prev => ({
+                          ...prev,
+                          folder: value === '' ? null : Number(value)
+                        }));
+                      }}
+                      disabled={loadingFolders}
+                      variant="outlined"
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <FolderIcon fontSize="small" />
+                          </InputAdornment>
+                        ),
+                      }}
+                    >
+                      <MenuItem value="">None</MenuItem>
+                      {Array.isArray(folders) && folders.map(folder => (
+                        <MenuItem key={folder.id} value={folder.id}>
+                          {folder.name}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                    {loadingFolders && (
+                      <Box sx={{ mt: 1, display: 'flex', alignItems: 'center' }}>
+                        <CircularProgress size={16} sx={{ mr: 1 }} />
+                        <Typography variant="caption" color="text.secondary">Loading folders...</Typography>
+                      </Box>
+                    )}
+                  </Grid>
+                </Grid>
+              </CardContent>
+            </Card>
           </Grid>
           
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Name"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              error={!!formErrors.name}
-              helperText={formErrors.name}
-              required
-            />
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="IAC Number"
-              name="iac_no"
-              value={formData.iac_no}
-              onChange={handleChange}
-              error={!!formErrors.iac_no}
-              helperText={formErrors.iac_no}
-              required
-            />
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              select
-              label="Risk Classification"
-              name="risk_classification"
-              value={formData.risk_classification || ''}
-              onChange={handleSelectChange}
-            >
-              <MenuItem value="">None</MenuItem>
-              {riskClassifications.map(option => (
-                <MenuItem key={option} value={option}>
-                  {option}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              select
-              label="Posting Frequency"
-              name="posting_frequency"
-              value={formData.posting_frequency || ''}
-              onChange={handleSelectChange}
-            >
-              <MenuItem value="">None</MenuItem>
-              {postingFrequencies.map(option => (
-                <MenuItem key={option} value={option}>
-                  {option}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={formData.close_monitoring}
-                  onChange={handleSwitchChange}
-                  name="close_monitoring"
-                  color="primary"
-                />
-              }
-              label="Close Monitoring"
-            />
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              select
-              label="Folder"
-              name="folder"
-              value={formData.folder || ''}
-              onChange={(e) => {
-                const value = e.target.value;
-                setFormData(prev => ({
-                  ...prev,
-                  folder: value === '' ? null : Number(value)
-                }));
-              }}
-              disabled={loadingFolders}
-            >
-              <MenuItem value="">None</MenuItem>
-              {/* Make sure folders is an array before mapping */}
-              {Array.isArray(folders) && folders.map(folder => (
-                <MenuItem key={folder.id} value={folder.id}>
-                  {folder.name}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-          
-          {/* Social Media Usernames */}
+          {/* Social Media Information */}
           <Grid item xs={12}>
-            <Typography variant="subtitle1" fontWeight="bold" mt={2}>
-              Social Media Usernames
-            </Typography>
-            <Divider sx={{ mb: 2, mt: 0.5 }} />
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Facebook Username"
-              name="facebook_username"
-              value={formData.facebook_username || ''}
-              onChange={handleChange}
-            />
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Instagram Username"
-              name="instagram_username"
-              value={formData.instagram_username || ''}
-              onChange={handleChange}
-            />
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="LinkedIn Username"
-              name="linkedin_username"
-              value={formData.linkedin_username || ''}
-              onChange={handleChange}
-            />
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="TikTok Username"
-              name="tiktok_username"
-              value={formData.tiktok_username || ''}
-              onChange={handleChange}
-            />
-          </Grid>
-          
-          {/* Social Media Profile URLs */}
-          <Grid item xs={12}>
-            <Typography variant="subtitle1" fontWeight="bold" mt={2}>
-              Social Media Profile URLs
-            </Typography>
-            <Divider sx={{ mb: 2, mt: 0.5 }} />
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Facebook Profile URL"
-              name="facebook_id"
-              value={formData.facebook_id || ''}
-              onChange={handleChange}
-              error={!!formErrors.facebook_id}
-              helperText={formErrors.facebook_id}
-            />
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Instagram Profile URL"
-              name="instagram_id"
-              value={formData.instagram_id || ''}
-              onChange={handleChange}
-              error={!!formErrors.instagram_id}
-              helperText={formErrors.instagram_id}
-            />
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="LinkedIn Profile URL"
-              name="linkedin_id"
-              value={formData.linkedin_id || ''}
-              onChange={handleChange}
-              error={!!formErrors.linkedin_id}
-              helperText={formErrors.linkedin_id}
-            />
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="TikTok Profile URL"
-              name="tiktok_id"
-              value={formData.tiktok_id || ''}
-              onChange={handleChange}
-              error={!!formErrors.tiktok_id}
-              helperText={formErrors.tiktok_id}
-            />
-          </Grid>
-          
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              multiline
-              rows={3}
-              label="Other Social Media"
-              name="other_social_media"
-              value={formData.other_social_media || ''}
-              onChange={handleChange}
-              placeholder="Enter details about other social media accounts"
-            />
+            <Card elevation={1} sx={{ mb: 3, borderRadius: 2, overflow: 'visible' }}>
+              <CardContent sx={{ p: 3 }}>
+                {/* Social Media Usernames */}
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <FacebookIcon sx={{ color: '#4267B2' }} fontSize="small" />
+                    <InstagramIcon sx={{ color: '#E1306C' }} fontSize="small" />
+                    <LinkedInIcon sx={{ color: '#0077B5' }} fontSize="small" />
+                    <MusicNoteIcon sx={{ color: '#000000' }} fontSize="small" />
+                  </Box>
+                  <Typography variant="h6" fontWeight="bold" color="primary" sx={{ ml: 1 }}>
+                    Social Media Information
+                  </Typography>
+                </Box>
+                <Divider sx={{ mb: 3 }} />
+                
+                <Typography variant="subtitle2" gutterBottom sx={{ mb: 2, fontWeight: 'bold' }}>
+                  Usernames
+                </Typography>
+                
+                <Grid container spacing={3}>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Facebook Username"
+                      name="facebook_username"
+                      value={formData.facebook_username || ''}
+                      onChange={handleChange}
+                      variant="outlined"
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <FacebookIcon fontSize="small" sx={{ color: '#4267B2' }} />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
+                  
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Instagram Username"
+                      name="instagram_username"
+                      value={formData.instagram_username || ''}
+                      onChange={handleChange}
+                      variant="outlined"
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <InstagramIcon fontSize="small" sx={{ color: '#E1306C' }} />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
+                  
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="LinkedIn Username"
+                      name="linkedin_username"
+                      value={formData.linkedin_username || ''}
+                      onChange={handleChange}
+                      variant="outlined"
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <LinkedInIcon fontSize="small" sx={{ color: '#0077B5' }} />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
+                  
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="TikTok Username"
+                      name="tiktok_username"
+                      value={formData.tiktok_username || ''}
+                      onChange={handleChange}
+                      variant="outlined"
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <MusicNoteIcon fontSize="small" />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
+                </Grid>
+                
+                {/* Social Media Profile URLs */}
+                <Typography variant="subtitle2" gutterBottom sx={{ mt: 4, mb: 2, fontWeight: 'bold' }}>
+                  Profile URLs
+                </Typography>
+                
+                <Grid container spacing={3}>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Facebook Profile URL"
+                      name="facebook_id"
+                      value={formData.facebook_id || ''}
+                      onChange={handleChange}
+                      error={!!formErrors.facebook_id}
+                      helperText={formErrors.facebook_id}
+                      variant="outlined"
+                      placeholder="https://facebook.com/username"
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <LinkIcon fontSize="small" />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
+                  
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Instagram Profile URL"
+                      name="instagram_id"
+                      value={formData.instagram_id || ''}
+                      onChange={handleChange}
+                      error={!!formErrors.instagram_id}
+                      helperText={formErrors.instagram_id}
+                      variant="outlined"
+                      placeholder="https://instagram.com/username"
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <LinkIcon fontSize="small" />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
+                  
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="LinkedIn Profile URL"
+                      name="linkedin_id"
+                      value={formData.linkedin_id || ''}
+                      onChange={handleChange}
+                      error={!!formErrors.linkedin_id}
+                      helperText={formErrors.linkedin_id}
+                      variant="outlined"
+                      placeholder="https://linkedin.com/in/username"
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <LinkIcon fontSize="small" />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
+                  
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="TikTok Profile URL"
+                      name="tiktok_id"
+                      value={formData.tiktok_id || ''}
+                      onChange={handleChange}
+                      error={!!formErrors.tiktok_id}
+                      helperText={formErrors.tiktok_id}
+                      variant="outlined"
+                      placeholder="https://tiktok.com/@username"
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <LinkIcon fontSize="small" />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
+                  
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      multiline
+                      rows={3}
+                      label="Other Social Media"
+                      name="other_social_media"
+                      value={formData.other_social_media || ''}
+                      onChange={handleChange}
+                      placeholder="Enter details about other social media accounts"
+                      variant="outlined"
+                    />
+                  </Grid>
+                </Grid>
+              </CardContent>
+            </Card>
           </Grid>
           
           {/* Form Actions */}
-          <Grid item xs={12} sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-            <Button 
-              variant="outlined"
-              onClick={() => {
-                if (formData.folder) {
-                  navigate(`/track-accounts/folders/${formData.folder}`);
-                } else {
-                  navigate('/track-accounts/folders');
-                }
+          <Grid item xs={12}>
+            <Paper
+              elevation={1}
+              sx={{
+                p: 2,
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: 2,
+                borderRadius: 2,
+                background: theme.palette.grey[50]
               }}
-              disabled={loading}
             >
-              Cancel
-            </Button>
-            <Button 
-              type="submit"
-              variant="contained"
-              color="primary"
-              disabled={loading}
-              startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
-            >
-              {loading ? 'Saving...' : accountId ? 'Update Account' : 'Create Account'}
-            </Button>
+              <Button 
+                variant="outlined"
+                onClick={() => {
+                  if (formData.folder) {
+                    navigate(`/track-accounts/folders/${formData.folder}`);
+                  } else {
+                    navigate('/track-accounts/folders');
+                  }
+                }}
+                disabled={loading}
+                startIcon={<CancelIcon />}
+                sx={{ borderRadius: 1.5 }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit"
+                variant="contained"
+                color="primary"
+                disabled={loading}
+                startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+                sx={{ borderRadius: 1.5, px: 3 }}
+              >
+                {loading ? 'Saving...' : accountId ? 'Update Account' : 'Create Account'}
+              </Button>
+            </Paper>
           </Grid>
         </Grid>
       </form>
