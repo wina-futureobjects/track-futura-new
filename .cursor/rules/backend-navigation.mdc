@@ -1,0 +1,54 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Backend Navigation
+
+The backend is a Django application structured into multiple apps, each handling specific functionality.
+
+## Core Configuration
+
+- [manage.py](mdc:backend/manage.py): Django's command-line utility for administrative tasks
+- [config/settings.py](mdc:backend/config/settings.py): Main Django project settings
+- [config/urls.py](mdc:backend/config/urls.py): URL routing configuration for the entire backend
+
+## Key Apps
+
+### Data Collection and Processing
+
+- **Data Collector**: Handles collecting data from social media platforms
+  - [data_collector/urls.py](mdc:backend/data_collector/urls.py)
+
+### Social Media Data Handling
+
+- **Facebook Data**: Handles Facebook-specific data
+  - [facebook_data/urls.py](mdc:backend/facebook_data/urls.py)
+- **Instagram Data**: Handles Instagram-specific data
+  - [instagram_data/urls.py](mdc:backend/instagram_data/urls.py)
+- **LinkedIn Data**: Handles LinkedIn-specific data
+  - [linkedin_data/urls.py](mdc:backend/linkedin_data/urls.py)
+- **TikTok Data**: Handles TikTok-specific data
+  - [tiktok_data/urls.py](mdc:backend/tiktok_data/urls.py)
+
+### Analytics and Reports
+
+- **Analytics**: Processes and analyzes collected data
+  - [analytics/urls.py](mdc:backend/analytics/urls.py)
+- **Reports**: Generates reports based on analytics
+  - [reports/urls.py](mdc:backend/reports/urls.py)
+- **Query Builder**: Builds SQL and NoSQL queries
+  - [query_builder/urls.py](mdc:backend/query_builder/urls.py)
+
+### User Management
+
+- **Users**: Handles user authentication and management
+  - [users/urls.py](mdc:backend/users/urls.py)
+- **Track Accounts**: Manages social media accounts being tracked
+  - [track_accounts/urls.py](mdc:backend/track_accounts/urls.py)
+
+## Database
+
+- [fix_db.py](mdc:backend/fix_db.py): Utility script for database fixes
+- [fix_database.py](mdc:backend/fix_database.py): Additional database maintenance scripts
+

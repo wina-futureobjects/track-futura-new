@@ -248,14 +248,14 @@ const ReportDetail = () => {
                 >
                   Back to Reports
                 </Button>
-                <Button
+                {/* <Button
                   variant="contained"
                   color="secondary"
                   startIcon={<AssessmentIcon />}
                   onClick={() => navigate(`/report-folders/${reportId}/instagram-data`)}
                 >
                   Add Instagram Data
-                </Button>
+                </Button> */}
                 <Button
                   variant="contained"
                   color="primary"
