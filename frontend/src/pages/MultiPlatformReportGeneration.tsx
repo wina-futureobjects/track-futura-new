@@ -152,10 +152,10 @@ const MultiPlatformReportGeneration = () => {
     start_date: new Date(new Date().setDate(new Date().getDate() - 30)), // Default to last 30 days
     end_date: new Date(),
     platform_folders: {
-      instagram: [],
-      facebook: [],
-      linkedin: [],
-      tiktok: [],
+      instagram: [] as number[],
+      facebook: [] as number[],
+      linkedin: [] as number[],
+      tiktok: [] as number[],
     },
   });
   
@@ -195,7 +195,12 @@ const MultiPlatformReportGeneration = () => {
         setReportData(data);
         
         // Parse source_folders JSON if it exists
-        let platformFolders = {
+        let platformFolders: {
+          instagram: number[];
+          facebook: number[];
+          linkedin: number[];
+          tiktok: number[];
+        } = {
           instagram: [],
           facebook: [],
           linkedin: [],
@@ -288,7 +293,12 @@ const MultiPlatformReportGeneration = () => {
       const response = await api.get('/api/linkedin-data/folders/');
       if (response.status === 200) {
         const folderData = response.data.results || response.data;
-        setLinkedinFolders(folderData);
+        // Ensure post_count is properly mapped for each folder
+        const processedData = folderData.map((folder: any) => ({
+          ...folder,
+          post_count: folder.post_count || 0
+        }));
+        setLinkedinFolders(processedData);
       }
     } catch (error) {
       console.error('Error fetching LinkedIn folders:', error);
@@ -304,7 +314,12 @@ const MultiPlatformReportGeneration = () => {
       const response = await api.get('/api/tiktok-data/folders/');
       if (response.status === 200) {
         const folderData = response.data.results || response.data;
-        setTiktokFolders(folderData);
+        // Ensure post_count is properly mapped for each folder
+        const processedData = folderData.map((folder: any) => ({
+          ...folder,
+          post_count: folder.post_count || 0
+        }));
+        setTiktokFolders(processedData);
       }
     } catch (error) {
       console.error('Error fetching TikTok folders:', error);
@@ -449,58 +464,179 @@ const MultiPlatformReportGeneration = () => {
       return;
     }
 
+    // Enable debugging
+    const DEBUG = true;
+    const debug = (message: string, data?: any) => {
+      if (DEBUG) {
+        if (data) {
+          console.log(`DEBUG: ${message}`, data);
+        } else {
+          console.log(`DEBUG: ${message}`);
+        }
+      }
+    };
+
     try {
       setGenerating(true);
-
-      let response;
+      
+      // RADICAL APPROACH:
+      // 1. Skip creating a report first
+      // 2. Go directly to report generation endpoint with all params
+      // 3. Let the backend handle creating the report and populating it in one step
+      // 4. Only fall back to the two-step process if needed
+      debug("Starting report generation with direct approach");
+      debug("Report params:", reportParams);
+      
+      const generateData = {
+        name: reportParams.name,
+        description: reportParams.description,
+        start_date: reportParams.start_date.toISOString(),
+        end_date: reportParams.end_date.toISOString(),
+        platform_folders: reportParams.platform_folders,
+        create_if_needed: true, // Signal to backend that we want to create the report if it doesn't exist
+      };
+      
+      let generationEndpoint = '/api/track-accounts/reports/generate_combined/';
       if (reportId) {
-        // Update existing report
-        response = await api.put(`/api/track-accounts/reports/${reportId}/`, {
-          name: reportParams.name,
-          description: reportParams.description,
-          start_date: reportParams.start_date.toISOString(),
-          end_date: reportParams.end_date.toISOString(),
-          source_folders: JSON.stringify(reportParams.platform_folders)
-        });
-      } else {
-        // Create new report
-        response = await api.post('/api/track-accounts/reports/', {
-          name: reportParams.name,
-          description: reportParams.description,
-          start_date: reportParams.start_date.toISOString(),
-          end_date: reportParams.end_date.toISOString(),
-          source_folders: JSON.stringify(reportParams.platform_folders),
-          total_posts: 0,
-          matched_posts: 0
-        });
+        // If we have a report ID, use it, but still try the combined endpoint first
+        generationEndpoint = `/api/track-accounts/reports/${reportId}/generate_combined/`;
+        debug(`Using existing report ID: ${reportId}`);
       }
-
-      if (response.status === 200 || response.status === 201) {
-        const newReportId = response.data.id || reportId;
+      
+      try {
+        debug("Attempting combined report generation", generateData);
+        // First try the combined endpoint that creates and generates in one step
+        const combinedResponse = await api.post(generationEndpoint, generateData);
         
-        // Generate the report content
-        const generateResponse = await api.post(`/api/track-accounts/reports/${newReportId}/generate_report/`, {
+        debug("Combined generation response:", combinedResponse);
+        
+        if (combinedResponse.status === 200 || combinedResponse.status === 201) {
+          // Success! Get the report ID from the response
+          const generatedReportId = combinedResponse.data.id || reportId;
+          debug(`Successfully created/generated report with ID: ${generatedReportId}`);
+          
+          showSnackbar('Report generated successfully', 'success');
+          
+          // Navigate to the detail page
+          setTimeout(() => {
+            debug(`Navigating to report: ${generatedReportId}`);
+            navigate(`/report-folders/${generatedReportId}`);
+          }, 2000);
+          return;
+        }
+        
+        // If we get here, the combined endpoint failed, fall back to the old approach
+        debug("Combined approach failed, falling back to two-step process");
+        throw new Error("Combined endpoint not available");
+      } catch (combinedError) {
+        debug("Error with combined approach:", combinedError);
+        debug("Falling back to two-step process");
+        
+        // FALLBACK: Use the traditional two-step approach but with careful handling
+        
+        // Step 1: Determine if we need to create or update a report
+        let targetReportId = reportId;
+        
+        if (!targetReportId) {
+          // Check if a report with this name already exists to avoid duplication
+          debug("Checking for existing reports with same name");
+          const checkResponse = await api.get('/api/track-accounts/reports/');
+          let existingReports: any[] = [];
+          
+          if (checkResponse.status === 200) {
+            if (Array.isArray(checkResponse.data)) {
+              existingReports = checkResponse.data;
+            } else if (checkResponse.data.results && Array.isArray(checkResponse.data.results)) {
+              existingReports = checkResponse.data.results;
+            }
+          }
+          
+          debug("Found existing reports:", existingReports);
+          
+          const existingReport = existingReports.find((report: any) => 
+            report.name === reportParams.name && (!report.matched_posts || report.matched_posts === 0)
+          );
+          
+          if (existingReport) {
+            // Use the existing empty report
+            targetReportId = existingReport.id;
+            debug(`Using existing empty report ID: ${targetReportId}`);
+          } else {
+            // Create a new report
+            debug("Creating new report");
+            const createData = {
+              name: reportParams.name,
+              description: reportParams.description,
+              start_date: reportParams.start_date.toISOString(),
+              end_date: reportParams.end_date.toISOString(),
+              source_folders: JSON.stringify(reportParams.platform_folders),
+              total_posts: 0,
+              matched_posts: 0
+            };
+            
+            debug("Create request data:", createData);
+            const createResponse = await api.post('/api/track-accounts/reports/', createData);
+            debug("Create response:", createResponse);
+            
+            if (createResponse.status !== 201 || !createResponse.data || !createResponse.data.id) {
+              throw new Error('Failed to create report');
+            }
+            
+            targetReportId = createResponse.data.id;
+            debug(`Created new report with ID: ${targetReportId}`);
+          }
+        } else {
+          // Update the existing report
+          debug(`Updating existing report: ${targetReportId}`);
+          const updateData = {
+            name: reportParams.name,
+            description: reportParams.description,
+            start_date: reportParams.start_date.toISOString(),
+            end_date: reportParams.end_date.toISOString(),
+            source_folders: JSON.stringify(reportParams.platform_folders)
+          };
+          
+          debug("Update request data:", updateData);
+          const updateResponse = await api.put(`/api/track-accounts/reports/${targetReportId}/`, updateData);
+          debug("Update response:", updateResponse);
+          
+          if (updateResponse.status !== 200) {
+            throw new Error('Failed to update report');
+          }
+        }
+        
+        // Step 2: Generate the report content
+        debug(`Generating content for report ID: ${targetReportId}`);
+        const generateContentData = {
           platform_folders: reportParams.platform_folders,
           start_date: reportParams.start_date.toISOString(),
           end_date: reportParams.end_date.toISOString(),
           name: reportParams.name,
-          description: reportParams.description
-        });
-
-        if (generateResponse.status === 200 || generateResponse.status === 201) {
-          showSnackbar('Report generated successfully', 'success');
-          // Navigate to the report detail page
-          setTimeout(() => {
-            navigate(`/report-folders/${newReportId}`);
-          }, 1500);
-        } else {
+          description: reportParams.description,
+          replace_existing: true  // Tell backend to replace any existing entries
+        };
+        
+        debug("Generate content request data:", generateContentData);
+        const generateResponse = await api.post(
+          `/api/track-accounts/reports/${targetReportId}/generate_report/`, 
+          generateContentData
+        );
+        debug("Generate content response:", generateResponse);
+        
+        if (generateResponse.status !== 200 && generateResponse.status !== 201) {
           throw new Error('Failed to generate report content');
         }
-      } else {
-        throw new Error('Failed to create/update report');
+        
+        showSnackbar('Report generated successfully', 'success');
+        
+        // Add a delay before navigation to ensure backend processing completes
+        setTimeout(() => {
+          debug(`Navigating to report: ${targetReportId}`);
+          navigate(`/report-folders/${targetReportId}`);
+        }, 2500);
       }
     } catch (error) {
-      console.error('Error generating report:', error);
+      console.error('Error in report generation process:', error);
       showSnackbar('Failed to generate report', 'error');
     } finally {
       setGenerating(false);
@@ -508,138 +644,744 @@ const MultiPlatformReportGeneration = () => {
   };
 
   return (
-    <Container maxWidth="xl" sx={{ mt: 2, mb: 4 }}>
-      {/* Breadcrumbs */}
-      <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
-        <Link 
-          underline="hover" 
-          sx={{ display: 'flex', alignItems: 'center' }} 
-          color="inherit" 
-          href="/"
-        >
-          <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-          Home
-        </Link>
-        <Link 
-          underline="hover" 
-          sx={{ display: 'flex', alignItems: 'center' }} 
-          color="inherit" 
-          onClick={handleBackToReports}
-          style={{ cursor: 'pointer' }}
-        >
-          <DescriptionIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-          Report Folders
-        </Link>
-        <Typography
-          sx={{ display: 'flex', alignItems: 'center' }}
-          color="text.primary"
-        >
-          {reportId ? 'Edit Report' : 'New Multi-Platform Report'}
-        </Typography>
-      </Breadcrumbs>
-
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h4">
-          {reportId ? 'Edit Multi-Platform Report' : 'Create Multi-Platform Report'}
-        </Typography>
-        <Button
-          variant="outlined"
-          startIcon={<ArrowBackIcon />}
-          onClick={handleBackToReports}
-        >
-          Back to Reports
-        </Button>
-      </Box>
-
-      {/* Main content area with two columns */}
-      <Grid container spacing={2}>
-        {/* Left column - Report details */}
-        <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 3, height: '100%' }}>
-            <Typography variant="h6" gutterBottom>
-              Report Details
+    <Box sx={{ bgcolor: '#f8f9fa', minHeight: '100vh' }}>
+      <Container maxWidth="xl" sx={{ py: 3 }}>
+        {/* Header area with breadcrumbs and title */}
+        <Box sx={{ mb: 2 }}>
+          <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 1 }}>
+            <Link 
+              underline="hover" 
+              sx={{ display: 'flex', alignItems: 'center' }} 
+              color="inherit" 
+              href="/"
+            >
+              <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
+              Home
+            </Link>
+            <Link 
+              underline="hover" 
+              sx={{ display: 'flex', alignItems: 'center' }} 
+              color="inherit" 
+              onClick={handleBackToReports}
+              style={{ cursor: 'pointer' }}
+            >
+              <DescriptionIcon sx={{ mr: 0.5 }} fontSize="inherit" />
+              Report Folders
+            </Link>
+            <Typography
+              sx={{ display: 'flex', alignItems: 'center' }}
+              color="text.primary"
+            >
+              {reportId ? 'Edit Report' : 'New Multi-Platform Report'}
             </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
-              <TextField
-                label="Report Name"
-                value={reportParams.name}
-                onChange={(e) => handleInputChange('name', e.target.value)}
-                fullWidth
-                required
-              />
-              <TextField
-                label="Description"
-                value={reportParams.description}
-                onChange={(e) => handleInputChange('description', e.target.value)}
-                fullWidth
-                multiline
-                rows={3}
-              />
-              <LocalizationProvider dateAdapter={AdapterDateFns}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <DatePicker
-                    label="Start Date"
-                    value={reportParams.start_date}
-                    onChange={(date) => handleDateChange('start_date', date)}
-                    slotProps={{ textField: { fullWidth: true } }}
-                  />
-                  <DatePicker
-                    label="End Date"
-                    value={reportParams.end_date}
-                    onChange={(date) => handleDateChange('end_date', date)}
-                    slotProps={{ textField: { fullWidth: true } }}
-                  />
-                </Box>
-              </LocalizationProvider>
+          </Breadcrumbs>
 
-              {/* Summary of selected folders */}
-              <Box sx={{ mt: 3 }}>
-                <Typography variant="subtitle2" gutterBottom>
-                  Selected Data:
-                </Typography>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <InstagramIcon sx={{ mr: 1 }} fontSize="small" />
-                    <Typography variant="body2">
-                      {reportParams.platform_folders.instagram.length} Instagram folders
-                    </Typography>
+          <Box sx={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 1
+          }}>
+            <Typography variant="h4" component="h1" sx={{ fontWeight: 600 }}>
+              {reportId ? 'Edit Multi-Platform Report' : 'Create Multi-Platform Report'}
+            </Typography>
+            <Button
+              variant="outlined"
+              startIcon={<ArrowBackIcon />}
+              onClick={handleBackToReports}
+              size="large"
+            >
+              Back to Reports
+            </Button>
+          </Box>
+        </Box>
+
+        {/* Main content area with modernized layout */}
+        <Box sx={{ 
+          display: 'flex', 
+          flexDirection: { xs: 'column', lg: 'row' },
+          gap: 2,
+          alignItems: 'stretch'
+        }}>
+          {/* Left column - Report details */}
+          <Box sx={{ 
+            width: { xs: '100%', lg: '350px' },
+            flexShrink: 0,
+            alignSelf: 'flex-start',
+          }}>
+            <Paper 
+              elevation={2} 
+              sx={{ 
+                p: 2, 
+                borderRadius: 2,
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
+              <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: 'primary.main' }}>
+                Report Details
+              </Typography>
+              <Box sx={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: 2, 
+                mt: 1,
+              }}>
+                <TextField
+                  label="Report Name"
+                  value={reportParams.name}
+                  onChange={(e) => handleInputChange('name', e.target.value)}
+                  fullWidth
+                  required
+                  variant="outlined"
+                  size="small"
+                />
+                <TextField
+                  label="Description"
+                  value={reportParams.description}
+                  onChange={(e) => handleInputChange('description', e.target.value)}
+                  fullWidth
+                  multiline
+                  rows={2}
+                  variant="outlined"
+                  placeholder="Enter a description for this report"
+                  size="small"
+                />
+                <LocalizationProvider dateAdapter={AdapterDateFns}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <DatePicker
+                      label="Start Date"
+                      value={reportParams.start_date}
+                      onChange={(date) => handleDateChange('start_date', date)}
+                      slotProps={{ 
+                        textField: { 
+                          fullWidth: true,
+                          variant: "outlined",
+                          size: "small"
+                        } 
+                      }}
+                    />
+                    <DatePicker
+                      label="End Date"
+                      value={reportParams.end_date}
+                      onChange={(date) => handleDateChange('end_date', date)}
+                      slotProps={{ 
+                        textField: { 
+                          fullWidth: true,
+                          variant: "outlined",
+                          size: "small"
+                        } 
+                      }}
+                    />
                   </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <FacebookIcon sx={{ mr: 1 }} fontSize="small" />
-                    <Typography variant="body2">
-                      {reportParams.platform_folders.facebook.length} Facebook folders
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <LinkedInIcon sx={{ mr: 1 }} fontSize="small" />
-                    <Typography variant="body2">
-                      {reportParams.platform_folders.linkedin.length} LinkedIn folders
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Box sx={{ mr: 1, display: 'flex', alignItems: 'center' }}>
-                      <TikTokIcon />
+                </LocalizationProvider>
+
+                {/* Summary of selected folders */}
+                <Box sx={{ 
+                  mt: 1,
+                  p: 1.5, 
+                  bgcolor: 'background.default', 
+                  borderRadius: 1,
+                  border: '1px solid',
+                  borderColor: 'divider'
+                }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                    Selected Data:
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <InstagramIcon sx={{ mr: 1, color: '#E1306C' }} fontSize="small" />
+                        <Typography variant="body2">Instagram</Typography>
+                      </Box>
+                      <Chip 
+                        label={reportParams.platform_folders.instagram.length} 
+                        size="small" 
+                        color={reportParams.platform_folders.instagram.length > 0 ? "primary" : "default"}
+                      />
                     </Box>
-                    <Typography variant="body2">
-                      {reportParams.platform_folders.tiktok.length} TikTok folders
-                    </Typography>
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <FacebookIcon sx={{ mr: 1, color: '#1877F2' }} fontSize="small" />
+                        <Typography variant="body2">Facebook</Typography>
+                      </Box>
+                      <Chip 
+                        label={reportParams.platform_folders.facebook.length} 
+                        size="small" 
+                        color={reportParams.platform_folders.facebook.length > 0 ? "primary" : "default"}
+                      />
+                    </Box>
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <LinkedInIcon sx={{ mr: 1, color: '#0A66C2' }} fontSize="small" />
+                        <Typography variant="body2">LinkedIn</Typography>
+                      </Box>
+                      <Chip 
+                        label={reportParams.platform_folders.linkedin.length} 
+                        size="small" 
+                        color={reportParams.platform_folders.linkedin.length > 0 ? "primary" : "default"}
+                      />
+                    </Box>
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Box sx={{ mr: 1, display: 'flex', alignItems: 'center', color: '#000000' }}>
+                          <TikTokIcon />
+                        </Box>
+                        <Typography variant="body2">TikTok</Typography>
+                      </Box>
+                      <Chip 
+                        label={reportParams.platform_folders.tiktok.length} 
+                        size="small" 
+                        color={reportParams.platform_folders.tiktok.length > 0 ? "primary" : "default"}
+                      />
+                    </Box>
                   </Box>
                 </Box>
               </Box>
+            </Paper>
+          </Box>
 
-              {/* Generate Button for mobile view */}
-              <Box sx={{ display: { xs: 'flex', md: 'none' }, justifyContent: 'center', mt: 3 }}>
+          {/* Right column - Platform selection */}
+          <Box sx={{ flex: 1 }}>
+            <Paper 
+              elevation={2} 
+              sx={{ 
+                borderRadius: 2, 
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+                position: 'relative'
+              }}
+            >
+              <Box sx={{ px: 3, pt: 2, pb: 1 }}>
+                <Typography variant="h6" sx={{ fontWeight: 600, color: 'primary.main' }}>
+                  Select Platform Data
+                </Typography>
+              </Box>
+              
+              <Box sx={{ 
+                borderBottom: 1, 
+                borderColor: 'divider',
+                px: 2
+              }}>
+                <Tabs 
+                  value={activeTab} 
+                  onChange={handleTabChange} 
+                  aria-label="platform tabs"
+                  variant="scrollable"
+                  scrollButtons="auto"
+                  sx={{
+                    '& .MuiTab-root': {
+                      minHeight: 48,
+                      textTransform: 'none',
+                      fontSize: '0.95rem',
+                      fontWeight: 500
+                    }
+                  }}
+                >
+                  <Tab 
+                    icon={<InstagramIcon sx={{ color: '#E1306C' }} />} 
+                    label="Instagram" 
+                    iconPosition="start" 
+                    id="platform-tab-0"
+                    aria-controls="platform-tabpanel-0"
+                  />
+                  <Tab 
+                    icon={<FacebookIcon sx={{ color: '#1877F2' }} />} 
+                    label="Facebook" 
+                    iconPosition="start"
+                    id="platform-tab-1"
+                    aria-controls="platform-tabpanel-1"
+                  />
+                  <Tab 
+                    icon={<LinkedInIcon sx={{ color: '#0A66C2' }} />} 
+                    label="LinkedIn" 
+                    iconPosition="start"
+                    id="platform-tab-2"
+                    aria-controls="platform-tabpanel-2"
+                  />
+                  <Tab 
+                    icon={<Box sx={{ color: '#000000' }}><TikTokIcon /></Box>}
+                    label="TikTok" 
+                    iconPosition="start"
+                    id="platform-tab-3"
+                    aria-controls="platform-tabpanel-3"
+                  />
+                </Tabs>
+              </Box>
+              
+              <Box sx={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                {/* Instagram Tab */}
+                <TabPanel value={activeTab} index={0}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                    <Box>
+                      <Box sx={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: 1,
+                        mb: 1
+                      }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
+                          Select Instagram Folders ({reportParams.platform_folders.instagram.length} selected)
+                        </Typography>
+                        <TextField
+                          placeholder="Search folders..."
+                          value={instagramSearch}
+                          onChange={(e) => setInstagramSearch(e.target.value)}
+                          size="small"
+                          variant="outlined"
+                          sx={{ width: { xs: '100%', sm: '250px' } }}
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <SearchIcon />
+                              </InputAdornment>
+                            ),
+                          }}
+                        />
+                      </Box>
+                      
+                      {loading ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                          <CircularProgress />
+                        </Box>
+                      ) : filteredInstagramFolders.length === 0 ? (
+                        <Box sx={{ 
+                          p: 4, 
+                          textAlign: 'center',
+                          bgcolor: 'background.default',
+                          borderRadius: 1
+                        }}>
+                          <Typography>No Instagram folders found</Typography>
+                        </Box>
+                      ) : (
+                        <Box sx={{ 
+                          height: { xs: '300px', sm: '300px', lg: '350px' }, 
+                          overflow: 'auto',
+                          borderRadius: 1,
+                          bgcolor: 'background.default',
+                          border: '1px solid',
+                          borderColor: 'divider'
+                        }}>
+                          <List dense disablePadding>
+                            {filteredInstagramFolders.map((folder) => (
+                              <React.Fragment key={folder.id}>
+                                <ListItemButton
+                                  onClick={() => toggleInstagramFolder(folder.id)}
+                                  selected={reportParams.platform_folders.instagram.includes(folder.id)}
+                                  sx={{ 
+                                    py: 1,
+                                    '&.Mui-selected': {
+                                      bgcolor: 'primary.lighter',
+                                      '&:hover': {
+                                        bgcolor: 'primary.lighter',
+                                      }
+                                    }
+                                  }}
+                                >
+                                  <ListItemIcon>
+                                    <Checkbox
+                                      edge="start"
+                                      checked={reportParams.platform_folders.instagram.includes(folder.id)}
+                                      tabIndex={-1}
+                                      disableRipple
+                                      color="primary"
+                                    />
+                                  </ListItemIcon>
+                                  <ListItemText 
+                                    primary={
+                                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                                        {folder.name}
+                                      </Typography>
+                                    }
+                                    secondary={
+                                      <>
+                                        {folder.description && <Typography variant="body2" color="text.secondary">{folder.description}</Typography>}
+                                        <Typography variant="body2" color="text.secondary">
+                                          {folder.post_count !== undefined ? folder.post_count : 0} posts
+                                        </Typography>
+                                      </>
+                                    }
+                                  />
+                                  <InstagramIcon sx={{ color: '#E1306C' }} />
+                                </ListItemButton>
+                                <Divider />
+                              </React.Fragment>
+                            ))}
+                          </List>
+                        </Box>
+                      )}
+                    </Box>
+                  </Box>
+                </TabPanel>
+
+                {/* Facebook Tab */}
+                <TabPanel value={activeTab} index={1}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                    <Box>
+                      <Box sx={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: 1,
+                        mb: 1
+                      }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
+                          Select Facebook Folders ({reportParams.platform_folders.facebook.length} selected)
+                        </Typography>
+                        <TextField
+                          placeholder="Search folders..."
+                          value={facebookSearch}
+                          onChange={(e) => setFacebookSearch(e.target.value)}
+                          size="small"
+                          variant="outlined"
+                          sx={{ width: { xs: '100%', sm: '250px' } }}
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <SearchIcon />
+                              </InputAdornment>
+                            ),
+                          }}
+                        />
+                      </Box>
+                      
+                      {loading ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                          <CircularProgress />
+                        </Box>
+                      ) : filteredFacebookFolders.length === 0 ? (
+                        <Box sx={{ 
+                          p: 4, 
+                          textAlign: 'center',
+                          bgcolor: 'background.default',
+                          borderRadius: 1
+                        }}>
+                          <Typography>No Facebook folders found</Typography>
+                        </Box>
+                      ) : (
+                        <Box sx={{ 
+                          height: { xs: '300px', sm: '300px', lg: '350px' }, 
+                          overflow: 'auto',
+                          borderRadius: 1,
+                          bgcolor: 'background.default',
+                          border: '1px solid',
+                          borderColor: 'divider'
+                        }}>
+                          <List dense disablePadding>
+                            {filteredFacebookFolders.map((folder) => (
+                              <React.Fragment key={folder.id}>
+                                <ListItemButton
+                                  onClick={() => toggleFacebookFolder(folder.id)}
+                                  selected={reportParams.platform_folders.facebook.includes(folder.id)}
+                                  sx={{ 
+                                    py: 1,
+                                    '&.Mui-selected': {
+                                      bgcolor: 'primary.lighter',
+                                      '&:hover': {
+                                        bgcolor: 'primary.lighter',
+                                      }
+                                    }
+                                  }}
+                                >
+                                  <ListItemIcon>
+                                    <Checkbox
+                                      edge="start"
+                                      checked={reportParams.platform_folders.facebook.includes(folder.id)}
+                                      tabIndex={-1}
+                                      disableRipple
+                                      color="primary"
+                                    />
+                                  </ListItemIcon>
+                                  <ListItemText 
+                                    primary={
+                                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                                        {folder.name}
+                                      </Typography>
+                                    }
+                                    secondary={
+                                      <>
+                                        {folder.description && <Typography variant="body2" color="text.secondary">{folder.description}</Typography>}
+                                        <Typography variant="body2" color="text.secondary">
+                                          {folder.post_count !== undefined ? folder.post_count : 0} posts
+                                        </Typography>
+                                      </>
+                                    }
+                                  />
+                                  <FacebookIcon sx={{ color: '#1877F2' }} />
+                                </ListItemButton>
+                                <Divider />
+                              </React.Fragment>
+                            ))}
+                          </List>
+                        </Box>
+                      )}
+                    </Box>
+                  </Box>
+                </TabPanel>
+
+                {/* LinkedIn Tab */}
+                <TabPanel value={activeTab} index={2}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                    <Box>
+                      <Box sx={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: 1,
+                        mb: 1
+                      }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
+                          Select LinkedIn Folders ({reportParams.platform_folders.linkedin.length} selected)
+                        </Typography>
+                        <TextField
+                          placeholder="Search folders..."
+                          value={linkedinSearch}
+                          onChange={(e) => setLinkedinSearch(e.target.value)}
+                          size="small"
+                          variant="outlined"
+                          sx={{ width: { xs: '100%', sm: '250px' } }}
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <SearchIcon />
+                              </InputAdornment>
+                            ),
+                          }}
+                        />
+                      </Box>
+                      
+                      {loading ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                          <CircularProgress />
+                        </Box>
+                      ) : filteredLinkedinFolders.length === 0 ? (
+                        <Box sx={{ 
+                          p: 4, 
+                          textAlign: 'center',
+                          bgcolor: 'background.default',
+                          borderRadius: 1
+                        }}>
+                          <Typography>No LinkedIn folders found</Typography>
+                        </Box>
+                      ) : (
+                        <Box sx={{ 
+                          height: { xs: '300px', sm: '300px', lg: '350px' }, 
+                          overflow: 'auto',
+                          borderRadius: 1,
+                          bgcolor: 'background.default',
+                          border: '1px solid',
+                          borderColor: 'divider'
+                        }}>
+                          <List dense disablePadding>
+                            {filteredLinkedinFolders.map((folder) => (
+                              <React.Fragment key={folder.id}>
+                                <ListItemButton
+                                  onClick={() => toggleLinkedinFolder(folder.id)}
+                                  selected={reportParams.platform_folders.linkedin.includes(folder.id)}
+                                  sx={{ 
+                                    py: 1,
+                                    '&.Mui-selected': {
+                                      bgcolor: 'primary.lighter',
+                                      '&:hover': {
+                                        bgcolor: 'primary.lighter',
+                                      }
+                                    }
+                                  }}
+                                >
+                                  <ListItemIcon>
+                                    <Checkbox
+                                      edge="start"
+                                      checked={reportParams.platform_folders.linkedin.includes(folder.id)}
+                                      tabIndex={-1}
+                                      disableRipple
+                                      color="primary"
+                                    />
+                                  </ListItemIcon>
+                                  <ListItemText 
+                                    primary={
+                                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                                        {folder.name}
+                                      </Typography>
+                                    }
+                                    secondary={
+                                      <>
+                                        {folder.description && <Typography variant="body2" color="text.secondary">{folder.description}</Typography>}
+                                        <Typography variant="body2" color="text.secondary">
+                                          {folder.post_count !== undefined ? folder.post_count : 0} posts
+                                        </Typography>
+                                      </>
+                                    }
+                                  />
+                                  <LinkedInIcon sx={{ color: '#0A66C2' }} />
+                                </ListItemButton>
+                                <Divider />
+                              </React.Fragment>
+                            ))}
+                          </List>
+                        </Box>
+                      )}
+                    </Box>
+                  </Box>
+                </TabPanel>
+
+                {/* TikTok Tab */}
+                <TabPanel value={activeTab} index={3}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                    <Box>
+                      <Box sx={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: 1,
+                        mb: 1
+                      }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
+                          Select TikTok Folders ({reportParams.platform_folders.tiktok.length} selected)
+                        </Typography>
+                        <TextField
+                          placeholder="Search folders..."
+                          value={tiktokSearch}
+                          onChange={(e) => setTiktokSearch(e.target.value)}
+                          size="small"
+                          variant="outlined"
+                          sx={{ width: { xs: '100%', sm: '250px' } }}
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <SearchIcon />
+                              </InputAdornment>
+                            ),
+                          }}
+                        />
+                      </Box>
+                      
+                      {loading ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                          <CircularProgress />
+                        </Box>
+                      ) : filteredTiktokFolders.length === 0 ? (
+                        <Box sx={{ 
+                          p: 4, 
+                          textAlign: 'center',
+                          bgcolor: 'background.default',
+                          borderRadius: 1
+                        }}>
+                          <Typography>No TikTok folders found</Typography>
+                        </Box>
+                      ) : (
+                        <Box sx={{ 
+                          height: { xs: '300px', sm: '300px', lg: '350px' }, 
+                          overflow: 'auto',
+                          borderRadius: 1,
+                          bgcolor: 'background.default',
+                          border: '1px solid',
+                          borderColor: 'divider'
+                        }}>
+                          <List dense disablePadding>
+                            {filteredTiktokFolders.map((folder) => (
+                              <React.Fragment key={folder.id}>
+                                <ListItemButton
+                                  onClick={() => toggleTiktokFolder(folder.id)}
+                                  selected={reportParams.platform_folders.tiktok.includes(folder.id)}
+                                  sx={{ 
+                                    py: 1,
+                                    '&.Mui-selected': {
+                                      bgcolor: 'primary.lighter',
+                                      '&:hover': {
+                                        bgcolor: 'primary.lighter',
+                                      }
+                                    }
+                                  }}
+                                >
+                                  <ListItemIcon>
+                                    <Checkbox
+                                      edge="start"
+                                      checked={reportParams.platform_folders.tiktok.includes(folder.id)}
+                                      tabIndex={-1}
+                                      disableRipple
+                                      color="primary"
+                                    />
+                                  </ListItemIcon>
+                                  <ListItemText 
+                                    primary={
+                                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                                        {folder.name}
+                                      </Typography>
+                                    }
+                                    secondary={
+                                      <>
+                                        {folder.description && <Typography variant="body2" color="text.secondary">{folder.description}</Typography>}
+                                        <Typography variant="body2" color="text.secondary">
+                                          {folder.post_count !== undefined ? folder.post_count : 0} posts
+                                        </Typography>
+                                      </>
+                                    }
+                                  />
+                                  <Box sx={{ color: '#000000' }}>
+                                    <TikTokIcon />
+                                  </Box>
+                                </ListItemButton>
+                                <Divider />
+                              </React.Fragment>
+                            ))}
+                          </List>
+                        </Box>
+                      )}
+                    </Box>
+                  </Box>
+                </TabPanel>
+              </Box>
+              
+              {/* Generate Report button positioned at the bottom right */}
+              <Box sx={{ 
+                p: 2, 
+                borderTop: '1px solid', 
+                borderColor: 'divider',
+                display: 'flex',
+                justifyContent: 'flex-end'
+              }}>
                 <Button
                   variant="contained"
                   color="primary"
                   size="large"
                   onClick={handleGenerateReport}
                   disabled={generating}
-                  fullWidth
+                  sx={{ 
+                    py: 1,
+                    px: 3,
+                    borderRadius: 2,
+                    boxShadow: 2,
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    fontSize: '1rem'
+                  }}
                 >
                   {generating ? (
                     <>
-                      <CircularProgress size={24} sx={{ mr: 1 }} />
+                      <CircularProgress size={24} sx={{ mr: 1 }} color="inherit" />
                       Generating...
                     </>
                   ) : (
@@ -647,414 +1389,10 @@ const MultiPlatformReportGeneration = () => {
                   )}
                 </Button>
               </Box>
-            </Box>
-          </Paper>
-        </Grid>
-
-        {/* Right column - Platform selection */}
-        <Grid item xs={12} md={8}>
-          <Paper sx={{ p: 2, height: '100%' }}>
-            <Typography variant="h6" gutterBottom sx={{ pl: 1 }}>
-              Select Platform Data
-            </Typography>
-            
-            <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-              <Tabs 
-                value={activeTab} 
-                onChange={handleTabChange} 
-                aria-label="platform tabs"
-                variant="scrollable"
-                scrollButtons="auto"
-              >
-                <Tab 
-                  icon={<InstagramIcon />} 
-                  label="Instagram" 
-                  iconPosition="start" 
-                  id="platform-tab-0"
-                  aria-controls="platform-tabpanel-0"
-                />
-                <Tab 
-                  icon={<FacebookIcon />} 
-                  label="Facebook" 
-                  iconPosition="start"
-                  id="platform-tab-1"
-                  aria-controls="platform-tabpanel-1"
-                />
-                <Tab 
-                  icon={<LinkedInIcon />} 
-                  label="LinkedIn" 
-                  iconPosition="start"
-                  id="platform-tab-2"
-                  aria-controls="platform-tabpanel-2"
-                />
-                <Tab 
-                  icon={<TikTokIcon />} 
-                  label="TikTok" 
-                  iconPosition="start"
-                  id="platform-tab-3"
-                  aria-controls="platform-tabpanel-3"
-                />
-              </Tabs>
-            </Box>
-
-            {/* Instagram Tab */}
-            <TabPanel value={activeTab} index={0}>
-              <Box>
-                <Grid container spacing={2} alignItems="center">
-                  <Grid item xs={12} sm={7}>
-                    <Typography variant="subtitle1">
-                      Select Instagram Folders ({reportParams.platform_folders.instagram.length} selected)
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={5}>
-                    <TextField
-                      placeholder="Search folders..."
-                      value={instagramSearch}
-                      onChange={(e) => setInstagramSearch(e.target.value)}
-                      fullWidth
-                      variant="outlined"
-                      size="small"
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <SearchIcon />
-                          </InputAdornment>
-                        ),
-                      }}
-                    />
-                  </Grid>
-                </Grid>
-                
-                {loading ? (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-                    <CircularProgress />
-                  </Box>
-                ) : filteredInstagramFolders.length === 0 ? (
-                  <Typography sx={{ mt: 2 }}>No Instagram folders found</Typography>
-                ) : (
-                  <Paper 
-                    variant="outlined" 
-                    sx={{ 
-                      height: { xs: '250px', sm: '350px' }, 
-                      overflow: 'auto',
-                      mt: 2,
-                      borderRadius: 1
-                    }}
-                  >
-                    <List dense disablePadding>
-                      {filteredInstagramFolders.map((folder) => (
-                        <React.Fragment key={folder.id}>
-                          <ListItemButton
-                            onClick={() => toggleInstagramFolder(folder.id)}
-                            selected={reportParams.platform_folders.instagram.includes(folder.id)}
-                            dense
-                          >
-                            <ListItemIcon>
-                              <Checkbox
-                                edge="start"
-                                checked={reportParams.platform_folders.instagram.includes(folder.id)}
-                                tabIndex={-1}
-                                disableRipple
-                              />
-                            </ListItemIcon>
-                            <ListItemText 
-                              primary={folder.name} 
-                              secondary={
-                                <>
-                                  {folder.description && <span>{folder.description}<br /></span>}
-                                  <span>{typeof folder.post_count === 'number' ? folder.post_count : 'Unknown'} posts</span>
-                                </>
-                              }
-                            />
-                            <InstagramIcon color="action" />
-                          </ListItemButton>
-                          <Divider />
-                        </React.Fragment>
-                      ))}
-                    </List>
-                  </Paper>
-                )}
-              </Box>
-            </TabPanel>
-
-            {/* Facebook Tab */}
-            <TabPanel value={activeTab} index={1}>
-              <Box>
-                <Grid container spacing={2} alignItems="center">
-                  <Grid item xs={12} sm={7}>
-                    <Typography variant="subtitle1">
-                      Select Facebook Folders ({reportParams.platform_folders.facebook.length} selected)
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={5}>
-                    <TextField
-                      placeholder="Search folders..."
-                      value={facebookSearch}
-                      onChange={(e) => setFacebookSearch(e.target.value)}
-                      fullWidth
-                      variant="outlined"
-                      size="small"
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <SearchIcon />
-                          </InputAdornment>
-                        ),
-                      }}
-                    />
-                  </Grid>
-                </Grid>
-                
-                {loading ? (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-                    <CircularProgress />
-                  </Box>
-                ) : filteredFacebookFolders.length === 0 ? (
-                  <Typography sx={{ mt: 2 }}>No Facebook folders found</Typography>
-                ) : (
-                  <Paper 
-                    variant="outlined" 
-                    sx={{ 
-                      height: { xs: '250px', sm: '350px' }, 
-                      overflow: 'auto',
-                      mt: 2,
-                      borderRadius: 1
-                    }}
-                  >
-                    <List dense disablePadding>
-                      {filteredFacebookFolders.map((folder) => (
-                        <React.Fragment key={folder.id}>
-                          <ListItemButton
-                            onClick={() => toggleFacebookFolder(folder.id)}
-                            selected={reportParams.platform_folders.facebook.includes(folder.id)}
-                            dense
-                          >
-                            <ListItemIcon>
-                              <Checkbox
-                                edge="start"
-                                checked={reportParams.platform_folders.facebook.includes(folder.id)}
-                                tabIndex={-1}
-                                disableRipple
-                              />
-                            </ListItemIcon>
-                            <ListItemText 
-                              primary={folder.name} 
-                              secondary={
-                                <>
-                                  {folder.description && <span>{folder.description}<br /></span>}
-                                  <span>{typeof folder.post_count === 'number' ? folder.post_count : 'Unknown'} posts</span>
-                                </>
-                              }
-                            />
-                            <FacebookIcon color="action" />
-                          </ListItemButton>
-                          <Divider />
-                        </React.Fragment>
-                      ))}
-                    </List>
-                  </Paper>
-                )}
-              </Box>
-            </TabPanel>
-
-            {/* LinkedIn Tab */}
-            <TabPanel value={activeTab} index={2}>
-              <Box>
-                <Grid container spacing={2} alignItems="center">
-                  <Grid item xs={12} sm={7}>
-                    <Typography variant="subtitle1">
-                      Select LinkedIn Folders ({reportParams.platform_folders.linkedin.length} selected)
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={5}>
-                    <TextField
-                      placeholder="Search folders..."
-                      value={linkedinSearch}
-                      onChange={(e) => setLinkedinSearch(e.target.value)}
-                      fullWidth
-                      variant="outlined"
-                      size="small"
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <SearchIcon />
-                          </InputAdornment>
-                        ),
-                      }}
-                    />
-                  </Grid>
-                </Grid>
-                
-                {loading ? (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-                    <CircularProgress />
-                  </Box>
-                ) : filteredLinkedinFolders.length === 0 ? (
-                  <Typography sx={{ mt: 2 }}>No LinkedIn folders found</Typography>
-                ) : (
-                  <Paper 
-                    variant="outlined" 
-                    sx={{ 
-                      height: { xs: '250px', sm: '350px' }, 
-                      overflow: 'auto',
-                      mt: 2,
-                      borderRadius: 1
-                    }}
-                  >
-                    <List dense disablePadding>
-                      {filteredLinkedinFolders.map((folder) => (
-                        <React.Fragment key={folder.id}>
-                          <ListItemButton
-                            onClick={() => toggleLinkedinFolder(folder.id)}
-                            selected={reportParams.platform_folders.linkedin.includes(folder.id)}
-                            dense
-                          >
-                            <ListItemIcon>
-                              <Checkbox
-                                edge="start"
-                                checked={reportParams.platform_folders.linkedin.includes(folder.id)}
-                                tabIndex={-1}
-                                disableRipple
-                              />
-                            </ListItemIcon>
-                            <ListItemText 
-                              primary={folder.name} 
-                              secondary={
-                                <>
-                                  {folder.description && <span>{folder.description}<br /></span>}
-                                  <span>{typeof folder.post_count === 'number' ? folder.post_count : 'Unknown'} posts</span>
-                                </>
-                              }
-                            />
-                            <LinkedInIcon color="action" />
-                          </ListItemButton>
-                          <Divider />
-                        </React.Fragment>
-                      ))}
-                    </List>
-                  </Paper>
-                )}
-              </Box>
-            </TabPanel>
-
-            {/* TikTok Tab */}
-            <TabPanel value={activeTab} index={3}>
-              <Box>
-                <Grid container spacing={2} alignItems="center">
-                  <Grid item xs={12} sm={7}>
-                    <Typography variant="subtitle1">
-                      Select TikTok Folders ({reportParams.platform_folders.tiktok.length} selected)
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={5}>
-                    <TextField
-                      placeholder="Search folders..."
-                      value={tiktokSearch}
-                      onChange={(e) => setTiktokSearch(e.target.value)}
-                      fullWidth
-                      variant="outlined"
-                      size="small"
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <SearchIcon />
-                          </InputAdornment>
-                        ),
-                      }}
-                    />
-                  </Grid>
-                </Grid>
-                
-                {loading ? (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-                    <CircularProgress />
-                  </Box>
-                ) : filteredTiktokFolders.length === 0 ? (
-                  <Typography sx={{ mt: 2 }}>No TikTok folders found</Typography>
-                ) : (
-                  <Paper 
-                    variant="outlined" 
-                    sx={{ 
-                      height: { xs: '250px', sm: '350px' }, 
-                      overflow: 'auto',
-                      mt: 2,
-                      borderRadius: 1
-                    }}
-                  >
-                    <List dense disablePadding>
-                      {filteredTiktokFolders.map((folder) => (
-                        <React.Fragment key={folder.id}>
-                          <ListItemButton
-                            onClick={() => toggleTiktokFolder(folder.id)}
-                            selected={reportParams.platform_folders.tiktok.includes(folder.id)}
-                            dense
-                          >
-                            <ListItemIcon>
-                              <Checkbox
-                                edge="start"
-                                checked={reportParams.platform_folders.tiktok.includes(folder.id)}
-                                tabIndex={-1}
-                                disableRipple
-                              />
-                            </ListItemIcon>
-                            <ListItemText 
-                              primary={folder.name} 
-                              secondary={
-                                <>
-                                  {folder.description && <span>{folder.description}<br /></span>}
-                                  <span>{typeof folder.post_count === 'number' ? folder.post_count : 'Unknown'} posts</span>
-                                </>
-                              }
-                            />
-                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                              <TikTokIcon />
-                            </Box>
-                          </ListItemButton>
-                          <Divider />
-                        </React.Fragment>
-                      ))}
-                    </List>
-                  </Paper>
-                )}
-              </Box>
-            </TabPanel>
-          </Paper>
-        </Grid>
-      </Grid>
-
-      {/* Sticky Generate Button for desktop */}
-      <Box 
-        sx={{ 
-          display: { xs: 'none', md: 'flex' },
-          position: 'fixed', 
-          bottom: 24, 
-          right: 24, 
-          zIndex: 10 
-        }}
-      >
-        <Button
-          variant="contained"
-          color="primary"
-          size="large"
-          onClick={handleGenerateReport}
-          disabled={generating}
-          sx={{ 
-            minWidth: 200, 
-            py: 1.5,
-            boxShadow: 3,
-            borderRadius: 2
-          }}
-        >
-          {generating ? (
-            <>
-              <CircularProgress size={24} sx={{ mr: 1 }} />
-              Generating...
-            </>
-          ) : (
-            reportId ? 'Update Report' : 'Generate Report'
-          )}
-        </Button>
-      </Box>
+            </Paper>
+          </Box>
+        </Box>
+      </Container>
 
       {/* Snackbar for notifications */}
       <Snackbar
@@ -1072,7 +1410,7 @@ const MultiPlatformReportGeneration = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </Container>
+    </Box>
   );
 };
 

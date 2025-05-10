@@ -25,7 +25,6 @@ import {
   MoreVert as MoreIcon,
 } from '@mui/icons-material';
 import GELogo from '../../assets/images/logos/GE-logo.png';
-import GELogoFallback from './GELogoFallback';
 
 const Search = styled('div')(({ theme }) => ({
   position: 'relative',
@@ -251,7 +250,6 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
               mr: 2
             }}
           >
-            {!imageError ? (
               <img 
                 src={GELogo} 
                 alt="Great Eastern Logo" 
@@ -261,9 +259,6 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
                 }} 
                 onError={handleImageError}
               />
-            ) : (
-              <GELogoFallback />
-            )}
           </Box>
           
           {!isSmall && (
