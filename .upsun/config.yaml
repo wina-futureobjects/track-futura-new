@@ -3,7 +3,6 @@ applications:
     source:
       root: "backend"
     type: "python:3.11"
-    disk: 8192 # 8 GB
 
     web:
       commands:
