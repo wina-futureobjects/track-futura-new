@@ -26,7 +26,7 @@ SECRET_KEY = "django-insecure-k14j23-+4o*h)26ms8k#ghmv*kglz!hsf^h%sac1^sy7w6f2qw
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = ['*']  # Allow all hosts in production for now
+ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
 
 # Application definition
@@ -99,32 +99,6 @@ DATABASES = {
     }
 }
 
-# Check for Upsun environment
-if 'UPSUN_APPLICATION' in os.environ:
-    # Parse Upsun database relationship
-    import json
-    relationships = json.loads(os.environ['UPSUN_RELATIONSHIPS'])
-    db_settings = relationships['database'][0]
-    
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': db_settings['path'],
-            'USER': db_settings['username'],
-            'PASSWORD': db_settings['password'],
-            'HOST': db_settings['host'],
-            'PORT': db_settings['port'],
-        }
-    }
-# Otherwise, check for DATABASE_URL (for other deployment environments)
-elif 'DATABASE_URL' in os.environ:
-    import dj_database_url
-    DATABASES['default'] = dj_database_url.config(
-        conn_max_age=600,
-        conn_health_checks=True,
-    )
-
-
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
@@ -184,3 +158,36 @@ REST_FRAMEWORK = {
 # CORS settings
 CORS_ALLOW_ALL_ORIGINS = True  # For development only, set specific origins in production
 CORS_ALLOW_CREDENTIALS = True
+
+# Production/Upsun settings.
+if (os.getenv('PLATFORM_APPLICATION_NAME') is not None):
+    DEBUG = False
+
+    # Static dir.
+    if (os.getenv('PLATFORM_APP_DIR') is not None):
+        STATIC_ROOT = os.path.join(os.getenv('PLATFORM_APP_DIR'), 'static')
+
+    # Secret Key.
+    if (os.getenv('PLATFORM_PROJECT_ENTROPY') is not None):
+        SECRET_KEY = os.getenv('PLATFORM_PROJECT_ENTROPY')
+
+    # Set allowed hosts from environment variable
+    if os.getenv('DJANGO_ALLOWED_HOSTS'):
+        ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS').split(',')
+    
+    # Production database configuration.
+    if (os.getenv('PLATFORM_ENVIRONMENT') is not None):
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': os.getenv('DATABASE_PATH'),
+                'USER': os.getenv('DATABASE_USERNAME'),
+                'PASSWORD': os.getenv('DATABASE_PASSWORD'),
+                'HOST': os.getenv('DATABASE_HOST'),
+                'PORT': os.getenv('DATABASE_PORT'),
+            },
+            'sqlite': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+            }
+        }
