@@ -10,9 +10,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name="facebookpost",
-            name="user_posted",
-            field=models.CharField(blank=True, max_length=100, null=True),
-        ),
+        # Field already exists in the model, so we remove the operation to avoid duplicate column error
     ]
