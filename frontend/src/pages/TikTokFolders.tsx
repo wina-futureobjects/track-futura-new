@@ -42,6 +42,7 @@ import {
   ViewList as ViewListIcon,
   GridView as GridViewIcon,
 } from '@mui/icons-material';
+import { apiFetch } from '../utils/api';
 
 interface Folder {
   id: number;
@@ -78,7 +79,7 @@ const TikTokFolders = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch('/api/tiktok-data/folders/');
+      const response = await apiFetch('/api/tiktok-data/folders/');
       
       if (!response.ok) {
         throw new Error('Failed to fetch folders');
@@ -92,7 +93,7 @@ const TikTokFolders = () => {
       const foldersWithCounts = await Promise.all(
         foldersData.map(async (folder: Folder) => {
           try {
-            const countResponse = await fetch(`/api/tiktok-data/posts/?folder_id=${folder.id}&page_size=1`);
+            const countResponse = await apiFetch(`/api/tiktok-data/posts/?folder_id=${folder.id}&page_size=1`);
             if (countResponse.ok) {
               const countData = await countResponse.json();
               return { ...folder, posts_count: countData.count || 0 };
@@ -122,7 +123,7 @@ const TikTokFolders = () => {
     }
     
     try {
-      const response = await fetch('/api/tiktok-data/folders/', {
+      const response = await apiFetch('/api/tiktok-data/folders/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -164,7 +165,7 @@ const TikTokFolders = () => {
     }
     
     try {
-      const response = await fetch(`/api/tiktok-data/folders/${selectedFolder.id}/`, {
+      const response = await apiFetch(`/api/tiktok-data/folders/${selectedFolder.id}/`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -201,7 +202,7 @@ const TikTokFolders = () => {
     if (!selectedFolder) return;
     
     try {
-      const response = await fetch(`/api/tiktok-data/folders/${selectedFolder.id}/`, {
+      const response = await apiFetch(`/api/tiktok-data/folders/${selectedFolder.id}/`, {
         method: 'DELETE',
       });
       

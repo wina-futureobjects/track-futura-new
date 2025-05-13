@@ -38,6 +38,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import GridViewIcon from '@mui/icons-material/GridView';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import HomeIcon from '@mui/icons-material/Home';
+import { apiFetch } from '../utils/api';
 
 interface Folder {
   id: number;
@@ -64,7 +65,7 @@ const FacebookFolders = () => {
   const fetchFolders = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/facebook-data/folders/');
+      const response = await apiFetch('/api/facebook-data/folders/');
       if (!response.ok) {
         throw new Error('Failed to fetch folders');
       }
@@ -117,7 +118,7 @@ const FacebookFolders = () => {
     }
 
     try {
-      const response = await fetch('/api/facebook-data/folders/', {
+      const response = await apiFetch('/api/facebook-data/folders/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -147,7 +148,7 @@ const FacebookFolders = () => {
     }
 
     try {
-      const response = await fetch(`/api/facebook-data/folders/${selectedFolder.id}/`, {
+      const response = await apiFetch(`/api/facebook-data/folders/${selectedFolder.id}/`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -177,7 +178,7 @@ const FacebookFolders = () => {
     }
 
     try {
-      const response = await fetch(`/api/facebook-data/folders/${folderId}/`, {
+      const response = await apiFetch(`/api/facebook-data/folders/${folderId}/`, {
         method: 'DELETE',
       });
 

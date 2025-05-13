@@ -45,6 +45,7 @@ import FolderIcon from '@mui/icons-material/Folder';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import EditIcon from '@mui/icons-material/Edit';
+import { apiFetch } from '../utils/api';
 
 interface InstagramPost {
   id: number;
@@ -124,7 +125,7 @@ const InstagramDataUpload = () => {
         ? `&content_type=${contentType}` 
         : '';
       
-      const response = await fetch(`/api/instagram-data/posts/?page=${pageNumber + 1}&page_size=${pageSize}${folderParam}${searchParam}${contentTypeParam}`);
+      const response = await apiFetch(`/api/instagram-data/posts/?page=${pageNumber + 1}&page_size=${pageSize}${folderParam}${searchParam}${contentTypeParam}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch posts');
@@ -162,7 +163,7 @@ const InstagramDataUpload = () => {
   const fetchFolderDetails = async () => {
     if (folderId) {
       try {
-        const response = await fetch(`/api/instagram-data/folders/${folderId}/`);
+        const response = await apiFetch(`/api/instagram-data/folders/${folderId}/`);
         if (response.ok) {
           const data = await response.json();
           setCurrentFolder(data);
@@ -180,7 +181,7 @@ const InstagramDataUpload = () => {
     try {
       const folderParam = `folder_id=${folderId}`;
       // Get stats for all posts in the folder (no pagination)
-      const response = await fetch(`/api/instagram-data/posts/?${folderParam}&page_size=1000`);
+      const response = await apiFetch(`/api/instagram-data/posts/?${folderParam}&page_size=1000`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch folder statistics');
@@ -211,7 +212,7 @@ const InstagramDataUpload = () => {
   const checkServerStatus = async () => {
     try {
       // Use a simple endpoint to check if server is running
-      const response = await fetch('/api/instagram-data/folders/', { 
+      const response = await apiFetch('/api/instagram-data/folders/', { 
         method: 'HEAD',
         headers: { 'Accept': 'application/json' }
       });
@@ -380,7 +381,7 @@ const InstagramDataUpload = () => {
       
       // Check if the backend server is running
       try {
-        const response = await fetch('/api/instagram-data/posts/upload_csv/', {
+        const response = await apiFetch('/api/instagram-data/posts/upload_csv/', {
           method: 'POST',
           body: formData,
           headers: {
@@ -479,7 +480,7 @@ const InstagramDataUpload = () => {
       
       // Check if the backend server is running
       try {
-        const response = await fetch('/api/instagram-data/posts/upload_csv/', {
+        const response = await apiFetch('/api/instagram-data/posts/upload_csv/', {
           method: 'POST',
           body: formData,
           headers: {
@@ -547,7 +548,7 @@ const InstagramDataUpload = () => {
       // Add content type parameter
       const contentTypeParam = contentType ? `&content_type=${contentType}` : '';
       
-      const response = await fetch(
+      const response = await apiFetch(
         `/api/instagram-data/posts/download_csv/?${folderParam}${contentTypeParam}`,
         {
           method: 'GET',

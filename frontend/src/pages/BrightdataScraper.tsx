@@ -52,6 +52,7 @@ import MusicVideoIcon from '@mui/icons-material/MusicVideo';
 import FolderIcon from '@mui/icons-material/Folder';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
+import { apiFetch } from '../utils/api';
 
 // Create a Grid component that inherits from MuiGrid to fix type issues
 const Grid = (props: any) => <MuiGrid {...props} />;
@@ -125,7 +126,7 @@ const BrightdataScraper = () => {
   const fetchRequests = async () => {
     try {
       setRefreshing(true);
-      const response = await fetch('/api/brightdata/requests/');
+      const response = await apiFetch('/api/brightdata/requests/');
       if (!response.ok) {
         throw new Error('Failed to fetch scraper requests');
       }
@@ -157,7 +158,7 @@ const BrightdataScraper = () => {
             ? 'linkedin-data' 
             : 'tiktok-data';
             
-      const response = await fetch(`/api/${platformEndpoint}/folders/`);
+      const response = await apiFetch(`/api/${platformEndpoint}/folders/`);
       if (!response.ok) {
         throw new Error(`Failed to fetch ${platform} folders`);
       }
@@ -178,7 +179,7 @@ const BrightdataScraper = () => {
   // Fetch Brightdata configurations
   const fetchConfigs = async () => {
     try {
-      const response = await fetch('/api/brightdata/configs/');
+      const response = await apiFetch('/api/brightdata/configs/');
       if (!response.ok) {
         throw new Error('Failed to fetch Brightdata configurations');
       }
@@ -291,7 +292,7 @@ const BrightdataScraper = () => {
       if (endDate) console.log('End date:', payload.end_date);
       if (folderId) console.log('Folder ID:', folderId);
       
-      const response = await fetch(`/api/brightdata/requests/${endpoint}/`, {
+      const response = await apiFetch(`/api/brightdata/requests/${endpoint}/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -428,7 +429,7 @@ const BrightdataScraper = () => {
     try {
       setTestingConfig(true);
       
-      const response = await fetch('/api/brightdata/configs/active/');
+      const response = await apiFetch('/api/brightdata/configs/active/');
       
       // Parse response
       let textResponse = await response.text();
@@ -440,7 +441,7 @@ const BrightdataScraper = () => {
         const configData = JSON.parse(textResponse);
         
         // Now test the actual API
-        const testResponse = await fetch('/api/brightdata/requests/test_connection/', {
+        const testResponse = await apiFetch('/api/brightdata/requests/test_connection/', {
           method: 'POST',
         });
         

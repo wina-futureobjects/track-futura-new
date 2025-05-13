@@ -31,6 +31,7 @@ import HomeIcon from '@mui/icons-material/Home';
 import FolderIcon from '@mui/icons-material/Folder';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import { apiFetch } from '../utils/api';
 
 interface TrackAccount {
   id: number;
@@ -86,7 +87,7 @@ const TrackAccountUpload = () => {
       // Add search param if search term exists
       const searchParam = searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : '';
       
-      const response = await fetch(`/api/track-accounts/accounts/?page=${pageNumber + 1}&page_size=${pageSize}${folderParam}${searchParam}`);
+      const response = await apiFetch(`/api/track-accounts/accounts/?page=${pageNumber + 1}&page_size=${pageSize}${folderParam}${searchParam}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch accounts');
@@ -114,7 +115,7 @@ const TrackAccountUpload = () => {
   const fetchFolderDetails = async () => {
     if (folderId) {
       try {
-        const response = await fetch(`/api/track-accounts/folders/${folderId}/`);
+        const response = await apiFetch(`/api/track-accounts/folders/${folderId}/`);
         if (response.ok) {
           const data = await response.json();
           setCurrentFolder(data);
@@ -157,7 +158,7 @@ const TrackAccountUpload = () => {
         formData.append('folder_id', folderId);
       }
 
-      const response = await fetch('/api/track-accounts/accounts/upload_csv/', {
+      const response = await apiFetch('/api/track-accounts/accounts/upload_csv/', {
         method: 'POST',
         body: formData,
       });
@@ -184,7 +185,7 @@ const TrackAccountUpload = () => {
   const handleDownloadCSV = async () => {
     try {
       const folderParam = folderId ? `?folder_id=${folderId}` : '';
-      const response = await fetch(`/api/track-accounts/accounts/download_csv/${folderParam}`);
+      const response = await apiFetch(`/api/track-accounts/accounts/download_csv/${folderParam}`);
       
       if (!response.ok) {
         throw new Error('Download failed');

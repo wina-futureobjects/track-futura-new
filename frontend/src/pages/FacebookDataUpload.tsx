@@ -46,6 +46,7 @@ import FolderIcon from '@mui/icons-material/Folder';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import EditIcon from '@mui/icons-material/Edit';
+import { apiFetch } from '../utils/api';
 
 interface FacebookPost {
   id: number;
@@ -120,7 +121,7 @@ const FacebookDataUpload = () => {
         ? `&content_type=${contentType}` 
         : '';
       
-      const response = await fetch(`/api/facebook-data/posts/?page=${pageNumber + 1}&page_size=${pageSize}${folderParam}${searchParam}${contentTypeParam}`);
+      const response = await apiFetch(`/api/facebook-data/posts/?page=${pageNumber + 1}&page_size=${pageSize}${folderParam}${searchParam}${contentTypeParam}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch posts');
@@ -158,7 +159,7 @@ const FacebookDataUpload = () => {
   const fetchFolderDetails = async () => {
     if (folderId) {
       try {
-        const response = await fetch(`/api/facebook-data/folders/${folderId}/`);
+        const response = await apiFetch(`/api/facebook-data/folders/${folderId}/`);
         if (response.ok) {
           const data = await response.json();
           setCurrentFolder(data);
@@ -174,7 +175,7 @@ const FacebookDataUpload = () => {
     if (!folderId) return;
     
     try {
-      const response = await fetch(`/api/facebook-data/posts/stats/?folder_id=${folderId}`);
+      const response = await apiFetch(`/api/facebook-data/posts/stats/?folder_id=${folderId}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch folder statistics');
@@ -190,7 +191,7 @@ const FacebookDataUpload = () => {
   // Check if server is online
   const checkServerStatus = async () => {
     try {
-      const response = await fetch('/api/facebook-data/posts/?page=1&page_size=1');
+      const response = await apiFetch('/api/facebook-data/posts/?page=1&page_size=1');
       setServerStatus(response.ok ? 'online' : 'offline');
     } catch {
       setServerStatus('offline');
@@ -300,7 +301,7 @@ const FacebookDataUpload = () => {
       formData.append('folder_id', folderId);
       formData.append('content_type', 'post');
       
-      const response = await fetch('/api/facebook-data/posts/upload_csv/', {
+      const response = await apiFetch('/api/facebook-data/posts/upload_csv/', {
         method: 'POST',
         body: formData,
       });
@@ -353,7 +354,7 @@ const FacebookDataUpload = () => {
       formData.append('folder_id', folderId);
       formData.append('content_type', 'reel');
       
-      const response = await fetch('/api/facebook-data/posts/upload_csv/', {
+      const response = await apiFetch('/api/facebook-data/posts/upload_csv/', {
         method: 'POST',
         body: formData,
       });

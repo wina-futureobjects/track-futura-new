@@ -38,6 +38,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import HomeIcon from '@mui/icons-material/Home';
 import SettingsIcon from '@mui/icons-material/Settings';
+import { apiFetch } from '../utils/api';
 
 interface BrightdataConfig {
   id: number;
@@ -74,7 +75,7 @@ const BrightdataSettings = () => {
   const fetchConfigs = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/brightdata/configs/');
+      const response = await apiFetch('/api/brightdata/configs/');
       if (!response.ok) {
         throw new Error('Failed to fetch configurations');
       }
@@ -149,7 +150,7 @@ const BrightdataSettings = () => {
       
       console.log('Submitting config:', url, method, payload);
       
-      const response = await fetch(url, {
+      const response = await apiFetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
@@ -176,7 +177,7 @@ const BrightdataSettings = () => {
   const handleSetActive = async (configId: number) => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/brightdata/configs/${configId}/set_active/`, {
+      const response = await apiFetch(`/api/brightdata/configs/${configId}/set_active/`, {
         method: 'POST',
       });
 
@@ -204,7 +205,7 @@ const BrightdataSettings = () => {
     
     try {
       setLoading(true);
-      const response = await fetch(`/api/brightdata/configs/${configToDelete}/`, {
+      const response = await apiFetch(`/api/brightdata/configs/${configToDelete}/`, {
         method: 'DELETE',
       });
 

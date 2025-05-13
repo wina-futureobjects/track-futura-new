@@ -31,6 +31,7 @@ import LinkIcon from '@mui/icons-material/Link';
 import InfoIcon from '@mui/icons-material/Info';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
+import { apiFetch } from '../../utils/api';
 
 // Types
 interface TrackAccountFormProps {
@@ -120,7 +121,7 @@ const TrackAccountForm: React.FC<TrackAccountFormProps> = ({ accountId, folderId
     const fetchFolders = async () => {
       try {
         setLoadingFolders(true);
-        const response = await fetch('/api/track-accounts/folders/');
+        const response = await apiFetch('/api/track-accounts/folders/');
         if (!response.ok) {
           throw new Error('Failed to load folders');
         }
@@ -157,7 +158,7 @@ const TrackAccountForm: React.FC<TrackAccountFormProps> = ({ accountId, folderId
       const fetchAccountData = async () => {
         try {
           setLoadingAccount(true);
-          const response = await fetch(`/api/track-accounts/accounts/${accountId}/`);
+          const response = await apiFetch(`/api/track-accounts/accounts/${accountId}/`);
           if (!response.ok) {
             throw new Error('Failed to load account data');
           }
@@ -263,7 +264,7 @@ const TrackAccountForm: React.FC<TrackAccountFormProps> = ({ accountId, folderId
         ? `/api/track-accounts/accounts/${accountId}/` 
         : '/api/track-accounts/accounts/';
       
-      const response = await fetch(url, {
+      const response = await apiFetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',

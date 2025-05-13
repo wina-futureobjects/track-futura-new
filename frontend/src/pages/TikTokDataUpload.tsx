@@ -46,6 +46,7 @@ import FolderIcon from '@mui/icons-material/Folder';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import EditIcon from '@mui/icons-material/Edit';
+import { apiFetch } from '../utils/api';
 
 interface TikTokPost {
   id: number;
@@ -125,7 +126,7 @@ const TikTokDataUpload = () => {
         ? `&content_type=${contentType}` 
         : '';
       
-      const response = await fetch(`/api/tiktok-data/posts/?page=${pageNumber + 1}&page_size=${pageSize}${folderParam}${searchParam}${contentTypeParam}`);
+      const response = await apiFetch(`/api/tiktok-data/posts/?page=${pageNumber + 1}&page_size=${pageSize}${folderParam}${searchParam}${contentTypeParam}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch posts');
@@ -163,7 +164,7 @@ const TikTokDataUpload = () => {
   const fetchFolderDetails = async () => {
     if (folderId) {
       try {
-        const response = await fetch(`/api/tiktok-data/folders/${folderId}/`);
+        const response = await apiFetch(`/api/tiktok-data/folders/${folderId}/`);
         if (response.ok) {
           const data = await response.json();
           setCurrentFolder(data);
@@ -181,7 +182,7 @@ const TikTokDataUpload = () => {
     try {
       const folderParam = `folder_id=${folderId}`;
       // Get stats for all posts in the folder (no pagination)
-      const response = await fetch(`/api/tiktok-data/posts/?${folderParam}&page_size=1000`);
+      const response = await apiFetch(`/api/tiktok-data/posts/?${folderParam}&page_size=1000`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch folder statistics');
@@ -212,7 +213,7 @@ const TikTokDataUpload = () => {
   const checkServerStatus = async () => {
     try {
       // Use a simple endpoint to check if server is running
-      const response = await fetch('/api/tiktok-data/folders/', { 
+      const response = await apiFetch('/api/tiktok-data/folders/', { 
         method: 'HEAD',
         headers: { 'Accept': 'application/json' }
       });
@@ -381,7 +382,7 @@ const TikTokDataUpload = () => {
       
       // Check if the backend server is running
       try {
-        const response = await fetch('/api/tiktok-data/posts/upload_csv/', {
+        const response = await apiFetch('/api/tiktok-data/posts/upload_csv/', {
           method: 'POST',
           body: formData,
           headers: {
@@ -488,7 +489,7 @@ const TikTokDataUpload = () => {
       
       // Check if the backend server is running
       try {
-        const response = await fetch('/api/tiktok-data/posts/upload_csv/', {
+        const response = await apiFetch('/api/tiktok-data/posts/upload_csv/', {
           method: 'POST',
           body: formData,
           headers: {
