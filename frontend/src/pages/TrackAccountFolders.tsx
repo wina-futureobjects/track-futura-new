@@ -29,6 +29,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import FolderIcon from '@mui/icons-material/Folder';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import { apiFetch } from '../utils/api';
 
 interface Folder {
   id: number;
@@ -57,7 +58,7 @@ const TrackAccountFolders = () => {
   const fetchFolders = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/track-accounts/folders/');
+      const response = await apiFetch('/api/track-accounts/folders/');
       if (!response.ok) {
         throw new Error('Failed to fetch folders');
       }
@@ -133,7 +134,7 @@ const TrackAccountFolders = () => {
   // CRUD operations
   const handleCreateFolder = async () => {
     try {
-      const response = await fetch('/api/track-accounts/folders/', {
+      const response = await apiFetch('/api/track-accounts/folders/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -182,7 +183,7 @@ const TrackAccountFolders = () => {
     if (!currentFolder) return;
 
     try {
-      const response = await fetch(`/api/track-accounts/folders/${currentFolder.id}/`, {
+      const response = await apiFetch(`/api/track-accounts/folders/${currentFolder.id}/`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -231,7 +232,7 @@ const TrackAccountFolders = () => {
     if (!currentFolder) return;
 
     try {
-      const response = await fetch(`/api/track-accounts/folders/${currentFolder.id}/`, {
+      const response = await apiFetch(`/api/track-accounts/folders/${currentFolder.id}/`, {
         method: 'DELETE',
       });
 
