@@ -29,6 +29,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import FolderIcon from '@mui/icons-material/Folder';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import api from '../utils/api';
 
 interface Folder {
   id: number;
@@ -57,7 +58,7 @@ const TrackAccountFolders = () => {
   const fetchFolders = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/track-accounts/folders/');
+      const response = await api.get('/api/track-accounts/folders/');
       if (!response.ok) {
         throw new Error('Failed to fetch folders');
       }
@@ -133,15 +134,9 @@ const TrackAccountFolders = () => {
   // CRUD operations
   const handleCreateFolder = async () => {
     try {
-      const response = await fetch('/api/track-accounts/folders/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: newFolderName,
-          description: newFolderDescription || null,
-        }),
+      const response = await api.post('/api/track-accounts/folders/', {
+        name: newFolderName,
+        description: newFolderDescription || null,
       });
 
       if (!response.ok) {
@@ -182,15 +177,9 @@ const TrackAccountFolders = () => {
     if (!currentFolder) return;
 
     try {
-      const response = await fetch(`/api/track-accounts/folders/${currentFolder.id}/`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: newFolderName,
-          description: newFolderDescription || null,
-        }),
+      const response = await api.patch(`/api/track-accounts/folders/${currentFolder.id}/`, {
+        name: newFolderName,
+        description: newFolderDescription || null,
       });
 
       if (!response.ok) {
@@ -231,9 +220,7 @@ const TrackAccountFolders = () => {
     if (!currentFolder) return;
 
     try {
-      const response = await fetch(`/api/track-accounts/folders/${currentFolder.id}/`, {
-        method: 'DELETE',
-      });
+      const response = await api.delete(`/api/track-accounts/folders/${currentFolder.id}/`);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -251,6 +238,7 @@ const TrackAccountFolders = () => {
         }
         return prevFolders.filter(folder => folder.id !== currentFolder.id);
       });
+      
       showSnackbar('Folder deleted successfully', 'success');
     } catch (error) {
       console.error('Error deleting folder:', error);
