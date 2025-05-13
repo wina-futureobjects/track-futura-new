@@ -27,6 +27,8 @@ import TrackAccountCreate from './pages/TrackAccountCreate';
 import TrackAccountEdit from './pages/TrackAccountEdit';
 import TrackAccountsList from './pages/TrackAccountsList';
 import Settings from './pages/Settings';
+import BrightdataSettings from './pages/BrightdataSettings';
+import BrightdataScraper from './pages/BrightdataScraper';
 
 // Local auth implementation to avoid import issues
 const isAuthenticated = () => {
@@ -289,6 +291,20 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <MultiPlatformReportGeneration />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/brightdata-settings" element={
+            <ProtectedRoute>
+              <Layout>
+                <BrightdataSettings />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/brightdata-scraper" element={
+            <ProtectedRoute>
+              <Layout>
+                <BrightdataScraper />
               </Layout>
             </ProtectedRoute>
           } />

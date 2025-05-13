@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     "track_accounts",
     "linkedin_data",
     "tiktok_data",
+    "brightdata_integration",
 ]
 
 MIDDLEWARE = [

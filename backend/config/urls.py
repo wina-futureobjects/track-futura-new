@@ -31,5 +31,6 @@ urlpatterns = [
     path("api/track-accounts/", include("track_accounts.urls")),
     path("api/linkedin-data/", include("linkedin_data.urls")),
     path("api/tiktok-data/", include("tiktok_data.urls")),
+    path("api/brightdata/", include("brightdata_integration.urls")),
     path("api/", RedirectView.as_view(url="/api/users/", permanent=False)),
 ]

@@ -38,7 +38,9 @@ import {
   ExpandLess as ExpandLessIcon,
   ExpandMore as ExpandMoreIcon,
   DataUsage as DataUsageIcon,
-  InsertChart as ChartIcon
+  InsertChart as ChartIcon,
+  AutoAwesome as AutoAwesomeIcon,
+  SettingsSuggest as SettingsSuggestIcon
 } from '@mui/icons-material';
 import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import MusicVideoIcon from '@mui/icons-material/MusicVideo';
@@ -107,6 +109,8 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
         { text: 'Facebook Data', path: '/facebook-folders', icon: <FacebookIcon /> },
         { text: 'LinkedIn Data', path: '/linkedin-folders', icon: <LinkedInIcon /> },
         { text: 'TikTok Data', path: '/tiktok-folders', icon: <MusicVideoIcon /> },
+        { text: 'Brightdata Scraper', path: '/brightdata-scraper', icon: <AutoAwesomeIcon /> },
+        { text: 'Brightdata Settings', path: '/brightdata-settings', icon: <SettingsSuggestIcon /> },
       ]
     },
     { 
@@ -151,6 +155,12 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
     }
     if (itemPath === '/track-accounts/folders') {
       return location.pathname.startsWith('/track-accounts');
+    }
+    if (itemPath === '/brightdata-scraper') {
+      return location.pathname === '/brightdata-scraper';
+    }
+    if (itemPath === '/brightdata-settings') {
+      return location.pathname === '/brightdata-settings';
     }
     
     // For other paths, check if the current path starts with the menu item path
