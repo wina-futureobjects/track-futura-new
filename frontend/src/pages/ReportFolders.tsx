@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   Container,
   Typography,
@@ -101,13 +101,31 @@ const ReportFolders = () => {
   });
 
   const navigate = useNavigate();
+  const location = useLocation();
+  const { organizationId, projectId } = useParams<{ 
+    organizationId?: string;
+    projectId?: string;
+  }>();
+  
+  // Also get project ID from URL query parameter if not in params
+  const queryParams = new URLSearchParams(location.search);
+  const queryProjectId = queryParams.get('project');
+  
+  // Use project ID from params or query string
+  const effectiveProjectId = projectId || queryProjectId;
 
   const fetchReports = useCallback(async () => {
     setLoading(true);
     setError(null);
     
     try {
-      const response = await api.get('/api/track-accounts/reports/');
+      // Add project filter if projectId is available
+      let url = '/api/track-accounts/reports/';
+      if (effectiveProjectId) {
+        url += `?project=${effectiveProjectId}`;
+      }
+      
+      const response = await api.get(url);
       if (response.status === 200) {
         // Ensure response.data is an array
         if (Array.isArray(response.data)) {
@@ -129,7 +147,7 @@ const ReportFolders = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [effectiveProjectId]);
 
   useEffect(() => {
     fetchReports();
@@ -286,7 +304,13 @@ const ReportFolders = () => {
   };
 
   const handleViewFolder = (folderId: number) => {
-    navigate(`/report-folders/${folderId}`);
+    if (organizationId && projectId) {
+      navigate(`/organizations/${organizationId}/projects/${projectId}/report-folders/${folderId}`);
+    } else if (effectiveProjectId) {
+      navigate(`/report-folders/${folderId}?project=${effectiveProjectId}`);
+    } else {
+      navigate(`/report-folders/${folderId}`);
+    }
   };
 
   const handleViewModeChange = (
@@ -431,25 +455,6 @@ const ReportFolders = () => {
 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Box sx={{ mb: 3 }}>
-        <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
-          <Link 
-            component={RouterLink}
-            to="/"
-            underline="hover" 
-            sx={{ display: 'flex', alignItems: 'center' }}
-            color="inherit"
-          >
-            <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            Home
-          </Link>
-          <Typography color="text.primary" sx={{ display: 'flex', alignItems: 'center' }}>
-            <FolderIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            Report Folders
-          </Typography>
-        </Breadcrumbs>
-      </Box>
-
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4" component="h1">Report Folders</Typography>
         <Box display="flex" gap={2} alignItems="center">

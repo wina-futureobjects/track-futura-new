@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   Container,
   Typography,
@@ -42,6 +42,8 @@ interface Folder {
 
 const TrackAccountFolders = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { organizationId, projectId } = useParams<{ organizationId?: string; projectId?: string }>();
   const [folders, setFolders] = useState<Folder[]>([]);
   const [loading, setLoading] = useState(true);
   const [newFolderName, setNewFolderName] = useState('');
@@ -58,7 +60,13 @@ const TrackAccountFolders = () => {
   const fetchFolders = async () => {
     try {
       setLoading(true);
-      const response = await apiFetch('/api/track-accounts/folders/');
+      // Modify API endpoint to include project if available
+      let endpoint = '/api/track-accounts/folders/';
+      if (projectId) {
+        endpoint += `?project=${projectId}`;
+      }
+      
+      const response = await apiFetch(endpoint);
       if (!response.ok) {
         throw new Error('Failed to fetch folders');
       }
@@ -96,7 +104,7 @@ const TrackAccountFolders = () => {
 
   useEffect(() => {
     fetchFolders();
-  }, []);
+  }, [projectId]);
 
   // Show snackbar message
   const showSnackbar = (message: string, severity: 'success' | 'error') => {
@@ -134,15 +142,22 @@ const TrackAccountFolders = () => {
   // CRUD operations
   const handleCreateFolder = async () => {
     try {
+      const payload: any = {
+        name: newFolderName,
+        description: newFolderDescription || null,
+      };
+      
+      // Add project ID to the request body if available
+      if (projectId) {
+        payload.project = parseInt(projectId, 10);
+      }
+      
       const response = await apiFetch('/api/track-accounts/folders/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name: newFolderName,
-          description: newFolderDescription || null,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -260,41 +275,29 @@ const TrackAccountFolders = () => {
   };
 
   const handleFolderClick = (folderId: number) => {
-    navigate(`/track-accounts/folders/${folderId}`);
+    if (organizationId && projectId) {
+      navigate(`/organizations/${organizationId}/projects/${projectId}/track-accounts/folders/${folderId}`);
+    } else {
+      navigate(`/track-accounts/folders/${folderId}`);
+    }
   };
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      {/* Breadcrumbs navigation */}
-      <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
-        <Link
-          underline="hover"
-          sx={{ display: 'flex', alignItems: 'center' }}
-          color="inherit"
-          href="/"
-        >
-          <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-          Home
-        </Link>
-        <Typography
-          sx={{ display: 'flex', alignItems: 'center' }}
-          color="text.primary"
-        >
-          <FolderIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-          Track Account Folders
-        </Typography>
-      </Breadcrumbs>
-
       {/* Page title and actions */}
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h4" gutterBottom>
-          Track Account Folders
-        </Typography>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h4" component="h1">Track Account Folders</Typography>
         <Box>
           <Button
             variant="outlined"
             startIcon={<ViewListIcon />}
-            onClick={() => navigate('/track-accounts/accounts')}
+            onClick={() => {
+              if (organizationId && projectId) {
+                navigate(`/organizations/${organizationId}/projects/${projectId}/track-accounts/accounts`);
+              } else {
+                navigate('/track-accounts/accounts');
+              }
+            }}
             sx={{ mr: 1 }}
           >
             View All Accounts
@@ -302,15 +305,23 @@ const TrackAccountFolders = () => {
           <Button
             variant="outlined"
             startIcon={<PersonAddIcon />}
-            onClick={() => navigate('/track-accounts/create')}
+            onClick={() => {
+              if (organizationId && projectId) {
+                navigate(`/organizations/${organizationId}/projects/${projectId}/track-accounts/create`);
+              } else {
+                navigate('/track-accounts/create');
+              }
+            }}
             sx={{ mr: 1 }}
           >
             Create Account
           </Button>
           <Button
             variant="contained"
+            color="primary"
             startIcon={<AddIcon />}
             onClick={handleOpenAddDialog}
+            sx={{ ml: 1 }}
           >
             Create Folder
           </Button>

@@ -286,31 +286,19 @@ const FolderReportGeneration = () => {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      {/* Breadcrumbs */}
-      <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
-        <Link 
-          underline="hover" 
-          sx={{ display: 'flex', alignItems: 'center' }} 
-          color="inherit" 
-          href="/"
-        >
-          <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-          Home
-        </Link>
-        <Link
-          underline="hover"
-          sx={{ display: 'flex', alignItems: 'center' }}
-          color="inherit"
-          onClick={handleBackToFolders}
-          style={{ cursor: 'pointer' }}
-        >
-          <FolderIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-          Report Folders
-        </Link>
-        <Typography sx={{ display: 'flex', alignItems: 'center' }} color="text.primary">
+      {/* Header */}
+      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="h4" component="h1" gutterBottom>
           {isExistingReport ? 'Add Instagram Data' : 'Generate Report'}
         </Typography>
-      </Breadcrumbs>
+        <Button
+          variant="outlined"
+          startIcon={<ArrowBackIcon />}
+          onClick={handleBackToFolders}
+        >
+          Back to Folders
+        </Button>
+      </Box>
 
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>

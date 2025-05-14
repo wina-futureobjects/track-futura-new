@@ -92,41 +92,89 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
   
   // State to track expanded menu categories
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({
-    socialMedia: true,
-    analysis: true
+    socialMedia: true
   });
   
   // Menu items with categories
   const menuItems: MenuItem[] = [
-    { text: 'Dashboard', path: '/', icon: <DashboardIcon /> },
-    { text: 'Track Accounts', path: '/track-accounts/folders', icon: <TrackChangesIcon /> },
+    { text: 'Dashboard', path: getDashboardPath(), icon: <DashboardIcon /> },
     { 
-      text: 'Social Media Data', 
+      text: 'Input Collection', 
+      path: getTrackAccountsPath(), 
+      icon: <TrackChangesIcon /> 
+    },
+    { 
+      text: 'Data Storage', 
       path: '#social-media', 
       icon: <DataUsageIcon />,
       subItems: [
-        { text: 'Instagram Data', path: '/instagram-folders', icon: <InstagramIcon /> },
-        { text: 'Facebook Data', path: '/facebook-folders', icon: <FacebookIcon /> },
-        { text: 'LinkedIn Data', path: '/linkedin-folders', icon: <LinkedInIcon /> },
-        { text: 'TikTok Data', path: '/tiktok-folders', icon: <MusicVideoIcon /> },
-        { text: 'Brightdata Scraper', path: '/brightdata-scraper', icon: <AutoAwesomeIcon /> },
-        { text: 'Brightdata Settings', path: '/brightdata-settings', icon: <SettingsSuggestIcon /> },
+        { text: 'Instagram Data', path: getSocialMediaPath('instagram-folders'), icon: <InstagramIcon /> },
+        { text: 'Facebook Data', path: getSocialMediaPath('facebook-folders'), icon: <FacebookIcon /> },
+        { text: 'LinkedIn Data', path: getSocialMediaPath('linkedin-folders'), icon: <LinkedInIcon /> },
+        { text: 'TikTok Data', path: getSocialMediaPath('tiktok-folders'), icon: <MusicVideoIcon /> },
+        { text: 'Brightdata Scraper', path: getSocialMediaPath('brightdata-scraper'), icon: <AutoAwesomeIcon /> },
+        { text: 'Brightdata Settings', path: getSocialMediaPath('brightdata-settings'), icon: <SettingsSuggestIcon /> },
       ]
     },
     { 
-      text: 'Analysis', 
-      path: '#analysis', 
+      text: 'AI Analysis', 
+      path: getSocialMediaPath('analysis'),
       icon: <ChartIcon />,
-      subItems: [
-        { text: 'Social Analysis', path: '/social-analysis', icon: <AnalyticsIcon /> },
-        { text: 'Web Presence', path: '/web-presence', icon: <LanguageIcon /> },
-        { text: 'Sentiment Analysis', path: '/sentiment', icon: <MoodIcon /> },
-        { text: 'Word Cloud', path: '/word-cloud', icon: <CloudQueueIcon /> },
-        { text: 'NPS Reports', path: '/nps', icon: <AssessmentIcon /> },
-      ]
     },
-    { text: 'Report Folders', path: '/report-folders', icon: <DescriptionIcon /> },
+    { text: 'Report Generation', path: getReportFoldersPath(), icon: <DescriptionIcon /> },
   ];
+
+  // Function to get correct path for Dashboard based on URL
+  function getDashboardPath() {
+    // Extract organization and project IDs from URL
+    const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
+    
+    if (match) {
+      const [, orgId, projId] = match;
+      return `/organizations/${orgId}/projects/${projId}`;
+    }
+    
+    return '/';
+  }
+
+  // Function to get correct path for Track Accounts based on URL
+  function getTrackAccountsPath() {
+    // Extract organization and project IDs from URL
+    const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
+    
+    if (match) {
+      const [, orgId, projId] = match;
+      return `/organizations/${orgId}/projects/${projId}/track-accounts/folders`;
+    }
+    
+    return '/track-accounts/folders';
+  }
+
+  // Function to get correct path for social media data based on URL
+  function getSocialMediaPath(endpoint: string) {
+    // Extract organization and project IDs from URL
+    const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
+    
+    if (match) {
+      const [, orgId, projId] = match;
+      return `/organizations/${orgId}/projects/${projId}/${endpoint}`;
+    }
+    
+    return `/${endpoint}`;
+  }
+
+  // Function to get correct path for Report Folders based on URL
+  function getReportFoldersPath() {
+    // Extract organization and project IDs from URL
+    const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
+    
+    if (match) {
+      const [, orgId, projId] = match;
+      return `/organizations/${orgId}/projects/${projId}/report-folders`;
+    }
+    
+    return '/report-folders';
+  }
 
   // Function to check if a menu item is active based on the current path
   const isActive = useCallback((itemPath: string) => {
@@ -140,27 +188,49 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
       return false;
     }
     
+    // Special handling for Dashboard
+    if (itemPath.includes('/projects/') && !itemPath.includes('/track-accounts') && 
+        !itemPath.includes('/instagram') && !itemPath.includes('/facebook') && 
+        !itemPath.includes('/linkedin') && !itemPath.includes('/tiktok') && 
+        !itemPath.includes('/report-folders') && !itemPath.includes('/brightdata') &&
+        !itemPath.includes('/analysis')) {
+      return location.pathname === itemPath;
+    }
+    
     // Special handling for social media data sections
-    if (itemPath === '/instagram-folders') {
-      return location.pathname.startsWith('/instagram');
+    if (itemPath.includes('instagram-folders')) {
+      return location.pathname.includes('instagram');
     }
-    if (itemPath === '/facebook-folders') {
-      return location.pathname.startsWith('/facebook');
+    if (itemPath.includes('facebook-folders')) {
+      return location.pathname.includes('facebook');
     }
-    if (itemPath === '/linkedin-folders') {
-      return location.pathname.startsWith('/linkedin');
+    if (itemPath.includes('linkedin-folders')) {
+      return location.pathname.includes('linkedin');
     }
-    if (itemPath === '/tiktok-folders') {
-      return location.pathname.startsWith('/tiktok');
+    if (itemPath.includes('tiktok-folders')) {
+      return location.pathname.includes('tiktok');
     }
-    if (itemPath === '/track-accounts/folders') {
-      return location.pathname.startsWith('/track-accounts');
+    
+    // Check if this is a track-accounts path in either old format or new format with organization/project
+    if (itemPath.includes('/track-accounts/folders')) {
+      return location.pathname.includes('/track-accounts');
     }
-    if (itemPath === '/brightdata-scraper') {
-      return location.pathname === '/brightdata-scraper';
+    
+    if (itemPath.includes('brightdata-scraper')) {
+      return location.pathname.includes('brightdata-scraper');
     }
-    if (itemPath === '/brightdata-settings') {
-      return location.pathname === '/brightdata-settings';
+    if (itemPath.includes('brightdata-settings')) {
+      return location.pathname.includes('brightdata-settings');
+    }
+    
+    // Special handling for analysis page
+    if (itemPath.includes('analysis')) {
+      return location.pathname.includes('analysis');
+    }
+    
+    // Special handling for report folders
+    if (itemPath.includes('report-folders')) {
+      return location.pathname.includes('report-folders');
     }
     
     // For other paths, check if the current path starts with the menu item path
@@ -187,9 +257,14 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
       return;
     }
     
+    // Special handling for Dashboard when using organization/project structure
+    if (path.match(/\/organizations\/\d+\/projects\/\d+$/) && location.pathname === path) {
+      return; // Already on dashboard, do nothing
+    }
+    
     // Prevent navigation if already on the same path or subpath
     if (location.pathname === path || 
-        (path !== '/' && location.pathname.startsWith(path))) {
+        (path !== '/' && path !== getDashboardPath() && location.pathname.startsWith(path))) {
       return;
     }
     

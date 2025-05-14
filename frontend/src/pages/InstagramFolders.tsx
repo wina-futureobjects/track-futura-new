@@ -29,7 +29,7 @@ import {
   TableCell,
   Tooltip,
 } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
 import FolderIcon from '@mui/icons-material/Folder';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -50,6 +50,7 @@ interface Folder {
 
 const InstagramFolders = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [folders, setFolders] = useState<Folder[]>([]);
   const [loading, setLoading] = useState(true);
   const [openNewFolderDialog, setOpenNewFolderDialog] = useState(false);
@@ -59,12 +60,21 @@ const InstagramFolders = () => {
   const [folderDescription, setFolderDescription] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  
+  // Get project ID from URL query parameter
+  const queryParams = new URLSearchParams(location.search);
+  const projectId = queryParams.get('project');
 
   // Fetch folders
   const fetchFolders = async () => {
     try {
       setLoading(true);
-      const response = await apiFetch('/api/instagram-data/folders/');
+      // Add project filter if projectId is available
+      const url = projectId 
+        ? `/api/instagram-data/folders/?project=${projectId}` 
+        : '/api/instagram-data/folders/';
+      
+      const response = await apiFetch(url);
       if (!response.ok) {
         throw new Error('Failed to fetch folders');
       }
@@ -92,10 +102,21 @@ const InstagramFolders = () => {
 
   useEffect(() => {
     fetchFolders();
-  }, []);
+  }, [projectId]); // Add projectId as dependency
 
   const handleOpenFolder = (folderId: number) => {
-    navigate(`/instagram-data/${folderId}`);
+    // Extract organization and project IDs from URL
+    const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
+    
+    if (match) {
+      const [, orgId, projId] = match;
+      navigate(`/organizations/${orgId}/projects/${projId}/instagram-data/${folderId}`);
+    } else if (projectId) {
+      // If not in the pathname but we have projectId in query params
+      navigate(`/instagram-data/${folderId}?project=${projectId}`);
+    } else {
+      navigate(`/instagram-data/${folderId}`);
+    }
   };
 
   const handleNewFolder = () => {
@@ -125,6 +146,7 @@ const InstagramFolders = () => {
         body: JSON.stringify({
           name: folderName,
           description: folderDescription || null,
+          project: projectId ? parseInt(projectId, 10) : null,
         }),
       });
 
@@ -155,6 +177,7 @@ const InstagramFolders = () => {
         body: JSON.stringify({
           name: folderName,
           description: folderDescription || null,
+          project: projectId ? parseInt(projectId, 10) : null,
         }),
       });
 

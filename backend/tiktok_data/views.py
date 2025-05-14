@@ -26,9 +26,71 @@ class FolderViewSet(viewsets.ModelViewSet):
     """
     API endpoint for managing TikTok data folders
     """
-    queryset = Folder.objects.all()
     serializer_class = FolderSerializer
     permission_classes = [AllowAny]  # For testing, use proper permissions in production
+    
+    def get_queryset(self):
+        """
+        Filter folders by project if project parameter is provided
+        """
+        queryset = Folder.objects.all()
+        
+        # Filter by project if specified
+        project_id = self.request.query_params.get('project')
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+            
+        return queryset
+    
+    def create(self, request, *args, **kwargs):
+        """
+        Override create method to ensure project ID is saved
+        """
+        # Explicitly get project ID from request data
+        project_id = request.data.get('project')
+        
+        # Validate and save using serializer
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        # Save with project ID explicitly set
+        folder = serializer.save()
+        
+        # Double check the project ID is set correctly
+        if project_id and not folder.project_id:
+            folder.project_id = project_id
+            folder.save()
+            
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+    
+    def update(self, request, *args, **kwargs):
+        """
+        Override update method to ensure project ID is preserved
+        """
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        
+        # Get project ID from request or use existing
+        project_id = request.data.get('project', instance.project_id)
+        
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        
+        # Save with project ID explicitly set
+        updated_instance = serializer.save()
+        
+        # Double check the project ID is preserved
+        if project_id and updated_instance.project_id != project_id:
+            updated_instance.project_id = project_id
+            updated_instance.save()
+        
+        if getattr(instance, '_prefetched_objects_cache', None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+        
+        return Response(serializer.data)
 
 class TikTokPostViewSet(viewsets.ModelViewSet):
     """

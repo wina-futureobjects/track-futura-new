@@ -626,26 +626,6 @@ const LinkedInDataUpload = () => {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      {/* Breadcrumbs navigation */}
-      <Box mb={4}>
-        <Breadcrumbs separator="›" aria-label="breadcrumb">
-          <Link 
-            component="button"
-            underline="hover"
-            sx={{ display: 'flex', alignItems: 'center' }}
-            color="inherit"
-            onClick={handleGoToFolders}
-          >
-            <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            Folders
-          </Link>
-          <Typography color="text.primary" sx={{ display: 'flex', alignItems: 'center' }}>
-            <FolderIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            {currentFolder ? currentFolder.name : 'LinkedIn Data'}
-          </Typography>
-        </Breadcrumbs>
-      </Box>
-
       {/* Page title with folder details */}
       <Box mb={4}>
         <Typography variant="h4" component="h1" gutterBottom>

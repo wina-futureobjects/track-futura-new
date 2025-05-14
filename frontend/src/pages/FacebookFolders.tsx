@@ -30,7 +30,7 @@ import {
   Tooltip,
   Alert,
 } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
 import FolderIcon from '@mui/icons-material/Folder';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -51,6 +51,11 @@ interface Folder {
 
 const FacebookFolders = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  // Get project ID from URL query parameter
+  const queryParams = new URLSearchParams(location.search);
+  const projectId = queryParams.get('project');
+  
   const [folders, setFolders] = useState<Folder[]>([]);
   const [loading, setLoading] = useState(true);
   const [openNewFolderDialog, setOpenNewFolderDialog] = useState(false);
@@ -65,7 +70,12 @@ const FacebookFolders = () => {
   const fetchFolders = async () => {
     try {
       setLoading(true);
-      const response = await apiFetch('/api/facebook-data/folders/');
+      // Add project filter if projectId is available
+      const url = projectId 
+        ? `/api/facebook-data/folders/?project=${projectId}` 
+        : '/api/facebook-data/folders/';
+      
+      const response = await apiFetch(url);
       if (!response.ok) {
         throw new Error('Failed to fetch folders');
       }
@@ -93,10 +103,21 @@ const FacebookFolders = () => {
 
   useEffect(() => {
     fetchFolders();
-  }, []);
+  }, [projectId]); // Add projectId as dependency
 
   const handleOpenFolder = (folderId: number) => {
-    navigate(`/facebook-data/${folderId}`);
+    // Extract organization and project IDs from URL
+    const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
+    
+    if (match) {
+      const [, orgId, projId] = match;
+      navigate(`/organizations/${orgId}/projects/${projId}/facebook-data/${folderId}`);
+    } else if (projectId) {
+      // If not in the pathname but we have projectId in query params
+      navigate(`/facebook-data/${folderId}?project=${projectId}`);
+    } else {
+      navigate(`/facebook-data/${folderId}`);
+    }
   };
 
   const handleNewFolder = () => {
@@ -126,6 +147,7 @@ const FacebookFolders = () => {
         body: JSON.stringify({
           name: folderName,
           description: folderDescription || null,
+          project: projectId ? parseInt(projectId, 10) : null,
         }),
       });
 
@@ -156,6 +178,7 @@ const FacebookFolders = () => {
         body: JSON.stringify({
           name: folderName,
           description: folderDescription || null,
+          project: projectId ? parseInt(projectId, 10) : null,
         }),
       });
 

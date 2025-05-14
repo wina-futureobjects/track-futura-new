@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from . import views
 
 router = DefaultRouter()
-router.register(r'folders', views.TrackAccountFolderViewSet)
+router.register(r'folders', views.TrackAccountFolderViewSet, basename='track-account-folder')
 router.register(r'accounts', views.TrackAccountViewSet, basename='track-account')
 router.register(r'reports', views.ReportFolderViewSet, basename='report-folder')
 

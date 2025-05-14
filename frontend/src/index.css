@@ -7,3 +7,20 @@
 .MuiBreadcrumbs-ol a {
   cursor: pointer;
 }
+
+/* Typewriter cursor animation */
+.cursor {
+  display: inline-block;
+  width: 2px;
+  animation: blink 1s step-end infinite;
+  margin-left: 2px;
+}
+
+@keyframes blink {
+  from, to {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}

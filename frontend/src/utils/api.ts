@@ -29,9 +29,22 @@ export const createApiUrl = (endpoint: string): string => {
 };
 
 /**
- * Wrapper for the fetch API that automatically adds the API base URL
+ * Wrapper for the fetch API that automatically adds the API base URL and auth token
  */
 export const apiFetch = (endpoint: string, options?: RequestInit): Promise<Response> => {
   const url = createApiUrl(endpoint);
-  return fetch(url, options);
+  
+  // Get auth token from localStorage if available
+  const token = localStorage.getItem('authToken');
+  
+  // Prepare headers with Authorization if token exists
+  const headers = {
+    ...(options?.headers || {}),
+    ...(token ? { 'Authorization': `Token ${token}` } : {})
+  };
+  
+  return fetch(url, {
+    ...options,
+    headers
+  });
 }; 

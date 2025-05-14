@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
+import { apiFetch } from '../../utils/api';
 
 // Define local types and auth implementation
 interface RegisterCredentials {
@@ -17,17 +18,45 @@ interface RegisterCredentials {
 // Local auth implementation
 const useAuth = () => {
   const register = async (credentials: RegisterCredentials) => {
-    // Mock register for development
-    console.log('Mock register with:', credentials);
-    return { 
-      user: { 
-        id: 1, 
-        username: credentials.username,
-        email: credentials.email,
-        first_name: credentials.first_name,
-        last_name: credentials.last_name
-      } 
-    };
+    try {
+      const response = await apiFetch('/api/users/register/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(credentials),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Registration error data:', errorData);
+        
+        if (errorData.detail) {
+          throw new Error(errorData.detail);
+        } else if (typeof errorData === 'object') {
+          // Format field-specific errors
+          const errorMessage = Object.entries(errorData)
+            .map(([field, errors]) => `${field}: ${errors}`)
+            .join(', ');
+          throw new Error(errorMessage);
+        }
+        
+        throw new Error('Registration failed');
+      }
+      
+      const data = await response.json();
+      console.log('Registration successful:', data);
+      
+      // Store token temporarily (we'll redirect to login anyway)
+      localStorage.setItem('authToken', data.token);
+      
+      return { 
+        user: data.user
+      };
+    } catch (error) {
+      console.error('Registration error:', error);
+      throw error;
+    }
   };
   
   return { register };

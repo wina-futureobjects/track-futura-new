@@ -7,6 +7,11 @@ class LinkedInPostSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class FolderSerializer(serializers.ModelSerializer):
+    post_count = serializers.SerializerMethodField()
+    
     class Meta:
         model = Folder
-        fields = '__all__' 
+        fields = ['id', 'name', 'description', 'project', 'created_at', 'updated_at', 'post_count']
+    
+    def get_post_count(self, obj):
+        return obj.posts.count() 

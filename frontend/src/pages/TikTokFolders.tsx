@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Container,
   Typography,
@@ -54,6 +54,11 @@ interface Folder {
 
 const TikTokFolders = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  // Get project ID from URL query parameter
+  const queryParams = new URLSearchParams(location.search);
+  const projectId = queryParams.get('project');
+  
   const [folders, setFolders] = useState<Folder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -73,13 +78,18 @@ const TikTokFolders = () => {
   // Fetch folders on component mount
   useEffect(() => {
     fetchFolders();
-  }, []);
+  }, [projectId]);
 
   const fetchFolders = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await apiFetch('/api/tiktok-data/folders/');
+      // Add project filter if projectId is available
+      const url = projectId 
+        ? `/api/tiktok-data/folders/?project=${projectId}` 
+        : '/api/tiktok-data/folders/';
+      
+      const response = await apiFetch(url);
       
       if (!response.ok) {
         throw new Error('Failed to fetch folders');
@@ -131,6 +141,7 @@ const TikTokFolders = () => {
         body: JSON.stringify({
           name: newFolderName,
           description: newFolderDescription || null,
+          project: projectId ? parseInt(projectId, 10) : null,
         }),
       });
       
@@ -173,6 +184,7 @@ const TikTokFolders = () => {
         body: JSON.stringify({
           name: editFolderName,
           description: editFolderDescription || null,
+          project: projectId ? parseInt(projectId, 10) : null,
         }),
       });
       
@@ -223,8 +235,19 @@ const TikTokFolders = () => {
     }
   };
 
-  const handleOpenFolder = (folder: Folder) => {
-    navigate(`/tiktok-data/${folder.id}`);
+  const handleOpenFolder = (folderId: number) => {
+    // Extract organization and project IDs from URL
+    const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
+    
+    if (match) {
+      const [, orgId, projId] = match;
+      navigate(`/organizations/${orgId}/projects/${projId}/tiktok-data/${folderId}`);
+    } else if (projectId) {
+      // If not in the pathname but we have projectId in query params
+      navigate(`/tiktok-data/${folderId}?project=${projectId}`);
+    } else {
+      navigate(`/tiktok-data/${folderId}`);
+    }
   };
 
   const handleOpenEditDialog = (folder: Folder) => {
@@ -262,7 +285,7 @@ const TikTokFolders = () => {
             cursor: 'pointer'
           }
         }}
-          onClick={() => handleOpenFolder(folder)}
+          onClick={() => handleOpenFolder(folder.id)}
         >
           <CardContent 
             sx={{ flexGrow: 1 }}
@@ -331,7 +354,7 @@ const TikTokFolders = () => {
             <TableRow 
               key={folder.id}
               hover
-              onClick={() => handleOpenFolder(folder)}
+              onClick={() => handleOpenFolder(folder.id)}
               sx={{ cursor: 'pointer' }}
             >
               <TableCell>

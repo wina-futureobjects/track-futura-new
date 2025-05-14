@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ThemeProvider } from '@mui/material/styles';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/layout/Layout';
+import NoSidebarLayout from './components/NoSidebarLayout';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
@@ -29,19 +30,39 @@ import TrackAccountsList from './pages/TrackAccountsList';
 import Settings from './pages/Settings';
 import BrightdataSettings from './pages/BrightdataSettings';
 import BrightdataScraper from './pages/BrightdataScraper';
-
-// Local auth implementation to avoid import issues
-const isAuthenticated = () => {
-  // For development, always return true
-  return true;
-  // In production, uncomment:
-  // return !!localStorage.getItem('authToken');
-};
+import ProjectsList from './pages/ProjectsList';
+import ProjectDashboard from './pages/ProjectDashboard';
+import OrganizationsList from './pages/OrganizationsList';
+import OrganizationProjects from './pages/OrganizationProjects';
+import SuperAdminDashboard from './pages/admin/SuperAdminDashboard';
+import TenantAdminDashboard from './pages/admin/TenantAdminDashboard';
+import Analysis from './pages/Analysis';
+import type { UserRole } from './utils/auth';
+import { isAuthenticated, hasRole } from './utils/auth';
 
 // Route guard component for protected routes
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const auth = isAuthenticated();
   return auth ? <>{children}</> : <Navigate to="/login" />;
+};
+
+// Admin-specific route guard
+// Used to protect admin routes
+const AdminRoute = ({ children, requiredRole }: { children: React.ReactNode, requiredRole: UserRole }) => {
+  const auth = isAuthenticated();
+  const hasRequiredRole = hasRole(requiredRole);
+  
+  // First check if authenticated, then check if has the required role
+  if (!auth) {
+    return <Navigate to="/login" />;
+  }
+  
+  // If not authorized for this role, redirect to default page
+  if (!hasRequiredRole) {
+    return <Navigate to="/" />;
+  }
+  
+  return <>{children}</>;
 };
 
 function App() {
@@ -50,11 +71,73 @@ function App() {
       <CssBaseline />
       <Router>
         <Routes>
+          {/* Public routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           
-          {/* Protected routes */}
+          {/* Root route - redirect to login if not authenticated */}
           <Route path="/" element={
+            isAuthenticated() ? (
+              <NoSidebarLayout>
+                <OrganizationsList />
+              </NoSidebarLayout>
+            ) : (
+              <Navigate to="/login" />
+            )
+          } />
+          
+          {/* Admin routes */}
+          <Route path="/admin/super" element={
+            <AdminRoute requiredRole="super_admin">
+              <NoSidebarLayout>
+                <SuperAdminDashboard />
+              </NoSidebarLayout>
+            </AdminRoute>
+          } />
+          
+          {/* Organizations routes - no sidebar */}
+          <Route path="/organizations" element={
+            <ProtectedRoute>
+              <NoSidebarLayout>
+                <OrganizationsList />
+              </NoSidebarLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/organizations/:organizationId/projects" element={
+            <ProtectedRoute>
+              <NoSidebarLayout>
+                <OrganizationProjects />
+              </NoSidebarLayout>
+            </ProtectedRoute>
+          } />
+          
+          {/* New project view route within organization context */}
+          <Route path="/organizations/:organizationId/projects/:projectId" element={
+            <ProtectedRoute>
+              <Layout>
+                <ProjectDashboard />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          {/* Projects routes - no sidebar, now redirects to organization projects */}
+          <Route path="/projects" element={
+            <ProtectedRoute>
+              <Navigate to="/organizations" replace />
+            </ProtectedRoute>
+          } />
+          
+          {/* Project Dashboard and all other routes - with sidebar */}
+          <Route path="/dashboard/:projectId" element={
+            <ProtectedRoute>
+              <Layout>
+                <ProjectDashboard />
+              </Layout>
+            </ProtectedRoute>
+          } />
+
+          {/* Dashboard is now for backward compatibility */}
+          <Route path="/dashboard" element={
             <ProtectedRoute>
               <Layout>
                 <Dashboard />
@@ -83,7 +166,7 @@ function App() {
             </ProtectedRoute>
           } />
 
-          {/* Facebook routes */}
+          
           <Route path="/facebook-data" element={
             <ProtectedRoute>
               <Navigate to="/facebook-folders" replace />
@@ -146,7 +229,7 @@ function App() {
             </ProtectedRoute>
           } />
 
-          {/* Track Account routes */}
+          
           <Route path="/track-accounts" element={
             <ProtectedRoute>
               <Navigate to="/track-accounts/folders" replace />
@@ -201,41 +284,107 @@ function App() {
               </Layout>
             </ProtectedRoute>
           } />
-          <Route path="/social-analysis" element={
+          
+          {/* New routes with organization and project IDs */}
+          <Route path="/organizations/:organizationId/projects/:projectId/track-accounts" element={
+            <ProtectedRoute>
+              <Navigate to="/organizations/:organizationId/projects/:projectId/track-accounts/folders" replace />
+            </ProtectedRoute>
+          } />
+          <Route path="/organizations/:organizationId/projects/:projectId/track-accounts/folders" element={
             <ProtectedRoute>
               <Layout>
-                <div>Social Analysis Page (Coming Soon)</div>
+                <TrackAccountFolders />
               </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/organizations/:organizationId/projects/:projectId/track-accounts/accounts" element={
+            <ProtectedRoute>
+              <Layout>
+                <TrackAccountsList />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/organizations/:organizationId/projects/:projectId/track-accounts/folders/:folderId" element={
+            <ProtectedRoute>
+              <Layout>
+                <TrackAccountFolderDetail />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/organizations/:organizationId/projects/:projectId/track-accounts/folders/:folderId/upload" element={
+            <ProtectedRoute>
+              <Layout>
+                <TrackAccountUpload />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/organizations/:organizationId/projects/:projectId/track-accounts/create" element={
+            <ProtectedRoute>
+              <Layout>
+                <TrackAccountCreate />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/organizations/:organizationId/projects/:projectId/track-accounts/folders/:folderId/create" element={
+            <ProtectedRoute>
+              <Layout>
+                <TrackAccountCreate />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/organizations/:organizationId/projects/:projectId/track-accounts/edit/:accountId" element={
+            <ProtectedRoute>
+              <Layout>
+                <TrackAccountEdit />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/social-analysis" element={
+            <ProtectedRoute>
+              <Navigate to="/analysis" replace />
             </ProtectedRoute>
           } />
           <Route path="/web-presence" element={
             <ProtectedRoute>
-              <Layout>
-                <div>Web Presence Page (Coming Soon)</div>
-              </Layout>
+              <Navigate to="/analysis" replace />
             </ProtectedRoute>
           } />
           <Route path="/sentiment" element={
             <ProtectedRoute>
-              <Layout>
-                <div>Sentiment Analysis Page (Coming Soon)</div>
-              </Layout>
+              <Navigate to="/analysis" replace />
             </ProtectedRoute>
           } />
           <Route path="/wordcloud" element={
             <ProtectedRoute>
-              <Layout>
-                <div>Word Cloud Page (Coming Soon)</div>
-              </Layout>
+              <Navigate to="/analysis" replace />
             </ProtectedRoute>
           } />
           <Route path="/nps-reports" element={
             <ProtectedRoute>
+              <Navigate to="/analysis" replace />
+            </ProtectedRoute>
+          } />
+          
+          {/* New unified Analysis route */}
+          <Route path="/analysis" element={
+            <ProtectedRoute>
               <Layout>
-                <div>NPS Reports Page (Coming Soon)</div>
+                <Analysis />
               </Layout>
             </ProtectedRoute>
           } />
+          
+          {/* Analysis route with organization and project IDs */}
+          <Route path="/organizations/:organizationId/projects/:projectId/analysis" element={
+            <ProtectedRoute>
+              <Layout>
+                <Analysis />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
           <Route path="/settings" element={
             <ProtectedRoute>
               <Layout>
@@ -243,13 +392,13 @@ function App() {
               </Layout>
             </ProtectedRoute>
           } />
+          {/* Report Folder Routes */}
           <Route path="/reports" element={
             <ProtectedRoute>
               <Navigate to="/report-folders" replace />
             </ProtectedRoute>
           } />
           
-          {/* Report Folder Routes */}
           <Route path="/report-folders" element={
             <ProtectedRoute>
               <Layout>
@@ -257,6 +406,7 @@ function App() {
               </Layout>
             </ProtectedRoute>
           } />
+          
           <Route path="/report-folders/:reportId" element={
             <ProtectedRoute>
               <Layout>
@@ -302,6 +452,130 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/brightdata-scraper" element={
+            <ProtectedRoute>
+              <Layout>
+                <BrightdataScraper />
+              </Layout>
+            </ProtectedRoute>
+          } />
+
+          {/* Social Media Data with organization and project IDs */}
+          {/* Instagram routes */}
+          <Route path="/organizations/:organizationId/projects/:projectId/instagram-folders" element={
+            <ProtectedRoute>
+              <Layout>
+                <InstagramFolders />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/organizations/:organizationId/projects/:projectId/instagram-data/:folderId" element={
+            <ProtectedRoute>
+              <Layout>
+                <InstagramDataUpload />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          {/* Facebook routes */}
+          <Route path="/organizations/:organizationId/projects/:projectId/facebook-folders" element={
+            <ProtectedRoute>
+              <Layout>
+                <FacebookFolders />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/organizations/:organizationId/projects/:projectId/facebook-data/:folderId" element={
+            <ProtectedRoute>
+              <Layout>
+                <FacebookDataUpload />
+              </Layout>
+            </ProtectedRoute>
+          } />
+
+          {/* LinkedIn routes */}
+          <Route path="/organizations/:organizationId/projects/:projectId/linkedin-folders" element={
+            <ProtectedRoute>
+              <Layout>
+                <LinkedInFolders />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/organizations/:organizationId/projects/:projectId/linkedin-data/:folderId" element={
+            <ProtectedRoute>
+              <Layout>
+                <LinkedInDataUpload />
+              </Layout>
+            </ProtectedRoute>
+          } />
+
+          {/* TikTok routes */}
+          <Route path="/organizations/:organizationId/projects/:projectId/tiktok-folders" element={
+            <ProtectedRoute>
+              <Layout>
+                <TikTokFolders />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/organizations/:organizationId/projects/:projectId/tiktok-data/:folderId" element={
+            <ProtectedRoute>
+              <Layout>
+                <TikTokDataUpload />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          {/* Report Folder Routes with organization and project IDs */}
+          <Route path="/organizations/:organizationId/projects/:projectId/report-folders" element={
+            <ProtectedRoute>
+              <Layout>
+                <ReportFolders />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/organizations/:organizationId/projects/:projectId/report-folders/:reportId" element={
+            <ProtectedRoute>
+              <Layout>
+                <ReportDetail />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/organizations/:organizationId/projects/:projectId/report-folders/:reportId/instagram-data" element={
+            <ProtectedRoute>
+              <Layout>
+                <InstagramFolderSelector />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          {/* Multi-Platform Report Generation Routes with organization and project IDs */}
+          <Route path="/organizations/:organizationId/projects/:projectId/report-folders/create/multi-platform" element={
+            <ProtectedRoute>
+              <Layout>
+                <MultiPlatformReportGeneration />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/organizations/:organizationId/projects/:projectId/report-folders/:reportId/edit-multi-platform" element={
+            <ProtectedRoute>
+              <Layout>
+                <MultiPlatformReportGeneration />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          {/* Brightdata routes with organization and project IDs */}
+          <Route path="/organizations/:organizationId/projects/:projectId/brightdata-settings" element={
+            <ProtectedRoute>
+              <Layout>
+                <BrightdataSettings />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/organizations/:organizationId/projects/:projectId/brightdata-scraper" element={
             <ProtectedRoute>
               <Layout>
                 <BrightdataScraper />

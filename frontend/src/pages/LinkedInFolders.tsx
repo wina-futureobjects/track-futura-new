@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Container,
   Typography,
@@ -54,6 +54,10 @@ interface Folder {
 
 const LinkedInFolders = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  // Get project ID from URL query parameter
+  const queryParams = new URLSearchParams(location.search);
+  const projectId = queryParams.get('project');
   const [folders, setFolders] = useState<Folder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -76,10 +80,16 @@ const LinkedInFolders = () => {
   }, []);
 
   const fetchFolders = async () => {
+    setLoading(true);
+    setError(null);
+    
     try {
-      setLoading(true);
-      setError(null);
-      const response = await apiFetch('/api/linkedin-data/folders/');
+      // Add project filter if projectId is available
+      const url = projectId 
+        ? `/api/linkedin-data/folders/?project=${projectId}` 
+        : '/api/linkedin-data/folders/';
+      
+      const response = await apiFetch(url);
       
       if (!response.ok) {
         throw new Error('Failed to fetch folders');
@@ -131,6 +141,7 @@ const LinkedInFolders = () => {
         body: JSON.stringify({
           name: newFolderName,
           description: newFolderDescription || null,
+          project: projectId ? parseInt(projectId, 10) : null,
         }),
       });
       
@@ -173,6 +184,7 @@ const LinkedInFolders = () => {
         body: JSON.stringify({
           name: editFolderName,
           description: editFolderDescription || null,
+          project: projectId ? parseInt(projectId, 10) : null,
         }),
       });
       
@@ -224,7 +236,18 @@ const LinkedInFolders = () => {
   };
 
   const handleOpenFolder = (folder: Folder) => {
-    navigate(`/linkedin-data/${folder.id}`);
+    // Extract organization and project IDs from URL
+    const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
+    
+    if (match) {
+      const [, orgId, projId] = match;
+      navigate(`/organizations/${orgId}/projects/${projId}/linkedin-data/${folder.id}`);
+    } else if (projectId) {
+      // If not in the pathname but we have projectId in query params
+      navigate(`/linkedin-data/${folder.id}?project=${projectId}`);
+    } else {
+      navigate(`/linkedin-data/${folder.id}`);
+    }
   };
 
   const handleOpenEditDialog = (folder: Folder) => {

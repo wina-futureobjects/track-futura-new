@@ -37,6 +37,8 @@ import { apiFetch } from '../../utils/api';
 interface TrackAccountFormProps {
   accountId?: string; // Optional - if provided, we're editing an existing account
   folderId?: string; // Optional - if provided, pre-select this folder
+  organizationId?: string; // Optional - for navigation with organization context
+  projectId?: string; // Optional - for navigation with project context
   onSuccess?: (account: TrackAccount) => void;
 }
 
@@ -57,6 +59,7 @@ interface TrackAccount {
   close_monitoring: boolean;
   posting_frequency: string | null;
   folder: number | null;
+  project?: number | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -83,7 +86,13 @@ const postingFrequencies = [
   'High'
 ];
 
-const TrackAccountForm: React.FC<TrackAccountFormProps> = ({ accountId, folderId, onSuccess }) => {
+const TrackAccountForm: React.FC<TrackAccountFormProps> = ({ 
+  accountId, 
+  folderId, 
+  organizationId,
+  projectId,
+  onSuccess 
+}) => {
   const navigate = useNavigate();
   const theme = useTheme();
   const [loading, setLoading] = useState(false);
@@ -121,7 +130,14 @@ const TrackAccountForm: React.FC<TrackAccountFormProps> = ({ accountId, folderId
     const fetchFolders = async () => {
       try {
         setLoadingFolders(true);
-        const response = await apiFetch('/api/track-accounts/folders/');
+        
+        // Add project filter if available
+        let endpoint = '/api/track-accounts/folders/';
+        if (projectId) {
+          endpoint += `?project=${projectId}`;
+        }
+        
+        const response = await apiFetch(endpoint);
         if (!response.ok) {
           throw new Error('Failed to load folders');
         }
@@ -150,7 +166,7 @@ const TrackAccountForm: React.FC<TrackAccountFormProps> = ({ accountId, folderId
     };
 
     fetchFolders();
-  }, []);
+  }, [projectId]);
 
   // Load account data if editing
   useEffect(() => {
@@ -259,17 +275,24 @@ const TrackAccountForm: React.FC<TrackAccountFormProps> = ({ accountId, folderId
     setSuccess(null);
     
     try {
-      const method = accountId ? 'PUT' : 'POST';
       const url = accountId 
-        ? `/api/track-accounts/accounts/${accountId}/` 
+        ? `/api/track-accounts/accounts/${accountId}/`
         : '/api/track-accounts/accounts/';
+      
+      const method = accountId ? 'PUT' : 'POST';
+      
+      // Add project ID to request body if available
+      let requestData = { ...formData };
+      if (projectId && !accountId) { // Only for new accounts
+        requestData.project = parseInt(projectId, 10);
+      }
       
       const response = await apiFetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(requestData),
       });
       
       if (!response.ok) {
@@ -288,9 +311,17 @@ const TrackAccountForm: React.FC<TrackAccountFormProps> = ({ accountId, folderId
         // Otherwise, navigate back after a short delay
         setTimeout(() => {
           if (formData.folder) {
-            navigate(`/track-accounts/folders/${formData.folder}`);
+            if (organizationId && projectId) {
+              navigate(`/organizations/${organizationId}/projects/${projectId}/track-accounts/folders/${formData.folder}`);
+            } else {
+              navigate(`/track-accounts/folders/${formData.folder}`);
+            }
           } else {
-            navigate('/track-accounts/folders');
+            if (organizationId && projectId) {
+              navigate(`/organizations/${organizationId}/projects/${projectId}/track-accounts/folders`);
+            } else {
+              navigate('/track-accounts/folders');
+            }
           }
         }, 1500);
       }
@@ -299,6 +330,23 @@ const TrackAccountForm: React.FC<TrackAccountFormProps> = ({ accountId, folderId
       setError(error instanceof Error ? error.message : 'An unknown error occurred');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Function to navigate back based on context
+  const handleCancel = () => {
+    if (formData.folder) {
+      if (organizationId && projectId) {
+        navigate(`/organizations/${organizationId}/projects/${projectId}/track-accounts/folders/${formData.folder}`);
+      } else {
+        navigate(`/track-accounts/folders/${formData.folder}`);
+      }
+    } else {
+      if (organizationId && projectId) {
+        navigate(`/organizations/${organizationId}/projects/${projectId}/track-accounts/folders`);
+      } else {
+        navigate('/track-accounts/folders');
+      }
     }
   };
 
@@ -764,28 +812,23 @@ const TrackAccountForm: React.FC<TrackAccountFormProps> = ({ accountId, folderId
             >
               <Button 
                 variant="outlined"
-                onClick={() => {
-                  if (formData.folder) {
-                    navigate(`/track-accounts/folders/${formData.folder}`);
-                  } else {
-                    navigate('/track-accounts/folders');
-                  }
-                }}
-                disabled={loading}
+                color="secondary"
                 startIcon={<CancelIcon />}
-                sx={{ borderRadius: 1.5 }}
+                onClick={handleCancel}
               >
                 Cancel
               </Button>
               <Button 
-                type="submit"
-                variant="contained"
+                variant="contained" 
                 color="primary"
+                startIcon={<SaveIcon />}
+                onClick={handleSubmit}
                 disabled={loading}
-                startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
-                sx={{ borderRadius: 1.5, px: 3 }}
               >
-                {loading ? 'Saving...' : accountId ? 'Update Account' : 'Create Account'}
+                {loading ? 
+                  <CircularProgress size={24} /> : 
+                  (accountId ? 'Update Account' : 'Create Account')
+                }
               </Button>
             </Paper>
           </Grid>

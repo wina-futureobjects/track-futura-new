@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Container,
   Typography,
@@ -30,8 +30,13 @@ interface Folder {
 }
 
 const TrackAccountEdit = () => {
-  const { accountId } = useParams();
+  const { accountId, organizationId, projectId } = useParams<{ 
+    accountId?: string; 
+    organizationId?: string;
+    projectId?: string;
+  }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [account, setAccount] = useState<TrackAccount | null>(null);
   const [folder, setFolder] = useState<Folder | null>(null);
   const [loading, setLoading] = useState(true);
@@ -108,11 +113,37 @@ const TrackAccountEdit = () => {
             <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
             Home
           </Link>
+          {organizationId && (
+            <Link
+              underline="hover"
+              color="inherit"
+              sx={{ display: 'flex', alignItems: 'center' }}
+              onClick={() => navigate(`/organizations/${organizationId}/projects`)}
+            >
+              Organization {organizationId}
+            </Link>
+          )}
+          {projectId && (
+            <Link
+              underline="hover"
+              color="inherit"
+              sx={{ display: 'flex', alignItems: 'center' }}
+              onClick={() => navigate(`/organizations/${organizationId}/projects/${projectId}`)}
+            >
+              Project {projectId}
+            </Link>
+          )}
           <Link
             underline="hover"
             color="inherit"
             sx={{ display: 'flex', alignItems: 'center' }}
-            onClick={() => navigate('/track-accounts/folders')}
+            onClick={() => {
+              if (organizationId && projectId) {
+                navigate(`/organizations/${organizationId}/projects/${projectId}/track-accounts/folders`);
+              } else {
+                navigate('/track-accounts/folders');
+              }
+            }}
           >
             <FolderIcon sx={{ mr: 0.5 }} fontSize="inherit" />
             Track Account Folders
@@ -122,7 +153,13 @@ const TrackAccountEdit = () => {
               underline="hover"
               color="inherit"
               sx={{ display: 'flex', alignItems: 'center' }}
-              onClick={() => navigate(`/track-accounts/folders/${folder.id}`)}
+              onClick={() => {
+                if (organizationId && projectId) {
+                  navigate(`/organizations/${organizationId}/projects/${projectId}/track-accounts/folders/${folder.id}`);
+                } else {
+                  navigate(`/track-accounts/folders/${folder.id}`);
+                }
+              }}
             >
               {folder.name}
             </Link>
@@ -134,7 +171,7 @@ const TrackAccountEdit = () => {
         </Breadcrumbs>
       </Box>
       
-      <TrackAccountForm accountId={accountId} />
+      <TrackAccountForm accountId={accountId} organizationId={organizationId} projectId={projectId} />
     </Container>
   );
 };

@@ -6,7 +6,7 @@ class FolderSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Folder
-        fields = ['id', 'name', 'description', 'created_at', 'updated_at', 'post_count']
+        fields = ['id', 'name', 'description', 'project', 'created_at', 'updated_at', 'post_count']
     
     def get_post_count(self, obj):
         return obj.posts.count()

@@ -449,6 +449,18 @@ const FacebookDataUpload = () => {
 
   return (
     <Container maxWidth="xl" style={{ marginTop: '2rem' }}>
+      {/* Page title with folder details */}
+      <Box mb={4}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          {currentFolder ? currentFolder.name : 'Facebook Data'}
+        </Typography>
+        {currentFolder?.description && (
+          <Typography variant="body1" color="text.secondary" paragraph>
+            {currentFolder.description}
+          </Typography>
+        )}
+      </Box>
+      
       <Paper elevation={3} style={{ padding: '2rem' }}>
         {!currentFolder && (
           <Alert severity="warning" style={{ marginBottom: '1rem' }}>

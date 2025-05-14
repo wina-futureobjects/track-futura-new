@@ -1,5 +1,5 @@
 import { useState, useEffect, ChangeEvent } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Container,
   Typography,
@@ -82,6 +82,7 @@ interface FolderStats {
 const InstagramDataUpload = () => {
   const { folderId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   
   // Update state to handle two separate files
   const [postFile, setPostFile] = useState<File | null>(null);
@@ -621,7 +622,23 @@ const InstagramDataUpload = () => {
 
   // Redirect to folders view
   const handleGoToFolders = () => {
-    navigate('/instagram-folders');
+    // Extract organization and project IDs from URL
+    const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
+    
+    if (match) {
+      const [, orgId, projId] = match;
+      navigate(`/organizations/${orgId}/projects/${projId}/instagram-folders`);
+    } else {
+      // Get project ID from URL query parameter
+      const queryParams = new URLSearchParams(location.search);
+      const projectId = queryParams.get('project');
+      
+      if (projectId) {
+        navigate(`/instagram-folders?project=${projectId}`);
+      } else {
+        navigate('/instagram-folders');
+      }
+    }
   };
 
   const handleCopyLink = (url: string) => {
@@ -641,7 +658,7 @@ const InstagramDataUpload = () => {
   };
 
   return (
-    <Container maxWidth="xl">
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       {/* Server status indicator */}
       {serverStatus !== 'online' && (
         <Paper sx={{ p: 2, mb: 3, bgcolor: serverStatus === 'checking' ? 'info.light' : 'error.light' }}>
@@ -670,33 +687,6 @@ const InstagramDataUpload = () => {
       )}
       
       <Box sx={{ my: 4 }}>
-        {/* Breadcrumbs */}
-        <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
-          <Link 
-            underline="hover" 
-            sx={{ display: 'flex', alignItems: 'center' }}
-            color="inherit" 
-            href="/"
-          >
-            <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            Home
-          </Link>
-          <Link 
-            underline="hover" 
-            sx={{ display: 'flex', alignItems: 'center' }}
-            color="inherit" 
-            onClick={() => navigate('/instagram-folders')}
-          >
-            <FolderIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            Instagram Data
-          </Link>
-          {currentFolder && (
-            <Typography color="text.primary">
-              {currentFolder.name}
-            </Typography>
-          )}
-        </Breadcrumbs>
-
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="h4" component="h1" gutterBottom>
             {currentFolder ? `Instagram Data: ${currentFolder.name}` : 'Instagram Data Management'}

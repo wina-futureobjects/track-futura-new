@@ -19,9 +19,28 @@ class TrackAccountFolderViewSet(viewsets.ModelViewSet):
     """
     API endpoint for managing Track Account folders
     """
-    queryset = TrackAccountFolder.objects.all()
     serializer_class = TrackAccountFolderSerializer
     permission_classes = [AllowAny]  # For testing, use proper permissions in production
+    
+    def get_queryset(self):
+        """
+        Filter folders by project if project parameter is provided
+        """
+        queryset = TrackAccountFolder.objects.all()
+        
+        # Filter by project if specified
+        project_id = self.request.query_params.get('project')
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+            
+        return queryset
+    
+    def perform_create(self, serializer):
+        """
+        Set project when creating a new folder if provided
+        """
+        project_id = self.request.data.get('project')
+        serializer.save(project_id=project_id)
 
 class TrackAccountViewSet(viewsets.ModelViewSet):
     """
@@ -41,6 +60,12 @@ class TrackAccountViewSet(viewsets.ModelViewSet):
         if folder_id:
             queryset = queryset.filter(folder_id=folder_id)
         
+        # Filter by project if specified
+        project_id = self.request.query_params.get('project')
+        if project_id:
+            # Filter accounts where the folder's project matches the specified project
+            queryset = queryset.filter(folder__project_id=project_id)
+        
         # Add search functionality
         search_query = self.request.query_params.get('search', '')
         if search_query:
@@ -55,6 +80,34 @@ class TrackAccountViewSet(viewsets.ModelViewSet):
             )
         
         return queryset
+    
+    def perform_create(self, serializer):
+        """
+        Set project when creating a new account
+        """
+        # Get project from request data directly
+        project_id = self.request.data.get('project')
+        
+        # If no project_id in request data but a folder is specified, get project from folder
+        if not project_id and serializer.validated_data.get('folder'):
+            folder = serializer.validated_data['folder']
+            project_id = folder.project_id
+            
+        serializer.save(project_id=project_id)
+    
+    def perform_update(self, serializer):
+        """
+        Update project when updating account if needed
+        """
+        # Get project from request data directly
+        project_id = self.request.data.get('project')
+        
+        # If no project_id in request data but a folder is specified, get project from folder
+        if not project_id and serializer.validated_data.get('folder'):
+            folder = serializer.validated_data['folder']
+            project_id = folder.project_id
+            
+        serializer.save(project_id=project_id)
 
     @action(detail=False, methods=['POST'])
     def upload_csv(self, request):
@@ -72,8 +125,16 @@ class TrackAccountViewSet(viewsets.ModelViewSet):
             # Get folder_id from request data
             folder_id = request.data.get('folder_id')
             folder = None
+            project_id = None
+            
             if folder_id:
                 folder = get_object_or_404(TrackAccountFolder, id=folder_id)
+                # Set project_id from the folder
+                if folder.project_id:
+                    project_id = folder.project_id
+            else:
+                # Get project ID directly from request data if no folder specified
+                project_id = request.data.get('project')
             
             # Read the CSV file
             decoded_file = csv_file.read().decode('utf-8')
@@ -109,6 +170,7 @@ class TrackAccountViewSet(viewsets.ModelViewSet):
                     'close_monitoring': row.get('Close Monitoring', '').lower() == 'yes',
                     'posting_frequency': row.get('Posting Frequency (High/ Medium/ Low)', ''),
                     'folder': folder,
+                    'project_id': project_id,
                 }
                 
                 # Check if account already exists

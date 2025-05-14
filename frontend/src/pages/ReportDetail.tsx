@@ -175,37 +175,45 @@ const ReportDetail = () => {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      {/* Breadcrumbs */}
-      <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
-        <Link
-          underline="hover"
-          sx={{ display: 'flex', alignItems: 'center' }}
-          color="inherit"
-          href="/"
-        >
-          <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-          Home
-        </Link>
-        <Link
-          underline="hover"
-          sx={{ display: 'flex', alignItems: 'center' }}
-          color="inherit"
-          onClick={handleBackToReports}
-          style={{ cursor: 'pointer' }}
-        >
-          <DescriptionIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-          Reports
-        </Link>
-        {report && (
-          <Typography
-            sx={{ display: 'flex', alignItems: 'center' }}
-            color="text.primary"
+      {/* Header with back button */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+        <Typography variant="h4" component="h1">
+          {report ? report.name : 'Report Details'}
+        </Typography>
+        <Box>
+          <Button
+            variant="outlined"
+            startIcon={<ArrowBackIcon />}
+            onClick={handleBackToReports}
+            sx={{ mr: 2 }}
           >
-            <AssessmentIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            {report.name}
-          </Typography>
-        )}
-      </Breadcrumbs>
+            Back to Reports
+          </Button>
+          {/* <Button
+            variant="contained"
+            color="secondary"
+            startIcon={<AssessmentIcon />}
+            onClick={() => navigate(`/report-folders/${reportId}/instagram-data`)}
+          >
+            Add Instagram Data
+          </Button> */}
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<EditIcon />}
+            onClick={() => navigate(`/report-folders/${reportId}/edit-multi-platform`)}
+          >
+            Edit Multi-Platform
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<DownloadIcon />}
+            onClick={handleDownloadCSV}
+          >
+            Download CSV
+          </Button>
+        </Box>
+      </Box>
 
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
@@ -239,38 +247,6 @@ const ReportDetail = () => {
                     variant="outlined"
                   />
                 </Box>
-              </Box>
-              <Box sx={{ display: 'flex', gap: 2 }}>
-                <Button
-                  variant="outlined"
-                  startIcon={<ArrowBackIcon />}
-                  onClick={handleBackToReports}
-                >
-                  Back to Reports
-                </Button>
-                {/* <Button
-                  variant="contained"
-                  color="secondary"
-                  startIcon={<AssessmentIcon />}
-                  onClick={() => navigate(`/report-folders/${reportId}/instagram-data`)}
-                >
-                  Add Instagram Data
-                </Button> */}
-                <Button
-                  variant="contained"
-                  color="primary"
-                  startIcon={<EditIcon />}
-                  onClick={() => navigate(`/report-folders/${reportId}/edit-multi-platform`)}
-                >
-                  Edit Multi-Platform
-                </Button>
-                <Button
-                  variant="contained"
-                  startIcon={<DownloadIcon />}
-                  onClick={handleDownloadCSV}
-                >
-                  Download CSV
-                </Button>
               </Box>
             </Box>
 

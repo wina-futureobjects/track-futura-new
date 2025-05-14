@@ -1,4 +1,5 @@
 from django.db import models
+from users.models import Project
 
 # Create your models here.
 
@@ -8,6 +9,7 @@ class Folder(models.Model):
     """
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, null=True)
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='instagram_folders', null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

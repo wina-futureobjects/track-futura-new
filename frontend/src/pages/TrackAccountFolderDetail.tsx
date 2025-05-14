@@ -1,5 +1,5 @@
 import { useState, useEffect, ChangeEvent } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Container,
   Typography,
@@ -88,8 +88,13 @@ interface Account {
 }
 
 const TrackAccountFolderDetail = () => {
-  const { folderId } = useParams();
+  const { folderId, organizationId, projectId } = useParams<{ 
+    folderId?: string; 
+    organizationId?: string;
+    projectId?: string;
+  }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [folder, setFolder] = useState<Folder | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
@@ -131,7 +136,13 @@ const TrackAccountFolderDetail = () => {
       setLoading(true);
       
       // Fetch folder details
-      const folderResponse = await api.get(`/api/track-accounts/folders/${folderId}/`);
+      let folderUrl = `/api/track-accounts/folders/${folderId}/`;
+      // Add project ID as query parameter if available
+      if (projectId) {
+        folderUrl += `?project=${projectId}`;
+      }
+      
+      const folderResponse = await api.get(folderUrl);
       if (folderResponse.status === 200) {
         setFolder(folderResponse.data);
       }
@@ -162,6 +173,11 @@ const TrackAccountFolderDetail = () => {
       
       // Build query parameters
       let queryParams = `folder_id=${folderId}&page=${pageNumber + 1}&page_size=${pageSize}`;
+      
+      // Add project ID if available
+      if (projectId) {
+        queryParams += `&project=${projectId}`;
+      }
       
       // Add search parameter if provided
       if (search) {
@@ -245,7 +261,11 @@ const TrackAccountFolderDetail = () => {
   };
 
   const handleBackToFolders = () => {
-    navigate('/track-accounts/folders');
+    if (organizationId && projectId) {
+      navigate(`/organizations/${organizationId}/projects/${projectId}/track-accounts/folders`);
+    } else {
+      navigate('/track-accounts/folders');
+    }
   };
 
   const handleGenerateReport = () => {
@@ -321,38 +341,44 @@ const TrackAccountFolderDetail = () => {
   };
 
   return (
-    <Container maxWidth="xl" sx={{ mt: 2, mb: 2 }}>
-      {/* Breadcrumbs */}
-      <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 1 }}>
-        <Link
-          underline="hover"
-          sx={{ display: 'flex', alignItems: 'center' }}
-          color="inherit"
-          href="/"
-        >
-          <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-          Home
-        </Link>
-        <Link
-          underline="hover"
-          sx={{ display: 'flex', alignItems: 'center' }}
-          color="inherit"
-          onClick={handleBackToFolders}
-          style={{ cursor: 'pointer' }}
-        >
-          <FolderIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-          Track Account Folders
-        </Link>
-        {folder && (
-          <Typography
-            sx={{ display: 'flex', alignItems: 'center' }}
-            color="text.primary"
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      {/* Action buttons */}
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          {folder ? folder.name : 'Folder Details'}
+        </Typography>
+        <Box>
+          <Button
+            variant="outlined"
+            startIcon={<ArrowBackIcon />}
+            onClick={handleBackToFolders}
+            sx={{ mr: 1 }}
           >
-            <FolderIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            {folder.name}
-          </Typography>
-        )}
-      </Breadcrumbs>
+            Back to Folders
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<AssessmentIcon />}
+            onClick={handleGenerateReport}
+            sx={{ mr: 1 }}
+          >
+            Generate Report
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => {
+              if (organizationId && projectId) {
+                navigate(`/organizations/${organizationId}/projects/${projectId}/track-accounts/folders/${folderId}/create`);
+              } else {
+                navigate(`/track-accounts/folders/${folderId}/create`);
+              }
+            }}
+          >
+            Add Account
+          </Button>
+        </Box>
+      </Box>
 
       {/* Show loading spinner only on first load */}
       {loading && initialLoad ? (
@@ -849,7 +875,13 @@ const TrackAccountFolderDetail = () => {
                             <Button
                               size="small"
                               startIcon={<EditIcon fontSize="small" />}
-                              onClick={() => navigate(`/track-accounts/edit/${account.id}`)}
+                              onClick={() => {
+                                if (organizationId && projectId) {
+                                  navigate(`/organizations/${organizationId}/projects/${projectId}/track-accounts/edit/${account.id}`);
+                                } else {
+                                  navigate(`/track-accounts/edit/${account.id}`);
+                                }
+                              }}
                               variant="outlined"
                               color="primary"
                               sx={{ py: 0.25, minWidth: 60 }}

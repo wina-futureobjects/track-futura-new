@@ -1,5 +1,6 @@
 from django.db import models
 import json
+from users.models import Project
 
 # Create your models here.
 
@@ -9,6 +10,7 @@ class TrackAccountFolder(models.Model):
     """
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, null=True)
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='track_account_folders', null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -26,6 +28,8 @@ class TrackAccount(models.Model):
     """
     # Add folder relationship
     folder = models.ForeignKey(TrackAccountFolder, on_delete=models.CASCADE, related_name='accounts', null=True, blank=True)
+    # Reference to the project
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='track_accounts', null=True)
     
     # Fields from the CSV
     name = models.CharField(max_length=255)
@@ -71,6 +75,7 @@ class ReportFolder(models.Model):
     """
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='report_folders', null=True)
     start_date = models.DateTimeField()
     end_date = models.DateTimeField()
     source_folders = models.TextField(blank=True, null=True)  # JSON array of folder IDs used for this report

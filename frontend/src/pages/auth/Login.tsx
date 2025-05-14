@@ -3,6 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
+import { apiFetch } from '../../utils/api';
+import { setAuthToken, setCurrentUser, UserRole } from '../../utils/auth';
 
 // Define local types and auth implementation
 interface LoginCredentials {
@@ -10,21 +12,113 @@ interface LoginCredentials {
   password: string;
 }
 
+interface User {
+  id: number;
+  username: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  global_role?: {
+    role: UserRole;
+    role_display: string;
+  };
+}
+
+interface LoginResult {
+  user: User;
+}
+
 // Local auth implementation
 const useAuth = () => {
-  const login = async (credentials: LoginCredentials) => {
-    // Mock login for development
-    console.log('Mock login with:', credentials);
-    return { 
-      user: { 
-        id: 1, 
-        username: credentials.username,
-        email: `${credentials.username}@example.com`,
-      } 
-    };
+  const login = async (credentials: LoginCredentials): Promise<LoginResult> => {
+    try {
+      const response = await apiFetch('/api/users/login/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(credentials),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Login failed');
+      }
+      
+      const data = await response.json();
+      
+      // Save token using the auth utility
+      setAuthToken(data.token);
+      
+      // Get user role and details
+      const userProfileResp = await apiFetch('/api/users/profile/', {
+        headers: {
+          'Authorization': `Token ${data.token}`
+        }
+      });
+      
+      if (userProfileResp.ok) {
+        const userProfileData = await userProfileResp.json();
+        // Store complete user data including role
+        const userData: User = {
+          id: data.user_id,
+          username: data.username,
+          email: data.email,
+          first_name: data.first_name || '',
+          last_name: data.last_name || '',
+          global_role: userProfileData.user.global_role
+        };
+        
+        // Save user data using auth utility
+        setCurrentUser(userData);
+        
+        return { user: userData };
+      } else {
+        // If profile fetch fails, still store basic user info
+        const userData: User = {
+          id: data.user_id,
+          username: data.username,
+          email: data.email,
+          first_name: data.first_name || '',
+          last_name: data.last_name || ''
+        };
+        
+        setCurrentUser(userData);
+        return { user: userData };
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    }
   };
   
   return { login };
+};
+
+// Component to display demo account credentials
+const DemoAccountsInfo = () => {
+  return (
+    <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-100 text-sm">
+      <h3 className="font-medium text-blue-800 mb-2">Demo Accounts</h3>
+      <div className="space-y-3">
+        <div>
+          <p className="font-medium text-gray-700">Super Admin:</p>
+          <p className="text-gray-600">Username: <span className="font-mono bg-gray-100 px-1">superadmin</span></p>
+          <p className="text-gray-600">Password: <span className="font-mono bg-gray-100 px-1">superadmin123</span></p>
+        </div>
+        <div>
+          <p className="font-medium text-gray-700">Tenant Admin:</p>
+          <p className="text-gray-600">Username: <span className="font-mono bg-gray-100 px-1">tenantadmin</span></p>
+          <p className="text-gray-600">Password: <span className="font-mono bg-gray-100 px-1">tenantadmin123</span></p>
+        </div>
+        <div>
+          <p className="font-medium text-gray-700">Regular User:</p>
+          <p className="text-gray-600">Username: <span className="font-mono bg-gray-100 px-1">user</span></p>
+          <p className="text-gray-600">Password: <span className="font-mono bg-gray-100 px-1">user123</span></p>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 const Login: React.FC = () => {
@@ -50,10 +144,40 @@ const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await login(credentials);
-      navigate('/');
+      const result = await login(credentials);
+      // Check if user has admin role and redirect accordingly
+      const userRole = result.user.global_role?.role;
+      
+      if (userRole === 'super_admin') {
+        navigate('/admin/super');
+      } else if (userRole === 'tenant_admin') {
+        // Fetch the tenant admin's organizations and redirect to the first one's projects page
+        try {
+          const response = await apiFetch('/api/users/organizations/');
+          if (response.ok) {
+            const data = await response.json();
+            const organizations = Array.isArray(data) ? data : (data.results || []);
+            
+            if (organizations.length > 0) {
+              // Redirect to the first organization's projects page
+              navigate(`/organizations/${organizations[0].id}/projects`);
+            } else {
+              // If no organizations, redirect to main page
+              navigate('/');
+            }
+          } else {
+            // If API call fails, redirect to main page
+            navigate('/');
+          }
+        } catch (error) {
+          console.error('Error fetching organizations:', error);
+          navigate('/');
+        }
+      } else {
+        navigate('/');
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+      setError(err instanceof Error ? err.message : 'Invalid username or password');
     } finally {
       setIsLoading(false);
     }
@@ -139,6 +263,9 @@ const Login: React.FC = () => {
                 {isLoading ? 'Signing in...' : 'Sign in'}
               </Button>
             </div>
+            
+            {/* Demo accounts information */}
+            <DemoAccountsInfo />
           </form>
 
           <div className="px-6 pb-6">
