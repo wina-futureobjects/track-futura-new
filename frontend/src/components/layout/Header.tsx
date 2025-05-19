@@ -725,7 +725,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
             />
           )}
           
-          {/* Right side buttons */}
+          {/* Right side buttons - simplified */}
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Button 
               color="inherit" 
@@ -755,34 +755,6 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
               Settings
             </Button>
             
-            <Button 
-              color="inherit" 
-              sx={{ 
-                textTransform: 'none', 
-                fontWeight: 400,
-                mr: 1,
-                color: 'text.primary',
-                fontSize: '14px'
-              }}
-              onClick={() => {}}
-            >
-              Feedback
-            </Button>
-            
-            <Button 
-              color="inherit" 
-              sx={{ 
-                textTransform: 'none', 
-                fontWeight: 400,
-                mr: 2,
-                color: 'text.primary',
-                fontSize: '14px'
-              }}
-              onClick={() => {}}
-            >
-              Get help
-            </Button>
-            
             <Box 
               sx={{ 
                 display: 'flex', 
@@ -790,7 +762,8 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
                 cursor: 'pointer',
                 p: 0.5,
                 borderRadius: 1,
-                '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.04)' }
+                '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.04)' },
+                ml: 1 
               }}
               onClick={handleProfileMenuOpen}
             >
@@ -799,8 +772,8 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
                   width: 28, 
                   height: 28,
                   fontSize: '12px',
-                  bgcolor: '#f0f0f0',
-                  color: '#5c5c5c'
+                  bgcolor: '#f0f0f0', // A light grey background
+                  color: '#5c5c5c'    // A darker grey for text
                 }}
               >
                 {userName ? userName.substring(0, 2).toLowerCase() : 'u'}

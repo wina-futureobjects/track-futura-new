@@ -26,7 +26,7 @@ class TrackAccount(models.Model):
     """
     Model for storing Track Account data
     """
-    # Add folder relationship
+    # Add folder relationship - Making null and blank explicitly True for clarity
     folder = models.ForeignKey(TrackAccountFolder, on_delete=models.CASCADE, related_name='accounts', null=True, blank=True)
     # Reference to the project
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='track_accounts', null=True)

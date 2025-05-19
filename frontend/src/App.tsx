@@ -232,7 +232,7 @@ function App() {
           
           <Route path="/track-accounts" element={
             <ProtectedRoute>
-              <Navigate to="/track-accounts/folders" replace />
+              <Navigate to="/track-accounts/accounts" replace />
             </ProtectedRoute>
           } />
           <Route path="/track-accounts/folders" element={
@@ -288,7 +288,7 @@ function App() {
           {/* New routes with organization and project IDs */}
           <Route path="/organizations/:organizationId/projects/:projectId/track-accounts" element={
             <ProtectedRoute>
-              <Navigate to="/organizations/:organizationId/projects/:projectId/track-accounts/folders" replace />
+              <Navigate to="/organizations/:organizationId/projects/:projectId/track-accounts/accounts" replace />
             </ProtectedRoute>
           } />
           <Route path="/organizations/:organizationId/projects/:projectId/track-accounts/folders" element={

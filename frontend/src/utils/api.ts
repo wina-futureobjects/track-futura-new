@@ -37,10 +37,18 @@ export const apiFetch = (endpoint: string, options?: RequestInit): Promise<Respo
   // Get auth token from localStorage if available
   const token = localStorage.getItem('authToken');
   
-  // Prepare headers with Authorization if token exists
+  // Get CSRF token from cookie if it exists
+  const csrfToken = document.cookie
+    .split(';')
+    .map(cookie => cookie.trim())
+    .find(cookie => cookie.startsWith('csrftoken='))
+    ?.split('=')[1];
+  
+  // Prepare headers with Authorization if token exists and CSRF token if it exists
   const headers = {
     ...(options?.headers || {}),
-    ...(token ? { 'Authorization': `Token ${token}` } : {})
+    ...(token ? { 'Authorization': `Token ${token}` } : {}),
+    ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {})
   };
   
   return fetch(url, {

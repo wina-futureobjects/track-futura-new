@@ -27,6 +27,13 @@ import {
   FormControl,
   InputLabel,
   SelectChangeEvent,
+  Grid,
+  Card,
+  CardContent,
+  CardActionArea,
+  Chip,
+  ToggleButtonGroup,
+  ToggleButton,
 } from '@mui/material';
 import { useNavigate, useParams } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
@@ -34,6 +41,8 @@ import SearchIcon from '@mui/icons-material/Search';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import GroupIcon from '@mui/icons-material/Group';
 import SettingsIcon from '@mui/icons-material/Settings';
+import ViewListIcon from '@mui/icons-material/ViewList';
+import GridViewIcon from '@mui/icons-material/GridView';
 import { apiFetch } from '../utils/api';
 
 interface Project {
@@ -91,6 +100,7 @@ const OrganizationProjects = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('last viewed');
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid');
 
   useEffect(() => {
     if (organizationId) {
@@ -279,10 +289,254 @@ const OrganizationProjects = () => {
     setSortBy(event.target.value);
   };
 
+  const handleViewModeChange = (
+    event: React.MouseEvent<HTMLElement>,
+    newViewMode: 'list' | 'grid',
+  ) => {
+    if (newViewMode !== null) {
+      setViewMode(newViewMode);
+    }
+  };
+
   // Filter projects based on search query
   const filteredProjects = projects.filter(project => 
     project.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Return either grid or list view of projects
+  const renderProjects = () => {
+    if (filteredProjects.length === 0) {
+      return (
+        <Paper sx={{ p: 4, textAlign: 'center', mt: 2, borderRadius: 8, border: '1px solid rgba(0,0,0,0.08)' }}>
+          <Typography variant="h6" gutterBottom>No projects found</Typography>
+          <Typography variant="body2" color="text.secondary" paragraph>
+            Create your first project in this organization to get started.
+          </Typography>
+          <Button 
+            variant="contained" 
+            startIcon={<AddIcon />} 
+            onClick={handleNewProject}
+            sx={{
+              borderRadius: 2,
+              bgcolor: '#1a73e8', 
+              color: 'white', 
+              textTransform: 'none',
+              fontWeight: 500,
+              boxShadow: 'none',
+              px: 3,
+              py: 1,
+              '&:hover': {
+                bgcolor: '#1558b3',
+                boxShadow: '0 2px 8px rgba(26, 115, 232, 0.3)'
+              }
+            }}
+          >
+            Create Project
+          </Button>
+        </Paper>
+      );
+    }
+
+    if (viewMode === 'grid') {
+      return (
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', mx: -1 }}>
+          {filteredProjects.map((project) => (
+            <Box 
+              key={project.id} 
+              sx={{ 
+                width: { xs: '100%', sm: '50%', md: '33.33%', lg: '25%' },
+                p: 1
+              }}
+            >
+              <Card 
+                sx={{ 
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  transition: 'transform 0.2s, box-shadow 0.2s',
+                  '&:hover': {
+                    transform: 'translateY(-4px)',
+                    boxShadow: '0 10px 20px rgba(0,0,0,0.1)',
+                  },
+                  cursor: 'pointer',
+                  borderRadius: '12px',
+                  overflow: 'hidden',
+                  border: '1px solid rgba(0,0,0,0.08)',
+                  boxShadow: 'none',
+                  position: 'relative'
+                }}
+              >
+                {/* Action button outside CardActionArea */}
+                <IconButton 
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Project actions menu
+                  }}
+                  sx={{ 
+                    position: 'absolute', 
+                    top: 8, 
+                    right: 8,
+                    zIndex: 1
+                  }}
+                >
+                  <MoreVertIcon fontSize="small" />
+                </IconButton>
+                
+                <CardActionArea 
+                  sx={{ 
+                    flexGrow: 1, 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'flex-start', 
+                    p: 2.5,
+                    '&:hover': {
+                      bgcolor: 'transparent'
+                    }
+                  }}
+                  onClick={() => handleOpenProject(project.id)}
+                >
+                  <Box 
+                    sx={{ 
+                      width: '100%', 
+                      display: 'flex', 
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      mb: 1
+                    }}
+                  >
+                    <Typography 
+                      variant="h6" 
+                      component="div" 
+                      sx={{ 
+                        fontWeight: 500,
+                        color: '#1a73e8',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                      }}
+                    >
+                      {project.name}
+                    </Typography>
+                  </Box>
+                  
+                  {project.description && (
+                    <Typography 
+                      variant="body2" 
+                      color="text.secondary"
+                      sx={{
+                        mb: 2,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: 'vertical',
+                      }}
+                    >
+                      {project.description}
+                    </Typography>
+                  )}
+                  
+                  <Box sx={{ 
+                    mt: 'auto',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    width: '100%'
+                  }}>
+                    <Chip 
+                      label={project.is_public ? 'Public' : 'Private'} 
+                      size="small"
+                      sx={{ 
+                        bgcolor: project.is_public ? 'rgba(46, 204, 113, 0.1)' : 'rgba(52, 152, 219, 0.1)',
+                        color: project.is_public ? 'rgb(46, 204, 113)' : 'rgb(52, 152, 219)',
+                        borderRadius: '4px',
+                        fontWeight: 500,
+                        fontSize: '0.7rem',
+                        height: '24px'
+                      }}
+                    />
+                    <Typography variant="caption" color="text.secondary">
+                      {new Date(project.created_at).toLocaleDateString()}
+                    </Typography>
+                  </Box>
+                </CardActionArea>
+              </Card>
+            </Box>
+          ))}
+        </Box>
+      );
+    }
+
+    // List View
+    return (
+      <TableContainer component={Paper} sx={{ 
+        boxShadow: 'none', 
+        borderRadius: '8px',
+        border: '1px solid rgba(0,0,0,0.12)'
+      }}>
+        <Table>
+          <TableHead sx={{ bgcolor: '#f9fafb' }}>
+            <TableRow>
+              <TableCell sx={{ fontWeight: 600, color: 'rgba(0, 0, 0, 0.87)', py: 1.5 }}>Project name</TableCell>
+              <TableCell sx={{ fontWeight: 600, color: 'rgba(0, 0, 0, 0.87)', py: 1.5 }}>Owner</TableCell>
+              <TableCell sx={{ fontWeight: 600, color: 'rgba(0, 0, 0, 0.87)', py: 1.5 }}>Access</TableCell>
+              <TableCell sx={{ fontWeight: 600, color: 'rgba(0, 0, 0, 0.87)', py: 1.5 }}>Created</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 600, color: 'rgba(0, 0, 0, 0.87)', py: 1.5 }}>Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {filteredProjects.map((project) => (
+              <TableRow 
+                key={project.id}
+                hover
+                sx={{ cursor: 'pointer' }}
+              >
+                <TableCell 
+                  sx={{ color: '#1a73e8', fontWeight: 500 }}
+                  onClick={() => handleOpenProject(project.id)}
+                >
+                  {project.name}
+                </TableCell>
+                <TableCell onClick={() => handleOpenProject(project.id)}>
+                  {project.owner_name}
+                </TableCell>
+                <TableCell onClick={() => handleOpenProject(project.id)}>
+                  <Chip 
+                    label={project.is_public ? 'Public' : 'Private'} 
+                    size="small"
+                    sx={{ 
+                      bgcolor: project.is_public ? 'rgba(46, 204, 113, 0.1)' : 'rgba(52, 152, 219, 0.1)',
+                      color: project.is_public ? 'rgb(46, 204, 113)' : 'rgb(52, 152, 219)',
+                      borderRadius: '4px',
+                      fontWeight: 500,
+                      fontSize: '0.7rem',
+                      height: '24px'
+                    }}
+                  />
+                </TableCell>
+                <TableCell onClick={() => handleOpenProject(project.id)}>
+                  {new Date(project.created_at).toLocaleDateString()}
+                </TableCell>
+                <TableCell align="center">
+                  <IconButton 
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Project actions menu
+                    }}
+                  >
+                    <MoreVertIcon fontSize="small" />
+                  </IconButton>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    );
+  };
 
   // Filter members based on search query
   const filteredMembers = members.filter(member => 
@@ -294,49 +548,35 @@ const OrganizationProjects = () => {
   return (
     <Box sx={{ 
       width: '100%', 
-      padding: '16px 32px',
-      bgcolor: '#f5f5f5',
-      minHeight: 'calc(100vh - 56px)',
+      padding: '24px 32px',
+      bgcolor: '#f8f9fa',
+      minHeight: 'calc(100vh - 64px)',
     }}>
-      {/* Breadcrumbs */}
-      <Box sx={{ mb: 2 }}>
-        <Breadcrumbs aria-label="breadcrumb">
-          <Link 
-            underline="hover" 
-            color="inherit" 
-            onClick={() => navigate('/organizations')}
-            sx={{ cursor: 'pointer' }}
-          >
-            Organizations
-          </Link>
-          <Typography color="text.primary">
-            {organization?.name || 'Organization'}
-          </Typography>
-        </Breadcrumbs>
-      </Box>
-      
-      {/* Organization Header */}
-      {organization && (
-        <Box mb={3}>
-          <Typography variant="h4" component="h1" fontWeight="500" gutterBottom>
-            {organization.name}
-          </Typography>
-          {organization.description && (
-            <Typography variant="body1" color="text.secondary">
-              {organization.description}
-            </Typography>
-          )}
-          <Box sx={{ mt: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              Owner: {organization.owner_name} • Members: {organization.members_count}
-            </Typography>
-          </Box>
-        </Box>
-      )}
-      
       {/* Tabs */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tabs value={activeTab} onChange={handleTabChange} aria-label="organization tabs">
+      <Box sx={{ mb: 4, display: 'flex', borderBottom: 1, borderColor: 'divider' }}>
+        <Tabs 
+          value={activeTab} 
+          onChange={handleTabChange} 
+          aria-label="organization tabs"
+          sx={{
+            '& .MuiTab-root': {
+              textTransform: 'none',
+              fontWeight: 500,
+              fontSize: '1rem',
+              color: 'rgba(0, 0, 0, 0.7)',
+              minWidth: 100,
+              py: 1.5,
+            },
+            '& .Mui-selected': {
+              color: '#1a73e8',
+              fontWeight: 600,
+            },
+            '& .MuiTabs-indicator': {
+              backgroundColor: '#1a73e8',
+              height: 3,
+            },
+          }}
+        >
           <Tab label="Projects" id="tab-0" />
           <Tab label="Members" id="tab-1" />
           <Tab label="Settings" id="tab-2" />
@@ -348,24 +588,26 @@ const OrganizationProjects = () => {
         {activeTab === 0 && (
           <>
             {/* Header and actions */}
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-              <Typography variant="h5" component="h2" fontWeight="500">
-                Projects
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
+              <Typography variant="h4" component="h1" fontWeight="600">
+                {organization?.name || 'Organization'} Projects
               </Typography>
               <Button 
                 variant="contained" 
                 startIcon={<AddIcon />}
                 onClick={handleNewProject}
                 sx={{ 
-                  borderRadius: 1,
-                  bgcolor: '#e5e8eb', 
-                  color: '#000000', 
+                  borderRadius: 8,
+                  bgcolor: '#1a73e8', 
+                  color: 'white', 
                   textTransform: 'none',
                   fontWeight: 500,
                   boxShadow: 'none',
+                  px: 3,
+                  py: 1.2,
                   '&:hover': {
-                    bgcolor: '#d5d8db',
-                    boxShadow: 'none'
+                    bgcolor: '#1558b3',
+                    boxShadow: '0 2px 8px rgba(26, 115, 232, 0.3)'
                   }
                 }}
               >
@@ -374,136 +616,129 @@ const OrganizationProjects = () => {
             </Box>
 
             {/* Search and filters bar */}
-            <Box 
-              display="flex" 
-              justifyContent="space-between" 
-              alignItems="center" 
-              sx={{ mb: 1 }}
+            <Paper
+              elevation={0}
+              sx={{ 
+                p: 1.5, 
+                mb: 3, 
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                borderRadius: 3,
+                border: '1px solid rgba(0, 0, 0, 0.08)',
+                bgcolor: 'white' 
+              }}
             >
-              <TextField
-                placeholder="Search projects"
-                variant="outlined"
-                size="small"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                sx={{ 
-                  width: '300px',
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: 'white',
-                    '& fieldset': {
-                      borderColor: 'rgba(0, 0, 0, 0.23)',
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                width: '100%',
+                maxWidth: 500,
+                borderRadius: 2,
+                px: 2,
+                py: 0.5,
+                bgcolor: 'rgba(0, 0, 0, 0.03)'
+              }}>
+                <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />
+                <TextField
+                  placeholder="Search projects"
+                  variant="standard"
+                  fullWidth
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  sx={{ 
+                    '& .MuiInput-root': {
+                      '&::before, &::after': {
+                        display: 'none'
+                      }
                     },
-                  },
-                }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-              <FormControl size="small" sx={{ minWidth: 180, backgroundColor: 'white' }}>
-                <InputLabel id="sort-select-label">Sort by</InputLabel>
-                <Select
-                  labelId="sort-select-label"
-                  id="sort-select"
-                  value={sortBy}
-                  label="Sort by"
-                  onChange={handleSortChange}
+                    '& .MuiInputBase-input': {
+                      py: 1
+                    }
+                  }}
+                />
+              </Box>
+              
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 1,
+                  py: 0.75,
+                  px: 2,
+                  borderRadius: 2,
+                  bgcolor: 'rgba(0, 0, 0, 0.03)'
+                }}>
+                  <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+                    Sort by:
+                  </Typography>
+                  <Select
+                    value={sortBy}
+                    onChange={handleSortChange}
+                    size="small"
+                    variant="standard"
+                    disableUnderline
+                    sx={{ 
+                      minWidth: 120,
+                      '& .MuiSelect-select': {
+                        fontWeight: 500,
+                        py: 0,
+                        color: '#1a73e8'
+                      }
+                    }}
+                  >
+                    <MenuItem value="last viewed">Last viewed</MenuItem>
+                    <MenuItem value="newest">Newest</MenuItem>
+                    <MenuItem value="oldest">Oldest</MenuItem>
+                    <MenuItem value="name">Name</MenuItem>
+                  </Select>
+                </Box>
+                
+                <ToggleButtonGroup
+                  value={viewMode}
+                  exclusive
+                  onChange={handleViewModeChange}
+                  aria-label="view mode"
+                  size="small"
+                  sx={{ 
+                    border: 'none',
+                    bgcolor: 'rgba(0, 0, 0, 0.03)',
+                    borderRadius: 2,
+                    '& .MuiToggleButton-root': {
+                      border: 'none',
+                      py: 0.75,
+                      '&.Mui-selected': {
+                        bgcolor: 'white',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+                        '&:hover': {
+                          bgcolor: 'white'
+                        }
+                      }
+                    }
+                  }}
                 >
-                  <MenuItem value="last viewed">last viewed</MenuItem>
-                  <MenuItem value="newest">newest</MenuItem>
-                  <MenuItem value="oldest">oldest</MenuItem>
-                  <MenuItem value="name">name</MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
+                  <ToggleButton value="grid" aria-label="grid view">
+                    <GridViewIcon />
+                  </ToggleButton>
+                  <ToggleButton value="list" aria-label="list view">
+                    <ViewListIcon />
+                  </ToggleButton>
+                </ToggleButtonGroup>
+              </Box>
+            </Paper>
 
             {/* Projects Count */}
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               Showing {filteredProjects.length} project{filteredProjects.length !== 1 ? 's' : ''}
             </Typography>
 
-            {/* Projects Table */}
+            {/* Projects Display */}
             {loading ? (
               <Box display="flex" justifyContent="center" mt={4}>
                 <CircularProgress />
               </Box>
             ) : (
-              <>
-                {filteredProjects.length > 0 ? (
-                  <TableContainer component={Paper} sx={{ 
-                    boxShadow: 'none', 
-                    borderRadius: '4px',
-                    border: '1px solid rgba(0,0,0,0.12)'
-                  }}>
-                    <Table>
-                      <TableHead sx={{ bgcolor: '#f9fafb' }}>
-                        <TableRow>
-                          <TableCell sx={{ fontWeight: 600, color: 'rgba(0, 0, 0, 0.87)', py: 1.5 }}>Project name</TableCell>
-                          <TableCell sx={{ fontWeight: 600, color: 'rgba(0, 0, 0, 0.87)', py: 1.5 }}>Owner</TableCell>
-                          <TableCell sx={{ fontWeight: 600, color: 'rgba(0, 0, 0, 0.87)', py: 1.5 }}>Access</TableCell>
-                          <TableCell sx={{ fontWeight: 600, color: 'rgba(0, 0, 0, 0.87)', py: 1.5 }}>Created</TableCell>
-                          <TableCell align="center" sx={{ fontWeight: 600, color: 'rgba(0, 0, 0, 0.87)', py: 1.5 }}>Actions</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {filteredProjects.map((project) => (
-                          <TableRow 
-                            key={project.id}
-                            hover
-                            sx={{ cursor: 'pointer' }}
-                            onClick={() => handleOpenProject(project.id)}
-                          >
-                            <TableCell sx={{ color: '#1a73e8', fontWeight: 500 }}>{project.name}</TableCell>
-                            <TableCell>{project.owner_name}</TableCell>
-                            <TableCell>{project.is_public ? 'Public' : 'Private'}</TableCell>
-                            <TableCell>{new Date(project.created_at).toLocaleDateString()}</TableCell>
-                            <TableCell align="center">
-                              <IconButton 
-                                size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  // Project actions menu
-                                }}
-                              >
-                                <MoreVertIcon fontSize="small" />
-                              </IconButton>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                ) : (
-                  <Paper sx={{ p: 4, textAlign: 'center', mt: 2, borderRadius: 2 }}>
-                    <Typography variant="h6" gutterBottom>No projects found</Typography>
-                    <Typography variant="body2" color="text.secondary" paragraph>
-                      Create your first project in this organization to get started.
-                    </Typography>
-                    <Button 
-                      variant="contained" 
-                      startIcon={<AddIcon />} 
-                      onClick={handleNewProject}
-                      sx={{
-                        borderRadius: 1,
-                        bgcolor: '#e5e8eb', 
-                        color: '#000000', 
-                        textTransform: 'none',
-                        fontWeight: 500,
-                        boxShadow: 'none',
-                        '&:hover': {
-                          bgcolor: '#d5d8db',
-                          boxShadow: 'none'
-                        }
-                      }}
-                    >
-                      Create Project
-                    </Button>
-                  </Paper>
-                )}
-              </>
+              renderProjects()
             )}
           </>
         )}
@@ -514,24 +749,26 @@ const OrganizationProjects = () => {
         {activeTab === 1 && (
           <>
             {/* Header and actions */}
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-              <Typography variant="h5" component="h2" fontWeight="500">
-                Members
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
+              <Typography variant="h4" component="h1" fontWeight="600">
+                {organization?.name || 'Organization'} Members
               </Typography>
               <Button 
                 variant="contained" 
                 startIcon={<GroupIcon />}
                 onClick={handleAddMember}
                 sx={{ 
-                  borderRadius: 1,
-                  bgcolor: '#e5e8eb', 
-                  color: '#000000', 
+                  borderRadius: 8,
+                  bgcolor: '#1a73e8', 
+                  color: 'white', 
                   textTransform: 'none',
                   fontWeight: 500,
                   boxShadow: 'none',
+                  px: 3,
+                  py: 1.2,
                   '&:hover': {
-                    bgcolor: '#d5d8db',
-                    boxShadow: 'none'
+                    bgcolor: '#1558b3',
+                    boxShadow: '0 2px 8px rgba(26, 115, 232, 0.3)'
                   }
                 }}
               >
@@ -540,33 +777,52 @@ const OrganizationProjects = () => {
             </Box>
 
             {/* Search for members */}
-            <TextField
-              placeholder="Search members"
-              variant="outlined"
-              size="small"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+            <Paper
+              elevation={0}
               sx={{ 
-                width: '300px',
-                mb: 2,
-                '& .MuiOutlinedInput-root': {
-                  backgroundColor: 'white',
-                  '& fieldset': {
-                    borderColor: 'rgba(0, 0, 0, 0.23)',
-                  },
-                },
+                p: 1.5, 
+                mb: 3, 
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                borderRadius: 3,
+                border: '1px solid rgba(0, 0, 0, 0.08)',
+                bgcolor: 'white' 
               }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
-              }}
-            />
+            >
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                width: '100%',
+                maxWidth: 500,
+                borderRadius: 2,
+                px: 2,
+                py: 0.5,
+                bgcolor: 'rgba(0, 0, 0, 0.03)'
+              }}>
+                <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />
+                <TextField
+                  placeholder="Search members by name or email"
+                  variant="standard"
+                  fullWidth
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  sx={{ 
+                    '& .MuiInput-root': {
+                      '&::before, &::after': {
+                        display: 'none'
+                      }
+                    },
+                    '& .MuiInputBase-input': {
+                      py: 1
+                    }
+                  }}
+                />
+              </Box>
+            </Paper>
 
             {/* Members Count */}
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               Showing {filteredMembers.length} member{filteredMembers.length !== 1 ? 's' : ''}
             </Typography>
 
@@ -580,8 +836,9 @@ const OrganizationProjects = () => {
                 {filteredMembers.length > 0 ? (
                   <TableContainer component={Paper} sx={{ 
                     boxShadow: 'none', 
-                    borderRadius: '4px',
-                    border: '1px solid rgba(0,0,0,0.12)'
+                    borderRadius: '8px',
+                    border: '1px solid rgba(0,0,0,0.08)',
+                    overflow: 'hidden'
                   }}>
                     <Table>
                       <TableHead sx={{ bgcolor: '#f9fafb' }}>
@@ -595,12 +852,32 @@ const OrganizationProjects = () => {
                       </TableHead>
                       <TableBody>
                         {filteredMembers.map((member) => (
-                          <TableRow key={member.id}>
-                            <TableCell>
+                          <TableRow key={member.id} hover>
+                            <TableCell sx={{ fontWeight: 500 }}>
                               {member.user.first_name} {member.user.last_name}
                             </TableCell>
                             <TableCell>{member.user.email}</TableCell>
-                            <TableCell sx={{ textTransform: 'capitalize' }}>{member.role}</TableCell>
+                            <TableCell>
+                              <Chip 
+                                label={member.role} 
+                                size="small"
+                                sx={{ 
+                                  bgcolor: 
+                                    member.role === 'admin' ? 'rgba(250, 173, 20, 0.1)' : 
+                                    member.role === 'member' ? 'rgba(52, 152, 219, 0.1)' : 
+                                    'rgba(149, 165, 166, 0.1)',
+                                  color:
+                                    member.role === 'admin' ? 'rgb(250, 173, 20)' : 
+                                    member.role === 'member' ? 'rgb(52, 152, 219)' : 
+                                    'rgb(149, 165, 166)',
+                                  borderRadius: '4px',
+                                  fontWeight: 500,
+                                  fontSize: '0.7rem',
+                                  height: '24px',
+                                  textTransform: 'capitalize'
+                                }}
+                              />
+                            </TableCell>
                             <TableCell>{new Date(member.date_joined).toLocaleDateString()}</TableCell>
                             <TableCell align="center">
                               <IconButton 
@@ -618,7 +895,7 @@ const OrganizationProjects = () => {
                     </Table>
                   </TableContainer>
                 ) : (
-                  <Paper sx={{ p: 4, textAlign: 'center', mt: 2, borderRadius: 2 }}>
+                  <Paper sx={{ p: 4, textAlign: 'center', mt: 2, borderRadius: 8, border: '1px solid rgba(0,0,0,0.08)' }}>
                     <Typography variant="h6" gutterBottom>No members found</Typography>
                     <Typography variant="body2" color="text.secondary" paragraph>
                       Add members to your organization to collaborate on projects.
@@ -628,15 +905,17 @@ const OrganizationProjects = () => {
                       startIcon={<GroupIcon />} 
                       onClick={handleAddMember}
                       sx={{
-                        borderRadius: 1,
-                        bgcolor: '#e5e8eb', 
-                        color: '#000000', 
+                        borderRadius: 8,
+                        bgcolor: '#1a73e8', 
+                        color: 'white', 
                         textTransform: 'none',
                         fontWeight: 500,
                         boxShadow: 'none',
+                        px: 3,
+                        py: 1.2,
                         '&:hover': {
-                          bgcolor: '#d5d8db',
-                          boxShadow: 'none'
+                          bgcolor: '#1558b3',
+                          boxShadow: '0 2px 8px rgba(26, 115, 232, 0.3)'
                         }
                       }}
                     >
@@ -654,49 +933,109 @@ const OrganizationProjects = () => {
       <Box role="tabpanel" hidden={activeTab !== 2}>
         {activeTab === 2 && (
           <>
-            <Typography variant="h5" component="h2" fontWeight="500" mb={3}>
-              Organization Settings
-            </Typography>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
+              <Typography variant="h4" component="h1" fontWeight="600">
+                {organization?.name || 'Organization'} Settings
+              </Typography>
+            </Box>
             
-            {/* Organization settings content goes here */}
-            <Paper sx={{ p: 3, mb: 3 }}>
-              <Typography variant="h6" gutterBottom>Organization Information</Typography>
-              <TextField
-                label="Organization Name"
-                fullWidth
-                margin="normal"
-                value={organization?.name || ''}
-                InputProps={{
-                  readOnly: true,
-                }}
-              />
-              <TextField
-                label="Description"
-                fullWidth
-                margin="normal"
-                multiline
-                rows={3}
-                value={organization?.description || ''}
-                InputProps={{
-                  readOnly: true,
-                }}
-              />
-              <Box mt={2}>
+            {/* Organization settings content */}
+            <Paper sx={{ 
+              p: 4, 
+              mb: 4, 
+              borderRadius: 3,
+              boxShadow: 'none',
+              border: '1px solid rgba(0,0,0,0.08)'
+            }}>
+              <Typography variant="h6" gutterBottom fontWeight={600}>Organization Information</Typography>
+              
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="body2" color="text.secondary" gutterBottom fontWeight={500}>
+                  Organization Name
+                </Typography>
+                <TextField
+                  fullWidth
+                  variant="outlined"
+                  size="small"
+                  value={organization?.name || ''}
+                  InputProps={{
+                    readOnly: true,
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      backgroundColor: 'white',
+                      borderRadius: 2
+                    }
+                  }}
+                />
+              </Box>
+              
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="body2" color="text.secondary" gutterBottom fontWeight={500}>
+                  Description
+                </Typography>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={3}
+                  variant="outlined"
+                  size="small"
+                  value={organization?.description || ''}
+                  InputProps={{
+                    readOnly: true,
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      backgroundColor: 'white',
+                      borderRadius: 2
+                    }
+                  }}
+                />
+              </Box>
+              
+              <Box mt={3}>
                 <Button 
                   variant="outlined" 
                   startIcon={<SettingsIcon />}
+                  sx={{
+                    borderRadius: 8,
+                    borderColor: '#1a73e8',
+                    color: '#1a73e8',
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    px: 3,
+                    py: 1
+                  }}
                 >
                   Edit Organization
                 </Button>
               </Box>
             </Paper>
             
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom sx={{ color: 'error.main' }}>Danger Zone</Typography>
+            <Paper sx={{ 
+              p: 4, 
+              borderRadius: 3,
+              boxShadow: 'none',
+              border: '1px solid rgba(255, 100, 100, 0.15)',
+              bgcolor: 'rgba(255, 100, 100, 0.03)'
+            }}>
+              <Typography variant="h6" gutterBottom fontWeight={600} sx={{ color: 'error.main' }}>
+                Danger Zone
+              </Typography>
+              <Typography variant="body2" color="text.secondary" paragraph>
+                Permanently delete this organization and all its data. This action cannot be undone.
+              </Typography>
               <Box mt={2}>
                 <Button 
                   variant="outlined" 
                   color="error"
+                  sx={{
+                    borderRadius: 8,
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    px: 3,
+                    py: 1
+                  }}
                   onClick={() => {
                     if (window.confirm('Are you sure you want to delete this organization? This action cannot be undone.')) {
                       // Delete organization API call
@@ -712,92 +1051,198 @@ const OrganizationProjects = () => {
       </Box>
 
       {/* New Project Dialog */}
-      <Dialog open={openNewProjectDialog} onClose={() => setOpenNewProjectDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Create New Project</DialogTitle>
-        <DialogContent>
+      <Dialog 
+        open={openNewProjectDialog} 
+        onClose={() => setOpenNewProjectDialog(false)}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{
+          sx: {
+            borderRadius: '12px',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
+          }
+        }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Typography variant="h5" fontWeight={600}>Create New Project</Typography>
+        </DialogTitle>
+        <DialogContent sx={{ pb: 2, pt: 2 }}>
+          <Typography variant="body2" color="text.secondary" paragraph>
+            Create a new project to organize your documents, assistants, and more.
+          </Typography>
           <TextField
             autoFocus
             margin="dense"
+            id="name"
             label="Project Name"
             type="text"
             fullWidth
+            variant="outlined"
             value={projectName}
             onChange={(e) => setProjectName(e.target.value)}
-            required
+            sx={{ mb: 3, mt: 2 }}
           />
           <TextField
             margin="dense"
-            label="Description (optional)"
+            id="description"
+            label="Description (Optional)"
             type="text"
             fullWidth
+            variant="outlined"
             multiline
             rows={3}
             value={projectDescription}
             onChange={(e) => setProjectDescription(e.target.value)}
+            sx={{ mb: 2 }}
           />
-          <FormControl fullWidth margin="dense">
-            <InputLabel id="project-access-label">Access</InputLabel>
-            <Select
-              labelId="project-access-label"
-              value={projectPublic ? 'public' : 'private'}
-              label="Access"
-              onChange={(e) => setProjectPublic(e.target.value === 'public')}
-            >
-              <MenuItem value="private">Private - Only you and users you add can access</MenuItem>
-              <MenuItem value="public">Public - All organization members can access</MenuItem>
-            </Select>
-          </FormControl>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+            <Typography variant="body2" sx={{ mr: 2 }}>
+              Project visibility:
+            </Typography>
+            <FormControl component="fieldset">
+              <Select
+                value={projectPublic ? "public" : "private"}
+                onChange={(e) => setProjectPublic(e.target.value === "public")}
+                size="small"
+                sx={{ minWidth: 120 }}
+              >
+                <MenuItem value="private">Private</MenuItem>
+                <MenuItem value="public">Public</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+          <Typography variant="caption" color="text.secondary">
+            {projectPublic 
+              ? "Public projects can be viewed by anyone with the link." 
+              : "Private projects are only visible to organization members."}
+          </Typography>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenNewProjectDialog(false)}>Cancel</Button>
-          <Button onClick={handleCreateProject} variant="contained" color="primary">
+        <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid rgba(0, 0, 0, 0.05)' }}>
+          <Button 
+            onClick={() => setOpenNewProjectDialog(false)}
+            sx={{ color: 'text.secondary' }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleCreateProject} 
+            variant="contained"
+            disabled={!projectName.trim()}
+            sx={{ 
+              borderRadius: 2,
+              bgcolor: '#1a73e8',
+              textTransform: 'none',
+              px: 3,
+              '&.Mui-disabled': {
+                bgcolor: 'rgba(26, 115, 232, 0.5)',
+                color: 'white'
+              }
+            }}
+          >
             Create
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Add Member Dialog */}
-      <Dialog open={openAddMemberDialog} onClose={() => setOpenAddMemberDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Add Member to Organization</DialogTitle>
-        <DialogContent>
+      <Dialog 
+        open={openAddMemberDialog} 
+        onClose={() => setOpenAddMemberDialog(false)}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{
+          sx: {
+            borderRadius: '12px',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
+          }
+        }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Typography variant="h5" fontWeight={600}>Invite New Member</Typography>
+        </DialogTitle>
+        <DialogContent sx={{ pb: 2, pt: 2 }}>
+          <Typography variant="body2" color="text.secondary" paragraph>
+            Invite a new member to join your organization. They will receive an email invitation.
+          </Typography>
           <TextField
             autoFocus
             margin="dense"
+            id="email"
             label="Email Address"
             type="email"
             fullWidth
+            variant="outlined"
             value={newMemberEmail}
             onChange={(e) => setNewMemberEmail(e.target.value)}
-            required
-            helperText="Enter the email of a registered user"
+            sx={{ mb: 3, mt: 2 }}
           />
-          <FormControl fullWidth margin="dense">
-            <InputLabel id="member-role-label">Role</InputLabel>
-            <Select
-              labelId="member-role-label"
-              value={newMemberRole}
-              label="Role"
-              onChange={(e) => setNewMemberRole(e.target.value)}
-            >
-              <MenuItem value="admin">Admin - Full access to organization</MenuItem>
-              <MenuItem value="member">Member - Can create projects and access public projects</MenuItem>
-              <MenuItem value="viewer">Viewer - Can only view public projects</MenuItem>
-            </Select>
-          </FormControl>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+            <Typography variant="body2" sx={{ mr: 2 }}>
+              Member role:
+            </Typography>
+            <FormControl component="fieldset">
+              <Select
+                value={newMemberRole}
+                onChange={(e) => setNewMemberRole(e.target.value)}
+                size="small"
+                sx={{ minWidth: 120 }}
+              >
+                <MenuItem value="admin">Admin</MenuItem>
+                <MenuItem value="member">Member</MenuItem>
+                <MenuItem value="viewer">Viewer</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+          <Typography variant="caption" color="text.secondary">
+            {newMemberRole === 'admin' 
+              ? "Admins can manage members, projects, and organization settings." 
+              : newMemberRole === 'member'
+                ? "Members can create and edit projects, but cannot manage organization settings."
+                : "Viewers can only view projects, but cannot edit them."}
+          </Typography>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenAddMemberDialog(false)}>Cancel</Button>
-          <Button onClick={handleAddMemberSubmit} variant="contained" color="primary">
-            Add Member
+        <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid rgba(0, 0, 0, 0.05)' }}>
+          <Button 
+            onClick={() => setOpenAddMemberDialog(false)}
+            sx={{ color: 'text.secondary' }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleAddMemberSubmit} 
+            variant="contained"
+            disabled={!newMemberEmail.trim()}
+            sx={{ 
+              borderRadius: 2,
+              bgcolor: '#1a73e8',
+              textTransform: 'none',
+              px: 3,
+              '&.Mui-disabled': {
+                bgcolor: 'rgba(26, 115, 232, 0.5)',
+                color: 'white'
+              }
+            }}
+          >
+            Send Invitation
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Error message */}
       {error && (
-        <Box mt={2} p={2} bgcolor="error.light" color="error.dark" borderRadius={1}>
-          <Typography variant="body2">{error}</Typography>
-        </Box>
+        <Paper sx={{ 
+          mt: 3,
+          p: 2, 
+          bgcolor: 'rgba(255, 100, 100, 0.03)', 
+          color: 'error.main',
+          borderRadius: 3,
+          border: '1px solid rgba(255, 100, 100, 0.15)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1
+        }}>
+          <Typography variant="body2" fontWeight={500}>{error}</Typography>
+        </Paper>
       )}
     </Box>
   );

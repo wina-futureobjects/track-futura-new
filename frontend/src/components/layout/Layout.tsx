@@ -14,7 +14,7 @@ const Main = styled('main', { shouldForwardProp: (prop) => prop !== 'open' && pr
   isMobile?: boolean;
 }>(({ theme, open, isMobile }) => ({
   flexGrow: 1,
-  padding: theme.spacing(3),
+  padding: 0,
   transition: theme.transitions.create(['margin', 'width'], {
     easing: theme.transitions.easing.sharp,
     duration: theme.transitions.duration.leavingScreen,
@@ -22,7 +22,6 @@ const Main = styled('main', { shouldForwardProp: (prop) => prop !== 'open' && pr
   ...(isMobile && {
     marginLeft: 0,
     width: '100%',
-    padding: theme.spacing(2),
   }),
   ...(!isMobile && {
     marginLeft: 0,
@@ -82,10 +81,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <DrawerHeader />
         <Box
           sx={{
-            borderRadius: 2,
-            p: { xs: 1.5, sm: 2, md: 3 },
             height: 'calc(100% - 64px)',
             overflow: 'auto',
+            width: '100%'
           }}
         >
           {children}

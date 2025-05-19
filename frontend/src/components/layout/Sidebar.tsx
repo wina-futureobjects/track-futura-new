@@ -144,10 +144,10 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
     
     if (match) {
       const [, orgId, projId] = match;
-      return `/organizations/${orgId}/projects/${projId}/track-accounts/folders`;
+      return `/organizations/${orgId}/projects/${projId}/track-accounts/accounts`;
     }
     
-    return '/track-accounts/folders';
+    return '/track-accounts/accounts';
   }
 
   // Function to get correct path for social media data based on URL

@@ -1,10 +1,13 @@
 import React from 'react';
-import { Box, Typography, Grid, Container, Paper } from '@mui/material';
+import { Box, Typography, Grid as MuiGrid, Container, Paper } from '@mui/material';
 import TopPerformers from '../components/dashboard/TopPerformers';
 import ActiveRepPercentage from '../components/dashboard/ActiveRepPercentage';
 import LeastActiveRep from '../components/dashboard/LeastActiveRep';
 import CloseMonitoring from '../components/dashboard/CloseMonitoring';
 import PostDistribution from '../components/dashboard/PostDistribution';
+
+// Create a Grid component that inherits from MuiGrid to fix type issues
+const Grid = (props: any) => <MuiGrid {...props} />;
 
 // For the KeywordsCloud component, we'll create a simpler version that doesn't depend on external libraries
 const KeywordsCloud = () => {
@@ -95,8 +98,13 @@ const getRandomColor = () => {
 
 const Dashboard: React.FC = () => {
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Box sx={{ mb: 4 }}>
+    <Box sx={{ 
+      width: '100%', 
+      px: { xs: 2, md: 3 }, 
+      py: 4,
+      backgroundColor: '#f8f9fd' 
+    }}>
+      <Box sx={{ mb: 3 }}>
         <Typography variant="h4" component="h1" gutterBottom fontWeight={700}>
           Activity Performance
         </Typography>
@@ -106,29 +114,33 @@ const Dashboard: React.FC = () => {
       </Box>
 
       {/* Top Performers Section */}
-      <TopPerformers />
-
-      {/* Middle Section - Active Rep % and Least Active */}
-      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3, mb: 4 }}>
-        <Box sx={{ flex: '1 1 auto', width: { xs: '100%', md: '66.666%' } }}>
-          <ActiveRepPercentage />
-        </Box>
-        <Box sx={{ flex: '1 1 auto', width: { xs: '100%', md: '33.333%' } }}>
-          <LeastActiveRep />
-        </Box>
+      <Box sx={{ mb: 3 }}>
+        <TopPerformers />
       </Box>
 
+      {/* Middle Section - Active Rep % and Least Active */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid item xs={12} md={8}>
+          <ActiveRepPercentage />
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <LeastActiveRep />
+        </Grid>
+      </Grid>
+
       {/* Close Monitoring Section */}
-      <Box sx={{ mb: 4 }}>
+      <Box sx={{ mb: 3 }}>
         <CloseMonitoring />
       </Box>
 
       {/* Post Distribution Section */}
-      <PostDistribution />
+      <Box sx={{ mb: 3 }}>
+        <PostDistribution />
+      </Box>
 
       {/* Keywords Cloud Section */}
       <KeywordsCloud />
-    </Container>
+    </Box>
   );
 };
 

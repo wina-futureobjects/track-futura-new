@@ -170,27 +170,19 @@ const TrackAccountsList = () => {
           <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
           Home
         </Link>
-        <Link
-          underline="hover"
-          sx={{ display: 'flex', alignItems: 'center' }}
-          color="inherit"
-          onClick={() => navigate('/track-accounts/folders')}
-        >
-          <FolderIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-          Track Account Folders
-        </Link>
         <Typography
           sx={{ display: 'flex', alignItems: 'center' }}
           color="text.primary"
         >
-          All Track Accounts
+          <FolderIcon sx={{ mr: 0.5 }} fontSize="inherit" />
+          Track Accounts
         </Typography>
       </Breadcrumbs>
 
       {/* Page title and actions */}
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="h4" gutterBottom>
-          All Track Accounts
+          Track Accounts
         </Typography>
         <Button
           variant="contained"
@@ -263,7 +255,6 @@ const TrackAccountsList = () => {
                     <TableCell align="center">Social Media</TableCell>
                     <TableCell>Risk Classification</TableCell>
                     <TableCell>Close Monitoring</TableCell>
-                    <TableCell>Folder</TableCell>
                     <TableCell>Actions</TableCell>
                   </TableRow>
                 </TableHead>
@@ -386,20 +377,6 @@ const TrackAccountsList = () => {
                           <Chip label="Yes" size="small" color="primary" />
                         ) : (
                           <Chip label="No" size="small" color="default" variant="outlined" />
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {account.folder ? (
-                          <Button 
-                            size="small" 
-                            variant="text"
-                            startIcon={<FolderIcon />}
-                            onClick={() => navigate(`/track-accounts/folders/${account.folder}`)}
-                          >
-                            View Folder
-                          </Button>
-                        ) : (
-                          '-'
                         )}
                       </TableCell>
                       <TableCell>

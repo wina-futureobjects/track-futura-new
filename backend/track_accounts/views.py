@@ -44,39 +44,85 @@ class TrackAccountFolderViewSet(viewsets.ModelViewSet):
 
 class TrackAccountViewSet(viewsets.ModelViewSet):
     """
-    API endpoint for Track Accounts
+    API endpoint for managing Track Accounts
     """
     serializer_class = TrackAccountSerializer
-    permission_classes = [AllowAny]  # Allow any user to access these endpoints for testing
+    permission_classes = [AllowAny]  # For testing, use proper permissions in production
     
     def get_queryset(self):
         """
-        Filter accounts by folder if folder_id is provided
+        Get queryset with filtering options
         """
         queryset = TrackAccount.objects.all()
         
-        # Filter by folder if specified
+        # Get query parameters
         folder_id = self.request.query_params.get('folder_id')
+        project_id = self.request.query_params.get('project')
+        search = self.request.query_params.get('search')
+        risk_classification = self.request.query_params.get('risk_classification')
+        close_monitoring = self.request.query_params.get('close_monitoring')
+        has_facebook = self.request.query_params.get('has_facebook')
+        has_instagram = self.request.query_params.get('has_instagram')
+        has_linkedin = self.request.query_params.get('has_linkedin')
+        has_tiktok = self.request.query_params.get('has_tiktok')
+        
+        # Filter by folder if specified
         if folder_id:
             queryset = queryset.filter(folder_id=folder_id)
         
         # Filter by project if specified
-        project_id = self.request.query_params.get('project')
         if project_id:
-            # Filter accounts where the folder's project matches the specified project
-            queryset = queryset.filter(folder__project_id=project_id)
+            queryset = queryset.filter(project_id=project_id)
         
-        # Add search functionality
-        search_query = self.request.query_params.get('search', '')
-        if search_query:
+        # Filter by search term if provided
+        if search:
             queryset = queryset.filter(
-                Q(name__icontains=search_query) |
-                Q(iac_no__icontains=search_query) |
-                Q(facebook_id__icontains=search_query) |
-                Q(instagram_id__icontains=search_query) |
-                Q(linkedin_id__icontains=search_query) |
-                Q(tiktok_id__icontains=search_query) |
-                Q(risk_classification__icontains=search_query)
+                Q(name__icontains=search) |
+                Q(iac_no__icontains=search) |
+                Q(facebook_username__icontains=search) |
+                Q(instagram_username__icontains=search) |
+                Q(linkedin_username__icontains=search) |
+                Q(tiktok_username__icontains=search)
+            )
+        
+        # Filter by risk classification if provided
+        if risk_classification:
+            queryset = queryset.filter(risk_classification=risk_classification)
+        
+        # Filter by close monitoring if provided
+        if close_monitoring is not None:
+            if close_monitoring.lower() == 'true':
+                queryset = queryset.filter(close_monitoring=True)
+            elif close_monitoring.lower() == 'false':
+                queryset = queryset.filter(close_monitoring=False)
+                
+        # Filter by social media presence
+        if has_facebook:
+            queryset = queryset.exclude(
+                Q(facebook_username__isnull=True) | Q(facebook_username='')
+            ).exclude(
+                Q(facebook_id__isnull=True) | Q(facebook_id='')
+            )
+        
+        if has_instagram:
+            queryset = queryset.exclude(
+                Q(instagram_username__isnull=True) | Q(instagram_username='')
+            ).exclude(
+                Q(instagram_id__isnull=True) | Q(instagram_id='')
+            )
+            
+        if has_linkedin:
+            queryset = queryset.exclude(
+                Q(linkedin_username__isnull=True) | Q(linkedin_username='')
+            ).exclude(
+                Q(linkedin_id__isnull=True) | Q(linkedin_id='')
+            )
+            
+        if has_tiktok:
+            queryset = queryset.exclude(
+                Q(tiktok_username__isnull=True) | Q(tiktok_username='')
+            ).exclude(
+                Q(tiktok_id__isnull=True) | Q(tiktok_id='')
             )
         
         return queryset
