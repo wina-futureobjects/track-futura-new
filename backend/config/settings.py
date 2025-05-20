@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "linkedin_data",
     "tiktok_data",
     "brightdata_integration",
+    "chat",
 ]
 
 MIDDLEWARE = [

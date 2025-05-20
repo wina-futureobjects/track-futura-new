@@ -242,127 +242,13 @@ const ProjectDashboard = () => {
       flexGrow: 1
     }}>
       <Container maxWidth="xl" sx={{ mx: 'auto' }}>
-        {/* Project header with title and actions - simplified */}
-        <Box sx={{ 
-          mb: 3
-        }}>
-          <Typography variant="h4" component="h1" fontWeight={600}>
-            Dashboard
-          </Typography>
-        </Box>
-
-        {/* Credit balance and key stats row */}
-        <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid item xs={12} md={9}>
-            <Paper
-              elevation={0}
-              sx={{ 
-                p: 3, 
-                borderRadius: 2,
-                background: `linear-gradient(135deg, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`,
-                color: 'white',
-                display: 'flex',
-                flexDirection: { xs: 'column', sm: 'row' },
-                alignItems: 'center',
-                gap: 3
-              }}
-            >
-              <Box sx={{ flex: 1 }}>
-                <Typography variant="h5" fontWeight={600} gutterBottom>
-                  Project Credits
-                </Typography>
-                <Typography variant="body1" sx={{ mb: 2, opacity: 0.9 }}>
-                  Your project has {stats.creditBalance} credits remaining out of {stats.maxCredits} total.
-                </Typography>
-                <Box sx={{ mb: 1 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                    <Typography variant="body2" fontWeight={500}>Usage</Typography>
-                    <Typography variant="body2" fontWeight={500}>{stats.creditBalance} / {stats.maxCredits}</Typography>
-                  </Box>
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={(stats.creditBalance / stats.maxCredits) * 100} 
-                    sx={{ 
-                      height: 8, 
-                      borderRadius: 1,
-                      bgcolor: 'rgba(255,255,255,0.2)',
-                      '& .MuiLinearProgress-bar': {
-                        bgcolor: 'white'
-                      }
-                    }}
-                  />
-                </Box>
-              </Box>
-              <Box>
-                <Button
-                  variant="contained"
-                  sx={{ 
-                    bgcolor: 'white', 
-                    color: theme.palette.primary.main,
-                    '&:hover': {
-                      bgcolor: 'rgba(255,255,255,0.9)'
-                    }
-                  }}
-                >
-                  Add Credits
-                </Button>
-              </Box>
-            </Paper>
-          </Grid>
-          
-          <Grid item xs={12} md={3}>
-            <Paper
-              elevation={0}
-              sx={{ 
-                p: 3, 
-                borderRadius: 2,
-                height: '100%',
-                boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-                display: 'flex',
-                flexDirection: 'column'
-              }}
-            >
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6">Project Status</Typography>
-                <IconButton size="small">
-                  <MoreVertIcon fontSize="small" />
-                </IconButton>
-              </Box>
-              
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="body2" color="text.secondary" gutterBottom>Created</Typography>
-                <Typography variant="body1" fontWeight={500}>{new Date(project.created_at).toLocaleDateString()}</Typography>
-              </Box>
-              
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="body2" color="text.secondary" gutterBottom>Owner</Typography>
-                <Typography variant="body1" fontWeight={500}>{project.owner_name}</Typography>
-              </Box>
-              
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="body2" color="text.secondary" gutterBottom>Organization</Typography>
-                <Typography variant="body1" fontWeight={500}>{project.organization?.name || 'Personal'}</Typography>
-              </Box>
-              
-              <Box sx={{ mt: 'auto', pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="body2" color="text.secondary">Last Update</Typography>
-                  <Typography variant="body2" fontWeight={500}>{new Date(project.updated_at).toLocaleDateString()}</Typography>
-                </Box>
-              </Box>
-            </Paper>
-          </Grid>
-        </Grid>
+        {/* Removed Project header with title and actions */}
+        {/* Removed Credit balance and key stats row (Project Credits and Project Status) */}
 
         {/* Dashboard Stats Cards */}
-        <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={6} lg={3}>
-            <Paper elevation={0} sx={{ 
-              p: 2.5, 
-              borderRadius: 2, 
-              boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-              height: '100%' 
-            }}>
+        <Grid container columns={12} spacing={2} sx={{ mb: 3 }}>
+          <Grid gridColumn={{ xs: 'span 12', sm: 'span 6', md: 'span 3' }}>
+            <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.05)', height: '100%' }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                 <Typography variant="subtitle1" color="text.secondary">Total Posts</Typography>
                 <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), color: theme.palette.primary.main }}>
@@ -384,14 +270,8 @@ const ProjectDashboard = () => {
               </Box>
             </Paper>
           </Grid>
-          
-          <Grid item xs={12} sm={6} lg={3}>
-            <Paper elevation={0} sx={{ 
-              p: 2.5, 
-              borderRadius: 2, 
-              boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-              height: '100%' 
-            }}>
+          <Grid gridColumn={{ xs: 'span 12', sm: 'span 6', md: 'span 3' }}>
+            <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.05)', height: '100%' }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                 <Typography variant="subtitle1" color="text.secondary">Total Accounts</Typography>
                 <Avatar sx={{ bgcolor: alpha(theme.palette.secondary.main, 0.1), color: theme.palette.secondary.main }}>
@@ -413,14 +293,8 @@ const ProjectDashboard = () => {
               </Box>
             </Paper>
           </Grid>
-          
-          <Grid item xs={12} sm={6} lg={3}>
-            <Paper elevation={0} sx={{ 
-              p: 2.5, 
-              borderRadius: 2, 
-              boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-              height: '100%' 
-            }}>
+          <Grid gridColumn={{ xs: 'span 12', sm: 'span 6', md: 'span 3' }}>
+            <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.05)', height: '100%' }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                 <Typography variant="subtitle1" color="text.secondary">Engagement Rate</Typography>
                 <Avatar sx={{ bgcolor: alpha(theme.palette.success.main, 0.1), color: theme.palette.success.main }}>
@@ -442,14 +316,8 @@ const ProjectDashboard = () => {
               </Box>
             </Paper>
           </Grid>
-          
-          <Grid item xs={12} sm={6} lg={3}>
-            <Paper elevation={0} sx={{ 
-              p: 2.5, 
-              borderRadius: 2, 
-              boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-              height: '100%' 
-            }}>
+          <Grid gridColumn={{ xs: 'span 12', sm: 'span 6', md: 'span 3' }}>
+            <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.05)', height: '100%' }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                 <Typography variant="subtitle1" color="text.secondary">Storage Used</Typography>
                 <Avatar sx={{ bgcolor: alpha(theme.palette.warning.main, 0.1), color: theme.palette.warning.main }}>
@@ -474,8 +342,8 @@ const ProjectDashboard = () => {
         </Grid>
 
         {/* Activity and Platform Distribution Charts */}
-        <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid item xs={12} md={8}>
+        <Grid container columns={12} spacing={2} sx={{ mb: 3 }}>
+          <Grid gridColumn={{ xs: 'span 12', md: 'span 8' }}>
             <Paper elevation={0} sx={{ p: 3, borderRadius: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Box>
@@ -567,7 +435,7 @@ const ProjectDashboard = () => {
             </Paper>
           </Grid>
           
-          <Grid item xs={12} md={4}>
+          <Grid gridColumn={{ xs: 'span 12', md: 'span 4' }}>
             <Paper elevation={0} sx={{ p: 3, borderRadius: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.05)', height: '100%' }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography variant="h6" fontWeight={500}>Platform Distribution</Typography>
@@ -620,8 +488,8 @@ const ProjectDashboard = () => {
         </Grid>
 
         {/* Quick Access Platform Buttons */}
-        <Grid container spacing={2}>
-          <Grid item xs={6} sm={4} md={3} lg={2}>
+        <Grid container columns={12} spacing={2}>
+          <Grid gridColumn={{ xs: 'span 6', sm: 'span 4', md: 'span 3', lg: 'span 2' }}>
             <Button 
               variant="outlined" 
               fullWidth 
@@ -645,7 +513,7 @@ const ProjectDashboard = () => {
               Instagram
             </Button>
           </Grid>
-          <Grid item xs={6} sm={4} md={3} lg={2}>
+          <Grid gridColumn={{ xs: 'span 6', sm: 'span 4', md: 'span 3', lg: 'span 2' }}>
             <Button 
               variant="outlined" 
               fullWidth 
@@ -669,7 +537,7 @@ const ProjectDashboard = () => {
               Facebook
             </Button>
           </Grid>
-          <Grid item xs={6} sm={4} md={3} lg={2}>
+          <Grid gridColumn={{ xs: 'span 6', sm: 'span 4', md: 'span 3', lg: 'span 2' }}>
             <Button 
               variant="outlined" 
               fullWidth 
@@ -693,7 +561,7 @@ const ProjectDashboard = () => {
               LinkedIn
             </Button>
           </Grid>
-          <Grid item xs={6} sm={4} md={3} lg={2}>
+          <Grid gridColumn={{ xs: 'span 6', sm: 'span 4', md: 'span 3', lg: 'span 2' }}>
             <Button 
               variant="outlined" 
               fullWidth 
@@ -717,7 +585,7 @@ const ProjectDashboard = () => {
               TikTok
             </Button>
           </Grid>
-          <Grid item xs={6} sm={4} md={3} lg={2}>
+          <Grid gridColumn={{ xs: 'span 6', sm: 'span 4', md: 'span 3', lg: 'span 2' }}>
             <Button 
               variant="outlined" 
               fullWidth 
@@ -741,7 +609,7 @@ const ProjectDashboard = () => {
               Accounts
             </Button>
           </Grid>
-          <Grid item xs={6} sm={4} md={3} lg={2}>
+          <Grid gridColumn={{ xs: 'span 6', sm: 'span 4', md: 'span 3', lg: 'span 2' }}>
             <Button 
               variant="outlined" 
               fullWidth 
