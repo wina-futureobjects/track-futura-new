@@ -6,7 +6,7 @@ applications:
 
     web:
       commands:
-        start: "gunicorn -b unix:$SOCKET config.wsgi"
+        start: "waitress-serve --unix-socket=$SOCKET config.wsgi:application"
       upstream:
         socket_family: unix
       locations:
@@ -15,7 +15,7 @@ applications:
         "/static":
           allow: true
           expires: "1h"
-          root: "static"
+          root: "staticfiles"
     build:
       flavor: none
     hooks:
