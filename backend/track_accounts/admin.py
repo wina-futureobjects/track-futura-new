@@ -1,27 +1,16 @@
 from django.contrib import admin
-from .models import TrackAccount, TrackAccountFolder, ReportFolder, ReportEntry
-
-@admin.register(TrackAccountFolder)
-class TrackAccountFolderAdmin(admin.ModelAdmin):
-    list_display = ('name', 'description', 'get_account_count', 'created_at', 'updated_at')
-    search_fields = ('name', 'description')
-    readonly_fields = ('created_at', 'updated_at')
-    ordering = ('-created_at',)
-    
-    def get_account_count(self, obj):
-        return obj.accounts.count()
-    get_account_count.short_description = 'Account Count'
+from .models import TrackAccount, ReportFolder, ReportEntry
 
 @admin.register(TrackAccount)
 class TrackAccountAdmin(admin.ModelAdmin):
-    list_display = ('name', 'iac_no', 'facebook_id', 'instagram_id', 'linkedin_id', 'tiktok_id', 
-                   'risk_classification', 'close_monitoring', 'folder')
-    list_filter = ('risk_classification', 'close_monitoring', 'posting_frequency', 'folder')
+    list_display = ('name', 'iac_no', 'facebook_link', 'instagram_link', 'linkedin_link', 'tiktok_link', 
+                   'risk_classification', 'close_monitoring', 'project')
+    list_filter = ('risk_classification', 'close_monitoring', 'posting_frequency', 'project')
     search_fields = ('name', 'iac_no')
     readonly_fields = ('created_at', 'updated_at')
     ordering = ('name',)
-    raw_id_fields = ('folder',)
-    list_select_related = ('folder',)
+    raw_id_fields = ('project',)
+    list_select_related = ('project',)
 
 @admin.register(ReportFolder)
 class ReportFolderAdmin(admin.ModelAdmin):

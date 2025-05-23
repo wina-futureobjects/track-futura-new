@@ -30,7 +30,6 @@ import { apiFetch } from '../../utils/api';
 // Types
 interface TrackAccountFormProps {
   accountId?: string; // Optional - if provided, we're editing an existing account
-  folderId?: string; // Optional - if provided, pre-select this folder
   organizationId?: string; // Optional - for navigation with organization context
   projectId?: string; // Optional - for navigation with project context
   onSuccess?: (account: TrackAccount) => void;
@@ -40,19 +39,14 @@ interface TrackAccount {
   id: number;
   name: string;
   iac_no: string;
-  facebook_username: string | null;
-  instagram_username: string | null;
-  linkedin_username: string | null;
-  tiktok_username: string | null;
-  facebook_id: string | null;
-  instagram_id: string | null;
-  linkedin_id: string | null;
-  tiktok_id: string | null;
+  facebook_link: string | null;
+  instagram_link: string | null;
+  linkedin_link: string | null;
+  tiktok_link: string | null;
   other_social_media: string | null;
   risk_classification: string | null;
   close_monitoring: boolean;
   posting_frequency: string | null;
-  folder: number | null;
   project?: number | null;
   created_at?: string;
   updated_at?: string;
@@ -73,7 +67,6 @@ const postingFrequencies = [
 
 const TrackAccountForm: React.FC<TrackAccountFormProps> = ({ 
   accountId, 
-  folderId, 
   organizationId,
   projectId,
   onSuccess 
@@ -89,19 +82,14 @@ const TrackAccountForm: React.FC<TrackAccountFormProps> = ({
     id: 0,
     name: '',
     iac_no: '',
-    facebook_username: '',
-    instagram_username: '',
-    linkedin_username: '',
-    tiktok_username: '',
-    facebook_id: '',
-    instagram_id: '',
-    linkedin_id: '',
-    tiktok_id: '',
+    facebook_link: '',
+    instagram_link: '',
+    linkedin_link: '',
+    tiktok_link: '',
     other_social_media: '',
     risk_classification: null,
     close_monitoring: false,
     posting_frequency: null,
-    folder: folderId ? parseInt(folderId) : null,
     project: projectId ? parseInt(projectId) : null
   });
 
@@ -123,7 +111,6 @@ const TrackAccountForm: React.FC<TrackAccountFormProps> = ({
           const accountData = await response.json();
           setFormData({
             ...accountData,
-            folder: accountData.folder || null,
             project: accountData.project || (projectId ? parseInt(projectId, 10) : null)
           });
         } catch (error) {
@@ -187,10 +174,10 @@ const TrackAccountForm: React.FC<TrackAccountFormProps> = ({
     
     // Validate URLs if provided
     const urlFields = [
-      { field: 'facebook_id', label: 'Facebook Profile URL' },
-      { field: 'instagram_id', label: 'Instagram Profile URL' },
-      { field: 'linkedin_id', label: 'LinkedIn Profile URL' },
-      { field: 'tiktok_id', label: 'TikTok Profile URL' }
+      { field: 'facebook_link', label: 'Facebook Profile URL' },
+      { field: 'instagram_link', label: 'Instagram Profile URL' },
+      { field: 'linkedin_link', label: 'LinkedIn Profile URL' },
+      { field: 'tiktok_link', label: 'TikTok Profile URL' }
     ];
     
     urlFields.forEach(({ field, label }) => {
@@ -405,19 +392,22 @@ const TrackAccountForm: React.FC<TrackAccountFormProps> = ({
             </Stack>
           </Box>
           
-          {/* Social Media Usernames */}
+          {/* Social Media Links */}
           <Box>
-            <Typography variant="h6" gutterBottom>Social Media Usernames</Typography>
+            <Typography variant="h6" gutterBottom>Social Media Links</Typography>
             <Divider sx={{ mb: 2 }} />
             
             <Stack spacing={2}>
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                 <TextField
                   sx={{ flex: 1, minWidth: 200 }}
-                  label="Facebook Username"
-                  name="facebook_username"
-                  value={formData.facebook_username || ''}
+                  label="Facebook Link"
+                  name="facebook_link"
+                  value={formData.facebook_link || ''}
                   onChange={handleChange}
+                  error={!!formErrors.facebook_link}
+                  helperText={formErrors.facebook_link}
+                  placeholder="https://facebook.com/username"
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
@@ -429,10 +419,13 @@ const TrackAccountForm: React.FC<TrackAccountFormProps> = ({
                 
                 <TextField
                   sx={{ flex: 1, minWidth: 200 }}
-                  label="Instagram Username"
-                  name="instagram_username"
-                  value={formData.instagram_username || ''}
+                  label="Instagram Link"
+                  name="instagram_link"
+                  value={formData.instagram_link || ''}
                   onChange={handleChange}
+                  error={!!formErrors.instagram_link}
+                  helperText={formErrors.instagram_link}
+                  placeholder="https://instagram.com/username"
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
@@ -446,10 +439,13 @@ const TrackAccountForm: React.FC<TrackAccountFormProps> = ({
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                 <TextField
                   sx={{ flex: 1, minWidth: 200 }}
-                  label="LinkedIn Username"
-                  name="linkedin_username"
-                  value={formData.linkedin_username || ''}
+                  label="LinkedIn Link"
+                  name="linkedin_link"
+                  value={formData.linkedin_link || ''}
                   onChange={handleChange}
+                  error={!!formErrors.linkedin_link}
+                  helperText={formErrors.linkedin_link}
+                  placeholder="https://linkedin.com/in/username"
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
@@ -461,98 +457,17 @@ const TrackAccountForm: React.FC<TrackAccountFormProps> = ({
                 
                 <TextField
                   sx={{ flex: 1, minWidth: 200 }}
-                  label="TikTok Username"
-                  name="tiktok_username"
-                  value={formData.tiktok_username || ''}
+                  label="TikTok Link"
+                  name="tiktok_link"
+                  value={formData.tiktok_link || ''}
                   onChange={handleChange}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <MusicNoteIcon fontSize="small" />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-              </Box>
-            </Stack>
-          </Box>
-          
-          {/* Social Media Profile URLs */}
-          <Box>
-            <Typography variant="h6" gutterBottom>Social Media Profile URLs</Typography>
-            <Divider sx={{ mb: 2 }} />
-            
-            <Stack spacing={2}>
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                <TextField
-                  sx={{ flex: 1, minWidth: 200 }}
-                  label="Facebook Profile URL"
-                  name="facebook_id"
-                  value={formData.facebook_id || ''}
-                  onChange={handleChange}
-                  error={!!formErrors.facebook_id}
-                  helperText={formErrors.facebook_id}
-                  placeholder="https://facebook.com/username"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <LinkIcon fontSize="small" />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-                
-                <TextField
-                  sx={{ flex: 1, minWidth: 200 }}
-                  label="Instagram Profile URL"
-                  name="instagram_id"
-                  value={formData.instagram_id || ''}
-                  onChange={handleChange}
-                  error={!!formErrors.instagram_id}
-                  helperText={formErrors.instagram_id}
-                  placeholder="https://instagram.com/username"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <LinkIcon fontSize="small" />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-              </Box>
-              
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                <TextField
-                  sx={{ flex: 1, minWidth: 200 }}
-                  label="LinkedIn Profile URL"
-                  name="linkedin_id"
-                  value={formData.linkedin_id || ''}
-                  onChange={handleChange}
-                  error={!!formErrors.linkedin_id}
-                  helperText={formErrors.linkedin_id}
-                  placeholder="https://linkedin.com/in/username"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <LinkIcon fontSize="small" />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-                
-                <TextField
-                  sx={{ flex: 1, minWidth: 200 }}
-                  label="TikTok Profile URL"
-                  name="tiktok_id"
-                  value={formData.tiktok_id || ''}
-                  onChange={handleChange}
-                  error={!!formErrors.tiktok_id}
-                  helperText={formErrors.tiktok_id}
+                  error={!!formErrors.tiktok_link}
+                  helperText={formErrors.tiktok_link}
                   placeholder="https://tiktok.com/@username"
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
-                        <LinkIcon fontSize="small" />
+                        <MusicNoteIcon fontSize="small" />
                       </InputAdornment>
                     ),
                   }}

@@ -1,25 +1,14 @@
 from rest_framework import serializers
-from .models import TrackAccount, TrackAccountFolder, ReportFolder, ReportEntry
-
-class TrackAccountFolderSerializer(serializers.ModelSerializer):
-    account_count = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = TrackAccountFolder
-        fields = ['id', 'name', 'description', 'account_count', 'created_at', 'updated_at']
-    
-    def get_account_count(self, obj):
-        return obj.accounts.count()
+from .models import TrackAccount, ReportFolder, ReportEntry
 
 class TrackAccountSerializer(serializers.ModelSerializer):
     class Meta:
         model = TrackAccount
         fields = [
             'id', 'name', 'iac_no', 
-            'facebook_username', 'instagram_username', 'linkedin_username', 'tiktok_username',
-            'facebook_id', 'instagram_id', 'linkedin_id', 'tiktok_id', 
+            'facebook_link', 'instagram_link', 'linkedin_link', 'tiktok_link', 
             'other_social_media', 'risk_classification', 'close_monitoring', 'posting_frequency',
-            'folder', 'created_at', 'updated_at'
+            'project', 'created_at', 'updated_at'
         ]
 
 class ReportEntrySerializer(serializers.ModelSerializer):

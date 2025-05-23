@@ -24,27 +24,31 @@ import {
   alpha,
 } from '@mui/material';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import HomeIcon from '@mui/icons-material/Home';
-import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined';
-import InstagramIcon from '@mui/icons-material/Instagram';
-import FacebookIcon from '@mui/icons-material/Facebook';
-import LinkedInIcon from '@mui/icons-material/LinkedIn';
-import WhatsAppIcon from '@mui/icons-material/WhatsApp';
-import PersonIcon from '@mui/icons-material/Person';
-import BarChartIcon from '@mui/icons-material/BarChart';
-import DataUsageIcon from '@mui/icons-material/DataUsage';
-import SummarizeIcon from '@mui/icons-material/Summarize';
-import StorageIcon from '@mui/icons-material/Storage';
-import PeopleIcon from '@mui/icons-material/People';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import CreditScoreIcon from '@mui/icons-material/CreditScore';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
-import NotificationsNoneOutlinedIcon from '@mui/icons-material/NotificationsNoneOutlined';
-import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
-import DateRangeOutlinedIcon from '@mui/icons-material/DateRangeOutlined';
-import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined';
-import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
-import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
+import { 
+  Home,
+  FolderOpen,
+  Instagram,
+  Facebook,
+  Linkedin,
+  Users,
+  BarChart3,
+  HardDrive,
+  TrendingUp,
+  CreditCard,
+  MoreHorizontal,
+  Bell,
+  RefreshCw,
+  Calendar,
+  Gauge,
+  Settings,
+  Sliders,
+  Activity,
+  Eye,
+  Target,
+  Award,
+  Clock,
+  MessageCircle
+} from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import StatCard from '../components/dashboard/StatCard';
 import {
@@ -61,6 +65,8 @@ import {
   BarChart,
   Bar,
   Legend,
+  LineChart,
+  Line,
 } from 'recharts';
 
 // Create a Grid component that inherits from MuiGrid to fix type issues
@@ -109,6 +115,26 @@ const platformDistribution = [
   { name: 'Facebook', value: 30, color: '#1877F2' },
   { name: 'LinkedIn', value: 15, color: '#0A66C2' },
   { name: 'TikTok', value: 10, color: '#000000' },
+];
+
+// Additional mock data for enhanced dashboard
+const recentActivity = [
+  { id: 1, action: 'New Instagram post uploaded', time: '2 hours ago', type: 'upload' },
+  { id: 2, action: 'Facebook analysis completed', time: '4 hours ago', type: 'analysis' },
+  { id: 3, action: 'Report generated successfully', time: '1 day ago', type: 'report' },
+  { id: 4, action: 'LinkedIn data imported', time: '2 days ago', type: 'import' },
+];
+
+const topPerformers = [
+  { platform: 'Instagram', account: '@brand_official', engagement: '8.4%', growth: '+12.3%' },
+  { platform: 'Facebook', account: 'Brand Page', engagement: '6.2%', growth: '+8.1%' },
+  { platform: 'LinkedIn', account: 'Company Page', engagement: '4.8%', growth: '+15.2%' },
+];
+
+const weeklyGoals = [
+  { goal: 'Post Uploads', current: 45, target: 60, percentage: 75 },
+  { goal: 'Engagement Rate', current: 3.2, target: 4.0, percentage: 80 },
+  { goal: 'New Followers', current: 1200, target: 1500, percentage: 80 },
 ];
 
 const ProjectDashboard = () => {
@@ -238,24 +264,32 @@ const ProjectDashboard = () => {
     <Box sx={{ 
       width: '100%', 
       backgroundColor: '#f8f9fd',
-      p: { xs: 2, md: 3 },
-      flexGrow: 1
+      p: { xs: 2, md: 3, lg: 4 },
+      flexGrow: 1,
+      minHeight: '100vh'
     }}>
-      <Container maxWidth="xl" sx={{ mx: 'auto' }}>
-        {/* Removed Project header with title and actions */}
-        {/* Removed Credit balance and key stats row (Project Credits and Project Status) */}
+      <Box sx={{ mx: 'auto', maxWidth: 'none', width: '100%' }}>
+        {/* Dashboard Header */}
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h4" fontWeight={600} gutterBottom>
+            {project?.name || 'Project Dashboard'}
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            Track your social media performance and manage your content across platforms
+          </Typography>
+        </Box>
 
         {/* Dashboard Stats Cards */}
-        <Grid container columns={12} spacing={2} sx={{ mb: 3 }}>
-          <Grid gridColumn={{ xs: 'span 12', sm: 'span 6', md: 'span 3' }}>
-            <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.05)', height: '100%' }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                <Typography variant="subtitle1" color="text.secondary">Total Posts</Typography>
-                <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), color: theme.palette.primary.main }}>
-                  <DataUsageIcon fontSize="small" />
+        <Grid container columns={12} spacing={4} sx={{ mb: 4 }}>
+          <Grid gridColumn={{ xs: 'span 12', sm: 'span 6', md: 'span 3', xl: 'span 3' }}>
+            <Paper elevation={0} sx={{ p: 4, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.08)', height: '100%', border: '1px solid', borderColor: 'divider' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+                <Typography variant="subtitle1" color="text.secondary" fontWeight={500}>Total Posts</Typography>
+                <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), color: theme.palette.primary.main, width: 48, height: 48 }}>
+                  <BarChart3 size={22} />
                 </Avatar>
               </Box>
-              <Typography variant="h4" fontWeight={600} gutterBottom>{stats.totalPosts}</Typography>
+              <Typography variant="h3" fontWeight={700} gutterBottom sx={{ color: 'text.primary' }}>{stats.totalPosts}</Typography>
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
                 <Chip 
                   label={`+12.5%`} 
@@ -263,22 +297,23 @@ const ProjectDashboard = () => {
                   sx={{ 
                     bgcolor: alpha(theme.palette.success.main, 0.1), 
                     color: theme.palette.success.main,
-                    mr: 1
+                    mr: 1,
+                    fontWeight: 600
                   }} 
                 />
                 <Typography variant="body2" color="text.secondary">vs last period</Typography>
               </Box>
             </Paper>
           </Grid>
-          <Grid gridColumn={{ xs: 'span 12', sm: 'span 6', md: 'span 3' }}>
-            <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.05)', height: '100%' }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                <Typography variant="subtitle1" color="text.secondary">Total Accounts</Typography>
-                <Avatar sx={{ bgcolor: alpha(theme.palette.secondary.main, 0.1), color: theme.palette.secondary.main }}>
-                  <PersonIcon fontSize="small" />
+          <Grid gridColumn={{ xs: 'span 12', sm: 'span 6', md: 'span 3', xl: 'span 3' }}>
+            <Paper elevation={0} sx={{ p: 4, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.08)', height: '100%', border: '1px solid', borderColor: 'divider' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+                <Typography variant="subtitle1" color="text.secondary" fontWeight={500}>Total Accounts</Typography>
+                <Avatar sx={{ bgcolor: alpha(theme.palette.secondary.main, 0.1), color: theme.palette.secondary.main, width: 48, height: 48 }}>
+                  <Users size={22} />
                 </Avatar>
               </Box>
-              <Typography variant="h4" fontWeight={600} gutterBottom>{stats.totalAccounts}</Typography>
+              <Typography variant="h3" fontWeight={700} gutterBottom sx={{ color: 'text.primary' }}>{stats.totalAccounts}</Typography>
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
                 <Chip 
                   label={`+5.2%`} 
@@ -286,22 +321,23 @@ const ProjectDashboard = () => {
                   sx={{ 
                     bgcolor: alpha(theme.palette.success.main, 0.1), 
                     color: theme.palette.success.main,
-                    mr: 1
+                    mr: 1,
+                    fontWeight: 600
                   }} 
                 />
                 <Typography variant="body2" color="text.secondary">vs last period</Typography>
               </Box>
             </Paper>
           </Grid>
-          <Grid gridColumn={{ xs: 'span 12', sm: 'span 6', md: 'span 3' }}>
-            <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.05)', height: '100%' }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                <Typography variant="subtitle1" color="text.secondary">Engagement Rate</Typography>
-                <Avatar sx={{ bgcolor: alpha(theme.palette.success.main, 0.1), color: theme.palette.success.main }}>
-                  <TrendingUpIcon fontSize="small" />
+          <Grid gridColumn={{ xs: 'span 12', sm: 'span 6', md: 'span 3', xl: 'span 3' }}>
+            <Paper elevation={0} sx={{ p: 4, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.08)', height: '100%', border: '1px solid', borderColor: 'divider' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+                <Typography variant="subtitle1" color="text.secondary" fontWeight={500}>Engagement Rate</Typography>
+                <Avatar sx={{ bgcolor: alpha(theme.palette.success.main, 0.1), color: theme.palette.success.main, width: 48, height: 48 }}>
+                  <TrendingUp size={22} />
                 </Avatar>
               </Box>
-              <Typography variant="h4" fontWeight={600} gutterBottom>{stats.engagementRate}%</Typography>
+              <Typography variant="h3" fontWeight={700} gutterBottom sx={{ color: 'text.primary' }}>{stats.engagementRate}%</Typography>
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
                 <Chip 
                   label={`+0.8%`} 
@@ -309,22 +345,23 @@ const ProjectDashboard = () => {
                   sx={{ 
                     bgcolor: alpha(theme.palette.success.main, 0.1), 
                     color: theme.palette.success.main,
-                    mr: 1
+                    mr: 1,
+                    fontWeight: 600
                   }} 
                 />
                 <Typography variant="body2" color="text.secondary">vs last period</Typography>
               </Box>
             </Paper>
           </Grid>
-          <Grid gridColumn={{ xs: 'span 12', sm: 'span 6', md: 'span 3' }}>
-            <Paper elevation={0} sx={{ p: 2.5, borderRadius: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.05)', height: '100%' }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                <Typography variant="subtitle1" color="text.secondary">Storage Used</Typography>
-                <Avatar sx={{ bgcolor: alpha(theme.palette.warning.main, 0.1), color: theme.palette.warning.main }}>
-                  <StorageIcon fontSize="small" />
+          <Grid gridColumn={{ xs: 'span 12', sm: 'span 6', md: 'span 3', xl: 'span 3' }}>
+            <Paper elevation={0} sx={{ p: 4, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.08)', height: '100%', border: '1px solid', borderColor: 'divider' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+                <Typography variant="subtitle1" color="text.secondary" fontWeight={500}>Storage Used</Typography>
+                <Avatar sx={{ bgcolor: alpha(theme.palette.warning.main, 0.1), color: theme.palette.warning.main, width: 48, height: 48 }}>
+                  <HardDrive size={22} />
                 </Avatar>
               </Box>
-              <Typography variant="h4" fontWeight={600} gutterBottom>{stats.totalStorageUsed}</Typography>
+              <Typography variant="h3" fontWeight={700} gutterBottom sx={{ color: 'text.primary' }}>{stats.totalStorageUsed}</Typography>
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
                 <Chip 
                   label={`-20.3%`} 
@@ -332,7 +369,8 @@ const ProjectDashboard = () => {
                   sx={{ 
                     bgcolor: alpha(theme.palette.error.main, 0.1), 
                     color: theme.palette.error.main,
-                    mr: 1
+                    mr: 1,
+                    fontWeight: 600
                   }} 
                 />
                 <Typography variant="body2" color="text.secondary">vs last period</Typography>
@@ -342,12 +380,12 @@ const ProjectDashboard = () => {
         </Grid>
 
         {/* Activity and Platform Distribution Charts */}
-        <Grid container columns={12} spacing={2} sx={{ mb: 3 }}>
-          <Grid gridColumn={{ xs: 'span 12', md: 'span 8' }}>
-            <Paper elevation={0} sx={{ p: 3, borderRadius: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Grid container columns={12} spacing={4} sx={{ mb: 4 }}>
+          <Grid gridColumn={{ xs: 'span 12', lg: 'span 7', xl: 'span 8' }}>
+            <Paper elevation={0} sx={{ p: 4, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.08)', border: '1px solid', borderColor: 'divider' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Box>
-                  <Typography variant="h6" fontWeight={500}>Activity Overview</Typography>
+                  <Typography variant="h6" fontWeight={600}>Activity Overview</Typography>
                   <Typography variant="body2" color="text.secondary">
                     Posts and engagements across platforms over time
                   </Typography>
@@ -355,7 +393,7 @@ const ProjectDashboard = () => {
                 <Box>
                   <Button 
                     variant="text" 
-                    endIcon={<DateRangeOutlinedIcon />}
+                    endIcon={<Calendar size={16} />}
                     sx={{ color: 'text.secondary' }}
                     size="small"
                   >
@@ -363,7 +401,7 @@ const ProjectDashboard = () => {
                   </Button>
                 </Box>
               </Box>
-              <Box sx={{ height: 340, width: '100%', mt: 2 }}>
+              <Box sx={{ height: { xs: 320, lg: 420, xl: 480 }, width: '100%', mt: 2 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart
                     data={activityData}
@@ -435,27 +473,27 @@ const ProjectDashboard = () => {
             </Paper>
           </Grid>
           
-          <Grid gridColumn={{ xs: 'span 12', md: 'span 4' }}>
-            <Paper elevation={0} sx={{ p: 3, borderRadius: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.05)', height: '100%' }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6" fontWeight={500}>Platform Distribution</Typography>
+          <Grid gridColumn={{ xs: 'span 12', lg: 'span 5', xl: 'span 4' }}>
+            <Paper elevation={0} sx={{ p: 4, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.08)', height: '100%', border: '1px solid', borderColor: 'divider' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6" fontWeight={600}>Platform Distribution</Typography>
                 <IconButton size="small">
-                  <MoreVertIcon fontSize="small" />
+                  <MoreHorizontal size={16} />
                 </IconButton>
               </Box>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                 Breakdown of your data across platforms
               </Typography>
               
-              <Box sx={{ height: 260, display: 'flex', justifyContent: 'center', alignItems: 'center', mt: 2 }}>
+              <Box sx={{ height: { xs: 240, lg: 340, xl: 400 }, display: 'flex', justifyContent: 'center', alignItems: 'center', mt: 2 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={platformDistribution}
                       cx="50%"
                       cy="50%"
-                      innerRadius={65}
-                      outerRadius={90}
+                      innerRadius={80}
+                      outerRadius={120}
                       paddingAngle={4}
                       dataKey="value"
                       strokeWidth={1}
@@ -487,154 +525,317 @@ const ProjectDashboard = () => {
           </Grid>
         </Grid>
 
-        {/* Quick Access Platform Buttons */}
-        <Grid container columns={12} spacing={2}>
-          <Grid gridColumn={{ xs: 'span 6', sm: 'span 4', md: 'span 3', lg: 'span 2' }}>
-            <Button 
-              variant="outlined" 
-              fullWidth 
-              startIcon={<InstagramIcon />}
-              sx={{ 
-                p: 1.5,
-                py: 2, 
-                justifyContent: 'flex-start',
-                borderColor: '#E1306C',
-                color: '#E1306C',
-                borderRadius: 2,
-                '&:hover': {
-                  borderColor: '#E1306C',
-                  backgroundColor: 'rgba(225, 48, 108, 0.04)'
-                }
-              }}
-              onClick={() => {
-                handleNavigate(`/organizations/${organizationId}/projects/${projectId}/instagram-folders`);
-              }}
-            >
-              Instagram
-            </Button>
+        {/* Additional Dashboard Content */}
+        <Grid container columns={12} spacing={4} sx={{ mb: 4 }}>
+          {/* Recent Activity */}
+          <Grid gridColumn={{ xs: 'span 12', md: 'span 6', lg: 'span 4' }}>
+            <Paper elevation={0} sx={{ p: 4, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.08)', height: '100%', border: '1px solid', borderColor: 'divider' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6" fontWeight={600}>Recent Activity</Typography>
+                <IconButton size="small">
+                  <RefreshCw size={16} />
+                </IconButton>
+              </Box>
+              <Stack spacing={2.5}>
+                {recentActivity.map((activity) => (
+                  <Box key={activity.id} sx={{ display: 'flex', alignItems: 'center', gap: 2.5 }}>
+                    <Avatar sx={{ 
+                      bgcolor: activity.type === 'upload' ? alpha(theme.palette.primary.main, 0.1) :
+                                activity.type === 'analysis' ? alpha(theme.palette.success.main, 0.1) :
+                                activity.type === 'report' ? alpha(theme.palette.warning.main, 0.1) :
+                                alpha(theme.palette.info.main, 0.1),
+                      color: activity.type === 'upload' ? theme.palette.primary.main :
+                             activity.type === 'analysis' ? theme.palette.success.main :
+                             activity.type === 'report' ? theme.palette.warning.main :
+                             theme.palette.info.main,
+                      width: 40,
+                      height: 40
+                    }}>
+                      {activity.type === 'upload' && <Activity size={18} />}
+                      {activity.type === 'analysis' && <Target size={18} />}
+                      {activity.type === 'report' && <BarChart3 size={18} />}
+                      {activity.type === 'import' && <HardDrive size={18} />}
+                    </Avatar>
+                    <Box sx={{ flexGrow: 1 }}>
+                      <Typography variant="body2" fontWeight={500}>{activity.action}</Typography>
+                      <Typography variant="caption" color="text.secondary">{activity.time}</Typography>
+                    </Box>
+                  </Box>
+                ))}
+              </Stack>
+            </Paper>
           </Grid>
-          <Grid gridColumn={{ xs: 'span 6', sm: 'span 4', md: 'span 3', lg: 'span 2' }}>
-            <Button 
-              variant="outlined" 
-              fullWidth 
-              startIcon={<FacebookIcon />}
-              sx={{ 
-                p: 1.5,
-                py: 2, 
-                justifyContent: 'flex-start',
-                borderColor: '#1877F2',
-                color: '#1877F2',
-                borderRadius: 2,
-                '&:hover': {
-                  borderColor: '#1877F2',
-                  backgroundColor: 'rgba(24, 119, 242, 0.04)'
-                }
-              }}
-              onClick={() => {
-                handleNavigate(`/organizations/${organizationId}/projects/${projectId}/facebook-folders`);
-              }}
-            >
-              Facebook
-            </Button>
+
+          {/* Top Performers */}
+          <Grid gridColumn={{ xs: 'span 12', md: 'span 6', lg: 'span 4' }}>
+            <Paper elevation={0} sx={{ p: 4, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.08)', height: '100%', border: '1px solid', borderColor: 'divider' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6" fontWeight={600}>Top Performers</Typography>
+                <IconButton size="small">
+                  <Award size={16} />
+                </IconButton>
+              </Box>
+              <Stack spacing={3.5}>
+                {topPerformers.map((performer, index) => (
+                  <Box key={index}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Avatar sx={{ 
+                          bgcolor: performer.platform === 'Instagram' ? '#E1306C' :
+                                   performer.platform === 'Facebook' ? '#1877F2' :
+                                   '#0A66C2',
+                          width: 36,
+                          height: 36
+                        }}>
+                          {performer.platform === 'Instagram' && <Instagram size={16} />}
+                          {performer.platform === 'Facebook' && <Facebook size={16} />}
+                          {performer.platform === 'LinkedIn' && <Linkedin size={16} />}
+                        </Avatar>
+                        <Box>
+                          <Typography variant="body2" fontWeight={600}>{performer.account}</Typography>
+                          <Typography variant="caption" color="text.secondary">{performer.platform}</Typography>
+                        </Box>
+                      </Box>
+                      <Box sx={{ textAlign: 'right' }}>
+                        <Typography variant="body2" fontWeight={600}>{performer.engagement}</Typography>
+                        <Typography variant="caption" color="success.main">{performer.growth}</Typography>
+                      </Box>
+                    </Box>
+                    {index < topPerformers.length - 1 && <Divider />}
+                  </Box>
+                ))}
+              </Stack>
+            </Paper>
           </Grid>
-          <Grid gridColumn={{ xs: 'span 6', sm: 'span 4', md: 'span 3', lg: 'span 2' }}>
-            <Button 
-              variant="outlined" 
-              fullWidth 
-              startIcon={<LinkedInIcon />}
-              sx={{ 
-                p: 1.5,
-                py: 2, 
-                justifyContent: 'flex-start',
-                borderColor: '#0A66C2',
-                color: '#0A66C2',
-                borderRadius: 2,
-                '&:hover': {
-                  borderColor: '#0A66C2',
-                  backgroundColor: 'rgba(10, 102, 194, 0.04)'
-                }
-              }}
-              onClick={() => {
-                handleNavigate(`/organizations/${organizationId}/projects/${projectId}/linkedin-folders`);
-              }}
-            >
-              LinkedIn
-            </Button>
-          </Grid>
-          <Grid gridColumn={{ xs: 'span 6', sm: 'span 4', md: 'span 3', lg: 'span 2' }}>
-            <Button 
-              variant="outlined" 
-              fullWidth 
-              startIcon={<WhatsAppIcon />}
-              sx={{ 
-                p: 1.5,
-                py: 2, 
-                justifyContent: 'flex-start',
-                borderColor: '#000000',
-                color: '#000000',
-                borderRadius: 2,
-                '&:hover': {
-                  borderColor: '#000000',
-                  backgroundColor: 'rgba(0, 0, 0, 0.04)'
-                }
-              }}
-              onClick={() => {
-                handleNavigate(`/organizations/${organizationId}/projects/${projectId}/tiktok-folders`);
-              }}
-            >
-              TikTok
-            </Button>
-          </Grid>
-          <Grid gridColumn={{ xs: 'span 6', sm: 'span 4', md: 'span 3', lg: 'span 2' }}>
-            <Button 
-              variant="outlined" 
-              fullWidth 
-              startIcon={<PersonIcon />}
-              sx={{ 
-                p: 1.5,
-                py: 2, 
-                justifyContent: 'flex-start',
-                borderColor: '#6200EA',
-                color: '#6200EA',
-                borderRadius: 2,
-                '&:hover': {
-                  borderColor: '#6200EA',
-                  backgroundColor: 'rgba(98, 0, 234, 0.04)'
-                }
-              }}
-              onClick={() => {
-                handleNavigate(`/organizations/${organizationId}/projects/${projectId}/track-accounts/folders`);
-              }}
-            >
-              Accounts
-            </Button>
-          </Grid>
-          <Grid gridColumn={{ xs: 'span 6', sm: 'span 4', md: 'span 3', lg: 'span 2' }}>
-            <Button 
-              variant="outlined" 
-              fullWidth 
-              startIcon={<BarChartIcon />}
-              sx={{ 
-                p: 1.5,
-                py: 2, 
-                justifyContent: 'flex-start',
-                borderColor: '#FFA000',
-                color: '#FFA000',
-                borderRadius: 2,
-                '&:hover': {
-                  borderColor: '#FFA000',
-                  backgroundColor: 'rgba(255, 160, 0, 0.04)'
-                }
-              }}
-              onClick={() => {
-                handleNavigate(`/organizations/${organizationId}/projects/${projectId}/report-folders`);
-              }}
-            >
-              Reports
-            </Button>
+
+          {/* Weekly Goals */}
+          <Grid gridColumn={{ xs: 'span 12', md: 'span 12', lg: 'span 4' }}>
+            <Paper elevation={0} sx={{ p: 4, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.08)', height: '100%', border: '1px solid', borderColor: 'divider' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6" fontWeight={600}>Weekly Goals</Typography>
+                <IconButton size="small">
+                  <Target size={16} />
+                </IconButton>
+              </Box>
+              <Stack spacing={3.5}>
+                {weeklyGoals.map((goal, index) => (
+                  <Box key={index}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
+                      <Typography variant="body2" fontWeight={500}>{goal.goal}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {goal.goal === 'Engagement Rate' ? `${goal.current}% / ${goal.target}%` : `${goal.current} / ${goal.target}`}
+                      </Typography>
+                    </Box>
+                    <LinearProgress 
+                      variant="determinate" 
+                      value={goal.percentage} 
+                      sx={{ 
+                        height: 10, 
+                        borderRadius: 5,
+                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                        '& .MuiLinearProgress-bar': {
+                          borderRadius: 5
+                        }
+                      }} 
+                    />
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                      {goal.percentage}% complete
+                    </Typography>
+                  </Box>
+                ))}
+              </Stack>
+            </Paper>
           </Grid>
         </Grid>
-      </Container>
+
+        {/* Quick Access Platform Buttons */}
+        <Grid container columns={12} spacing={4}>
+          <Grid gridColumn={{ xs: 'span 12' }}>
+            <Paper elevation={0} sx={{ p: 4, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.08)', border: '1px solid', borderColor: 'divider' }}>
+              <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>Quick Access</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
+                Navigate to different platform data and tools
+              </Typography>
+              <Grid container columns={12} spacing={3}>
+                <Grid gridColumn={{ xs: 'span 6', sm: 'span 4', md: 'span 3', lg: 'span 2', xl: 'span 2' }}>
+                  <Button 
+                    variant="outlined" 
+                    fullWidth 
+                    startIcon={<Instagram size={20} />}
+                    sx={{ 
+                      p: 3,
+                      py: 3, 
+                      justifyContent: 'flex-start',
+                      borderColor: '#E1306C',
+                      color: '#E1306C',
+                      borderRadius: 3,
+                      fontWeight: 600,
+                      fontSize: '0.95rem',
+                      '&:hover': {
+                        borderColor: '#E1306C',
+                        backgroundColor: 'rgba(225, 48, 108, 0.06)',
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 6px 16px rgba(225, 48, 108, 0.25)'
+                      },
+                      transition: 'all 0.2s ease-in-out'
+                    }}
+                    onClick={() => {
+                      handleNavigate(`/organizations/${organizationId}/projects/${projectId}/instagram-folders`);
+                    }}
+                  >
+                    Instagram
+                  </Button>
+                </Grid>
+                <Grid gridColumn={{ xs: 'span 6', sm: 'span 4', md: 'span 3', lg: 'span 2', xl: 'span 2' }}>
+                  <Button 
+                    variant="outlined" 
+                    fullWidth 
+                    startIcon={<Facebook size={20} />}
+                    sx={{ 
+                      p: 3,
+                      py: 3, 
+                      justifyContent: 'flex-start',
+                      borderColor: '#1877F2',
+                      color: '#1877F2',
+                      borderRadius: 3,
+                      fontWeight: 600,
+                      fontSize: '0.95rem',
+                      '&:hover': {
+                        borderColor: '#1877F2',
+                        backgroundColor: 'rgba(24, 119, 242, 0.06)',
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 6px 16px rgba(24, 119, 242, 0.25)'
+                      },
+                      transition: 'all 0.2s ease-in-out'
+                    }}
+                    onClick={() => {
+                      handleNavigate(`/organizations/${organizationId}/projects/${projectId}/facebook-folders`);
+                    }}
+                  >
+                    Facebook
+                  </Button>
+                </Grid>
+                <Grid gridColumn={{ xs: 'span 6', sm: 'span 4', md: 'span 3', lg: 'span 2', xl: 'span 2' }}>
+                  <Button 
+                    variant="outlined" 
+                    fullWidth 
+                    startIcon={<Linkedin size={20} />}
+                    sx={{ 
+                      p: 3,
+                      py: 3, 
+                      justifyContent: 'flex-start',
+                      borderColor: '#0A66C2',
+                      color: '#0A66C2',
+                      borderRadius: 3,
+                      fontWeight: 600,
+                      fontSize: '0.95rem',
+                      '&:hover': {
+                        borderColor: '#0A66C2',
+                        backgroundColor: 'rgba(10, 102, 194, 0.06)',
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 6px 16px rgba(10, 102, 194, 0.25)'
+                      },
+                      transition: 'all 0.2s ease-in-out'
+                    }}
+                    onClick={() => {
+                      handleNavigate(`/organizations/${organizationId}/projects/${projectId}/linkedin-folders`);
+                    }}
+                  >
+                    LinkedIn
+                  </Button>
+                </Grid>
+                <Grid gridColumn={{ xs: 'span 6', sm: 'span 4', md: 'span 3', lg: 'span 2', xl: 'span 2' }}>
+                  <Button 
+                    variant="outlined" 
+                    fullWidth 
+                    startIcon={<MessageCircle size={20} />}
+                    sx={{ 
+                      p: 3,
+                      py: 3, 
+                      justifyContent: 'flex-start',
+                      borderColor: '#000000',
+                      color: '#000000',
+                      borderRadius: 3,
+                      fontWeight: 600,
+                      fontSize: '0.95rem',
+                      '&:hover': {
+                        borderColor: '#000000',
+                        backgroundColor: 'rgba(0, 0, 0, 0.06)',
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 6px 16px rgba(0, 0, 0, 0.25)'
+                      },
+                      transition: 'all 0.2s ease-in-out'
+                    }}
+                    onClick={() => {
+                      handleNavigate(`/organizations/${organizationId}/projects/${projectId}/tiktok-folders`);
+                    }}
+                  >
+                    TikTok
+                  </Button>
+                </Grid>
+                <Grid gridColumn={{ xs: 'span 6', sm: 'span 4', md: 'span 3', lg: 'span 2', xl: 'span 2' }}>
+                  <Button 
+                    variant="outlined" 
+                    fullWidth 
+                    startIcon={<Users size={20} />}
+                    sx={{ 
+                      p: 3,
+                      py: 3, 
+                      justifyContent: 'flex-start',
+                      borderColor: '#6200EA',
+                      color: '#6200EA',
+                      borderRadius: 3,
+                      fontWeight: 600,
+                      fontSize: '0.95rem',
+                      '&:hover': {
+                        borderColor: '#6200EA',
+                        backgroundColor: 'rgba(98, 0, 234, 0.06)',
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 6px 16px rgba(98, 0, 234, 0.25)'
+                      },
+                      transition: 'all 0.2s ease-in-out'
+                    }}
+                    onClick={() => {
+                      handleNavigate(`/organizations/${organizationId}/projects/${projectId}/track-accounts/accounts`);
+                    }}
+                  >
+                    Accounts
+                  </Button>
+                </Grid>
+                <Grid gridColumn={{ xs: 'span 6', sm: 'span 4', md: 'span 3', lg: 'span 2', xl: 'span 2' }}>
+                  <Button 
+                    variant="outlined" 
+                    fullWidth 
+                    startIcon={<BarChart3 size={20} />}
+                    sx={{ 
+                      p: 3,
+                      py: 3, 
+                      justifyContent: 'flex-start',
+                      borderColor: '#FFA000',
+                      color: '#FFA000',
+                      borderRadius: 3,
+                      fontWeight: 600,
+                      fontSize: '0.95rem',
+                      '&:hover': {
+                        borderColor: '#FFA000',
+                        backgroundColor: 'rgba(255, 160, 0, 0.06)',
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 6px 16px rgba(255, 160, 0, 0.25)'
+                      },
+                      transition: 'all 0.2s ease-in-out'
+                    }}
+                    onClick={() => {
+                      handleNavigate(`/organizations/${organizationId}/projects/${projectId}/report-folders`);
+                    }}
+                  >
+                    Reports
+                  </Button>
+                </Grid>
+              </Grid>
+            </Paper>
+          </Grid>
+        </Grid>
+      </Box>
     </Box>
   );
 };

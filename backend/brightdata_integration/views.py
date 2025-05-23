@@ -3,15 +3,20 @@ import json
 import requests
 import datetime
 from django.shortcuts import get_object_or_404
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from .models import BrightdataConfig, ScraperRequest
-from .serializers import BrightdataConfigSerializer, ScraperRequestSerializer, ScraperRequestCreateSerializer
+from .models import BrightdataConfig, ScraperRequest, BatchScraperJob
+from .serializers import (
+    BrightdataConfigSerializer, ScraperRequestSerializer, ScraperRequestCreateSerializer,
+    BatchScraperJobSerializer, BatchScraperJobCreateSerializer
+)
+from .services import AutomatedBatchScraper, create_and_execute_batch_job
 import traceback
 import logging
 from urllib.parse import urlencode
@@ -22,29 +27,43 @@ class BrightdataConfigViewSet(viewsets.ModelViewSet):
     serializer_class = BrightdataConfigSerializer
     permission_classes = [AllowAny]  # For testing, use proper permissions in production
     
+    def get_queryset(self):
+        """Filter by platform if specified"""
+        queryset = BrightdataConfig.objects.all()
+        platform = self.request.query_params.get('platform')
+        if platform:
+            queryset = queryset.filter(platform=platform)
+        return queryset.order_by('platform', 'name')
+    
     @action(detail=True, methods=['POST'])
     def set_active(self, request, pk=None):
-        """Set the current configuration as active and deactivate others"""
+        """Set the current configuration as active and deactivate others for the same platform"""
         config = self.get_object()
         
-        # Deactivate all other configurations
-        BrightdataConfig.objects.exclude(pk=config.pk).update(is_active=False)
+        # Deactivate all other configurations for this platform
+        BrightdataConfig.objects.filter(platform=config.platform, is_active=True).exclude(pk=config.pk).update(is_active=False)
         
         # Activate the current configuration
         config.is_active = True
         config.save()
         
-        return Response({'status': 'Configuration activated'})
+        return Response({'status': f'{config.platform.title()} configuration activated'})
     
     @action(detail=False, methods=['GET'])
     def active(self, request):
-        """Get the active configuration"""
-        config = BrightdataConfig.objects.filter(is_active=True).first()
-        if not config:
-            return Response({'error': 'No active configuration found'}, status=status.HTTP_404_NOT_FOUND)
-        
-        serializer = self.get_serializer(config)
-        return Response(serializer.data)
+        """Get all active configurations by platform"""
+        platform = request.query_params.get('platform')
+        if platform:
+            config = BrightdataConfig.objects.filter(platform=platform, is_active=True).first()
+            if not config:
+                return Response({'error': f'No active configuration found for {platform}'}, status=status.HTTP_404_NOT_FOUND)
+            serializer = self.get_serializer(config)
+            return Response(serializer.data)
+        else:
+            # Return all active configurations grouped by platform
+            configs = BrightdataConfig.objects.filter(is_active=True).order_by('platform')
+            serializer = self.get_serializer(configs, many=True)
+            return Response(serializer.data)
 
 class ScraperRequestViewSet(viewsets.ModelViewSet):
     """API endpoint for Brightdata scraper requests"""
@@ -69,10 +88,10 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
             print(f"Request data: {request.data}")
             print("=======================================\n")
             
-            # Get the active configuration
-            config = BrightdataConfig.objects.filter(is_active=True).first()
+            # Get the active Facebook configuration
+            config = BrightdataConfig.objects.filter(platform='facebook', is_active=True).first()
             if not config:
-                return Response({'error': 'No active Brightdata configuration found'}, 
+                return Response({'error': 'No active Facebook Brightdata configuration found'}, 
                                status=status.HTTP_400_BAD_REQUEST)
             
             # Get request parameters
@@ -1034,283 +1053,336 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @csrf_exempt
+@require_http_methods(["POST"])
 def brightdata_webhook(request):
-    """Webhook to receive data from Brightdata"""
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Only POST requests are allowed'}, status=405)
-    
+    """
+    Webhook endpoint to receive scraped data from BrightData
+    """
     try:
-        # Parse the webhook payload
-        payload = json.loads(request.body)
-        request_id = payload.get('request_id')
+        # Verify authentication
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not _verify_webhook_auth(auth_header):
+            logger.warning(f"Unauthorized webhook request from {request.META.get('REMOTE_ADDR')}")
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+        
+        # Parse the incoming data
+        if request.content_type == 'application/json':
+            data = json.loads(request.body)
+        else:
+            logger.error(f"Unsupported content type: {request.content_type}")
+            return JsonResponse({'error': 'Unsupported content type'}, status=400)
+        
+        # Extract metadata from headers or data
+        snapshot_id = request.headers.get('X-Snapshot-Id') or data.get('snapshot_id')
+        platform = request.headers.get('X-Platform') or data.get('platform', 'unknown')
+        
+        logger.info(f"Received webhook data for snapshot_id: {snapshot_id}, platform: {platform}")
         
         # Find the corresponding scraper request
-        scraper_request = ScraperRequest.objects.filter(request_id=request_id).first()
-        if not scraper_request:
-            return JsonResponse({'error': 'Unknown request ID'}, status=404)
+        scraper_request = None
+        if snapshot_id:
+            try:
+                scraper_request = ScraperRequest.objects.get(request_id=snapshot_id)
+            except ScraperRequest.DoesNotExist:
+                logger.warning(f"No scraper request found for snapshot_id: {snapshot_id}")
         
-        # Update the scraper request status
-        scraper_request.status = 'completed'
-        scraper_request.completed_at = timezone.now()
-        scraper_request.response_metadata = payload
-        scraper_request.save()
+        # Process the data based on platform
+        success = _process_webhook_data(data, platform, scraper_request)
         
-        # Process the scraped data based on platform
-        if scraper_request.platform == 'facebook':
-            _process_facebook_data(scraper_request, payload)
-        elif scraper_request.platform == 'instagram':
-            _process_instagram_data(scraper_request, payload)
-        elif scraper_request.platform == 'linkedin':
-            _process_linkedin_data(scraper_request, payload)
-        elif scraper_request.platform == 'tiktok':
-            _process_tiktok_data(scraper_request, payload)
-        
-        return JsonResponse({'status': 'Data received successfully'})
-    
+        if success:
+            # Update scraper request status
+            if scraper_request:
+                scraper_request.status = 'completed'
+                scraper_request.save()
+            
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Data processed successfully',
+                'snapshot_id': snapshot_id
+            })
+        else:
+            # Update scraper request status to failed
+            if scraper_request:
+                scraper_request.status = 'failed'
+                scraper_request.error_message = 'Failed to process webhook data'
+                scraper_request.save()
+            
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Failed to process data'
+            }, status=500)
+            
+    except json.JSONDecodeError:
+        logger.error("Invalid JSON in webhook request")
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
     except Exception as e:
-        # Log the error
-        print(f"Error processing webhook: {str(e)}")
-        return JsonResponse({'error': str(e)}, status=500)
+        logger.error(f"Error processing webhook: {str(e)}")
+        return JsonResponse({'error': 'Internal server error'}, status=500)
 
-def _process_facebook_data(scraper_request, payload):
-    """Process the Facebook data received from Brightdata"""
-    from facebook_data.models import FacebookPost, Folder
-    
-    # Get the results from the payload
-    results = payload.get('results', [])
-    if not results:
-        return
-    
-    # Get or create a folder if folder_id is provided
-    folder = None
-    if scraper_request.folder_id:
-        try:
-            folder = Folder.objects.get(id=scraper_request.folder_id)
-        except Folder.DoesNotExist:
-            # Folder doesn't exist, create a new one
-            folder_name = f"Brightdata Import {timezone.now().strftime('%Y-%m-%d %H:%M')}"
-            folder = Folder.objects.create(name=folder_name)
-    
-    # Process each post in the results
-    for post_data in results:
-        try:
-            # Skip if we don't have a post_id
-            post_id = post_data.get('post_id')
-            if not post_id:
+@csrf_exempt
+@require_http_methods(["POST"])
+def brightdata_notify(request):
+    """
+    Notification endpoint to receive status updates from BrightData
+    """
+    try:
+        # Verify authentication
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not _verify_webhook_auth(auth_header):
+            logger.warning(f"Unauthorized notify request from {request.META.get('REMOTE_ADDR')}")
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+        
+        # Parse notification data
+        if request.content_type == 'application/json':
+            data = json.loads(request.body)
+        else:
+            # Handle form-encoded data
+            data = dict(request.POST.items())
+        
+        snapshot_id = data.get('snapshot_id')
+        status_update = data.get('status')
+        message = data.get('message', '')
+        
+        logger.info(f"Received notification: snapshot_id={snapshot_id}, status={status_update}, message={message}")
+        
+        # Find and update the corresponding scraper request
+        if snapshot_id:
+            try:
+                scraper_request = ScraperRequest.objects.get(request_id=snapshot_id)
+                
+                # Update status based on notification
+                if status_update in ['completed', 'finished']:
+                    scraper_request.status = 'completed'
+                elif status_update in ['failed', 'error']:
+                    scraper_request.status = 'failed'
+                    scraper_request.error_message = message
+                elif status_update in ['running', 'processing']:
+                    scraper_request.status = 'processing'
+                
+                # Store notification metadata
+                if not scraper_request.response_metadata:
+                    scraper_request.response_metadata = {}
+                
+                scraper_request.response_metadata['notifications'] = scraper_request.response_metadata.get('notifications', [])
+                scraper_request.response_metadata['notifications'].append({
+                    'timestamp': request.headers.get('Date') or 'unknown',
+                    'status': status_update,
+                    'message': message,
+                    'data': data
+                })
+                
+                scraper_request.save()
+                
+                logger.info(f"Updated scraper request {scraper_request.id} status to {scraper_request.status}")
+                
+            except ScraperRequest.DoesNotExist:
+                logger.warning(f"No scraper request found for snapshot_id: {snapshot_id}")
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Notification processed successfully'
+        })
+        
+    except json.JSONDecodeError:
+        logger.error("Invalid JSON in notification request")
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        logger.error(f"Error processing notification: {str(e)}")
+        return JsonResponse({'error': 'Internal server error'}, status=500)
+
+def _verify_webhook_auth(auth_header: str) -> bool:
+    """
+    Verify webhook authentication
+    """
+    try:
+        # Get webhook auth token from BrightData config
+        # You can store this in your BrightdataConfig model or settings
+        from django.conf import settings
+        expected_token = getattr(settings, 'BRIGHTDATA_WEBHOOK_TOKEN', 'your-webhook-secret-token')
+        
+        # Support both "Bearer token" and "token" formats
+        token = auth_header.replace('Bearer ', '').strip()
+        return token == expected_token
+        
+    except Exception as e:
+        logger.error(f"Error verifying webhook auth: {str(e)}")
+        return False
+
+def _process_webhook_data(data, platform: str, scraper_request=None):
+    """
+    Process incoming webhook data and store it in the appropriate platform model
+    """
+    try:
+        # Import platform-specific models
+        from facebook_data.models import FacebookPost
+        from instagram_data.models import InstagramPost
+        from linkedin_data.models import LinkedInPost
+        from tiktok_data.models import TikTokPost
+        
+        # Platform to model mapping
+        platform_models = {
+            'facebook': FacebookPost,
+            'instagram': InstagramPost,
+            'linkedin': LinkedInPost,
+            'tiktok': TikTokPost,
+        }
+        
+        PostModel = platform_models.get(platform.lower())
+        if not PostModel:
+            logger.error(f"No model found for platform: {platform}")
+            return False
+        
+        # Extract posts from data
+        posts_data = data if isinstance(data, list) else data.get('data', [])
+        
+        folder_id = scraper_request.folder_id if scraper_request else None
+        created_count = 0
+        
+        for post_data in posts_data:
+            try:
+                # Map common fields (you'll need to adjust based on your model fields)
+                post_fields = _map_post_fields(post_data, platform)
+                
+                if folder_id:
+                    post_fields['folder_id'] = folder_id
+                
+                # Create or update post
+                post_id = post_data.get('post_id') or post_data.get('id')
+                if post_id:
+                    post, created = PostModel.objects.get_or_create(
+                        post_id=post_id,
+                        defaults=post_fields
+                    )
+                    if created:
+                        created_count += 1
+                else:
+                    # Create new post without checking for duplicates
+                    PostModel.objects.create(**post_fields)
+                    created_count += 1
+                    
+            except Exception as e:
+                logger.error(f"Error processing individual post: {str(e)}")
                 continue
+        
+        logger.info(f"Successfully processed {created_count} posts for platform {platform}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error processing webhook data: {str(e)}")
+        return False
+
+def _map_post_fields(post_data: dict, platform: str) -> dict:
+    """
+    Map BrightData post fields to our model fields
+    """
+    # This is a basic mapping - you'll need to adjust based on your actual model fields
+    # and the data structure returned by BrightData
+    
+    common_mapping = {
+        'url': post_data.get('url', ''),
+        'content': post_data.get('text') or post_data.get('content') or post_data.get('description', ''),
+        'date_posted': post_data.get('date') or post_data.get('created_time') or post_data.get('timestamp'),
+        'likes': post_data.get('likes_count') or post_data.get('likes') or 0,
+        'comments': post_data.get('comments_count') or post_data.get('comments') or 0,
+        'shares': post_data.get('shares_count') or post_data.get('shares') or 0,
+        'user_posted': post_data.get('username') or post_data.get('author') or post_data.get('user', ''),
+    }
+    
+    # Platform-specific mappings
+    if platform == 'instagram':
+        common_mapping.update({
+            'hashtags': ', '.join(post_data.get('hashtags', [])) if post_data.get('hashtags') else '',
+            'num_comments': post_data.get('comments_count', 0),
+            'followers': post_data.get('followers_count', 0),
+        })
+    elif platform == 'facebook':
+        common_mapping.update({
+            'reactions': post_data.get('reactions_count', 0),
+        })
+    # Add more platform-specific mappings as needed
+    
+    return common_mapping
+
+class BatchScraperJobViewSet(viewsets.ModelViewSet):
+    """API endpoint for automated batch scraper jobs"""
+    queryset = BatchScraperJob.objects.all()
+    serializer_class = BatchScraperJobSerializer
+    permission_classes = [AllowAny]  # For testing, use proper permissions in production
+    
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return BatchScraperJobCreateSerializer
+        return self.serializer_class
+    
+    def get_queryset(self):
+        """Filter by project if specified"""
+        queryset = BatchScraperJob.objects.all()
+        project_id = self.request.query_params.get('project')
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+        return queryset.order_by('-created_at')
+    
+    @action(detail=True, methods=['POST'])
+    def execute(self, request, pk=None):
+        """Execute a batch scraper job"""
+        job = self.get_object()
+        
+        if job.status != 'pending':
+            return Response({'error': 'Job can only be executed if it is in pending status'}, 
+                           status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            scraper = AutomatedBatchScraper()
+            success = scraper.execute_batch_job(job.id)
             
-            # Check if post already exists
-            post, created = FacebookPost.objects.get_or_create(
-                post_id=post_id,
-                folder=folder,
-                defaults={
-                    # Handle the field mapping from Brightdata to our model
-                    'url': post_data.get('url', ''),
-                    'user_url': post_data.get('user_url', ''),
-                    'user_posted': post_data.get('user_posted', ''),
-                    'content': post_data.get('content', ''),
-                    'hashtags': post_data.get('hashtags', ''),
-                    'date_posted': post_data.get('date_posted', None),
-                    'num_comments': post_data.get('num_comments', 0),
-                    'num_shares': post_data.get('num_shares', 0),
-                    'likes': post_data.get('likes', 0),
-                    'page_name': post_data.get('page_name', ''),
-                    'profile_id': post_data.get('profile_id', ''),
-                    'content_type': scraper_request.content_type,
-                    'platform_type': 'facebook',
-                    'attachments_data': post_data.get('attachments', {}),
-                    'thumbnail': post_data.get('thumbnail', ''),
-                    'post_image': post_data.get('post_image', ''),
-                    'is_page': post_data.get('is_page', False)
-                }
+            if success:
+                return Response({'status': 'Job execution started successfully'})
+            else:
+                return Response({'error': 'Failed to start job execution'}, 
+                               status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        except Exception as e:
+            return Response({'error': f'Error executing job: {str(e)}'}, 
+                           status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=True, methods=['POST'])
+    def cancel(self, request, pk=None):
+        """Cancel a batch scraper job"""
+        job = self.get_object()
+        
+        if job.status in ['completed', 'failed', 'cancelled']:
+            return Response({'error': 'Job cannot be cancelled in its current status'}, 
+                           status=status.HTTP_400_BAD_REQUEST)
+        
+        job.status = 'cancelled'
+        job.completed_at = timezone.now()
+        job.save()
+        
+        return Response({'status': 'Job cancelled successfully'})
+    
+    @action(detail=False, methods=['POST'])
+    def create_and_execute(self, request):
+        """Create and execute a batch scraper job"""
+        try:
+            job, success = create_and_execute_batch_job(
+                name=request.data.get('name'),
+                project_id=request.data.get('project_id'),
+                source_folder_ids=request.data.get('source_folder_ids', []),
+                platforms_to_scrape=request.data.get('platforms_to_scrape'),
+                num_of_posts=request.data.get('num_of_posts', 10),
+                start_date=request.data.get('start_date'),
+                end_date=request.data.get('end_date'),
+                auto_create_folders=request.data.get('auto_create_folders', True),
+                output_folder_pattern=request.data.get('output_folder_pattern')
             )
             
-            # If post already exists, update relevant fields
-            if not created:
-                post.content = post_data.get('content', post.content)
-                post.num_comments = post_data.get('num_comments', post.num_comments)
-                post.num_shares = post_data.get('num_shares', post.num_shares)
-                post.likes = post_data.get('likes', post.likes)
-                post.save()
-                
+            return Response({
+                'job_id': job.id,
+                'success': success,
+                'message': f'Batch job {"completed successfully" if success else "failed"}'
+            }, status=status.HTTP_201_CREATED)
+            
         except Exception as e:
-            # Log individual post processing errors but continue with others
-            print(f"Error processing post {post_data.get('post_id')}: {str(e)}")
-            continue
-
-def _process_instagram_data(scraper_request, payload):
-    """Process the Instagram data received from Brightdata"""
-    from instagram_data.models import InstagramPost, Folder
-    
-    # Get the results from the payload
-    results = payload.get('results', [])
-    if not results:
-        return
-    
-    # Get or create a folder if folder_id is provided
-    folder = None
-    if scraper_request.folder_id:
-        try:
-            folder = Folder.objects.get(id=scraper_request.folder_id)
-        except Folder.DoesNotExist:
-            # Folder doesn't exist, create a new one
-            folder_name = f"Brightdata Import {timezone.now().strftime('%Y-%m-%d %H:%M')}"
-            folder = Folder.objects.create(name=folder_name)
-    
-    # Process each post in the results
-    for post_data in results:
-        try:
-            # Skip if we don't have a post_id
-            post_id = post_data.get('post_id')
-            if not post_id:
-                continue
-            
-            # Check if post already exists
-            post, created = InstagramPost.objects.get_or_create(
-                post_id=post_id,
-                folder=folder,
-                defaults={
-                    # Handle the field mapping from Brightdata to our model
-                    'url': post_data.get('url', ''),
-                    'username': post_data.get('username', ''),
-                    'caption': post_data.get('caption', ''),
-                    'hashtags': post_data.get('hashtags', ''),
-                    'date_posted': post_data.get('date_posted', None),
-                    'comments': post_data.get('comments', 0),
-                    'likes': post_data.get('likes', 0),
-                    'content_type': scraper_request.content_type,
-                    'image_url': post_data.get('image_url', ''),
-                    'platform_type': 'instagram'
-                }
-            )
-            
-            # If post already exists, update relevant fields
-            if not created:
-                post.caption = post_data.get('caption', post.caption)
-                post.comments = post_data.get('comments', post.comments)
-                post.likes = post_data.get('likes', post.likes)
-                post.save()
-                
-        except Exception as e:
-            # Log individual post processing errors but continue with others
-            print(f"Error processing Instagram post {post_data.get('post_id')}: {str(e)}")
-            continue
-
-def _process_linkedin_data(scraper_request, payload):
-    """Process the LinkedIn data received from Brightdata"""
-    from linkedin_data.models import LinkedInPost, Folder
-    
-    # Get the results from the payload
-    results = payload.get('results', [])
-    if not results:
-        return
-    
-    # Get or create a folder if folder_id is provided
-    folder = None
-    if scraper_request.folder_id:
-        try:
-            folder = Folder.objects.get(id=scraper_request.folder_id)
-        except Folder.DoesNotExist:
-            # Folder doesn't exist, create a new one
-            folder_name = f"Brightdata Import {timezone.now().strftime('%Y-%m-%d %H:%M')}"
-            folder = Folder.objects.create(name=folder_name)
-    
-    # Process each post in the results
-    for post_data in results:
-        try:
-            # Skip if we don't have a post_id
-            post_id = post_data.get('post_id')
-            if not post_id:
-                continue
-            
-            # Check if post already exists
-            post, created = LinkedInPost.objects.get_or_create(
-                post_id=post_id,
-                folder=folder,
-                defaults={
-                    # Handle the field mapping from Brightdata to our model
-                    'url': post_data.get('url', ''),
-                    'author': post_data.get('author', ''),
-                    'content': post_data.get('content', ''),
-                    'hashtags': post_data.get('hashtags', ''),
-                    'date_posted': post_data.get('date_posted', None),
-                    'comments': post_data.get('comments', 0),
-                    'likes': post_data.get('likes', 0),
-                    'company_name': post_data.get('company_name', ''),
-                    'platform_type': 'linkedin',
-                    'content_type': scraper_request.content_type,
-                }
-            )
-            
-            # If post already exists, update relevant fields
-            if not created:
-                post.content = post_data.get('content', post.content)
-                post.comments = post_data.get('comments', post.comments)
-                post.likes = post_data.get('likes', post.likes)
-                post.save()
-                
-        except Exception as e:
-            # Log individual post processing errors but continue with others
-            print(f"Error processing LinkedIn post {post_data.get('post_id')}: {str(e)}")
-            continue
-
-def _process_tiktok_data(scraper_request, payload):
-    """Process the TikTok data received from Brightdata"""
-    from tiktok_data.models import TikTokPost, Folder
-    
-    # Get the results from the payload
-    results = payload.get('results', [])
-    if not results:
-        return
-    
-    # Get or create a folder if folder_id is provided
-    folder = None
-    if scraper_request.folder_id:
-        try:
-            folder = Folder.objects.get(id=scraper_request.folder_id)
-        except Folder.DoesNotExist:
-            # Folder doesn't exist, create a new one
-            folder_name = f"Brightdata Import {timezone.now().strftime('%Y-%m-%d %H:%M')}"
-            folder = Folder.objects.create(name=folder_name)
-    
-    # Process each post in the results
-    for post_data in results:
-        try:
-            # Skip if we don't have a post_id
-            post_id = post_data.get('post_id')
-            if not post_id:
-                continue
-            
-            # Check if post already exists
-            post, created = TikTokPost.objects.get_or_create(
-                post_id=post_id,
-                folder=folder,
-                defaults={
-                    # Handle the field mapping from Brightdata to our model
-                    'url': post_data.get('url', ''),
-                    'creator': post_data.get('creator', ''),
-                    'description': post_data.get('description', ''),
-                    'hashtags': post_data.get('hashtags', ''),
-                    'date_posted': post_data.get('date_posted', None),
-                    'comments': post_data.get('comments', 0),
-                    'likes': post_data.get('likes', 0),
-                    'shares': post_data.get('shares', 0),
-                    'views': post_data.get('views', 0),
-                    'platform_type': 'tiktok',
-                    'content_type': scraper_request.content_type,
-                }
-            )
-            
-            # If post already exists, update relevant fields
-            if not created:
-                post.description = post_data.get('description', post.description)
-                post.comments = post_data.get('comments', post.comments)
-                post.likes = post_data.get('likes', post.likes)
-                post.shares = post_data.get('shares', post.shares)
-                post.views = post_data.get('views', post.views)
-                post.save()
-                
-        except Exception as e:
-            # Log individual post processing errors but continue with others
-            print(f"Error processing TikTok post {post_data.get('post_id')}: {str(e)}")
-            continue
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)

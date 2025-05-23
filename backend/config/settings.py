@@ -164,6 +164,45 @@ CORS_ALLOW_CREDENTIALS = True
 # CSRF settings
 CSRF_TRUSTED_ORIGINS = ['http://localhost:5173']
 
+# BrightData Integration Settings - Auto-detect domain for Upsun deployment
+def get_brightdata_base_url():
+    # Manual override via environment variable (highest priority)
+    manual_url = os.getenv('BRIGHTDATA_BASE_URL')
+    if manual_url:
+        return manual_url
+    
+    # Auto-detect for Upsun/Platform.sh deployment
+    if os.getenv('PLATFORM_APPLICATION_NAME'):
+        # Get the default route from Platform.sh environment
+        platform_routes = os.getenv('PLATFORM_ROUTES')
+        if platform_routes:
+            try:
+                import json
+                routes = json.loads(platform_routes)
+                # Find the primary HTTPS route
+                for route_url, route_config in routes.items():
+                    if route_config.get('primary') and route_url.startswith('https://'):
+                        return route_url.rstrip('/')
+                # Fallback: use the first HTTPS route
+                for route_url in routes.keys():
+                    if route_url.startswith('https://'):
+                        return route_url.rstrip('/')
+            except (json.JSONDecodeError, AttributeError):
+                pass
+        
+        # Fallback: construct from app name and default Upsun domain
+        app_name = os.getenv('PLATFORM_APPLICATION_NAME')
+        project_id = os.getenv('PLATFORM_PROJECT')
+        environment = os.getenv('PLATFORM_ENVIRONMENT', 'main')
+        if app_name and project_id:
+            return f"https://{app_name}-{project_id}.{environment}.platformsh.site"
+    
+    # Development fallback
+    return 'http://localhost:8000'
+
+BRIGHTDATA_BASE_URL = get_brightdata_base_url()
+BRIGHTDATA_WEBHOOK_TOKEN = os.getenv('BRIGHTDATA_WEBHOOK_TOKEN', 'your-default-webhook-secret-token-change-this')
+
 # Production/Upsun settings.
 if (os.getenv('PLATFORM_APPLICATION_NAME') is not None):
     DEBUG = False

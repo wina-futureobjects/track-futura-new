@@ -4,30 +4,10 @@ from users.models import Project
 
 # Create your models here.
 
-class TrackAccountFolder(models.Model):
-    """
-    Model for organizing Track Accounts into folders
-    """
-    name = models.CharField(max_length=100)
-    description = models.TextField(blank=True, null=True)
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='track_account_folders', null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return self.name
-    
-    class Meta:
-        ordering = ['-created_at']
-        verbose_name = "Track Account Folder"
-        verbose_name_plural = "Track Account Folders"
-
 class TrackAccount(models.Model):
     """
     Model for storing Track Account data
     """
-    # Add folder relationship - Making null and blank explicitly True for clarity
-    folder = models.ForeignKey(TrackAccountFolder, on_delete=models.CASCADE, related_name='accounts', null=True, blank=True)
     # Reference to the project
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='track_accounts', null=True)
     
@@ -35,17 +15,11 @@ class TrackAccount(models.Model):
     name = models.CharField(max_length=255)
     iac_no = models.CharField(max_length=100, unique=True)
     
-    # Social media usernames (from FB, IG, LK, TK columns)
-    facebook_username = models.CharField(max_length=100, blank=True, null=True)
-    instagram_username = models.CharField(max_length=100, blank=True, null=True)
-    linkedin_username = models.CharField(max_length=100, blank=True, null=True)
-    tiktok_username = models.CharField(max_length=100, blank=True, null=True)
-    
-    # Social media profile URLs (from FACEBOOK_ID, INSTAGRAM_ID, etc columns)
-    facebook_id = models.URLField(max_length=500, blank=True, null=True)
-    instagram_id = models.URLField(max_length=500, blank=True, null=True)
-    linkedin_id = models.URLField(max_length=500, blank=True, null=True)
-    tiktok_id = models.URLField(max_length=500, blank=True, null=True)
+    # Social media profile URLs (renamed from _id to _link for clarity)
+    facebook_link = models.URLField(max_length=500, blank=True, null=True)
+    instagram_link = models.URLField(max_length=500, blank=True, null=True)
+    linkedin_link = models.URLField(max_length=500, blank=True, null=True)
+    tiktok_link = models.URLField(max_length=500, blank=True, null=True)
     
     other_social_media = models.TextField(blank=True, null=True)
     risk_classification = models.CharField(max_length=100, blank=True, null=True)

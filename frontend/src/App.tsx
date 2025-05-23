@@ -3,7 +3,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 import NoSidebarLayout from './components/NoSidebarLayout';
-import Dashboard from './pages/Dashboard';
+import Dashboard3 from './pages/Dashboard3';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import InstagramDataUpload from './pages/InstagramDataUpload';
@@ -14,8 +14,6 @@ import LinkedInDataUpload from './pages/LinkedInDataUpload';
 import LinkedInFolders from './pages/LinkedInFolders';
 import TikTokDataUpload from './pages/TikTokDataUpload';
 import TikTokFolders from './pages/TikTokFolders';
-import TrackAccountFolders from './pages/TrackAccountFolders';
-import TrackAccountFolderDetail from './pages/TrackAccountFolderDetail';
 import TrackAccountUpload from './pages/TrackAccountUpload';
 import ReportFolders from './pages/ReportFolders';
 import ReportDetail from './pages/ReportDetail';
@@ -29,9 +27,8 @@ import TrackAccountEdit from './pages/TrackAccountEdit';
 import TrackAccountsList from './pages/TrackAccountsList';
 import Settings from './pages/Settings';
 import BrightdataSettings from './pages/BrightdataSettings';
-import BrightdataScraper from './pages/BrightdataScraper';
+import AutomatedBatchScraper from './pages/AutomatedBatchScraper';
 import ProjectsList from './pages/ProjectsList';
-import ProjectDashboard from './pages/ProjectDashboard';
 import OrganizationsList from './pages/OrganizationsList';
 import OrganizationProjects from './pages/OrganizationProjects';
 import SuperAdminDashboard from './pages/admin/SuperAdminDashboard';
@@ -115,7 +112,7 @@ function App() {
           <Route path="/organizations/:organizationId/projects/:projectId" element={
             <ProtectedRoute>
               <Layout>
-                <ProjectDashboard />
+                <Dashboard3 />
               </Layout>
             </ProtectedRoute>
           } />
@@ -131,16 +128,16 @@ function App() {
           <Route path="/dashboard/:projectId" element={
             <ProtectedRoute>
               <Layout>
-                <ProjectDashboard />
+                <Dashboard3 />
               </Layout>
             </ProtectedRoute>
           } />
 
-          {/* Dashboard is now for backward compatibility */}
+          {/* Main dashboard for backward compatibility */}
           <Route path="/dashboard" element={
             <ProtectedRoute>
               <Layout>
-                <Dashboard />
+                <Dashboard3 />
               </Layout>
             </ProtectedRoute>
           } />
@@ -232,13 +229,8 @@ function App() {
           
           <Route path="/track-accounts" element={
             <ProtectedRoute>
-              <Navigate to="/track-accounts/accounts" replace />
-            </ProtectedRoute>
-          } />
-          <Route path="/track-accounts/folders" element={
-            <ProtectedRoute>
               <Layout>
-                <TrackAccountFolders />
+                <TrackAccountsList />
               </Layout>
             </ProtectedRoute>
           } />
@@ -249,14 +241,7 @@ function App() {
               </Layout>
             </ProtectedRoute>
           } />
-          <Route path="/track-accounts/folders/:folderId" element={
-            <ProtectedRoute>
-              <Layout>
-                <TrackAccountFolderDetail />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/track-accounts/folders/:folderId/upload" element={
+          <Route path="/track-accounts/upload" element={
             <ProtectedRoute>
               <Layout>
                 <TrackAccountUpload />
@@ -264,13 +249,6 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/track-accounts/create" element={
-            <ProtectedRoute>
-              <Layout>
-                <TrackAccountCreate />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/track-accounts/folders/:folderId/create" element={
             <ProtectedRoute>
               <Layout>
                 <TrackAccountCreate />
@@ -288,13 +266,8 @@ function App() {
           {/* New routes with organization and project IDs */}
           <Route path="/organizations/:organizationId/projects/:projectId/track-accounts" element={
             <ProtectedRoute>
-              <Navigate to="/organizations/:organizationId/projects/:projectId/track-accounts/accounts" replace />
-            </ProtectedRoute>
-          } />
-          <Route path="/organizations/:organizationId/projects/:projectId/track-accounts/folders" element={
-            <ProtectedRoute>
               <Layout>
-                <TrackAccountFolders />
+                <TrackAccountsList />
               </Layout>
             </ProtectedRoute>
           } />
@@ -305,14 +278,7 @@ function App() {
               </Layout>
             </ProtectedRoute>
           } />
-          <Route path="/organizations/:organizationId/projects/:projectId/track-accounts/folders/:folderId" element={
-            <ProtectedRoute>
-              <Layout>
-                <TrackAccountFolderDetail />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/organizations/:organizationId/projects/:projectId/track-accounts/folders/:folderId/upload" element={
+          <Route path="/organizations/:organizationId/projects/:projectId/track-accounts/upload" element={
             <ProtectedRoute>
               <Layout>
                 <TrackAccountUpload />
@@ -320,13 +286,6 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/organizations/:organizationId/projects/:projectId/track-accounts/create" element={
-            <ProtectedRoute>
-              <Layout>
-                <TrackAccountCreate />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/organizations/:organizationId/projects/:projectId/track-accounts/folders/:folderId/create" element={
             <ProtectedRoute>
               <Layout>
                 <TrackAccountCreate />
@@ -454,7 +413,7 @@ function App() {
           <Route path="/brightdata-scraper" element={
             <ProtectedRoute>
               <Layout>
-                <BrightdataScraper />
+                <AutomatedBatchScraper />
               </Layout>
             </ProtectedRoute>
           } />
@@ -578,7 +537,7 @@ function App() {
           <Route path="/organizations/:organizationId/projects/:projectId/brightdata-scraper" element={
             <ProtectedRoute>
               <Layout>
-                <BrightdataScraper />
+                <AutomatedBatchScraper />
               </Layout>
             </ProtectedRoute>
           } />

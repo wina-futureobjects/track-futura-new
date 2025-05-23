@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, ChangeEvent } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   Container,
   Typography,
@@ -28,40 +28,28 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DownloadIcon from '@mui/icons-material/Download';
 import SearchIcon from '@mui/icons-material/Search';
 import HomeIcon from '@mui/icons-material/Home';
-import FolderIcon from '@mui/icons-material/Folder';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import TrackChangesIcon from '@mui/icons-material/TrackChanges';
 import { apiFetch } from '../utils/api';
 
 interface TrackAccount {
   id: number;
   name: string;
   iac_no: string;
-  facebook_username: string | null;
-  instagram_username: string | null;
-  linkedin_username: string | null;
-  tiktok_username: string | null;
-  facebook_id: string | null;
-  instagram_id: string | null;
-  linkedin_id: string | null;
-  tiktok_id: string | null;
+  facebook_link: string | null;
+  instagram_link: string | null;
+  linkedin_link: string | null;
+  tiktok_link: string | null;
   other_social_media: string | null;
   risk_classification: string | null;
   close_monitoring: boolean;
   posting_frequency: string | null;
-  folder: number | null;
   created_at: string;
   updated_at: string;
 }
 
-interface Folder {
-  id: number;
-  name: string;
-  description: string | null;
-}
-
 const TrackAccountUpload = () => {
-  const { folderId } = useParams();
   const navigate = useNavigate();
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -73,7 +61,6 @@ const TrackAccountUpload = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
   const [totalCount, setTotalCount] = useState(0);
-  const [currentFolder, setCurrentFolder] = useState<Folder | null>(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
@@ -82,12 +69,10 @@ const TrackAccountUpload = () => {
   const fetchAccounts = async (pageNumber = 0, pageSize = 10, searchTerm = '') => {
     try {
       setIsLoading(true);
-      // Add folder filtering if folderId is present
-      const folderParam = folderId ? `&folder_id=${folderId}` : '';
       // Add search param if search term exists
       const searchParam = searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : '';
       
-      const response = await apiFetch(`/api/track-accounts/accounts/?page=${pageNumber + 1}&page_size=${pageSize}${folderParam}${searchParam}`);
+      const response = await apiFetch(`/api/track-accounts/accounts/?page=${pageNumber + 1}&page_size=${pageSize}${searchParam}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch accounts');
@@ -111,28 +96,10 @@ const TrackAccountUpload = () => {
     }
   };
 
-  // Fetch folder details if folderId is present
-  const fetchFolderDetails = async () => {
-    if (folderId) {
-      try {
-        const response = await apiFetch(`/api/track-accounts/folders/${folderId}/`);
-        if (response.ok) {
-          const data = await response.json();
-          setCurrentFolder(data);
-        }
-      } catch (error) {
-        console.error('Error fetching folder details:', error);
-      }
-    }
-  };
-
   // Initial data load
   useEffect(() => {
     fetchAccounts(page, rowsPerPage, searchTerm);
-    if (folderId) {
-      fetchFolderDetails();
-    }
-  }, [folderId]);
+  }, [page, rowsPerPage, searchTerm]);
 
   // Handle file selection
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -154,9 +121,6 @@ const TrackAccountUpload = () => {
 
       const formData = new FormData();
       formData.append('file', file);
-      if (folderId) {
-        formData.append('folder_id', folderId);
-      }
 
       const response = await apiFetch('/api/track-accounts/accounts/upload_csv/', {
         method: 'POST',
@@ -184,8 +148,7 @@ const TrackAccountUpload = () => {
   // Handle CSV download
   const handleDownloadCSV = async () => {
     try {
-      const folderParam = folderId ? `?folder_id=${folderId}` : '';
-      const response = await apiFetch(`/api/track-accounts/accounts/download_csv/${folderParam}`);
+      const response = await apiFetch('/api/track-accounts/accounts/download_csv/');
       
       if (!response.ok) {
         throw new Error('Download failed');
@@ -230,11 +193,6 @@ const TrackAccountUpload = () => {
     fetchAccounts(0, rowsPerPage, newSearchTerm);
   };
 
-  // Handle navigation
-  const handleGoToFolders = () => {
-    navigate('/track-accounts/folders');
-  };
-
   // Handle copying links
   const handleCopyLink = (url: string) => {
     navigator.clipboard.writeText(url);
@@ -245,16 +203,39 @@ const TrackAccountUpload = () => {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      {/* Breadcrumbs */}
+      <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
+        <Link 
+          underline="hover" 
+          color="inherit" 
+          sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+          onClick={() => navigate('/')}
+        >
+          <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
+          Home
+        </Link>
+        <Link
+          underline="hover"
+          color="inherit"
+          sx={{ cursor: 'pointer' }}
+          onClick={() => navigate('/track-accounts/accounts')}
+        >
+          <TrackChangesIcon sx={{ mr: 0.5 }} fontSize="inherit" />
+          Input Collection
+        </Link>
+        <Typography color="text.primary">
+          Upload
+        </Typography>
+      </Breadcrumbs>
+
       {/* Header section */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" component="h1" gutterBottom>
-          {currentFolder ? `${currentFolder.name} - Track Accounts` : 'Track Accounts'}
+          Upload Track Accounts
         </Typography>
-        {currentFolder?.description && (
-          <Typography variant="body1" color="text.secondary" paragraph>
-            {currentFolder.description}
-          </Typography>
-        )}
+        <Typography variant="body1" color="text.secondary">
+          Upload a CSV file to bulk import track accounts or download the current accounts as CSV.
+        </Typography>
       </Box>
 
       {/* Upload section */}
@@ -358,32 +339,32 @@ const TrackAccountUpload = () => {
                   {/* Usernames */}
                   <TableCell>
                     <Stack direction="row" spacing={1}>
-                      {account.facebook_username && (
+                      {account.facebook_link && (
                         <Chip 
-                          label={`FB: ${account.facebook_username}`} 
+                          label={`FB: ${account.facebook_link}`} 
                           size="small" 
-                          onClick={() => handleCopyLink(account.facebook_username!)} 
+                          onClick={() => handleCopyLink(account.facebook_link!)} 
                         />
                       )}
-                      {account.instagram_username && (
+                      {account.instagram_link && (
                         <Chip 
-                          label={`IG: ${account.instagram_username}`} 
+                          label={`IG: ${account.instagram_link}`} 
                           size="small" 
-                          onClick={() => handleCopyLink(account.instagram_username!)} 
+                          onClick={() => handleCopyLink(account.instagram_link!)} 
                         />
                       )}
-                      {account.linkedin_username && (
+                      {account.linkedin_link && (
                         <Chip 
-                          label={`LK: ${account.linkedin_username}`} 
+                          label={`LK: ${account.linkedin_link}`} 
                           size="small" 
-                          onClick={() => handleCopyLink(account.linkedin_username!)} 
+                          onClick={() => handleCopyLink(account.linkedin_link!)} 
                         />
                       )}
-                      {account.tiktok_username && (
+                      {account.tiktok_link && (
                         <Chip 
-                          label={`TK: ${account.tiktok_username}`} 
+                          label={`TK: ${account.tiktok_link}`} 
                           size="small" 
-                          onClick={() => handleCopyLink(account.tiktok_username!)} 
+                          onClick={() => handleCopyLink(account.tiktok_link!)} 
                         />
                       )}
                     </Stack>
@@ -391,30 +372,30 @@ const TrackAccountUpload = () => {
                   {/* Social Media Links */}
                   <TableCell>
                     <Stack direction="row" spacing={1}>
-                      {account.facebook_id && (
+                      {account.facebook_link && (
                         <Tooltip title="Copy Facebook URL">
-                          <IconButton size="small" onClick={() => handleCopyLink(account.facebook_id!)}>
+                          <IconButton size="small" onClick={() => handleCopyLink(account.facebook_link!)}>
                             <ContentCopyIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                       )}
-                      {account.instagram_id && (
+                      {account.instagram_link && (
                         <Tooltip title="Copy Instagram URL">
-                          <IconButton size="small" onClick={() => handleCopyLink(account.instagram_id!)}>
+                          <IconButton size="small" onClick={() => handleCopyLink(account.instagram_link!)}>
                             <ContentCopyIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                       )}
-                      {account.linkedin_id && (
+                      {account.linkedin_link && (
                         <Tooltip title="Copy LinkedIn URL">
-                          <IconButton size="small" onClick={() => handleCopyLink(account.linkedin_id!)}>
+                          <IconButton size="small" onClick={() => handleCopyLink(account.linkedin_link!)}>
                             <ContentCopyIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                       )}
-                      {account.tiktok_id && (
+                      {account.tiktok_link && (
                         <Tooltip title="Copy TikTok URL">
-                          <IconButton size="small" onClick={() => handleCopyLink(account.tiktok_id!)}>
+                          <IconButton size="small" onClick={() => handleCopyLink(account.tiktok_link!)}>
                             <ContentCopyIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
@@ -446,12 +427,12 @@ const TrackAccountUpload = () => {
                   </TableCell>
                   <TableCell>
                     <Stack direction="row" spacing={1}>
-                      {account.facebook_id && (
+                      {account.facebook_link && (
                         <Tooltip title="Open Facebook">
                           <IconButton 
                             size="small" 
                             component="a" 
-                            href={account.facebook_id} 
+                            href={account.facebook_link} 
                             target="_blank" 
                             rel="noopener noreferrer"
                           >
@@ -459,12 +440,12 @@ const TrackAccountUpload = () => {
                           </IconButton>
                         </Tooltip>
                       )}
-                      {account.instagram_id && (
+                      {account.instagram_link && (
                         <Tooltip title="Open Instagram">
                           <IconButton 
                             size="small" 
                             component="a" 
-                            href={account.instagram_id} 
+                            href={account.instagram_link} 
                             target="_blank" 
                             rel="noopener noreferrer"
                           >

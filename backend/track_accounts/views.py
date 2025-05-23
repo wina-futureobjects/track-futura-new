@@ -9,38 +9,11 @@ from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
 from django.http import HttpResponse
 from django.db.models import Q
-from .models import TrackAccount, TrackAccountFolder, ReportFolder, ReportEntry
+from .models import TrackAccount, ReportFolder, ReportEntry
 from .serializers import (
-    TrackAccountSerializer, TrackAccountFolderSerializer,
+    TrackAccountSerializer,
     ReportFolderSerializer, ReportEntrySerializer, ReportFolderDetailSerializer
 )
-
-class TrackAccountFolderViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint for managing Track Account folders
-    """
-    serializer_class = TrackAccountFolderSerializer
-    permission_classes = [AllowAny]  # For testing, use proper permissions in production
-    
-    def get_queryset(self):
-        """
-        Filter folders by project if project parameter is provided
-        """
-        queryset = TrackAccountFolder.objects.all()
-        
-        # Filter by project if specified
-        project_id = self.request.query_params.get('project')
-        if project_id:
-            queryset = queryset.filter(project_id=project_id)
-            
-        return queryset
-    
-    def perform_create(self, serializer):
-        """
-        Set project when creating a new folder if provided
-        """
-        project_id = self.request.data.get('project')
-        serializer.save(project_id=project_id)
 
 class TrackAccountViewSet(viewsets.ModelViewSet):
     """
@@ -56,7 +29,6 @@ class TrackAccountViewSet(viewsets.ModelViewSet):
         queryset = TrackAccount.objects.all()
         
         # Get query parameters
-        folder_id = self.request.query_params.get('folder_id')
         project_id = self.request.query_params.get('project')
         search = self.request.query_params.get('search')
         risk_classification = self.request.query_params.get('risk_classification')
@@ -66,10 +38,6 @@ class TrackAccountViewSet(viewsets.ModelViewSet):
         has_linkedin = self.request.query_params.get('has_linkedin')
         has_tiktok = self.request.query_params.get('has_tiktok')
         
-        # Filter by folder if specified
-        if folder_id:
-            queryset = queryset.filter(folder_id=folder_id)
-        
         # Filter by project if specified
         if project_id:
             queryset = queryset.filter(project_id=project_id)
@@ -78,11 +46,7 @@ class TrackAccountViewSet(viewsets.ModelViewSet):
         if search:
             queryset = queryset.filter(
                 Q(name__icontains=search) |
-                Q(iac_no__icontains=search) |
-                Q(facebook_username__icontains=search) |
-                Q(instagram_username__icontains=search) |
-                Q(linkedin_username__icontains=search) |
-                Q(tiktok_username__icontains=search)
+                Q(iac_no__icontains=search)
             )
         
         # Filter by risk classification if provided
@@ -99,30 +63,22 @@ class TrackAccountViewSet(viewsets.ModelViewSet):
         # Filter by social media presence
         if has_facebook:
             queryset = queryset.exclude(
-                Q(facebook_username__isnull=True) | Q(facebook_username='')
-            ).exclude(
-                Q(facebook_id__isnull=True) | Q(facebook_id='')
+                Q(facebook_link__isnull=True) | Q(facebook_link='')
             )
         
         if has_instagram:
             queryset = queryset.exclude(
-                Q(instagram_username__isnull=True) | Q(instagram_username='')
-            ).exclude(
-                Q(instagram_id__isnull=True) | Q(instagram_id='')
+                Q(instagram_link__isnull=True) | Q(instagram_link='')
             )
             
         if has_linkedin:
             queryset = queryset.exclude(
-                Q(linkedin_username__isnull=True) | Q(linkedin_username='')
-            ).exclude(
-                Q(linkedin_id__isnull=True) | Q(linkedin_id='')
+                Q(linkedin_link__isnull=True) | Q(linkedin_link='')
             )
             
         if has_tiktok:
             queryset = queryset.exclude(
-                Q(tiktok_username__isnull=True) | Q(tiktok_username='')
-            ).exclude(
-                Q(tiktok_id__isnull=True) | Q(tiktok_id='')
+                Q(tiktok_link__isnull=True) | Q(tiktok_link='')
             )
         
         return queryset
@@ -133,12 +89,6 @@ class TrackAccountViewSet(viewsets.ModelViewSet):
         """
         # Get project from request data directly
         project_id = self.request.data.get('project')
-        
-        # If no project_id in request data but a folder is specified, get project from folder
-        if not project_id and serializer.validated_data.get('folder'):
-            folder = serializer.validated_data['folder']
-            project_id = folder.project_id
-            
         serializer.save(project_id=project_id)
     
     def perform_update(self, serializer):
@@ -147,12 +97,6 @@ class TrackAccountViewSet(viewsets.ModelViewSet):
         """
         # Get project from request data directly
         project_id = self.request.data.get('project')
-        
-        # If no project_id in request data but a folder is specified, get project from folder
-        if not project_id and serializer.validated_data.get('folder'):
-            folder = serializer.validated_data['folder']
-            project_id = folder.project_id
-            
         serializer.save(project_id=project_id)
 
     @action(detail=False, methods=['POST'])
@@ -168,19 +112,8 @@ class TrackAccountViewSet(viewsets.ModelViewSet):
             if not csv_file.name.endswith('.csv'):
                 return Response({'error': 'File must be a CSV'}, status=status.HTTP_400_BAD_REQUEST)
             
-            # Get folder_id from request data
-            folder_id = request.data.get('folder_id')
-            folder = None
-            project_id = None
-            
-            if folder_id:
-                folder = get_object_or_404(TrackAccountFolder, id=folder_id)
-                # Set project_id from the folder
-                if folder.project_id:
-                    project_id = folder.project_id
-            else:
-                # Get project ID directly from request data if no folder specified
-                project_id = request.data.get('project')
+            # Get project ID directly from request data
+            project_id = request.data.get('project')
             
             # Read the CSV file
             decoded_file = csv_file.read().decode('utf-8')
@@ -198,135 +131,148 @@ class TrackAccountViewSet(viewsets.ModelViewSet):
                     continue
                 
                 # Prepare the data dictionary
-                default_data = {
-                    'name': row.get('Name', ''),
-                    'iac_no': row.get('IAC_NO', ''),
-                    # Social media usernames
-                    'facebook_username': row.get('FB', ''),
-                    'instagram_username': row.get('IG', ''),
-                    'linkedin_username': row.get('LK', ''),
-                    'tiktok_username': row.get('TK', ''),
-                    # Social media URLs
-                    'facebook_id': row.get('FACEBOOK_ID', ''),
-                    'instagram_id': row.get('INSTAGRAM_ID', ''),
-                    'linkedin_id': row.get('LINKEDIN_ID', ''),
-                    'tiktok_id': row.get('TIKTOK_ID', ''),
-                    'other_social_media': row.get('Other Social Media platforms', ''),
-                    'risk_classification': row.get('Risk Classification (Others)', ''),
-                    'close_monitoring': row.get('Close Monitoring', '').lower() == 'yes',
-                    'posting_frequency': row.get('Posting Frequency (High/ Medium/ Low)', ''),
-                    'folder': folder,
-                    'project_id': project_id,
+                data = {
+                    'name': row.get('Name', '').strip(),
+                    'iac_no': row.get('IAC_NO', '').strip(),
+                    'facebook_link': row.get('FACEBOOK_LINK', '').strip() or None,
+                    'instagram_link': row.get('INSTAGRAM_LINK', '').strip() or None,
+                    'linkedin_link': row.get('LINKEDIN_LINK', '').strip() or None,
+                    'tiktok_link': row.get('TIKTOK_LINK', '').strip() or None,
+                    'other_social_media': row.get('OTHER_SOCIAL_MEDIA', '').strip() or None,
+                    'risk_classification': row.get('RISK_CLASSIFICATION', '').strip() or None,
+                    'close_monitoring': row.get('CLOSE_MONITORING', '').strip().lower() in ['yes', 'true', '1'],
+                    'posting_frequency': row.get('POSTING_FREQUENCY', '').strip() or None,
+                    'project': project_id
                 }
                 
-                # Check if account already exists
-                try:
-                    existing_account = TrackAccount.objects.get(iac_no=default_data['iac_no'])
+                # Check if account with this IAC_NO already exists
+                existing_account = TrackAccount.objects.filter(iac_no=data['iac_no']).first()
+                
+                if existing_account:
                     # Update existing account
-                    for key, value in default_data.items():
-                        setattr(existing_account, key, value)
+                    for key, value in data.items():
+                        if key != 'project':  # Don't change project
+                            setattr(existing_account, key, value)
                     existing_account.save()
                     updated_objects.append(existing_account)
-                except TrackAccount.DoesNotExist:
-                    # Create a new account
-                    new_account = TrackAccount.objects.create(**default_data)
+                else:
+                    # Create new account
+                    new_account = TrackAccount.objects.create(**data)
                     created_objects.append(new_account)
             
-            total_count = len(created_objects) + len(updated_objects)
-            message = f"Successfully processed {total_count} accounts: {len(created_objects)} created, {len(updated_objects)} updated"
-            
             return Response({
-                'message': message,
-                'count': total_count,
+                'message': f'Successfully processed CSV. Created: {len(created_objects)}, Updated: {len(updated_objects)}',
                 'created': len(created_objects),
                 'updated': len(updated_objects)
             }, status=status.HTTP_201_CREATED)
             
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-    
+
     @action(detail=False, methods=['GET'])
     def download_csv(self, request):
         """
-        Download Track Accounts as CSV
+        Download track accounts as CSV
         """
         try:
-            # Filter by folder if specified
-            folder_id = request.query_params.get('folder_id')
-            accounts = TrackAccount.objects.all()
-            if folder_id:
-                accounts = accounts.filter(folder_id=folder_id)
+            # Get query parameters for filtering
+            project_id = request.query_params.get('project')
             
-            # Create the HttpResponse object with the appropriate CSV header
+            # Start with base queryset
+            queryset = TrackAccount.objects.all()
+            
+            # Filter by project if specified
+            if project_id:
+                queryset = queryset.filter(project_id=project_id)
+            
+            # Create CSV response
             response = HttpResponse(content_type='text/csv')
             response['Content-Disposition'] = 'attachment; filename="track_accounts.csv"'
             
-            # Create the CSV writer
             writer = csv.writer(response)
             
-            # Write the header row
+            # Write header
             writer.writerow([
-                'FB', 'IG', 'LK', 'TK', '',
-                'Number of rows', 'Name', 'IAC_NO', 'FACEBOOK_ID', 'INSTAGRAM_ID', 'LINKEDIN_ID', 
-                'TIKTOK_ID', 'Other Social Media platforms', 'Risk Classification (Others)',
-                'Close Monitoring', 'Posting Frequency (High/ Medium/ Low)'
+                'Name', 'IAC_NO', 
+                'FACEBOOK_LINK', 'INSTAGRAM_LINK', 'LINKEDIN_LINK', 'TIKTOK_LINK',
+                'OTHER_SOCIAL_MEDIA', 'RISK_CLASSIFICATION', 'CLOSE_MONITORING', 'POSTING_FREQUENCY'
             ])
             
-            # Write the data rows
-            for account in accounts:
+            # Write data rows
+            for account in queryset:
                 writer.writerow([
-                    account.facebook_username,
-                    account.instagram_username,
-                    account.linkedin_username,
-                    account.tiktok_username,
-                    '',  # Empty column
-                    '',  # Number of rows (leave empty)
                     account.name,
                     account.iac_no,
-                    account.facebook_id,
-                    account.instagram_id,
-                    account.linkedin_id,
-                    account.tiktok_id,
-                    account.other_social_media,
-                    account.risk_classification,
+                    account.facebook_link or '',
+                    account.instagram_link or '',
+                    account.linkedin_link or '',
+                    account.tiktok_link or '',
+                    account.other_social_media or '',
+                    account.risk_classification or '',
                     'Yes' if account.close_monitoring else 'No',
-                    account.posting_frequency
+                    account.posting_frequency or ''
                 ])
             
             return response
-        
+            
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=False, methods=['POST'])
-    def move_to_folder(self, request):
+    @action(detail=False, methods=['GET'])
+    def stats(self, request):
         """
-        Move accounts to a specific folder
+        Get statistics for filtering
         """
         try:
-            account_ids = request.data.get('account_ids', [])
-            folder_id = request.data.get('folder_id')
+            # Get query parameters
+            project_id = request.query_params.get('project')
             
-            if not account_ids:
-                return Response({'error': 'No accounts specified'}, status=status.HTTP_400_BAD_REQUEST)
+            # Start with base queryset
+            queryset = TrackAccount.objects.all()
             
-            folder = None
-            if folder_id:
-                folder = get_object_or_404(TrackAccountFolder, id=folder_id)
+            # Filter by project if specified
+            if project_id:
+                queryset = queryset.filter(project_id=project_id)
             
-            accounts = TrackAccount.objects.filter(id__in=account_ids)
-            count = accounts.count()
+            # Calculate statistics
+            total = queryset.count()
             
-            if count == 0:
-                return Response({'error': 'No accounts found with provided IDs'}, status=status.HTTP_404_NOT_FOUND)
+            # Risk classification counts
+            risk_counts = {
+                'low': queryset.filter(risk_classification='Low').count(),
+                'medium': queryset.filter(risk_classification='Medium').count(),
+                'high': queryset.filter(risk_classification='High').count(),
+                'critical': queryset.filter(risk_classification='Critical').count(),
+            }
             
-            # Update the folder for all matching accounts
-            accounts.update(folder=folder)
+            # Monitoring counts
+            monitoring_counts = {
+                'monitored': queryset.filter(close_monitoring=True).count(),
+                'unmonitored': queryset.filter(close_monitoring=False).count(),
+            }
+            
+            # Social media counts
+            social_media_counts = {
+                'facebook': queryset.exclude(
+                    Q(facebook_link__isnull=True) | Q(facebook_link='')
+                ).count(),
+                'instagram': queryset.exclude(
+                    Q(instagram_link__isnull=True) | Q(instagram_link='')
+                ).count(),
+                'linkedin': queryset.exclude(
+                    Q(linkedin_link__isnull=True) | Q(linkedin_link='')
+                ).count(),
+                'tiktok': queryset.exclude(
+                    Q(tiktok_link__isnull=True) | Q(tiktok_link='')
+                ).count(),
+            }
             
             return Response({
-                'message': f"Successfully moved {count} accounts to {folder.name if folder else 'no folder'}",
-                'count': count
-            }, status=status.HTTP_200_OK)
+                'total': total,
+                'riskCounts': risk_counts,
+                'monitoringCounts': monitoring_counts,
+                'socialMediaCounts': social_media_counts,
+            })
             
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -375,492 +321,6 @@ class ReportFolderViewSet(viewsets.ModelViewSet):
             print(f"Error creating report folder: {str(e)}")
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
     
-    @action(detail=True, methods=['POST'])
-    def generate_report(self, request, pk=None):
-        """
-        Generate a new report and save it to the database
-        Supports all platform types: Instagram, Facebook, LinkedIn, TikTok
-        """
-        try:
-            # Get request data
-            folder_ids_by_platform = request.data.get('platform_folders', {})
-            instagram_folder_ids = folder_ids_by_platform.get('instagram', [])
-            facebook_folder_ids = folder_ids_by_platform.get('facebook', [])
-            linkedin_folder_ids = folder_ids_by_platform.get('linkedin', [])
-            tiktok_folder_ids = folder_ids_by_platform.get('tiktok', [])
-            
-            # For backward compatibility
-            if not folder_ids_by_platform and request.data.get('folder_ids'):
-                instagram_folder_ids = request.data.get('folder_ids', [])
-            
-            start_date = request.data.get('start_date')
-            end_date = request.data.get('end_date')
-            report_name = request.data.get('name', f"Multi-Platform Report {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}")
-            report_description = request.data.get('description', 'Generated multi-platform report')
-            
-            all_folder_ids = instagram_folder_ids + facebook_folder_ids + linkedin_folder_ids + tiktok_folder_ids
-            if not all_folder_ids:
-                return Response({'error': 'No folders specified'}, status=status.HTTP_400_BAD_REQUEST)
-                
-            # Create the report folder
-            report = ReportFolder.objects.create(
-                name=report_name,
-                description=report_description,
-                start_date=start_date if start_date else datetime.datetime.now().isoformat(),
-                end_date=end_date if end_date else datetime.datetime.now().isoformat(),
-                source_folders=json.dumps({
-                    'instagram': instagram_folder_ids,
-                    'facebook': facebook_folder_ids,
-                    'linkedin': linkedin_folder_ids,
-                    'tiktok': tiktok_folder_ids
-                })
-            )
-            
-            total_posts = 0
-            matched_posts = 0
-            
-            # Process Instagram posts
-            if instagram_folder_ids:
-                from instagram_data.models import InstagramPost
-                instagram_posts = InstagramPost.objects.filter(folder_id__in=instagram_folder_ids)
-                total_posts += instagram_posts.count()
-                
-                for post in instagram_posts:
-                    # Extract username from post data
-                    username = self._extract_username_from_discovery_input(post.discovery_input)
-                    
-                    # Find matching account
-                    account = self._find_matching_account(username)
-                    
-                    # Create report entry
-                    entry = ReportEntry(
-                        report=report,
-                        username=username or post.user_posted,
-                        post_url=post.url,
-                        posting_date=post.date_posted,
-                        platform_type=post.platform_type or ('IG Post' if post.content_type == 'post' else 'IG Reel'),
-                        keywords=post.hashtags,
-                        content=post.description,
-                        post_id=f"instagram_{post.id}",
-                        sn=''
-                    )
-                    
-                    if account:
-                        matched_posts += 1
-                        entry.name = account.name
-                        entry.iac_no = account.iac_no
-                        entry.entity = ''
-                        entry.close_monitoring = 'Yes' if account.close_monitoring else 'No'
-                        entry.track_account_id = account.id
-                    else:
-                        entry.name = None
-                        entry.iac_no = None
-                        entry.entity = None
-                        entry.close_monitoring = 'No'
-                        entry.track_account_id = None
-                    
-                    entry.save()
-            
-            # Process Facebook posts
-            if facebook_folder_ids:
-                from facebook_data.models import FacebookPost
-                facebook_posts = FacebookPost.objects.filter(folder_id__in=facebook_folder_ids)
-                total_posts += facebook_posts.count()
-                
-                print(f"Processing {facebook_posts.count()} Facebook posts")
-                for post in facebook_posts:
-                    # Use user_url for matching with facebook_id in track accounts
-                    account = None
-                    if post.user_url and post.user_url.strip():
-                        print(f"Attempting to match Facebook post by user_url: {post.user_url}")
-                        account = self._find_matching_facebook_account(post.user_url)
-                    else:
-                        print(f"Facebook post has no user_url, post_id: {post.post_id}")
-                    
-                    # Fall back to username matching if no match found via URL
-                    if not account:
-                        username = post.user_posted or post.page_name or post.user_username_raw
-                        if username:
-                            print(f"Falling back to username matching for: {username}")
-                            account = self._find_matching_account(username)
-                    
-                    # Create report entry
-                    entry = ReportEntry(
-                        report=report,
-                        username=post.user_posted or post.page_name or post.user_username_raw,
-                        post_url=post.url,
-                        posting_date=post.date_posted,
-                        platform_type=post.platform_type or ('FB Post' if post.content_type == 'post' else 'FB Reel'),
-                        keywords=post.hashtags,
-                        content=post.description or post.content,
-                        post_id=f"facebook_{post.id}",
-                        sn=''
-                    )
-                    
-                    if account:
-                        matched_posts += 1
-                        print(f"Successfully matched Facebook post to account: {account.name}")
-                        entry.name = account.name
-                        entry.iac_no = account.iac_no
-                        entry.entity = ''
-                        entry.close_monitoring = 'Yes' if account.close_monitoring else 'No'
-                        entry.track_account_id = account.id
-                    else:
-                        print(f"No match found for Facebook post: {post.url}")
-                        entry.name = None
-                        entry.iac_no = None
-                        entry.entity = None
-                        entry.close_monitoring = 'No'
-                        entry.track_account_id = None
-                    
-                    entry.save()
-            
-            # Process LinkedIn posts
-            if linkedin_folder_ids:
-                from linkedin_data.models import LinkedInPost
-                linkedin_posts = LinkedInPost.objects.filter(folder_id__in=linkedin_folder_ids)
-                total_posts += linkedin_posts.count()
-                
-                for post in linkedin_posts:
-                    # Extract username from LinkedIn data
-                    username = post.user_posted or post.profile_name
-                    
-                    # Find matching account
-                    account = self._find_matching_account(username)
-                    
-                    # Create report entry
-                    entry = ReportEntry(
-                        report=report,
-                        username=username,
-                        post_url=post.url,
-                        posting_date=post.date_posted,
-                        platform_type='LinkedIn Post',
-                        keywords=post.hashtags,
-                        content=post.description,
-                        post_id=f"linkedin_{post.id}",
-                        sn=''
-                    )
-                    
-                    if account:
-                        matched_posts += 1
-                        entry.name = account.name
-                        entry.iac_no = account.iac_no
-                        entry.entity = ''
-                        entry.close_monitoring = 'Yes' if account.close_monitoring else 'No'
-                        entry.track_account_id = account.id
-                    else:
-                        entry.name = None
-                        entry.iac_no = None
-                        entry.entity = None
-                        entry.close_monitoring = 'No'
-                        entry.track_account_id = None
-                    
-                    entry.save()
-            
-            # Process TikTok posts
-            if tiktok_folder_ids:
-                from tiktok_data.models import TikTokPost
-                tiktok_posts = TikTokPost.objects.filter(folder_id__in=tiktok_folder_ids)
-                total_posts += tiktok_posts.count()
-                
-                for post in tiktok_posts:
-                    # Extract username from TikTok data
-                    username = post.user_posted
-                    
-                    # Find matching account
-                    account = self._find_matching_account(username)
-                    
-                    # Create report entry
-                    entry = ReportEntry(
-                        report=report,
-                        username=username,
-                        post_url=post.url,
-                        posting_date=post.date_posted,
-                        platform_type='TikTok Video',
-                        keywords=post.hashtags,
-                        content=post.description,
-                        post_id=f"tiktok_{post.id}",
-                        sn=''
-                    )
-                    
-                    if account:
-                        matched_posts += 1
-                        entry.name = account.name
-                        entry.iac_no = account.iac_no
-                        entry.entity = ''
-                        entry.close_monitoring = 'Yes' if account.close_monitoring else 'No'
-                        entry.track_account_id = account.id
-                    else:
-                        entry.name = None
-                        entry.iac_no = None
-                        entry.entity = None
-                        entry.close_monitoring = 'No'
-                        entry.track_account_id = None
-                    
-                    entry.save()
-            
-            # Update report statistics
-            report.total_posts = total_posts
-            report.matched_posts = matched_posts
-            report.save()
-            
-            return Response({
-                'id': report.id,
-                'name': report.name,
-                'total_posts': total_posts,
-                'matched_posts': matched_posts,
-                'platforms': {
-                    'instagram': len(instagram_folder_ids) > 0,
-                    'facebook': len(facebook_folder_ids) > 0,
-                    'linkedin': len(linkedin_folder_ids) > 0,
-                    'tiktok': len(tiktok_folder_ids) > 0
-                },
-                'match_percentage': round((matched_posts / total_posts) * 100) if total_posts > 0 else 0
-            }, status=status.HTTP_201_CREATED)
-            
-        except Exception as e:
-            import traceback
-            print(f"Error generating report: {str(e)}")
-            print(traceback.format_exc())
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-    
-    @action(detail=True, methods=['POST'])
-    def add_instagram_data(self, request, pk=None):
-        """
-        Add Instagram data to an existing report folder
-        """
-        try:
-            report = self.get_object()
-            
-            # Get request data
-            instagram_folder_ids = request.data.get('folder_ids', [])
-            start_date = request.data.get('start_date')  # We'll still accept these params
-            end_date = request.data.get('end_date')      # but not use them for filtering
-            append_entries = request.data.get('append_entries', True)
-            
-            print(f"Adding Instagram data from folders: {instagram_folder_ids}")
-            print(f"Date filtering disabled - including all posts")
-            
-            if not instagram_folder_ids:
-                return Response({'error': 'No folders specified'}, status=status.HTTP_400_BAD_REQUEST)
-            
-            # Update source folders
-            existing_folders = report.get_source_folders()
-            all_folders = existing_folders + [folder_id for folder_id in instagram_folder_ids if folder_id not in existing_folders]
-            report.set_source_folders(all_folders)
-            report.save()
-            
-            # If append_entries is False, clear existing entries
-            if not append_entries:
-                report.entries.all().delete()
-                report.matched_posts = 0
-                report.total_posts = 0
-            
-            # Fetch Instagram posts from the specified folders - NO DATE FILTERING
-            from instagram_data.models import InstagramPost
-            
-            # Fetch all posts from the selected folders without date filtering
-            posts = InstagramPost.objects.filter(
-                folder_id__in=instagram_folder_ids
-            )
-            
-            total_available_posts = posts.count()
-            print(f"Total posts available in selected folders: {total_available_posts}")
-            
-            # Get list of existing post IDs in the report
-            existing_post_ids = set(report.entries.values_list('post_id', flat=True))
-            print(f"Existing post IDs in report: {len(existing_post_ids)}")
-            
-            matched_new_posts = 0
-            processed_posts = 0
-            skipped_posts = 0
-            
-            # Process each post
-            for post in posts:
-                # Check if post is already in the report to avoid duplicates
-                if str(post.id) in existing_post_ids:
-                    skipped_posts += 1
-                    continue
-                
-                processed_posts += 1
-                    
-                # Extract username from post data
-                username = self._extract_username_from_discovery_input(post.discovery_input)
-                
-                # Find matching account
-                account = self._find_matching_account(username)
-                
-                # Create report entry (regardless of whether there's a match)
-                entry = ReportEntry(
-                    report=report,
-                    username=username,
-                    post_url=post.url,
-                    posting_date=post.date_posted,
-                    platform_type=post.platform_type or ('IG Post' if post.content_type == 'post' else 'IG Reel'),
-                    keywords=post.hashtags,
-                    content=post.description,
-                    post_id=str(post.id),  # Ensure post_id is stored as string for consistency
-                    sn=''  # Set S/N to empty string
-                )
-                
-                # If account is matched, add account data
-                if account:
-                    matched_new_posts += 1
-                    entry.name = account.name
-                    entry.iac_no = account.iac_no
-                    entry.entity = ''  # This could be added later
-                    entry.close_monitoring = 'Yes' if account.close_monitoring else 'No'
-                    entry.track_account_id = account.id
-                else:
-                    # For non-matches, leave these fields empty or set to default values
-                    entry.name = None
-                    entry.iac_no = None
-                    entry.entity = None
-                    entry.close_monitoring = 'No'
-                    entry.track_account_id = None
-                
-                entry.save()
-            
-            print(f"Processed {processed_posts} new posts, skipped {skipped_posts} duplicates")
-            
-            # Update report statistics
-            report.total_posts += processed_posts
-            report.matched_posts += matched_new_posts
-            report.save()
-            
-            return Response({
-                'id': report.id,
-                'name': report.name,
-                'total_posts': report.total_posts,
-                'matched_posts': report.matched_posts,
-                'new_posts_added': processed_posts,
-                'posts_skipped': skipped_posts,
-                'match_percentage': round((report.matched_posts / report.total_posts) * 100) if report.total_posts > 0 else 0
-            }, status=status.HTTP_200_OK)
-            
-        except Exception as e:
-            import traceback
-            print(f"Error adding Instagram data: {str(e)}")
-            print(traceback.format_exc())
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-    
-    @action(detail=True, methods=['GET'])
-    def download_csv(self, request, pk=None):
-        """
-        Download report as CSV
-        """
-        try:
-            report = self.get_object()
-            
-            # Create the HttpResponse object with CSV header
-            response = HttpResponse(content_type='text/csv')
-            response['Content-Disposition'] = f'attachment; filename="{report.name}.csv"'
-            
-            # Create the CSV writer
-            writer = csv.writer(response)
-            
-            # Write the header row
-            writer.writerow([
-                'S/N', 'Name', 'IAC No.', 'Entity', 'Under Close Monitoring? (Yes / No)',
-                'Posting Date', 'Platform Type', 'Post URL', 'Username', 
-                'Personal/Business', 'Keywords', 'Content'
-            ])
-            
-            # Write data rows
-            for index, entry in enumerate(report.entries.all()):
-                writer.writerow([
-                    index + 1,
-                    entry.name or '',
-                    entry.iac_no or '',
-                    entry.entity or '',
-                    entry.close_monitoring or 'No',
-                    entry.posting_date.strftime('%Y-%m-%d %H:%M:%S') if entry.posting_date else '',
-                    entry.platform_type or 'Instagram Post',
-                    entry.post_url or '',
-                    entry.username or '',
-                    entry.account_type or '',
-                    entry.keywords or '',
-                    entry.content or ''
-                ])
-            
-            return response
-            
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-    
-    def _extract_username_from_discovery_input(self, discovery_input):
-        """Extract Instagram username from discovery input"""
-        if not discovery_input:
-            return ''
-            
-        # Print for debugging
-        print(f"Extracting username from: {discovery_input[:100]}...")
-        
-        username = ''
-        
-        # STRATEGY 1: Parse as JSON and extract from URL
-        try:
-            data = json.loads(discovery_input)
-            
-            # If we have a URL field, extract username from it
-            if data.get('url'):
-                url = data['url']
-                print(f"Found URL in JSON: {url}")
-                
-                import re
-                # Handle different Instagram URL formats
-                url_pattern = r'(?:https?:\/\/)?(?:www\.)?instagram\.com\/([^\/\?]+)'
-                matches = re.search(url_pattern, url)
-                if matches:
-                    username = matches.group(1).strip()
-                    print(f"Extracted username from URL: '{username}'")
-                    return username
-                    
-            # If we have a username field directly
-            if data.get('username') or data.get('user_name'):
-                username = data.get('username') or data.get('user_name')
-                print(f"Found username in JSON: '{username}'")
-                return username
-        except Exception as e:
-            print(f"JSON parsing error: {str(e)}")
-        
-        # STRATEGY 2: Direct URL extraction if not JSON but contains instagram.com
-        if isinstance(discovery_input, str) and 'instagram.com' in discovery_input:
-            try:
-                import re
-                url_pattern = r'(?:https?:\/\/)?(?:www\.)?instagram\.com\/([^\/\?]+)'
-                matches = re.search(url_pattern, discovery_input)
-                if matches:
-                    username = matches.group(1).strip()
-                    print(f"Extracted username from string URL: '{username}'")
-                    return username
-            except Exception as e:
-                print(f"URL extraction error: {str(e)}")
-        
-        # STRATEGY 3: Look for common username patterns in the string
-        if isinstance(discovery_input, str) and ('@' in discovery_input or 'username' in discovery_input.lower()):
-            try:
-                import re
-                # Pattern for @username or "username: something"
-                patterns = [
-                    r'@([a-zA-Z0-9_\.]+)',                 # @username
-                    r'username\s*:\s*([a-zA-Z0-9_\.]+)',   # username: something
-                    r'user\s*:\s*([a-zA-Z0-9_\.]+)',       # user: something
-                ]
-                
-                for pattern in patterns:
-                    matches = re.search(pattern, discovery_input, re.IGNORECASE)
-                    if matches:
-                        username = matches.group(1).strip()
-                        print(f"Extracted username using pattern {pattern}: '{username}'")
-                        return username
-            except Exception as e:
-                print(f"Pattern matching error: {str(e)}")
-        
-        # If we get here, we couldn't extract a username
-        print(f"Could not extract username from discovery input")
-        return username
-    
     def _find_matching_account(self, username):
         """Find matching TrackAccount by Instagram username"""
         if not username:
@@ -874,31 +334,21 @@ class ReportFolderViewSet(viewsets.ModelViewSet):
         # Debug
         print(f"Looking for match for Instagram username: '{normalized_username}'")
         
-        # MATCHING STRATEGY 1: Direct exact match with instagram_username
+        # MATCHING STRATEGY: Extract username from instagram_link URL and compare
         try:
-            # Direct match with instagram_username field
-            account = TrackAccount.objects.filter(instagram_username__iexact=normalized_username).first()
-            if account:
-                print(f"Found direct match with instagram_username: {account.name} (ID: {account.id})")
-                return account
-        except Exception as e:
-            print(f"Error during direct username match: {str(e)}")
-        
-        # MATCHING STRATEGY 2: Extract username from instagram_id URL and compare
-        try:
-            # Query accounts with instagram_id that's not null/empty
-            accounts = TrackAccount.objects.exclude(instagram_id__isnull=True).exclude(instagram_id='')
+            # Query accounts with instagram_link that's not null/empty
+            accounts = TrackAccount.objects.exclude(instagram_link__isnull=True).exclude(instagram_link='')
             
             for account in accounts:
                 try:
-                    # Extract username from instagram_id URL
+                    # Extract username from instagram_link URL
                     import re
                     url_pattern = r'(?:https?:\/\/)?(?:www\.)?instagram\.com\/([^\/\?]+)'
-                    matches = re.search(url_pattern, account.instagram_id)
+                    matches = re.search(url_pattern, account.instagram_link)
                     if matches:
                         extracted_username = matches.group(1).lower().strip()
                         if extracted_username == normalized_username:
-                            print(f"Found URL match with instagram_id: {account.name} (ID: {account.id})")
+                            print(f"Found URL match with instagram_link: {account.name} (ID: {account.id})")
                             return account
                 except Exception as e:
                     print(f"Error processing account {account.id}: {str(e)}")
@@ -906,21 +356,6 @@ class ReportFolderViewSet(viewsets.ModelViewSet):
         except Exception as e:
             print(f"Error during URL extraction match: {str(e)}")
             
-        # MATCHING STRATEGY 3: More flexible/partial matching
-        try:
-            # Check if any account contains this username as part of their instagram fields
-            accounts = TrackAccount.objects.filter(
-                Q(instagram_username__icontains=normalized_username) | 
-                Q(instagram_id__icontains=normalized_username)
-            )
-            
-            if accounts.exists():
-                best_match = accounts.first()
-                print(f"Found partial match: {best_match.name} (ID: {best_match.id})")
-                return best_match
-        except Exception as e:
-            print(f"Error during partial match: {str(e)}")
-        
         # No matches found
         print(f"No matching account found for username: '{normalized_username}'")
         return None
@@ -938,87 +373,16 @@ class ReportFolderViewSet(viewsets.ModelViewSet):
         # Debug
         print(f"Looking for match for Facebook user_url: '{normalized_user_url}'")
         
-        # MATCHING STRATEGY 1: Direct exact match with facebook_id
+        # MATCHING STRATEGY: Direct exact match with facebook_link
         try:
-            # Direct match with facebook_id field
-            account = TrackAccount.objects.filter(facebook_id__iexact=normalized_user_url).first()
+            # Direct match with facebook_link field
+            account = TrackAccount.objects.filter(facebook_link__iexact=normalized_user_url).first()
             if account:
-                print(f"Found direct match with facebook_id: {account.name} (ID: {account.id})")
+                print(f"Found direct match with facebook_link: {account.name} (ID: {account.id})")
                 return account
         except Exception as e:
             print(f"Error during direct user_url match: {str(e)}")
         
-        # Extract identifiers from the post user_url
-        import re
-        post_profile_path = None
-        post_numeric_id = None
-        
-        # Extract from https://www.facebook.com/people/name/123456789/ or https://www.facebook.com/username/
-        path_match = re.search(r'facebook\.com\/(?:people\/)?([^\/\?]+)', normalized_user_url)
-        if path_match:
-            post_profile_path = path_match.group(1).lower().strip()
-        
-        # Extract numeric ID if present
-        id_match = re.search(r'\/(\d+)\/?(?:\?|$)', normalized_user_url)
-        if id_match:
-            post_numeric_id = id_match.group(1)
-        
-        # MATCHING STRATEGY 2: Match extracted paths and IDs against track accounts
-        try:
-            # Query accounts with facebook_id that's not null/empty
-            accounts = TrackAccount.objects.exclude(facebook_id__isnull=True).exclude(facebook_id='')
-            
-            for account in accounts:
-                try:
-                    account_fb_id = account.facebook_id.lower().strip()
-                    
-                    # Direct substring check for full URL
-                    if normalized_user_url in account_fb_id or account_fb_id in normalized_user_url:
-                        print(f"Found substring match with facebook_id: {account.name} (ID: {account.id})")
-                        return account
-                    
-                    # Extract profile path from account facebook_id
-                    acc_path_match = re.search(r'facebook\.com\/(?:people\/)?([^\/\?]+)', account_fb_id)
-                    if acc_path_match:
-                        acc_profile_path = acc_path_match.group(1).lower().strip()
-                        
-                        # Compare profile paths if both are available
-                        if post_profile_path and acc_profile_path and post_profile_path == acc_profile_path:
-                            print(f"Found profile path match with facebook_id: {account.name} (ID: {account.id})")
-                            return account
-                    
-                    # Extract numeric ID from account facebook_id
-                    acc_id_match = re.search(r'\/(\d+)\/?(?:\?|$)', account_fb_id)
-                    if acc_id_match:
-                        acc_numeric_id = acc_id_match.group(1)
-                        
-                        # Compare numeric IDs if both are available
-                        if post_numeric_id and acc_numeric_id and post_numeric_id == acc_numeric_id:
-                            print(f"Found numeric ID match with facebook_id: {account.name} (ID: {account.id})")
-                            return account
-                    
-                except Exception as e:
-                    print(f"Error processing account {account.id}: {str(e)}")
-                    continue
-        except Exception as e:
-            print(f"Error during URL extraction match: {str(e)}")
-            
-        # MATCHING STRATEGY 3: More flexible/partial matching
-        try:
-            # Only try this if we have a profile path to match
-            if post_profile_path:
-                accounts = TrackAccount.objects.filter(
-                    Q(facebook_id__icontains=post_profile_path) |
-                    Q(facebook_username__iexact=post_profile_path)
-                )
-                
-                if accounts.exists():
-                    best_match = accounts.first()
-                    print(f"Found partial match: {best_match.name} (ID: {best_match.id})")
-                    return best_match
-        except Exception as e:
-            print(f"Error during partial match: {str(e)}")
-        
         # No matches found
         print(f"No matching account found for user_url: '{normalized_user_url}'")
-        return None
+        return None 

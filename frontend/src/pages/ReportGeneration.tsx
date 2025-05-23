@@ -61,14 +61,10 @@ interface TrackAccount {
   id: number;
   name: string;
   iac_no: string;
-  facebook_username: string | null;
-  instagram_username: string | null;
-  linkedin_username: string | null;
-  tiktok_username: string | null;
-  facebook_id: string | null;
-  instagram_id: string | null;
-  linkedin_id: string | null;
-  tiktok_id: string | null;
+  facebook_link: string | null;
+  instagram_link: string | null;
+  linkedin_link: string | null;
+  tiktok_link: string | null;
   other_social_media: string | null;
   risk_classification: string | null;
   close_monitoring: boolean;
@@ -178,21 +174,21 @@ const ReportGeneration = () => {
     return '';
   };
 
-  // Find matching account by comparing extracted username with instagram_username and instagram_id
+  // Find matching account by comparing extracted username with instagram_link
   const findMatchingAccount = (username: string, accounts: TrackAccount[]): TrackAccount | undefined => {
     if (!username) return undefined;
     
     const normalizedUsername = username.toLowerCase().trim();
     
-    // Try direct match with instagram_username first (prioritize this)
+    // Try direct match with instagram_link first (prioritize this)
     let account = accounts.find(acc => 
-      acc.instagram_username && acc.instagram_username.toLowerCase().trim() === normalizedUsername
+      acc.instagram_link && acc.instagram_link.toLowerCase().trim() === normalizedUsername
     );
     
-    // If no match found, try to extract username from instagram_id URL
+    // If no match found, try to extract username from instagram_link URL
     if (!account) {
       account = accounts.find(acc => {
-        if (!acc.instagram_id) return false;
+        if (!acc.instagram_link) return false;
         
         // Extract username from URL
         // Handle different URL formats: 
@@ -200,7 +196,7 @@ const ReportGeneration = () => {
         // - https://instagram.com/username/
         // - www.instagram.com/username
         const urlPattern = /(?:https?:\/\/)?(?:www\.)?instagram\.com\/([^\/\?]+)/i;
-        const matches = acc.instagram_id.match(urlPattern);
+        const matches = acc.instagram_link.match(urlPattern);
         const extractedUsername = matches ? matches[1].toLowerCase().trim() : '';
         
         // Compare normalized usernames
@@ -212,9 +208,9 @@ const ReportGeneration = () => {
     if (!account) {
       account = accounts.find(acc => {
         // Check for partial username matches
-        if (acc.instagram_username) {
+        if (acc.instagram_link) {
           // Remove special characters and compare
-          const cleanUsername = acc.instagram_username.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const cleanUsername = acc.instagram_link.toLowerCase().replace(/[^a-z0-9]/g, '');
           const cleanSearchUsername = normalizedUsername.replace(/[^a-z0-9]/g, '');
           return cleanUsername === cleanSearchUsername;
         }
@@ -299,8 +295,8 @@ const ReportGeneration = () => {
       // Debug account usernames to help troubleshoot matching issues
       console.log('Available Instagram usernames in track accounts:');
       allAccounts.forEach(acc => {
-        if (acc.instagram_username) {
-          console.log(`Account ${acc.name} (${acc.iac_no}): username=${acc.instagram_username}`);
+        if (acc.instagram_link) {
+          console.log(`Account ${acc.name} (${acc.iac_no}): username=${acc.instagram_link}`);
         }
       });
 
@@ -354,7 +350,7 @@ const ReportGeneration = () => {
         
         if (account) {
           matchedPosts++;
-          console.log(`  ✓ Matched with account: ${account.name} (${account.iac_no}), IG username: ${account.instagram_username}`);
+          console.log(`  ✓ Matched with account: ${account.name} (${account.iac_no}), IG username: ${account.instagram_link}`);
         } else {
           unmatchedPosts++;
           console.log(`  ✗ No match found for username: ${username}`);

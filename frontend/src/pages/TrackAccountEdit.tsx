@@ -1,32 +1,21 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container,
   Typography,
   Box,
   Breadcrumbs,
   Link,
-  Paper,
   CircularProgress
 } from '@mui/material';
 import HomeIcon from '@mui/icons-material/Home';
-import FolderIcon from '@mui/icons-material/Folder';
 import EditIcon from '@mui/icons-material/Edit';
+import TrackChangesIcon from '@mui/icons-material/TrackChanges';
 import TrackAccountForm from '../components/track-accounts/TrackAccountForm';
 
 interface TrackAccount {
   id: number;
   name: string;
-  folder: number | null;
-}
-
-interface Folder {
-  id: number;
-  name: string;
-  description: string | null;
-  account_count: number;
-  created_at: string;
-  updated_at: string;
 }
 
 const TrackAccountEdit = () => {
@@ -36,19 +25,16 @@ const TrackAccountEdit = () => {
     projectId?: string;
   }>();
   const navigate = useNavigate();
-  const location = useLocation();
   const [account, setAccount] = useState<TrackAccount | null>(null);
-  const [folder, setFolder] = useState<Folder | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch account and folder data
+  // Fetch account data
   useEffect(() => {
     if (!accountId) return;
     
     setLoading(true);
     
-    // Fetch account data
     fetch(`/api/track-accounts/accounts/${accountId}/`)
       .then(response => {
         if (!response.ok) throw new Error('Failed to load account');
@@ -56,18 +42,6 @@ const TrackAccountEdit = () => {
       })
       .then(accountData => {
         setAccount(accountData);
-        
-        // If the account belongs to a folder, fetch folder details
-        if (accountData.folder) {
-          return fetch(`/api/track-accounts/folders/${accountData.folder}/`)
-            .then(response => {
-              if (!response.ok) throw new Error('Failed to load folder details');
-              return response.json();
-            })
-            .then(folderData => {
-              setFolder(folderData);
-            });
-        }
       })
       .catch(err => {
         console.error('Error loading data:', err);
@@ -139,31 +113,15 @@ const TrackAccountEdit = () => {
             sx={{ display: 'flex', alignItems: 'center' }}
             onClick={() => {
               if (organizationId && projectId) {
-                navigate(`/organizations/${organizationId}/projects/${projectId}/track-accounts/folders`);
+                navigate(`/organizations/${organizationId}/projects/${projectId}/track-accounts/accounts`);
               } else {
-                navigate('/track-accounts/folders');
+                navigate('/track-accounts/accounts');
               }
             }}
           >
-            <FolderIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            Track Account Folders
+            <TrackChangesIcon sx={{ mr: 0.5 }} fontSize="inherit" />
+            Input Collection
           </Link>
-          {folder && (
-            <Link
-              underline="hover"
-              color="inherit"
-              sx={{ display: 'flex', alignItems: 'center' }}
-              onClick={() => {
-                if (organizationId && projectId) {
-                  navigate(`/organizations/${organizationId}/projects/${projectId}/track-accounts/folders/${folder.id}`);
-                } else {
-                  navigate(`/track-accounts/folders/${folder.id}`);
-                }
-              }}
-            >
-              {folder.name}
-            </Link>
-          )}
           <Typography color="text.primary" sx={{ display: 'flex', alignItems: 'center' }}>
             <EditIcon sx={{ mr: 0.5 }} fontSize="inherit" />
             Edit {account?.name || 'Account'}

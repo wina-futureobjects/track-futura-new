@@ -28,7 +28,12 @@ import {
   DialogActions,
   DialogContent,
   DialogContentText,
-  DialogTitle
+  DialogTitle,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  SelectChangeEvent
 } from '@mui/material';
 import { Link } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
@@ -38,14 +43,21 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import HomeIcon from '@mui/icons-material/Home';
 import SettingsIcon from '@mui/icons-material/Settings';
+import FacebookIcon from '@mui/icons-material/Facebook';
+import InstagramIcon from '@mui/icons-material/Instagram';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
+import MusicVideoIcon from '@mui/icons-material/MusicVideo';
 import { apiFetch } from '../utils/api';
 
 interface BrightdataConfig {
   id: number;
   name: string;
+  platform: string;
+  platform_display: string;
   dataset_id: string;
   api_token: string;
   is_active: boolean;
+  description?: string;
   created_at: string;
   updated_at: string;
 }
@@ -60,6 +72,8 @@ const BrightdataSettings = () => {
   const [formOpen, setFormOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [name, setName] = useState('');
+  const [platform, setPlatform] = useState('');
+  const [description, setDescription] = useState('');
   const [apiToken, setApiToken] = useState('');
   const [datasetId, setDatasetId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -67,6 +81,13 @@ const BrightdataSettings = () => {
   // Delete confirmation dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [configToDelete, setConfigToDelete] = useState<number | null>(null);
+
+  const platformOptions = [
+    { value: 'facebook', label: 'Facebook', icon: <FacebookIcon /> },
+    { value: 'instagram', label: 'Instagram', icon: <InstagramIcon /> },
+    { value: 'linkedin', label: 'LinkedIn', icon: <LinkedInIcon /> },
+    { value: 'tiktok', label: 'TikTok', icon: <MusicVideoIcon /> },
+  ];
 
   useEffect(() => {
     fetchConfigs();
@@ -106,6 +127,8 @@ const BrightdataSettings = () => {
   const handleCreateConfig = () => {
     setEditId(null);
     setName('');
+    setPlatform('');
+    setDescription('');
     setApiToken('');
     setDatasetId('');
     setFormOpen(true);
@@ -114,6 +137,8 @@ const BrightdataSettings = () => {
   const handleEditConfig = (config: BrightdataConfig) => {
     setEditId(config.id);
     setName(config.name);
+    setPlatform(config.platform);
+    setDescription(config.description || '');
     setApiToken(''); // Don't set the API token for security reasons
     setDatasetId(config.dataset_id);
     setFormOpen(true);
@@ -124,7 +149,7 @@ const BrightdataSettings = () => {
   };
 
   const handleSubmit = async () => {
-    if (!name || !datasetId || (editId === null && !apiToken)) {
+    if (!name || !platform || !datasetId || (editId === null && !apiToken)) {
       setError('Please fill in all required fields');
       return;
     }
@@ -134,7 +159,9 @@ const BrightdataSettings = () => {
       
       const payload: any = {
         name,
+        platform,
         dataset_id: datasetId,
+        description: description || '',
       };
       
       // Only include API token for new configs or if the user has entered a new one
@@ -253,9 +280,35 @@ const BrightdataSettings = () => {
           Brightdata API Settings
         </Typography>
         <Typography variant="body1" sx={{ mb: 2 }}>
-          Manage your Brightdata API configurations for automated data scraping.
+          Manage your platform-specific Brightdata API configurations for automated data scraping. Each platform requires its own configuration with a unique dataset ID.
         </Typography>
       </Box>
+
+      <Card sx={{ mb: 4, backgroundColor: '#f5f5f5' }}>
+        <CardContent>
+          <Typography variant="h6" sx={{ mb: 2 }}>
+            Platform-Specific Configurations
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            The automated batch scraper requires separate Brightdata configurations for each social media platform. 
+            Each platform uses different dataset structures and may require different API tokens.
+          </Typography>
+          <Stack direction="row" spacing={2} flexWrap="wrap">
+            {platformOptions.map((platform) => {
+              const hasConfig = configs.some(c => c.platform === platform.value);
+              return (
+                <Chip
+                  key={platform.value}
+                  icon={platform.icon}
+                  label={platform.label}
+                  color={hasConfig ? 'success' : 'default'}
+                  variant={hasConfig ? 'filled' : 'outlined'}
+                />
+              );
+            })}
+          </Stack>
+        </CardContent>
+      </Card>
 
       <Card sx={{ mb: 4 }}>
         <CardContent>
@@ -282,6 +335,7 @@ const BrightdataSettings = () => {
                 <TableHead>
                   <TableRow>
                     <TableCell>Status</TableCell>
+                    <TableCell>Platform</TableCell>
                     <TableCell>Name</TableCell>
                     <TableCell>Dataset ID</TableCell>
                     <TableCell>Created</TableCell>
@@ -292,7 +346,7 @@ const BrightdataSettings = () => {
                 <TableBody>
                   {!Array.isArray(configs) || configs.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} align="center">
+                      <TableCell colSpan={7} align="center">
                         No configurations found. Click "Add New Configuration" to create one.
                       </TableCell>
                     </TableRow>
@@ -309,6 +363,14 @@ const BrightdataSettings = () => {
                               {config.is_active ? <CheckCircleIcon /> : <RadioButtonUncheckedIcon />}
                             </IconButton>
                           </Tooltip>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            {platformOptions.find(p => p.value === config.platform)?.icon}
+                            <Typography sx={{ ml: 1 }}>
+                              {config.platform_display || config.platform}
+                            </Typography>
+                          </Box>
                         </TableCell>
                         <TableCell>{config.name}</TableCell>
                         <TableCell>{config.dataset_id}</TableCell>
@@ -332,7 +394,7 @@ const BrightdataSettings = () => {
         </CardContent>
       </Card>
 
-      <Dialog open={formOpen} onClose={handleCloseForm}>
+      <Dialog open={formOpen} onClose={handleCloseForm} maxWidth="sm" fullWidth>
         <DialogTitle>{editId !== null ? 'Edit Configuration' : 'Add New Configuration'}</DialogTitle>
         <DialogContent>
           <DialogContentText sx={{ mb: 2 }}>
@@ -348,6 +410,32 @@ const BrightdataSettings = () => {
             value={name}
             onChange={(e) => setName(e.target.value)}
             sx={{ mb: 2 }}
+          />
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel>Platform</InputLabel>
+            <Select
+              value={platform}
+              onChange={(e: SelectChangeEvent) => setPlatform(e.target.value)}
+              label="Platform"
+            >
+              {platformOptions.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    {option.icon}
+                    <Typography sx={{ ml: 1 }}>{option.label}</Typography>
+                  </Box>
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <TextField
+            margin="dense"
+            label="Description (Optional)"
+            fullWidth
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            sx={{ mb: 2 }}
+            helperText="A brief description of this configuration"
           />
           <TextField
             margin="dense"

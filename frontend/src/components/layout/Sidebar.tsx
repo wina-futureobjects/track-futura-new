@@ -40,7 +40,8 @@ import {
   DataUsage as DataUsageIcon,
   InsertChart as ChartIcon,
   AutoAwesome as AutoAwesomeIcon,
-  SettingsSuggest as SettingsSuggestIcon
+  SettingsSuggest as SettingsSuggestIcon,
+  SpaceDashboard as SpaceDashboardIcon
 } from '@mui/icons-material';
 import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import MusicVideoIcon from '@mui/icons-material/MusicVideo';
@@ -95,9 +96,22 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
     socialMedia: true
   });
   
+  // Function to get correct path for Dashboard based on URL
+  function getDashboardPath() {
+    // Extract organization and project IDs from URL
+    const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
+    
+    if (match) {
+      const [, orgId, projId] = match;
+      return `/organizations/${orgId}/projects/${projId}`;
+    }
+    
+    return '/dashboard';
+  }
+
   // Menu items with categories
   const menuItems: MenuItem[] = [
-    { text: 'Dashboard', path: getDashboardPath(), icon: <DashboardIcon /> },
+    { text: 'Dashboard', path: getDashboardPath(), icon: <AnalyticsIcon /> },
     { 
       text: 'Input Collection', 
       path: getTrackAccountsPath(), 
@@ -123,19 +137,6 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
     },
     { text: 'Report Generation', path: getReportFoldersPath(), icon: <DescriptionIcon /> },
   ];
-
-  // Function to get correct path for Dashboard based on URL
-  function getDashboardPath() {
-    // Extract organization and project IDs from URL
-    const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
-    
-    if (match) {
-      const [, orgId, projId] = match;
-      return `/organizations/${orgId}/projects/${projId}`;
-    }
-    
-    return '/';
-  }
 
   // Function to get correct path for Track Accounts based on URL
   function getTrackAccountsPath() {
@@ -212,7 +213,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
     }
     
     // Check if this is a track-accounts path in either old format or new format with organization/project
-    if (itemPath.includes('/track-accounts/folders')) {
+    if (itemPath.includes('/track-accounts/accounts')) {
       return location.pathname.includes('/track-accounts');
     }
     
