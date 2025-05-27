@@ -165,8 +165,63 @@ REST_FRAMEWORK = {
 CORS_ALLOW_ALL_ORIGINS = True  # For development only, set specific origins in production
 CORS_ALLOW_CREDENTIALS = True
 
-# CSRF settings
-CSRF_TRUSTED_ORIGINS = ['http://localhost:5173']
+# CSRF settings - Auto-detect trusted origins for Upsun deployment
+def get_csrf_trusted_origins():
+    origins = ['http://localhost:5173', 'http://localhost:8000']  # Development origins
+    
+    # Auto-detect for Upsun/Platform.sh deployment
+    if os.getenv('PLATFORM_APPLICATION_NAME'):
+        # Get the routes from Platform.sh environment
+        platform_routes = os.getenv('PLATFORM_ROUTES')
+        if platform_routes:
+            try:
+                import json
+                routes = json.loads(platform_routes)
+                # Add all HTTPS routes as trusted origins
+                for route_url in routes.keys():
+                    if route_url.startswith('https://'):
+                        clean_url = route_url.rstrip('/')
+                        if clean_url not in origins:
+                            origins.append(clean_url)
+            except (json.JSONDecodeError, AttributeError):
+                pass
+        
+        # Fallback: construct from app name and default Upsun domain
+        app_name = os.getenv('PLATFORM_APPLICATION_NAME')
+        project_id = os.getenv('PLATFORM_PROJECT')
+        environment = os.getenv('PLATFORM_ENVIRONMENT', 'main')
+        if app_name and project_id:
+            fallback_url = f"https://{app_name}-{project_id}.{environment}.platformsh.site"
+            if fallback_url not in origins:
+                origins.append(fallback_url)
+            
+            # Also add the API subdomain
+            api_url = f"https://api.{app_name}-{project_id}.{environment}.platformsh.site"
+            if api_url not in origins:
+                origins.append(api_url)
+    
+    return origins
+
+CSRF_TRUSTED_ORIGINS = get_csrf_trusted_origins()
+
+# Additional CSRF settings for production
+CSRF_COOKIE_SECURE = not DEBUG  # Use secure cookies in production
+CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript access to CSRF token
+CSRF_COOKIE_SAMESITE = 'Lax'  # Allow cross-site requests with CSRF token
+CSRF_USE_SESSIONS = False  # Use cookies instead of sessions for CSRF tokens
+
+# Session security settings
+SESSION_COOKIE_SECURE = not DEBUG  # Use secure cookies in production
+SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookies
+SESSION_COOKIE_SAMESITE = 'Lax'  # Allow cross-site requests with session cookies
+
+# Security settings for production
+if not DEBUG:
+    SECURE_SSL_REDIRECT = os.getenv('DJANGO_SECURE_SSL_REDIRECT', 'False') == 'True'
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
 
 # BrightData Integration Settings - Auto-detect domain for Upsun deployment
 def get_brightdata_base_url():
@@ -218,9 +273,30 @@ if (os.getenv('PLATFORM_APPLICATION_NAME') is not None):
     if (os.getenv('PLATFORM_PROJECT_ENTROPY') is not None):
         SECRET_KEY = os.getenv('PLATFORM_PROJECT_ENTROPY')
 
-    # Set allowed hosts from environment variable
+    # Set allowed hosts from environment variable or auto-detect from routes
     if os.getenv('DJANGO_ALLOWED_HOSTS'):
         ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS').split(',')
+    else:
+        # Auto-detect allowed hosts from Platform.sh routes
+        allowed_hosts = ['*']  # Fallback to allow all
+        platform_routes = os.getenv('PLATFORM_ROUTES')
+        if platform_routes:
+            try:
+                import json
+                routes = json.loads(platform_routes)
+                allowed_hosts = []
+                for route_url in routes.keys():
+                    if route_url.startswith('https://'):
+                        # Extract hostname from URL
+                        from urllib.parse import urlparse
+                        hostname = urlparse(route_url).hostname
+                        if hostname and hostname not in allowed_hosts:
+                            allowed_hosts.append(hostname)
+                if not allowed_hosts:  # If no hosts found, allow all
+                    allowed_hosts = ['*']
+            except (json.JSONDecodeError, AttributeError, ImportError):
+                allowed_hosts = ['*']
+        ALLOWED_HOSTS = allowed_hosts
     
     # Production database configuration.
     if (os.getenv('PLATFORM_ENVIRONMENT') is not None):

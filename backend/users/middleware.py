@@ -16,6 +16,7 @@ class CustomCsrfMiddleware(CsrfViewMiddleware):
         exempt_paths = [
             r'^api/users/login/$',  # Login endpoint
             r'^api/users/register/$',  # Registration endpoint
+            r'^admin/login/$',  # Django admin login
         ]
         
         # If the path matches any of the exempt paths, skip CSRF validation

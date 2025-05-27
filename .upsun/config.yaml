@@ -32,6 +32,8 @@ applications:
     variables:
       env:
         DJANGO_SETTINGS_MODULE: "config.settings"
+        DEBUG: "False"
+        DJANGO_SECURE_SSL_REDIRECT: "True"
     mounts:
       "/staticfiles":
         source: "local"
