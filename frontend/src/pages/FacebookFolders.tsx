@@ -61,9 +61,21 @@ interface Folder {
 const FacebookFolders = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  // Get project ID from URL query parameter
-  const queryParams = new URLSearchParams(location.search);
-  const projectId = queryParams.get('project');
+  
+  // Extract project ID from URL path or query parameters
+  const getProjectId = () => {
+    // First try to extract from URL path: /organizations/{orgId}/projects/{projectId}/...
+    const pathMatch = location.pathname.match(/\/organizations\/\d+\/projects\/(\d+)/);
+    if (pathMatch) {
+      return pathMatch[1];
+    }
+    
+    // Fallback to query parameter: ?project=13
+    const queryParams = new URLSearchParams(location.search);
+    return queryParams.get('project');
+  };
+  
+  const projectId = getProjectId();
   
   const [folders, setFolders] = useState<Folder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,31 +92,53 @@ const FacebookFolders = () => {
   const fetchFolders = async () => {
     try {
       setLoading(true);
-      // Add project filter if projectId is available
-      const url = projectId 
-        ? `/api/facebook-data/folders/?project=${projectId}` 
-        : '/api/facebook-data/folders/';
+      
+      // Don't fetch folders if no project is found
+      if (!projectId) {
+        console.error('No project ID found in URL');
+        setError('No project context found. Please navigate to this page from within a project.');
+        setFolders([]);
+        setLoading(false);
+        return;
+      }
+      
+      // Add project filter
+      const url = `/api/facebook-data/folders/?project=${projectId}`;
+      
+      console.log('=== FRONTEND FETCH FACEBOOK FOLDERS DEBUG ===');
+      console.log('Project ID from URL path:', projectId);
+      console.log('Current URL:', location.pathname);
+      console.log('Fetch URL:', url);
       
       const response = await apiFetch(url);
+      console.log('Fetch response status:', response.status);
+      console.log('Fetch response ok:', response.ok);
+      
       if (!response.ok) {
         throw new Error('Failed to fetch folders');
       }
       
       const data = await response.json();
+      console.log('Raw response data:', data);
+      
       // Check if the response is paginated (has a 'results' key)
       if (data && typeof data === 'object' && 'results' in data) {
+        console.log('Using paginated data, count:', data.count);
+        console.log('Results:', data.results);
         setFolders(data.results || []);
       } else if (Array.isArray(data)) {
         // Handle case where API returns direct array
+        console.log('Using direct array data, length:', data.length);
         setFolders(data);
       } else {
         console.error('API returned unexpected data format:', data);
         setFolders([]);
         setError('Received invalid data format from server. Please try again.');
       }
+      console.log('=== END FRONTEND FETCH FACEBOOK FOLDERS DEBUG ===');
     } catch (error) {
       console.error('Error fetching folders:', error);
-      setFolders([]); // Ensure folders is an empty array when there's an error
+      setFolders([]);
       setError('Failed to load folders. Please try again.');
     } finally {
       setLoading(false);
@@ -151,22 +185,38 @@ const FacebookFolders = () => {
     }
 
     try {
+      const requestData = {
+        name: folderName,
+        description: folderDescription || null,
+        category: folderCategory,
+        project: projectId ? parseInt(projectId, 10) : null,
+      };
+      
+      console.log('=== FRONTEND FACEBOOK FOLDER CREATION DEBUG ===');
+      console.log('Project ID from URL:', projectId);
+      console.log('Request data being sent:', requestData);
+      console.log('API endpoint:', '/api/facebook-data/folders/');
+      
       const response = await apiFetch('/api/facebook-data/folders/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name: folderName,
-          description: folderDescription || null,
-          category: folderCategory,
-          project: projectId ? parseInt(projectId, 10) : null,
-        }),
+        body: JSON.stringify(requestData),
       });
 
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+      
       if (!response.ok) {
+        const errorData = await response.text();
+        console.log('Error response:', errorData);
         throw new Error('Failed to create folder');
       }
+
+      const responseData = await response.json();
+      console.log('Success response data:', responseData);
+      console.log('=== END FRONTEND FACEBOOK FOLDER CREATION DEBUG ===');
 
       // Refresh folders list
       fetchFolders();
@@ -448,6 +498,7 @@ const FacebookFolders = () => {
               color="primary"
               startIcon={<AddIcon />}
               onClick={handleNewFolder}
+              disabled={!projectId}
             >
               New Folder
             </Button>
@@ -478,6 +529,7 @@ const FacebookFolders = () => {
               color="primary"
               startIcon={<AddIcon />}
               onClick={handleNewFolder}
+              disabled={!projectId}
             >
               Create First Folder
             </Button>

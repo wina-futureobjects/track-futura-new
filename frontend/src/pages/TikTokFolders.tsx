@@ -55,9 +55,21 @@ interface Folder {
 const TikTokFolders = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  // Get project ID from URL query parameter
-  const queryParams = new URLSearchParams(location.search);
-  const projectId = queryParams.get('project');
+  
+  // Extract project ID from URL path or query parameters
+  const getProjectId = () => {
+    // First try to extract from URL path: /organizations/{orgId}/projects/{projectId}/...
+    const pathMatch = location.pathname.match(/\/organizations\/\d+\/projects\/(\d+)/);
+    if (pathMatch) {
+      return pathMatch[1];
+    }
+    
+    // Fallback to query parameter: ?project=13
+    const queryParams = new URLSearchParams(location.search);
+    return queryParams.get('project');
+  };
+  
+  const projectId = getProjectId();
   
   const [folders, setFolders] = useState<Folder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,20 +96,38 @@ const TikTokFolders = () => {
     try {
       setLoading(true);
       setError(null);
-      // Add project filter if projectId is available
-      const url = projectId 
-        ? `/api/tiktok-data/folders/?project=${projectId}` 
-        : '/api/tiktok-data/folders/';
+      
+      // Don't fetch folders if no project is found
+      if (!projectId) {
+        console.error('No project ID found in URL');
+        setError('No project context found. Please navigate to this page from within a project.');
+        setFolders([]);
+        setLoading(false);
+        return;
+      }
+      
+      // Add project filter
+      const url = `/api/tiktok-data/folders/?project=${projectId}`;
+      
+      console.log('=== FRONTEND FETCH TIKTOK FOLDERS DEBUG ===');
+      console.log('Project ID from URL path:', projectId);
+      console.log('Current URL:', location.pathname);
+      console.log('Fetch URL:', url);
       
       const response = await apiFetch(url);
+      console.log('Fetch response status:', response.status);
+      console.log('Fetch response ok:', response.ok);
       
       if (!response.ok) {
         throw new Error('Failed to fetch folders');
       }
       
       const data = await response.json();
+      console.log('Raw response data:', data);
+      
       // Get the results array from the paginated response
       const foldersData = data.results || [];
+      console.log('Folders data:', foldersData);
       
       // Fetch post counts for each folder
       const foldersWithCounts = await Promise.all(
@@ -116,6 +146,7 @@ const TikTokFolders = () => {
       );
       
       setFolders(foldersWithCounts);
+      console.log('=== END FRONTEND FETCH TIKTOK FOLDERS DEBUG ===');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       console.error('Error fetching folders:', err);
@@ -133,23 +164,38 @@ const TikTokFolders = () => {
     }
     
     try {
+      const requestData = {
+        name: newFolderName,
+        description: newFolderDescription || null,
+        project: projectId ? parseInt(projectId, 10) : null,
+      };
+      
+      console.log('=== FRONTEND TIKTOK FOLDER CREATION DEBUG ===');
+      console.log('Project ID from URL:', projectId);
+      console.log('Request data being sent:', requestData);
+      console.log('API endpoint:', '/api/tiktok-data/folders/');
+      
       const response = await apiFetch('/api/tiktok-data/folders/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name: newFolderName,
-          description: newFolderDescription || null,
-          project: projectId ? parseInt(projectId, 10) : null,
-        }),
+        body: JSON.stringify(requestData),
       });
       
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+      
       if (!response.ok) {
+        const errorData = await response.text();
+        console.log('Error response:', errorData);
         throw new Error('Failed to create folder');
       }
       
       const newFolder = await response.json();
+      console.log('Success response data:', newFolder);
+      console.log('=== END FRONTEND TIKTOK FOLDER CREATION DEBUG ===');
+      
       setFolders([...folders, { ...newFolder, posts_count: 0 }]);
       setNewFolderName('');
       setNewFolderDescription('');
@@ -443,6 +489,7 @@ const TikTokFolders = () => {
               color="primary"
               startIcon={<AddIcon />}
               onClick={() => setOpenCreateDialog(true)}
+              disabled={!projectId}
             >
               New Folder
             </Button>
@@ -471,6 +518,7 @@ const TikTokFolders = () => {
               color="primary"
               startIcon={<AddIcon />}
               onClick={() => setOpenCreateDialog(true)}
+              disabled={!projectId}
             >
               Create First Folder
             </Button>
