@@ -32,15 +32,24 @@ class FolderViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """
-        Filter folders by project if project parameter is provided
+        Filter folders by project if project parameter is provided.
+        Require project parameter to prevent cross-project data leakage.
         """
-        queryset = Folder.objects.all()
-        
-        # Filter by project if specified
+        # Get project ID from query parameters
         project_id = self.request.query_params.get('project')
-        if project_id:
-            queryset = queryset.filter(project_id=project_id)
-            
+        
+        # If no project ID is provided, return empty queryset to prevent data leakage
+        if not project_id:
+            return Folder.objects.none()
+        
+        # Validate project ID format
+        try:
+            project_id = int(project_id)
+        except (ValueError, TypeError):
+            return Folder.objects.none()
+        
+        # Filter by project
+        queryset = Folder.objects.filter(project_id=project_id)
         return queryset
     
     def create(self, request, *args, **kwargs):

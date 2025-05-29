@@ -18,18 +18,37 @@ class FolderSerializer(serializers.ModelSerializer):
         # Extract project from validated data
         project = validated_data.get('project')
         
-        # If no project is provided but it's required, try to get from context
+        # Multi-layer project ID protection
         if not project:
             request = self.context.get('request')
-            if request and hasattr(request, 'data'):
+            if request:
+                # Try to get project ID from request data
                 project_id = request.data.get('project')
                 if project_id:
-                    from users.models import Project
                     try:
+                        # Import here to avoid circular imports
+                        from users.models import Project
                         project = Project.objects.get(id=project_id)
                         validated_data['project'] = project
-                    except Project.DoesNotExist:
+                        print(f"=== SERIALIZER DEBUG: Found project from request data: {project_id} ===")
+                    except (Project.DoesNotExist, ValueError, TypeError) as e:
+                        print(f"=== SERIALIZER DEBUG: Project lookup failed: {e} ===")
                         pass
+                
+                # Fallback: try to get from query parameters
+                if not project and hasattr(request, 'query_params'):
+                    project_id = request.query_params.get('project')
+                    if project_id:
+                        try:
+                            from users.models import Project
+                            project = Project.objects.get(id=project_id)
+                            validated_data['project'] = project
+                            print(f"=== SERIALIZER DEBUG: Found project from query params: {project_id} ===")
+                        except (Project.DoesNotExist, ValueError, TypeError) as e:
+                            print(f"=== SERIALIZER DEBUG: Project lookup from query params failed: {e} ===")
+                            pass
+        
+        print(f"=== SERIALIZER DEBUG: Creating folder with validated_data: {validated_data} ===")
         
         # Create the folder
         folder = Folder.objects.create(**validated_data)
@@ -38,6 +57,11 @@ class FolderSerializer(serializers.ModelSerializer):
         if not folder.project_id and project:
             folder.project = project
             folder.save()
+            print(f"=== SERIALIZER DEBUG: Applied project failsafe, folder.project_id: {folder.project_id} ===")
+        
+        # Final verification
+        folder.refresh_from_db()
+        print(f"=== SERIALIZER DEBUG: Final folder state - ID: {folder.id}, Project ID: {folder.project_id} ===")
         
         return folder
     
@@ -45,14 +69,41 @@ class FolderSerializer(serializers.ModelSerializer):
         """
         Custom update method to ensure project ID is preserved
         """
+        # Multi-layer project preservation
+        original_project = instance.project
+        
         # If project is not in validated_data, preserve the existing one
-        if 'project' not in validated_data and instance.project:
-            validated_data['project'] = instance.project
+        if 'project' not in validated_data and original_project:
+            validated_data['project'] = original_project
+        
+        # Additional safety check: if project is None but instance had one, restore it
+        if validated_data.get('project') is None and original_project:
+            validated_data['project'] = original_project
+        
+        # Try to get project from request if it's missing
+        if not validated_data.get('project'):
+            request = self.context.get('request')
+            if request:
+                project_id = request.data.get('project')
+                if project_id:
+                    try:
+                        from users.models import Project
+                        project = Project.objects.get(id=project_id)
+                        validated_data['project'] = project
+                    except (Project.DoesNotExist, ValueError, TypeError):
+                        # If lookup fails, preserve original
+                        if original_project:
+                            validated_data['project'] = original_project
         
         # Update the instance
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
+        
+        # Verification: ensure project wasn't lost
+        if not instance.project_id and original_project:
+            instance.project = original_project
+            instance.save()
         
         return instance
     

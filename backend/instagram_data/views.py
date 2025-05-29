@@ -37,14 +37,40 @@ class FolderViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """
-        Filter folders by project if project parameter is provided
+        Filter folders by project if project parameter is provided.
+        Require project parameter to prevent cross-project data leakage.
         """
-        queryset = Folder.objects.all()
-        
-        # Filter by project if specified
+        # Get project ID from query parameters
         project_id = self.request.query_params.get('project')
-        if project_id:
-            queryset = queryset.filter(project_id=project_id)
+        
+        print(f"=== FOLDER QUERYSET DEBUG ===")
+        print(f"Requested project_id: {project_id}")
+        
+        # If no project ID is provided, return empty queryset to prevent data leakage
+        if not project_id:
+            print("No project_id provided - returning empty queryset for security")
+            print(f"=== END FOLDER QUERYSET DEBUG ===")
+            return Folder.objects.none()
+        
+        # Validate project ID format
+        try:
+            project_id = int(project_id)
+        except (ValueError, TypeError):
+            print(f"Invalid project_id format: {project_id} - returning empty queryset")
+            print(f"=== END FOLDER QUERYSET DEBUG ===")
+            return Folder.objects.none()
+        
+        # Filter by project
+        queryset = Folder.objects.filter(project_id=project_id)
+        
+        print(f"Total folders in DB: {Folder.objects.count()}")
+        print(f"Folders for project {project_id}: {queryset.count()}")
+        
+        # Debug: Show all folders for this project
+        print(f"Folders for project {project_id}:")
+        for folder in queryset:
+            print(f"  - Folder ID: {folder.id}, Name: {folder.name}, Project ID: {folder.project_id}")
+        print(f"=== END FOLDER QUERYSET DEBUG ===")
             
         return queryset
     
@@ -52,20 +78,43 @@ class FolderViewSet(viewsets.ModelViewSet):
         """
         Override create method to ensure project ID is saved
         """
+        # Debug logging
+        print(f"=== FOLDER CREATION DEBUG ===")
+        print(f"Request data: {request.data}")
+        print(f"Request method: {request.method}")
+        print(f"Request content type: {request.content_type}")
+        
         # Explicitly get project ID from request data
         project_id = request.data.get('project')
+        print(f"Extracted project_id: {project_id}")
         
         # Validate and save using serializer
         serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        print(f"Serializer data before validation: {serializer.initial_data}")
+        
+        try:
+            serializer.is_valid(raise_exception=True)
+            print(f"Serializer validated data: {serializer.validated_data}")
+        except Exception as e:
+            print(f"Serializer validation failed: {e}")
+            print(f"Serializer errors: {serializer.errors}")
+            raise
         
         # Save with project ID explicitly set
         folder = serializer.save()
+        print(f"Folder created - ID: {folder.id}, Name: {folder.name}, Project ID: {folder.project_id}")
         
         # Double check the project ID is set correctly
         if project_id and not folder.project_id:
+            print(f"Project ID missing, fixing manually...")
             folder.project_id = project_id
             folder.save()
+            print(f"After manual fix - Project ID: {folder.project_id}")
+        
+        # Verify final state
+        folder.refresh_from_db()
+        print(f"Final folder state - ID: {folder.id}, Project ID: {folder.project_id}")
+        print(f"=== END FOLDER CREATION DEBUG ===")
             
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
