@@ -26,8 +26,6 @@ import {
   Breadcrumbs,
   Tooltip,
   Snackbar,
-  Tab,
-  Tabs,
   FormControl,
   InputLabel,
   Select,
@@ -65,10 +63,28 @@ interface InstagramPost {
   is_paid_partnership: boolean;
 }
 
+interface InstagramComment {
+  id: number;
+  comment_id: string;
+  post_id: string;
+  post_url: string;
+  post_user: string;
+  comment: string;
+  comment_date: string;
+  comment_user: string;
+  comment_user_url: string;
+  likes_number: number;
+  replies_number: number;
+  hashtag_comment: string;
+  url: string;
+}
+
 interface Folder {
   id: number;
   name: string;
   description: string | null;
+  category: 'posts' | 'reels' | 'comments';
+  category_display: string;
 }
 
 // Add an interface for folder statistics
@@ -84,18 +100,19 @@ const InstagramDataUpload = () => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  // Update state to handle two separate files
-  const [postFile, setPostFile] = useState<File | null>(null);
-  const [reelFile, setReelFile] = useState<File | null>(null);
+  // Update state to handle single file upload
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [posts, setPosts] = useState<InstagramPost[]>([]);
+  const [comments, setComments] = useState<InstagramComment[]>([]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredPosts, setFilteredPosts] = useState<InstagramPost[]>([]);
+  const [filteredComments, setFilteredComments] = useState<InstagramComment[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [currentFolder, setCurrentFolder] = useState<Folder | null>(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -106,54 +123,79 @@ const InstagramDataUpload = () => {
     avgLikes: 0,
     verifiedAccounts: 0
   });
-  // Add tab state for upload section
-  const [uploadTabValue, setUploadTabValue] = useState(0);
-  // Add content type filter state
+  // Remove upload tab state as we're using single upload now
   const [contentTypeFilter, setContentTypeFilter] = useState<string>('all');
-  // Add a state for server status
   const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
 
-  // Fetch Instagram posts with pagination
+  // Fetch Instagram posts/comments with pagination
   const fetchPosts = async (pageNumber = 0, pageSize = 10, searchTerm = '', contentType = '') => {
     try {
       setIsLoading(true);
-      // Add folder filtering if folderId is present
-      const folderParam = folderId ? `&folder_id=${folderId}` : '';
-      // Add search param if search term exists
-      const searchParam = searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : '';
-      // Add content type filter if not 'all'
-      const contentTypeParam = contentType && contentType !== 'all' 
-        ? `&content_type=${contentType}` 
-        : '';
       
-      const response = await apiFetch(`/api/instagram-data/posts/?page=${pageNumber + 1}&page_size=${pageSize}${folderParam}${searchParam}${contentTypeParam}`);
+      if (!folderId) {
+        setPosts([]);
+        setComments([]);
+        setFilteredPosts([]);
+        setFilteredComments([]);
+        setTotalCount(0);
+        return;
+      }
+      
+      // Use the folder contents endpoint to get the right data type
+      const searchParam = searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : '';
+      
+      const response = await apiFetch(`/api/instagram-data/folders/${folderId}/contents/?page=${pageNumber + 1}&page_size=${pageSize}${searchParam}`);
       
       if (!response.ok) {
-        throw new Error('Failed to fetch posts');
+        throw new Error('Failed to fetch folder contents');
       }
       const data = await response.json();
       
+      // Debug logging to help identify the issue
+      console.log('Folder contents response:', data);
+      console.log('Current folder:', currentFolder);
+      console.log('Data category:', data.category);
+      
       // Check if the response has the expected pagination structure
-      if (data && typeof data === 'object' && 'results' in data) {
-        setPosts(data.results || []);
-        setFilteredPosts(data.results || []);
-        setTotalCount(data.count || 0);
-      } else if (Array.isArray(data)) {
-        // Handle case where API might return a direct array
-        setPosts(data);
-        setFilteredPosts(data);
-        setTotalCount(data.length);
-        console.warn('API returned an array instead of paginated results');
+      if (data && typeof data === 'object') {
+        if (data.category === 'comments') {
+          // Handle comments
+          const results = data.results || [];
+          console.log('Setting comments data:', results);
+          setComments(results);
+          setFilteredComments(results);
+          setPosts([]);
+          setFilteredPosts([]);
+          setTotalCount(data.count || results.length);
+        } else {
+          // Handle posts (default)
+          const results = data.results || [];
+          console.log('Setting posts data:', results);
+          // Apply content type filter on frontend if needed
+          let filteredResults = results;
+          if (contentType && contentType !== 'all') {
+            filteredResults = results.filter((post: InstagramPost) => post.content_type === contentType);
+          }
+          setPosts(filteredResults);
+          setFilteredPosts(filteredResults);
+          setComments([]);
+          setFilteredComments([]);
+          setTotalCount(data.count || filteredResults.length);
+        }
       } else {
         console.error('API returned unexpected data format:', data);
         setPosts([]);
+        setComments([]);
         setFilteredPosts([]);
+        setFilteredComments([]);
         setTotalCount(0);
       }
     } catch (error) {
       console.error('Error fetching posts:', error);
       setPosts([]);
+      setComments([]);
       setFilteredPosts([]);
+      setFilteredComments([]);
       setTotalCount(0);
     } finally {
       setIsLoading(false);
@@ -167,6 +209,7 @@ const InstagramDataUpload = () => {
         const response = await apiFetch(`/api/instagram-data/folders/${folderId}/`);
         if (response.ok) {
           const data = await response.json();
+          console.log('Folder details response:', data);
           setCurrentFolder(data);
         }
       } catch (error) {
@@ -244,120 +287,81 @@ const InstagramDataUpload = () => {
     fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter);
   }, [page, rowsPerPage, searchTerm, contentTypeFilter]);
 
-  // Handle tab change
-  const handleUploadTabChange = (_event: React.SyntheticEvent, newValue: number) => {
-    setUploadTabValue(newValue);
-  };
-
-  // Separate handlers for post and reel file selection
-  const handlePostFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+  // Handle file change
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files.length > 0) {
-      setPostFile(event.target.files[0]);
+      setUploadFile(event.target.files[0]);
       // Reset status messages
       setUploadSuccess(null);
       setUploadError(null);
     }
   };
 
-  const handleReelFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files.length > 0) {
-      setReelFile(event.target.files[0]);
-      // Reset status messages
-      setUploadSuccess(null);
-      setUploadError(null);
-    }
-  };
-
-  // CSV validation function to check for common date format issues
+  // Validate CSV file format
   const validateCsvFile = async (file: File): Promise<{valid: boolean, message?: string}> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
+    if (!file) {
+      return { valid: false, message: 'No file selected' };
+    }
+    
+    // Check file extension
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+    if (fileExtension !== 'csv') {
+      return { valid: false, message: 'File must be a CSV' };
+    }
+    
+    // Basic check on file size
+    if (file.size === 0) {
+      return { valid: false, message: 'File is empty' };
+    }
+
+    if (file.size > 50 * 1024 * 1024) { // 50MB
+      return { valid: false, message: 'File is too large (max 50MB)' };
+    }
+    
+    // Basic check for CSV content
+    try {
+      const sample = await file.slice(0, 1000).text();
+      const lines = sample.split('\n');
       
-      reader.onload = (event) => {
-        try {
-          const csvContent = event.target?.result as string;
-          if (!csvContent) {
-            resolve({valid: false, message: 'Could not read file content'});
-            return;
-          }
-          
-          // Split into lines and get headers
-          const lines = csvContent.split('\n');
-          if (lines.length < 2) {
-            resolve({valid: false, message: 'CSV file appears to be empty or invalid'});
-            return;
-          }
-          
-          const headers = lines[0].split(',');
-          
-          // Check if date_posted column exists
-          const dateColumnIndex = headers.findIndex(h => 
-            h.trim().toLowerCase() === 'date_posted' || 
-            h.trim().toLowerCase() === '"date_posted"'
-          );
-          
-          if (dateColumnIndex === -1) {
-            // No date column found, file is valid
-            resolve({valid: true});
-            return;
-          }
-          
-          // Check a sample of rows for potential date issues
-          const sampleSize = Math.min(10, lines.length - 1); // Check up to 10 rows
-          for (let i = 1; i <= sampleSize; i++) {
-            const row = lines[i].split(',');
-            if (row.length <= dateColumnIndex) continue;
-            
-            const dateValue = row[dateColumnIndex].trim();
-            
-            // Skip empty values
-            if (!dateValue || dateValue === '""' || dateValue === "''") continue;
-            
-            // Check for common date format issues
-            if (dateValue.includes('/') || 
-                (dateValue.includes('"') && dateValue.length > 2) ||
-                dateValue.match(/^\d{1,2}-\d{1,2}-\d{4}$/)) {
-              resolve({
-                valid: false, 
-                message: 'Warning: Your CSV may contain dates in non-standard formats. ' +
-                         'Please ensure dates are in YYYY-MM-DD format or they might not be processed correctly.'
-              });
-              return;
-            }
-          }
-          
-          // If we got here, file seems valid
-          resolve({valid: true});
-          
-        } catch (error) {
-          console.error('CSV validation error:', error);
-          resolve({valid: true}); // Allow upload despite validation error
+      if (lines.length < 2) {
+        return { valid: false, message: 'CSV must contain at least a header row and one data row' };
+      }
+      
+      const header = lines[0].toLowerCase();
+      
+      // Check for required columns in the header
+      const requiredColumns = ['url']; // Only require URL field
+      for (const column of requiredColumns) {
+        if (!header.includes(column)) {
+          return { 
+            valid: false, 
+            message: `CSV is missing required column: ${column}. Please check the file format.` 
+          };
         }
-      };
+      }
       
-      reader.onerror = () => {
-        resolve({valid: false, message: 'Error reading the file'});
-      };
-      
-      reader.readAsText(file);
-    });
+      return { valid: true };
+    } catch (error) {
+      console.error('Error validating file:', error);
+      return { valid: false, message: 'Error validating file. Please check the format.' };
+    }
   };
 
-  // Handle upload for posts
-  const handlePostUpload = async () => {
-    if (!postFile) {
-      setUploadError('Please select a post CSV file to upload');
+  // Handle upload
+  const handleUpload = async () => {
+    if (!uploadFile) {
+      setUploadError('Please select a CSV file to upload');
       return;
     }
 
-    if (!postFile.name.endsWith('.csv')) {
+    if (!uploadFile.name.endsWith('.csv')) {
       setUploadError('Please upload a CSV file');
       return;
     }
     
     // Validate CSV before uploading
     try {
-      const validationResult = await validateCsvFile(postFile);
+      const validationResult = await validateCsvFile(uploadFile);
       if (!validationResult.valid) {
         setUploadError(validationResult.message || 'CSV validation failed');
         return;
@@ -368,8 +372,7 @@ const InstagramDataUpload = () => {
     }
 
     const formData = new FormData();
-    formData.append('file', postFile);
-    formData.append('content_type', 'post');
+    formData.append('file', uploadFile);
     
     // Add folder_id to the form data if available
     if (folderId) {
@@ -380,9 +383,15 @@ const InstagramDataUpload = () => {
       setIsUploading(true);
       setUploadError(null); // Clear previous errors
       
+      // Determine the correct upload endpoint based on folder category
+      let uploadEndpoint = '/api/instagram-data/posts/upload_csv/';
+      if (currentFolder?.category === 'comments') {
+        uploadEndpoint = '/api/instagram-data/comments/upload_csv/';
+      }
+      
       // Check if the backend server is running
       try {
-        const response = await apiFetch('/api/instagram-data/posts/upload_csv/', {
+        const response = await apiFetch(uploadEndpoint, {
           method: 'POST',
           body: formData,
           headers: {
@@ -410,116 +419,24 @@ const InstagramDataUpload = () => {
         }
 
         const data = await response.json();
-        setUploadSuccess(`${data.message}`);
+        let successMessage = `${data.message}`;
         
-        // Refresh the post list
+        if (data.detected_content_type) {
+          successMessage += ` Content type detected: ${data.detected_content_type}`;
+        }
+        
+        setUploadSuccess(successMessage);
+        
+        // Refresh the post list and folder details
+        await fetchFolderDetails(); // Refresh folder details first
         fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter);
         fetchFolderStats();
         
         // Reset file input
-        setPostFile(null);
+        setUploadFile(null);
         
         // Reset file input element
-        const fileInput = document.getElementById('post-file-upload') as HTMLInputElement;
-        if (fileInput) {
-          fileInput.value = '';
-        }
-      } catch (networkError) {
-        console.error('Network error:', networkError);
-        // Show more helpful error message
-        if (networkError instanceof TypeError && networkError.message.includes('Failed to fetch')) {
-          throw new Error('Failed to connect to the server. Please check if the backend server is running and try again.');
-        } else {
-          throw networkError;
-        }
-      }
-      
-    } catch (error) {
-      console.error('Upload error:', error);
-      setUploadError(error instanceof Error ? error.message : 'An error occurred during upload');
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  // Handle upload for reels
-  const handleReelUpload = async () => {
-    if (!reelFile) {
-      setUploadError('Please select a reel CSV file to upload');
-      return;
-    }
-
-    if (!reelFile.name.endsWith('.csv')) {
-      setUploadError('Please upload a CSV file');
-      return;
-    }
-    
-    // Validate CSV before uploading
-    try {
-      const validationResult = await validateCsvFile(reelFile);
-      if (!validationResult.valid) {
-        setUploadError(validationResult.message || 'CSV validation failed');
-        return;
-      }
-    } catch (error) {
-      console.error('Validation error:', error);
-      // Continue with upload despite validation error
-    }
-
-    const formData = new FormData();
-    formData.append('file', reelFile);
-    formData.append('content_type', 'reel');
-    
-    // Add folder_id to the form data if available
-    if (folderId) {
-      formData.append('folder_id', folderId);
-    }
-
-    try {
-      setIsUploading(true);
-      setUploadError(null); // Clear previous errors
-      
-      // Check if the backend server is running
-      try {
-        const response = await apiFetch('/api/instagram-data/posts/upload_csv/', {
-          method: 'POST',
-          body: formData,
-          headers: {
-            'Accept': 'application/json',
-          },
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          // Check for specific error messages
-          let errorMessage = errorData.error || 'Upload failed';
-          
-          // Format array error messages more nicely
-          if (Array.isArray(errorMessage)) {
-            errorMessage = errorMessage.join('\n');
-          }
-          
-          // Show a more user-friendly message for date format errors
-          if ((typeof errorMessage === 'string') && 
-              (errorMessage.includes('invalid format') || errorMessage.includes('YYYY-MM-DD'))) {
-            throw new Error('Your CSV file contains dates in an invalid format. Please check that dates use a standard format like YYYY-MM-DD.');
-          }
-          
-          throw new Error(errorMessage);
-        }
-
-        const data = await response.json();
-        setUploadSuccess(`${data.message}`);
-        
-        // Refresh the post list
-        fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter);
-        fetchFolderStats();
-        
-        // Reset file input
-        setReelFile(null);
-        
-        // Reset file input element
-        const fileInput = document.getElementById('reel-file-upload') as HTMLInputElement;
+        const fileInput = document.getElementById('file-upload') as HTMLInputElement;
         if (fileInput) {
           fileInput.value = '';
         }
@@ -700,114 +617,55 @@ const InstagramDataUpload = () => {
         </Box>
         <Divider sx={{ mb: 4 }} />
 
-        {/* Upload section with tabs */}
         <Paper sx={{ p: 3, mb: 3 }}>
           <Typography variant="h6" gutterBottom>
             Upload Instagram Data
           </Typography>
           
-          <Tabs value={uploadTabValue} onChange={handleUploadTabChange} aria-label="instagram data upload tabs">
-            <Tab label="Posts" />
-            <Tab label="Reels" />
-          </Tabs>
+          <Typography variant="body1" gutterBottom>
+            Upload CSV file containing Instagram posts/reels data.
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            The system will automatically detect whether your CSV contains posts or reels based on the column headers.
+            Ensure date columns are in a standard format (YYYY-MM-DD). Empty date fields are allowed.
+          </Typography>
           
-          {uploadTabValue === 0 && (
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="body1" gutterBottom>
-                Upload Instagram Posts CSV file
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Ensure date columns are in a standard format (YYYY-MM-DD). Empty date fields are allowed.
-                <br />
-                Common date issues include quoted dates, inconsistent formats, or regional formats (like DD/MM/YYYY).
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Button
-                  variant="contained"
-                  component="label"
-                  startIcon={<CloudUploadIcon />}
-                  disabled={isUploading}
-                >
-                  Select Post CSV
-                  <input
-                    id="post-file-upload"
-                    type="file"
-                    hidden
-                    accept=".csv"
-                    onChange={handlePostFileChange}
-                  />
-                </Button>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={handlePostUpload}
-                  disabled={!postFile || isUploading}
-                >
-                  {isUploading ? <CircularProgress size={24} /> : 'Upload'}
-                </Button>
-                {postFile && <Typography variant="body2">{postFile.name}</Typography>}
-              </Box>
-              
-              <Box sx={{ mt: 2 }}>
-                <Button
-                  variant="outlined"
-                  startIcon={<DownloadIcon />}
-                  onClick={() => handleDownloadCSV('post')}
-                >
-                  Download Posts CSV
-                </Button>
-              </Box>
-            </Box>
-          )}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Button
+              variant="contained"
+              component="label"
+              startIcon={<CloudUploadIcon />}
+              disabled={isUploading}
+            >
+              Select CSV
+              <input
+                id="file-upload"
+                type="file"
+                hidden
+                accept=".csv"
+                onChange={handleFileChange}
+              />
+            </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleUpload}
+              disabled={!uploadFile || isUploading}
+            >
+              {isUploading ? <CircularProgress size={24} /> : 'Upload'}
+            </Button>
+            {uploadFile && <Typography variant="body2">{uploadFile.name}</Typography>}
+          </Box>
           
-          {uploadTabValue === 1 && (
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="body1" gutterBottom>
-                Upload Instagram Reels CSV file
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Ensure date columns are in a standard format (YYYY-MM-DD). Empty date fields are allowed.
-                <br />
-                Common date issues include quoted dates, inconsistent formats, or regional formats (like DD/MM/YYYY).
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Button
-                  variant="contained"
-                  component="label"
-                  startIcon={<CloudUploadIcon />}
-                  disabled={isUploading}
-                >
-                  Select Reel CSV
-                  <input
-                    id="reel-file-upload"
-                    type="file"
-                    hidden
-                    accept=".csv"
-                    onChange={handleReelFileChange}
-                  />
-                </Button>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={handleReelUpload}
-                  disabled={!reelFile || isUploading}
-                >
-                  {isUploading ? <CircularProgress size={24} /> : 'Upload'}
-                </Button>
-                {reelFile && <Typography variant="body2">{reelFile.name}</Typography>}
-              </Box>
-              
-              <Box sx={{ mt: 2 }}>
-                <Button
-                  variant="outlined"
-                  startIcon={<DownloadIcon />}
-                  onClick={() => handleDownloadCSV('reel')}
-                >
-                  Download Reels CSV
-                </Button>
-              </Box>
-            </Box>
-          )}
+          <Box sx={{ mt: 2 }}>
+            <Button
+              variant="outlined"
+              startIcon={<DownloadIcon />}
+              onClick={() => handleDownloadCSV(undefined)}
+            >
+              Download CSV
+            </Button>
+          </Box>
           
           {uploadSuccess && (
             <Alert severity="success" sx={{ mt: 2 }}>
@@ -871,14 +729,14 @@ const InstagramDataUpload = () => {
           </Box>
         </Stack>
 
-        {/* Add filters section above the data table */}
+        {/* Data display section - conditional based on folder category */}
         <Paper sx={{ p: 3, mb: 3 }}>
           <Typography variant="h6" gutterBottom>
-            Instagram Posts
+            {currentFolder?.category === 'comments' ? 'Instagram Comments' : 'Instagram Posts'}
           </Typography>
           
           <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-            {/* Existing search field */}
+            {/* Search field */}
             <TextField
               label="Search"
               variant="outlined"
@@ -895,47 +753,65 @@ const InstagramDataUpload = () => {
               sx={{ width: '300px' }}
             />
             
-            {/* Add content type filter */}
-            <FormControl size="small" sx={{ minWidth: 200 }}>
-              <InputLabel id="content-type-filter-label">Content Type</InputLabel>
-              <Select
-                labelId="content-type-filter-label"
-                id="content-type-filter"
-                value={contentTypeFilter}
-                label="Content Type"
-                onChange={handleContentTypeFilterChange}
-                disabled={isLoading}
-              >
-                <MenuItem value="all">All Content Types</MenuItem>
-                <MenuItem value="post">Instagram Posts Only</MenuItem>
-                <MenuItem value="reel">Instagram Reels Only</MenuItem>
-              </Select>
-              {isLoading && (
-                <CircularProgress
-                  size={24}
-                  sx={{
-                    position: 'absolute',
-                    right: 30,
-                    top: '50%',
-                    marginTop: '-12px',
-                  }}
-                />
-              )}
-            </FormControl>
+            {/* Content type filter - only show for posts/reels folders */}
+            {currentFolder?.category !== 'comments' && (
+              <FormControl size="small" sx={{ minWidth: 200 }}>
+                <InputLabel id="content-type-filter-label">Content Type</InputLabel>
+                <Select
+                  labelId="content-type-filter-label"
+                  id="content-type-filter"
+                  value={contentTypeFilter}
+                  label="Content Type"
+                  onChange={handleContentTypeFilterChange}
+                  disabled={isLoading}
+                >
+                  <MenuItem value="all">All Content Types</MenuItem>
+                  <MenuItem value="post">Instagram Posts Only</MenuItem>
+                  <MenuItem value="reel">Instagram Reels Only</MenuItem>
+                </Select>
+                {isLoading && (
+                  <CircularProgress
+                    size={24}
+                    sx={{
+                      position: 'absolute',
+                      right: 30,
+                      top: '50%',
+                      marginTop: '-12px',
+                    }}
+                  />
+                )}
+              </FormControl>
+            )}
           </Box>
           
-          {/* Existing data table */}
+          {/* Conditional table rendering */}
           <TableContainer>
             <Table stickyHeader>
               <TableHead>
                 <TableRow>
-                  <TableCell>User</TableCell>
-                  <TableCell>Type</TableCell>
-                  <TableCell>Description</TableCell>
-                  <TableCell>Date Posted</TableCell>
-                  <TableCell align="right">Likes</TableCell>
-                  <TableCell align="right">Comments</TableCell>
-                  <TableCell>Actions</TableCell>
+                  {currentFolder?.category === 'comments' ? (
+                    /* Comments table headers */
+                    <>
+                      <TableCell>Comment User</TableCell>
+                      <TableCell>Comment</TableCell>
+                      <TableCell>Post User</TableCell>
+                      <TableCell>Date</TableCell>
+                      <TableCell align="right">Likes</TableCell>
+                      <TableCell align="right">Replies</TableCell>
+                      <TableCell>Actions</TableCell>
+                    </>
+                  ) : (
+                    /* Posts table headers */
+                    <>
+                      <TableCell>User</TableCell>
+                      <TableCell>Type</TableCell>
+                      <TableCell>Description</TableCell>
+                      <TableCell>Date Posted</TableCell>
+                      <TableCell align="right">Likes</TableCell>
+                      <TableCell align="right">Comments</TableCell>
+                      <TableCell>Actions</TableCell>
+                    </>
+                  )}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -948,76 +824,129 @@ const InstagramDataUpload = () => {
                       </Typography>
                     </TableCell>
                   </TableRow>
-                ) : posts.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} align="center">
-                      <Typography>No posts found</Typography>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  posts.map((post) => (
-                    <TableRow key={post.id} hover>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          {post.is_verified && (
-                            <Tooltip title="Verified Account">
-                              <Chip 
-                                size="small" 
-                                color="primary" 
-                                label="Verified" 
-                                sx={{ mr: 1 }} 
-                              />
-                            </Tooltip>
-                          )}
-                          {post.user_posted}
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Chip 
-                          size="small" 
-                          color={post.content_type === 'reel' ? 'secondary' : 'primary'}
-                          variant={post.content_type === 'reel' ? 'filled' : 'outlined'}
-                          label={post.content_type === 'reel' ? 'Reel' : 'Post'} 
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" noWrap sx={{ maxWidth: 300 }}>
-                          {post.description || 'No description'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        {post.date_posted 
-                          ? new Date(post.date_posted).toLocaleDateString() 
-                          : 'Unknown'}
-                      </TableCell>
-                      <TableCell align="right">{post.likes.toLocaleString()}</TableCell>
-                      <TableCell align="right">{post.num_comments.toLocaleString()}</TableCell>
-                      <TableCell>
-                        <Tooltip title="Open in Instagram">
-                          <IconButton 
-                            size="small" 
-                            onClick={() => window.open(post.url, '_blank')}
-                          >
-                            <OpenInNewIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Copy link">
-                          <IconButton 
-                            size="small" 
-                            onClick={() => handleCopyLink(post.url)}
-                          >
-                            <ContentCopyIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
+                ) : currentFolder?.category === 'comments' ? (
+                  /* Comments table body */
+                  comments.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center">
+                        <Typography>No comments found</Typography>
                       </TableCell>
                     </TableRow>
-                  ))
+                  ) : (
+                    comments.map((comment) => (
+                      <TableRow key={comment.id} hover>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            {comment.comment_user}
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" noWrap sx={{ maxWidth: 300 }}>
+                            {comment.comment || 'No comment text'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>{comment.post_user || 'Unknown'}</TableCell>
+                        <TableCell>
+                          {comment.comment_date 
+                            ? new Date(comment.comment_date).toLocaleDateString() 
+                            : 'Unknown'}
+                        </TableCell>
+                        <TableCell align="right">{comment.likes_number.toLocaleString()}</TableCell>
+                        <TableCell align="right">{comment.replies_number.toLocaleString()}</TableCell>
+                        <TableCell>
+                          <Tooltip title="Open Post">
+                            <IconButton 
+                              size="small" 
+                              onClick={() => window.open(comment.post_url, '_blank')}
+                            >
+                              <OpenInNewIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Copy link">
+                            <IconButton 
+                              size="small" 
+                              onClick={() => handleCopyLink(comment.post_url)}
+                            >
+                              <ContentCopyIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )
+                ) : (
+                  /* Posts table body */
+                  posts.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center">
+                        <Typography>No posts found</Typography>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    posts.map((post) => (
+                      <TableRow key={post.id} hover>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            {post.is_verified && (
+                              <Tooltip title="Verified Account">
+                                <Chip 
+                                  size="small" 
+                                  color="primary" 
+                                  label="Verified" 
+                                  sx={{ mr: 1 }} 
+                                />
+                              </Tooltip>
+                            )}
+                            {post.user_posted}
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Chip 
+                            size="small" 
+                            color={post.content_type === 'reel' ? 'secondary' : 'primary'}
+                            variant={post.content_type === 'reel' ? 'filled' : 'outlined'}
+                            label={post.content_type === 'reel' ? 'Reel' : 'Post'} 
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" noWrap sx={{ maxWidth: 300 }}>
+                            {post.description || 'No description'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          {post.date_posted 
+                            ? new Date(post.date_posted).toLocaleDateString() 
+                            : 'Unknown'}
+                        </TableCell>
+                        <TableCell align="right">{post.likes.toLocaleString()}</TableCell>
+                        <TableCell align="right">{post.num_comments.toLocaleString()}</TableCell>
+                        <TableCell>
+                          <Tooltip title="Open in Instagram">
+                            <IconButton 
+                              size="small" 
+                              onClick={() => window.open(post.url, '_blank')}
+                            >
+                              <OpenInNewIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Copy link">
+                            <IconButton 
+                              size="small" 
+                              onClick={() => handleCopyLink(post.url)}
+                            >
+                              <ContentCopyIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )
                 )}
               </TableBody>
             </Table>
           </TableContainer>
           
-          {/* Existing pagination */}
+          {/* Pagination */}
           <TablePagination
             rowsPerPageOptions={[5, 10, 25, 50, 100]}
             component="div"

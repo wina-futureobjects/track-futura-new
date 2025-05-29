@@ -1,14 +1,15 @@
 from django.shortcuts import render
 import json
 import requests
-import datetime
+import logging
+from datetime import datetime, timedelta
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from .models import BrightdataConfig, ScraperRequest, BatchScraperJob
@@ -18,8 +19,10 @@ from .serializers import (
 )
 from .services import AutomatedBatchScraper, create_and_execute_batch_job
 import traceback
-import logging
 from urllib.parse import urlencode
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 class BrightdataConfigViewSet(viewsets.ModelViewSet):
     """API endpoint for Brightdata configuration"""
@@ -88,20 +91,23 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
             print(f"Request data: {request.data}")
             print("=======================================\n")
             
-            # Get the active Facebook configuration
-            config = BrightdataConfig.objects.filter(platform='facebook', is_active=True).first()
-            if not config:
-                return Response({'error': 'No active Facebook Brightdata configuration found'}, 
-                               status=status.HTTP_400_BAD_REQUEST)
-            
             # Get request parameters
             target_url = request.data.get('target_url')
             if not target_url:
                 return Response({'error': 'Target URL is required'}, 
                                status=status.HTTP_400_BAD_REQUEST)
             
-            # Optional parameters with defaults
+            # Get content type and determine platform configuration key
             content_type = request.data.get('content_type', 'post')
+            platform_config_key = f'facebook_{content_type}s'  # facebook_posts, facebook_reels, facebook_comments
+            
+            # Get the active Facebook configuration for specific content type
+            config = BrightdataConfig.objects.filter(platform=platform_config_key, is_active=True).first()
+            if not config:
+                return Response({'error': f'No active {platform_config_key} Brightdata configuration found'}, 
+                               status=status.HTTP_400_BAD_REQUEST)
+            
+            # Optional parameters with defaults
             num_of_posts = request.data.get('num_of_posts', 10)
             posts_to_not_include = request.data.get('posts_to_not_include', [])
             
@@ -117,7 +123,7 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
             if db_start_date:
                 try:
                     # Verify it's in YYYY-MM-DD format
-                    date_obj = datetime.datetime.strptime(db_start_date, '%Y-%m-%d')
+                    date_obj = datetime.strptime(db_start_date, '%Y-%m-%d')
                     # Convert to MM-DD-YYYY for API
                     api_start_date = date_obj.strftime('%m-%d-%Y')
                 except ValueError:
@@ -127,7 +133,7 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
             if db_end_date:
                 try:
                     # Verify it's in YYYY-MM-DD format
-                    date_obj = datetime.datetime.strptime(db_end_date, '%Y-%m-%d')
+                    date_obj = datetime.strptime(db_end_date, '%Y-%m-%d')
                     # Convert to MM-DD-YYYY for API
                     api_end_date = date_obj.strftime('%m-%d-%Y')
                 except ValueError:
@@ -158,13 +164,14 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
             }]
             
             # Log the request payload for debugging
-            print("\n\n==== DEBUG: BRIGHTDATA API REQUEST ====")
+            print(f"\n\n==== DEBUG: BRIGHTDATA API REQUEST ({platform_config_key.upper()}) ====")
             print(f"URL: {url}")
             print(f"Headers: {headers}")
             print(f"Params: {params}")
             print(f"Data: {data}")
             print(f"DB dates: start={db_start_date}, end={db_end_date}")
             print(f"API dates: start={api_start_date}, end={api_end_date}")
+            print(f"Configuration: {config.name} - {config.get_platform_display()}")
             
             # Show the actual request that would be made
             print(f"Final request URL: {url}?{urlencode(params)}")
@@ -181,7 +188,7 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
             # Create a scraper request record - use original YYYY-MM-DD for database
             scraper_request = ScraperRequest.objects.create(
                 config=config,
-                platform='facebook',
+                platform=platform_config_key,
                 content_type=content_type,
                 target_url=target_url,
                 num_of_posts=num_of_posts,
@@ -310,53 +317,28 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
             print(f"Request data: {request.data}")
             print("=======================================\n")
             
-            # Get the active configuration
-            config = BrightdataConfig.objects.filter(is_active=True).first()
-            if not config:
-                return Response({'error': 'No active Brightdata configuration found'}, 
-                               status=status.HTTP_400_BAD_REQUEST)
-            
             # Get request parameters
             target_url = request.data.get('target_url')
             if not target_url:
                 return Response({'error': 'Target URL is required'}, 
                                status=status.HTTP_400_BAD_REQUEST)
             
-            # Optional parameters with defaults
+            # Get content type and determine platform configuration key
             content_type = request.data.get('content_type', 'post')
-            num_of_posts = request.data.get('num_of_posts', 10)
-            posts_to_not_include = request.data.get('posts_to_not_include', [])
+            platform_config_key = f'instagram_{content_type}s'  # instagram_posts, instagram_reels, instagram_comments
             
-            # Date handling - save original YYYY-MM-DD dates for database
-            db_start_date = request.data.get('start_date', '')
-            db_end_date = request.data.get('end_date', '')
+            # Get the active Instagram configuration for specific content type
+            config = BrightdataConfig.objects.filter(platform=platform_config_key, is_active=True).first()
+            if not config:
+                return Response({'error': f'No active {platform_config_key} Brightdata configuration found'}, 
+                               status=status.HTTP_400_BAD_REQUEST)
             
-            # Create API date versions in MM-DD-YYYY format
-            api_start_date = ''
-            api_end_date = ''
-            
-            # Validate and convert dates if provided
-            if db_start_date:
-                try:
-                    # Verify it's in YYYY-MM-DD format
-                    date_obj = datetime.datetime.strptime(db_start_date, '%Y-%m-%d')
-                    # Convert to MM-DD-YYYY for API
-                    api_start_date = date_obj.strftime('%m-%d-%Y')
-                except ValueError:
-                    return Response({'error': 'Invalid start_date format. Use YYYY-MM-DD format.'}, 
-                                   status=status.HTTP_400_BAD_REQUEST)
-            
-            if db_end_date:
-                try:
-                    # Verify it's in YYYY-MM-DD format
-                    date_obj = datetime.datetime.strptime(db_end_date, '%Y-%m-%d')
-                    # Convert to MM-DD-YYYY for API
-                    api_end_date = date_obj.strftime('%m-%d-%Y')
-                except ValueError:
-                    return Response({'error': 'Invalid end_date format. Use YYYY-MM-DD format.'}, 
-                                   status=status.HTTP_400_BAD_REQUEST)
-            
+            # Get optional parameters
             folder_id = request.data.get('folder_id')
+            
+            # Date handling - only include if provided
+            start_date = request.data.get('start_date', '')
+            end_date = request.data.get('end_date', '')
             
             # Prepare Brightdata API request
             url = "https://api.brightdata.com/datasets/v3/trigger"
@@ -367,26 +349,37 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
             params = {
                 "dataset_id": config.dataset_id,
                 "include_errors": "true",
+                "type": "discover_new",
+                "discover_by": "url",
             }
             
-            # Create request payload as a direct array (not nested)
-            # Use MM-DD-YYYY format for API
-            data = [{
-                "url": target_url,
-                "num_of_posts": num_of_posts,
-                "posts_to_not_include": posts_to_not_include,
-                "start_date": api_start_date,
-                "end_date": api_end_date,
-            }]
+            # Create request payload based on content type
+            if content_type == 'reel':
+                # Instagram Reels API format
+                data = [{
+                    "url": target_url,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "all_reels": False,  # Default to specific date range
+                }]
+            else:
+                # Instagram Posts API format (includes posts and other content types)
+                data = [{
+                    "url": target_url,
+                    "num_of_posts": request.data.get('num_of_posts', 10),
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "post_type": "Post" if content_type == 'post' else content_type.title(),
+                    "posts_to_not_include": request.data.get('posts_to_not_include', []),
+                }]
             
             # Log the request payload for debugging
-            print("\n\n==== DEBUG: BRIGHTDATA API REQUEST (INSTAGRAM) ====")
+            print(f"\n\n==== DEBUG: BRIGHTDATA API REQUEST ({platform_config_key.upper()}) ====")
             print(f"URL: {url}")
             print(f"Headers: {headers}")
             print(f"Params: {params}")
             print(f"Data: {data}")
-            print(f"DB dates: start={db_start_date}, end={db_end_date}")
-            print(f"API dates: start={api_start_date}, end={api_end_date}")
+            print(f"Configuration: {config.name} - {config.get_platform_display()}")
             
             # Show the actual request that would be made
             print(f"Final request URL: {url}?{urlencode(params)}")
@@ -394,16 +387,13 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
             
             print("=======================================\n")
             
-            # Create a scraper request record - use original YYYY-MM-DD for database
+            # Create a scraper request record
             scraper_request = ScraperRequest.objects.create(
                 config=config,
-                platform='instagram',
+                platform=platform_config_key,
                 content_type=content_type,
                 target_url=target_url,
-                num_of_posts=num_of_posts,
-                posts_to_not_include=str(posts_to_not_include) if posts_to_not_include else None,
-                start_date=db_start_date if db_start_date else None,
-                end_date=db_end_date if db_end_date else None,
+                num_of_posts=request.data.get('num_of_posts', 10),  # Use actual value from request
                 folder_id=folder_id,
                 request_payload=data,
                 status='pending'
@@ -416,8 +406,6 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
                 print(f"Headers: {headers}")
                 print(f"Params: {params}")
                 print(f"Data: {data}")
-                print(f"DB dates: start={db_start_date}, end={db_end_date}")
-                print(f"API dates: start={api_start_date}, end={api_end_date}")
                 
                 # Show the actual request that would be made
                 print(f"Final request URL: {url}?{urlencode(params)}")
@@ -554,7 +542,7 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
             if db_start_date:
                 try:
                     # Verify it's in YYYY-MM-DD format
-                    date_obj = datetime.datetime.strptime(db_start_date, '%Y-%m-%d')
+                    date_obj = datetime.strptime(db_start_date, '%Y-%m-%d')
                     # Convert to MM-DD-YYYY for API
                     api_start_date = date_obj.strftime('%m-%d-%Y')
                 except ValueError:
@@ -564,7 +552,7 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
             if db_end_date:
                 try:
                     # Verify it's in YYYY-MM-DD format
-                    date_obj = datetime.datetime.strptime(db_end_date, '%Y-%m-%d')
+                    date_obj = datetime.strptime(db_end_date, '%Y-%m-%d')
                     # Convert to MM-DD-YYYY for API
                     api_end_date = date_obj.strftime('%m-%d-%Y')
                 except ValueError:
@@ -769,7 +757,7 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
             if db_start_date:
                 try:
                     # Verify it's in YYYY-MM-DD format
-                    date_obj = datetime.datetime.strptime(db_start_date, '%Y-%m-%d')
+                    date_obj = datetime.strptime(db_start_date, '%Y-%m-%d')
                     # Convert to MM-DD-YYYY for API
                     api_start_date = date_obj.strftime('%m-%d-%Y')
                 except ValueError:
@@ -779,7 +767,7 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
             if db_end_date:
                 try:
                     # Verify it's in YYYY-MM-DD format
-                    date_obj = datetime.datetime.strptime(db_end_date, '%Y-%m-%d')
+                    date_obj = datetime.strptime(db_end_date, '%Y-%m-%d')
                     # Convert to MM-DD-YYYY for API
                     api_end_date = date_obj.strftime('%m-%d-%Y')
                 except ValueError:
@@ -1243,12 +1231,37 @@ def _process_webhook_data(data, platform: str, scraper_request=None):
                 # Map common fields (you'll need to adjust based on your model fields)
                 post_fields = _map_post_fields(post_data, platform)
                 
-                if folder_id:
-                    post_fields['folder_id'] = folder_id
+                # Handle folder assignment for Facebook posts
+                if folder_id and platform.lower() == 'facebook':
+                    from facebook_data.models import Folder
+                    try:
+                        folder = Folder.objects.get(id=folder_id)
+                        post_fields['folder'] = folder
+                    except Folder.DoesNotExist:
+                        logger.warning(f"Folder with ID {folder_id} not found, creating default folder")
+                        folder = Folder.objects.create(name=f"Auto-created folder {folder_id}")
+                        post_fields['folder'] = folder
                 
                 # Create or update post
                 post_id = post_data.get('post_id') or post_data.get('id')
-                if post_id:
+                if post_id and platform.lower() == 'facebook':
+                    # For Facebook, check uniqueness by post_id and folder
+                    folder = post_fields.get('folder')
+                    if folder:
+                        post, created = PostModel.objects.get_or_create(
+                            post_id=post_id,
+                            folder=folder,
+                            defaults=post_fields
+                        )
+                    else:
+                        post, created = PostModel.objects.get_or_create(
+                            post_id=post_id,
+                            defaults=post_fields
+                        )
+                    if created:
+                        created_count += 1
+                elif post_id:
+                    # For other platforms
                     post, created = PostModel.objects.get_or_create(
                         post_id=post_id,
                         defaults=post_fields
@@ -1273,33 +1286,67 @@ def _process_webhook_data(data, platform: str, scraper_request=None):
 
 def _map_post_fields(post_data: dict, platform: str) -> dict:
     """
-    Map BrightData post fields to our model fields
+    Map BrightData post fields to our model fields based on actual BrightData JSON structure
     """
-    # This is a basic mapping - you'll need to adjust based on your actual model fields
-    # and the data structure returned by BrightData
     
+    if platform.lower() == 'facebook':
+        # Map Facebook-specific fields based on actual BrightData structure
+        mapped_data = {
+            'url': post_data.get('url', ''),
+            'post_id': post_data.get('post_id', ''),
+            'user_url': post_data.get('user_url', ''),
+            'user_username_raw': post_data.get('user_username_raw', ''),
+            'content': post_data.get('content', ''),
+            'date_posted': post_data.get('date_posted'),
+            'num_comments': post_data.get('num_comments', 0),
+            'num_shares': post_data.get('num_shares', 0),
+            'likes': post_data.get('likes', 0),
+            'video_view_count': post_data.get('video_view_count'),
+            'page_name': post_data.get('page_name', ''),
+            'profile_id': post_data.get('profile_id', ''),
+            'page_intro': post_data.get('page_intro', ''),
+            'page_category': post_data.get('page_category', ''),
+            'page_logo': post_data.get('page_logo', ''),
+            'page_external_website': post_data.get('page_external_website', ''),
+            'page_likes': post_data.get('page_likes'),
+            'page_followers': post_data.get('page_followers'),
+            'page_is_verified': post_data.get('page_is_verified', False),
+            'page_phone': post_data.get('page_phone', ''),
+            'page_email': post_data.get('page_email', ''),
+            'page_creation_time': post_data.get('page_creation_time'),
+            'page_reviews_score': post_data.get('page_reviews_score', ''),
+            'page_reviewers_amount': post_data.get('page_reviewers_amount'),
+            'page_price_range': post_data.get('page_price_range', ''),
+            'attachments_data': post_data.get('attachments'),
+            'post_external_image': post_data.get('post_external_image'),
+            'page_url': post_data.get('page_url', ''),
+            'header_image': post_data.get('header_image', ''),
+            'avatar_image_url': post_data.get('avatar_image_url', ''),
+            'profile_handle': post_data.get('profile_handle', ''),
+            'is_sponsored': post_data.get('is_sponsored', False),
+            'shortcode': post_data.get('shortcode', ''),
+            'is_page': post_data.get('is_page', False),
+            'about': post_data.get('about'),
+            'active_ads_urls': post_data.get('active_ads_urls'),
+            'delegate_page_id': post_data.get('delegate_page_id', ''),
+            'post_type': post_data.get('post_type', ''),
+            'timestamp': post_data.get('timestamp'),
+            'input': post_data.get('input'),
+            'num_likes_type': post_data.get('num_likes_type'),
+            'count_reactions_type': post_data.get('count_reactions_type'),
+        }
+        return mapped_data
+    
+    # Generic mapping for other platforms
     common_mapping = {
         'url': post_data.get('url', ''),
         'content': post_data.get('text') or post_data.get('content') or post_data.get('description', ''),
         'date_posted': post_data.get('date') or post_data.get('created_time') or post_data.get('timestamp'),
         'likes': post_data.get('likes_count') or post_data.get('likes') or 0,
-        'comments': post_data.get('comments_count') or post_data.get('comments') or 0,
-        'shares': post_data.get('shares_count') or post_data.get('shares') or 0,
+        'num_comments': post_data.get('comments_count') or post_data.get('comments') or 0,
+        'num_shares': post_data.get('shares_count') or post_data.get('shares') or 0,
         'user_posted': post_data.get('username') or post_data.get('author') or post_data.get('user', ''),
     }
-    
-    # Platform-specific mappings
-    if platform == 'instagram':
-        common_mapping.update({
-            'hashtags': ', '.join(post_data.get('hashtags', [])) if post_data.get('hashtags') else '',
-            'num_comments': post_data.get('comments_count', 0),
-            'followers': post_data.get('followers_count', 0),
-        })
-    elif platform == 'facebook':
-        common_mapping.update({
-            'reactions': post_data.get('reactions_count', 0),
-        })
-    # Add more platform-specific mappings as needed
     
     return common_mapping
 
@@ -1366,9 +1413,10 @@ class BatchScraperJobViewSet(viewsets.ModelViewSet):
         try:
             job, success = create_and_execute_batch_job(
                 name=request.data.get('name'),
-                project_id=request.data.get('project_id'),
+                project_id=request.data.get('project'),
                 source_folder_ids=request.data.get('source_folder_ids', []),
                 platforms_to_scrape=request.data.get('platforms_to_scrape'),
+                content_types_to_scrape=request.data.get('content_types_to_scrape', {}),
                 num_of_posts=request.data.get('num_of_posts', 10),
                 start_date=request.data.get('start_date'),
                 end_date=request.data.get('end_date'),
@@ -1386,3 +1434,106 @@ class BatchScraperJobViewSet(viewsets.ModelViewSet):
             return Response({
                 'error': str(e)
             }, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def scrape_comments(request):
+    """
+    Cross-platform comments scraping endpoint
+    
+    Expected payload:
+    {
+        "platform": "facebook_comments" | "instagram_comments",
+        "post_urls": ["url1", "url2", ...],
+        "comment_limit": 10,
+        "get_all_replies": false,
+        "result_folder_name": "Comments_Campaign_2024"
+    }
+    """
+    try:
+        # Get request parameters
+        platform = request.data.get('platform')
+        post_urls = request.data.get('post_urls', [])
+        comment_limit = request.data.get('comment_limit', 10)
+        get_all_replies = request.data.get('get_all_replies', False)
+        result_folder_name = request.data.get('result_folder_name')
+        
+        # Validate required parameters
+        if not platform:
+            return Response({'error': 'Platform is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not post_urls or not isinstance(post_urls, list):
+            return Response({'error': 'Post URLs list is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not result_folder_name:
+            return Response({'error': 'Result folder name is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate platform is a comment platform
+        if not platform.endswith('_comments'):
+            return Response({'error': 'Invalid platform. Must be a comments platform (e.g., facebook_comments, instagram_comments)'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if configuration exists for the platform
+        try:
+            config = BrightdataConfig.objects.get(platform=platform, is_active=True)
+        except BrightdataConfig.DoesNotExist:
+            return Response({'error': f'No active configuration found for {platform}. Please configure it in BrightData Settings.'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        # Determine the base platform (facebook, instagram)
+        base_platform = platform.split('_')[0]
+        
+        # Import the appropriate service based on platform
+        if base_platform == 'facebook':
+            from facebook_data.services import scrape_facebook_comments_from_urls
+            
+            # Get project ID from request or default
+            project_id = request.data.get('project_id', 1)
+            
+            # Use the URL-based Facebook comment scraper
+            result, success = scrape_facebook_comments_from_urls(
+                post_urls=post_urls,
+                comment_limit=comment_limit,
+                get_all_replies=get_all_replies,
+                result_folder_name=result_folder_name,
+                project_id=project_id
+            )
+            
+            return Response({
+                'success': success,
+                'message': 'Facebook comment scraping job submitted successfully' if success else 'Job submission failed',
+                'platform': platform,
+                'urls_count': len(post_urls),
+                'result': result
+            }, status=status.HTTP_201_CREATED if success else status.HTTP_400_BAD_REQUEST)
+            
+        elif base_platform == 'instagram':
+            # For Instagram comments, use the new Instagram service
+            from instagram_data.services import scrape_instagram_comments_from_urls
+            
+            # Get project ID from request or default
+            project_id = request.data.get('project_id', 1)
+            
+            # Use the Instagram comment scraper
+            result, success = scrape_instagram_comments_from_urls(
+                post_urls=post_urls,
+                result_folder_name=result_folder_name,
+                project_id=project_id
+            )
+            
+            return Response({
+                'success': success,
+                'message': 'Instagram comment scraping job submitted successfully' if success else 'Job submission failed',
+                'platform': platform,
+                'urls_count': len(post_urls),
+                'result': result
+            }, status=status.HTTP_201_CREATED if success else status.HTTP_400_BAD_REQUEST)
+            
+        else:
+            return Response({'error': f'Unsupported platform: {base_platform}'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+            
+    except Exception as e:
+        logger.error(f"Error in scrape_comments: {str(e)}")
+        return Response({'error': f'Internal server error: {str(e)}'}, 
+                      status=status.HTTP_500_INTERNAL_SERVER_ERROR)

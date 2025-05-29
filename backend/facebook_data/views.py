@@ -8,9 +8,10 @@ from rest_framework.response import Response
 from rest_framework.decorators import action, permission_classes
 from rest_framework.permissions import AllowAny
 from django.http import HttpResponse
-from .models import FacebookPost, Folder
-from .serializers import FacebookPostSerializer, FolderSerializer
+from .models import FacebookPost, Folder, FacebookComment, CommentScrapingJob
+from .serializers import FacebookPostSerializer, FolderSerializer, FacebookCommentSerializer, CommentScrapingJobSerializer
 from django.db.models import Q
+from django.db import models
 
 # Try to import dateparser, but provide a fallback if it's not available
 try:
@@ -91,6 +92,113 @@ class FolderViewSet(viewsets.ModelViewSet):
             instance._prefetched_objects_cache = {}
         
         return Response(serializer.data)
+
+    @action(detail=True, methods=['GET'])
+    def contents(self, request, pk=None):
+        """
+        Get the contents of a folder based on its category
+        """
+        try:
+            folder = self.get_object()
+            
+            if folder.category == 'posts':
+                # Return Facebook posts (excluding reels)
+                posts = FacebookPost.objects.filter(folder=folder).exclude(content_type='reel')
+                
+                # Apply search if provided
+                search_query = request.query_params.get('search', '')
+                if search_query:
+                    search_filter = Q()
+                    available_fields = [f.name for f in FacebookPost._meta.get_fields()]
+                    
+                    if 'user_posted' in available_fields:
+                        search_filter |= Q(user_posted__icontains=search_query)
+                    if 'content' in available_fields:
+                        search_filter |= Q(content__icontains=search_query)
+                    if 'hashtags' in available_fields:
+                        search_filter |= Q(hashtags__icontains=search_query)
+                    if 'page_name' in available_fields:
+                        search_filter |= Q(page_name__icontains=search_query)
+                    
+                    if search_filter:
+                        posts = posts.filter(search_filter)
+                
+                # Paginate results
+                page = self.paginate_queryset(posts)
+                if page is not None:
+                    serializer = FacebookPostSerializer(page, many=True)
+                    return self.get_paginated_response(serializer.data)
+                
+                serializer = FacebookPostSerializer(posts, many=True)
+                return Response({
+                    'category': 'posts',
+                    'results': serializer.data
+                })
+                
+            elif folder.category == 'reels':
+                # Return Facebook reels
+                reels = FacebookPost.objects.filter(folder=folder, content_type='reel')
+                
+                # Apply search if provided
+                search_query = request.query_params.get('search', '')
+                if search_query:
+                    search_filter = Q()
+                    available_fields = [f.name for f in FacebookPost._meta.get_fields()]
+                    
+                    if 'user_posted' in available_fields:
+                        search_filter |= Q(user_posted__icontains=search_query)
+                    if 'content' in available_fields:
+                        search_filter |= Q(content__icontains=search_query)
+                    if 'hashtags' in available_fields:
+                        search_filter |= Q(hashtags__icontains=search_query)
+                    if 'page_name' in available_fields:
+                        search_filter |= Q(page_name__icontains=search_query)
+                    
+                    if search_filter:
+                        reels = reels.filter(search_filter)
+                
+                # Paginate results
+                page = self.paginate_queryset(reels)
+                if page is not None:
+                    serializer = FacebookPostSerializer(page, many=True)
+                    return self.get_paginated_response(serializer.data)
+                
+                serializer = FacebookPostSerializer(reels, many=True)
+                return Response({
+                    'category': 'reels',
+                    'results': serializer.data
+                })
+                
+            elif folder.category == 'comments':
+                # Return Facebook comments
+                comments = FacebookComment.objects.filter(folder=folder)
+                
+                # Apply search if provided
+                search_query = request.query_params.get('search', '')
+                if search_query:
+                    search_filter = Q()
+                    search_filter |= Q(user_name__icontains=search_query)
+                    search_filter |= Q(comment_text__icontains=search_query)
+                    search_filter |= Q(post_id__icontains=search_query)
+                    comments = comments.filter(search_filter)
+                
+                # Paginate results
+                page = self.paginate_queryset(comments)
+                if page is not None:
+                    serializer = FacebookCommentSerializer(page, many=True)
+                    return self.get_paginated_response(serializer.data)
+                
+                serializer = FacebookCommentSerializer(comments, many=True)
+                return Response({
+                    'category': 'comments',
+                    'results': serializer.data
+                })
+            
+            else:
+                return Response({'error': 'Unknown folder category'}, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 class FacebookPostViewSet(viewsets.ModelViewSet):
     """
@@ -302,16 +410,54 @@ class FacebookPostViewSet(viewsets.ModelViewSet):
                         status=status.HTTP_400_BAD_REQUEST
                     )
             
-            content_type = request.data.get('content_type', 'post')
-            if content_type not in ['post', 'reel']:
+            # Decode and parse CSV with proper encoding handling
+            try:
+                # Try UTF-8 first, then UTF-8 with BOM, then fallback to other encodings
+                try:
+                    decoded_file = csv_file.read().decode('utf-8-sig')
+                except UnicodeDecodeError:
+                    csv_file.seek(0)  # Reset file pointer
+                    try:
+                        decoded_file = csv_file.read().decode('utf-8')
+                    except UnicodeDecodeError:
+                        csv_file.seek(0)  # Reset file pointer
+                        try:
+                            decoded_file = csv_file.read().decode('latin1')
+                        except UnicodeDecodeError:
+                            csv_file.seek(0)  # Reset file pointer
+                            decoded_file = csv_file.read().decode('cp1252', errors='replace')
+                
+                # Clean up any problematic characters that might cause issues
+                # Replace null bytes and other control characters
+                decoded_file = decoded_file.replace('\x00', '').replace('\r\n', '\n').replace('\r', '\n')
+                
+            except Exception as e:
                 return Response(
-                    {'error': 'Invalid content_type. Must be either "post" or "reel"'},
+                    {'error': f'Error reading CSV file. Please ensure it is a valid UTF-8 encoded CSV file. Error: {str(e)}'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Decode and parse CSV
-            decoded_file = csv_file.read().decode('utf-8-sig')  # Handle BOM
             csv_data = csv.DictReader(io.StringIO(decoded_file))
+            
+            # Auto-detect content type based on CSV headers
+            headers = set(csv_data.fieldnames or [])
+            
+            # Define unique fields for each content type
+            post_unique_fields = {'num_likes_type', 'original_post', 'attachments', 'post_type', 'post_external_link'}
+            reel_unique_fields = {'video_view_count', 'length', 'audio', 'thumbnail'}
+            
+            # Detect content type based on presence of unique fields
+            post_matches = len(headers.intersection(post_unique_fields))
+            reel_matches = len(headers.intersection(reel_unique_fields))
+            
+            if reel_matches > post_matches:
+                content_type = 'reel'
+                detected_reason = f"Detected as reel (found {reel_matches} reel-specific fields: {headers.intersection(reel_unique_fields)})"
+            else:
+                content_type = 'post'
+                detected_reason = f"Detected as post (found {post_matches} post-specific fields: {headers.intersection(post_unique_fields)})"
+            
+            print(f"Auto-detection result: {detected_reason}")
             
             rows_processed = 0
             rows_added = 0
@@ -326,242 +472,172 @@ class FacebookPostViewSet(viewsets.ModelViewSet):
                 
                 rows_processed += 1
                 
-                # Extract and validate required fields
-                url = row.get('url', '').strip('"')
-                post_id = row.get('post_id', '').strip('"')
+                # Debug: Print first few rows
+                if rows_processed <= 3:
+                    print(f"Row {rows_processed}: {dict(row)}")
                 
-                if not url:
-                    errors.append(f"Row {rows_processed}: Missing URL")
+                # Check if this row has warning or error messages indicating no comments
+                warning = row.get('warning', '').strip()
+                error = row.get('error', '').strip()
+                
+                # Skip rows with specific warnings/errors that indicate no actual comment data
+                if warning in ['This post has no comments.', 'For this type of posts (reels) comments are not available.'] or \
+                   error in ['Crawl failed after multiple attempts, please try again later']:
                     rows_skipped += 1
+                    print(f"Skipping row {rows_processed}: {warning or error}")
                     continue
                 
-                if not post_id:
-                    # Generate a pseudo-ID from URL if missing
-                    from hashlib import md5
-                    post_id = md5(url.encode()).hexdigest()[:16]
+                # Extract and validate required fields - be flexible with field extraction
+                comment_id = ''
+                for key in ['comment_id', 'id']:
+                    if key in row and row[key]:
+                        comment_id = str(row[key]).strip().strip('"').strip("'")
+                        break
+                
+                # Check if comment text exists
+                comment_text = ''
+                for key in ['comment_text', 'text', 'content', 'comment']:
+                    if key in row and row[key]:
+                        comment_text = str(row[key]).strip().strip('"').strip("'")
+                        break
+                
+                # Skip rows with empty comment text
+                if not comment_text:
+                    rows_skipped += 1
+                    print(f"Skipping row {rows_processed}: Empty comment text")
+                    continue
+                
+                # Try to extract post_id from multiple possible sources
+                post_id = ''
+                for key in ['post_id', 'id', 'original_post_id']:
+                    if key in row and row[key]:
+                        post_id = str(row[key]).strip().strip('"').strip("'")
+                        break
+                
+                # Debug: Print field extraction
+                if rows_processed <= 3:
+                    print(f"Extracted comment_id: '{comment_id}', comment_text: '{comment_text}', post_id: '{post_id}'")
+                
+                if not comment_id:
+                    errors.append(f"Row {rows_processed}: Missing comment_id")
+                    rows_skipped += 1
+                    print(f"Skipping row {rows_processed}: Missing comment_id")
+                    continue
                 
                 try:
-                    # Parse date fields - handle empty strings 
-                    date_posted_raw = row.get('date_posted', None)
-                    parsed_date = self._parse_date(date_posted_raw)
-                    
-                    # If date parsing failed but timestamp is available, try to use that
-                    if parsed_date is None and row.get('timestamp'):
-                        parsed_date = self._parse_date(row.get('timestamp'))
-                    
-                    # Process hashtags
-                    hashtags_raw = row.get('hashtags', '')
-                    hashtags_value = hashtags_raw
-                    
-                    # If hashtags is in JSON format (array string), keep it as is
-                    # Otherwise, assume it's comma-separated
-                    if not (hashtags_raw.startswith('[') and hashtags_raw.endswith(']')):
-                        if hashtags_raw and ',' in hashtags_raw:
-                            hashtags_list = [tag.strip() for tag in hashtags_raw.split(',')]
-                            hashtags_value = ','.join(hashtags_list)
-
-                    # user_posted is optional and can be determined from various alternative fields
-                    # We try to find it from these fields in the following order: user_posted -> page_name -> user_username_raw
-                    user_posted = row.get('user_posted', '')
-                    if not user_posted:
-                        user_posted = row.get('page_name', '')
-                    if not user_posted:
-                        user_posted = row.get('user_username_raw', '')
-                    
-                    # Determine description/content from various possible fields
-                    description = row.get('description', '')
-                    if not description:
-                        description = row.get('content', '')
-                    
-                    # Parse JSON fields if they exist
-                    num_likes_type = None
-                    if row.get('num_likes_type'):
+                    # Parse date field
+                    date_created_raw = row.get('date_created', None)
+                    parsed_date = None
+                    if date_created_raw:
                         try:
-                            # Try parsing as JSON, but if that fails, store as text
-                            num_likes_type = json.loads(row.get('num_likes_type'))
-                        except json.JSONDecodeError:
-                            # Just store as text
-                            num_likes_type = row.get('num_likes_type')
+                            # Try parsing with dateutil first
+                            from dateutil import parser as date_parser
+                            parsed_date = date_parser.parse(str(date_created_raw))
+                        except (ValueError, TypeError, ImportError):
+                            # Fallback parsing
+                            try:
+                                parsed_date = datetime.datetime.fromisoformat(str(date_created_raw).replace('Z', '+00:00'))
+                            except (ValueError, TypeError):
+                                print(f"Could not parse date_created: {date_created_raw}")
                     
-                    count_reactions_type = None
-                    if row.get('count_reactions_type'):
+                    # Safe integer conversion
+                    def safe_int(value, default=0):
                         try:
-                            count_reactions_type = json.loads(row.get('count_reactions_type'))
-                        except json.JSONDecodeError:
-                            # Store as text if not valid JSON
-                            count_reactions_type = row.get('count_reactions_type')
+                            if value is None or value == '' or value == '""':
+                                return default
+                            # Handle string numbers
+                            cleaned_value = str(value).strip().strip('"').strip("'")
+                            if not cleaned_value:
+                                return default
+                            return int(float(cleaned_value))  # Convert via float to handle decimal strings
+                        except (ValueError, TypeError):
+                            return default
                     
-                    attachments_data = None
-                    if row.get('attachments'):
+                    # Extract fields with flexible key names and safe string handling
+                    def get_field(row, *keys):
+                        for key in keys:
+                            if key in row and row[key] is not None:
+                                try:
+                                    value = str(row[key]).strip().strip('"').strip("'")
+                                    return value if value else ''
+                                except (UnicodeEncodeError, UnicodeDecodeError):
+                                    # Handle problematic Unicode characters
+                                    try:
+                                        value = str(row[key]).encode('utf-8', errors='replace').decode('utf-8').strip().strip('"').strip("'")
+                                        return value if value else ''
+                                    except:
+                                        return ''
+                        return ''
+                    
+                    # Try to find related Facebook post
+                    facebook_post = None
+                    if post_id:
                         try:
-                            attachments_data = json.loads(row.get('attachments'))
-                        except json.JSONDecodeError:
-                            # Store as text if not valid JSON
-                            attachments_data = row.get('attachments')
+                            facebook_post = FacebookPost.objects.filter(post_id=post_id).first()
+                        except FacebookPost.DoesNotExist:
+                            pass
                     
-                    original_post = None
-                    if row.get('original_post'):
-                        try:
-                            original_post = json.loads(row.get('original_post'))
-                        except json.JSONDecodeError:
-                            # Store as text if not valid JSON
-                            original_post = row.get('original_post')
+                    # Handle Unicode characters properly in comment text
+                    try:
+                        clean_comment_text = comment_text.encode('utf-8', errors='replace').decode('utf-8')
+                    except:
+                        clean_comment_text = comment_text
                     
-                    active_ads_urls = None
-                    if row.get('active_ads_urls'):
-                        try:
-                            active_ads_urls = json.loads(row.get('active_ads_urls'))
-                        except json.JSONDecodeError:
-                            # Store as text if not valid JSON
-                            active_ads_urls = row.get('active_ads_urls')
-                    
-                    input_data = None
-                    if row.get('input'):
-                        try:
-                            input_data = json.loads(row.get('input'))
-                        except json.JSONDecodeError:
-                            # Store as text if not valid JSON
-                            input_data = row.get('input')
-                    
-                    # Prepare the default data dictionary with all possible fields from the CSV
-                    default_data = {
-                        # Basic fields
-                        'url': url,
+                    # Prepare the comment data
+                    comment_data = {
+                        'comment_id': comment_id,
+                        'folder': folder,
+                        'facebook_post': facebook_post,
+                        'url': get_field(row, 'url', 'post_url'),
                         'post_id': post_id,
-                        'user_url': row.get('user_url', ''),
-                        'user_posted': user_posted,
-                        'user_username_raw': row.get('user_username_raw', ''),
-                        
-                        # Content fields
-                        'content': row.get('content', ''),
-                        'description': description,
-                        'hashtags': hashtags_value,
-                        'date_posted': parsed_date,
-                        
-                        # Engagement metrics
-                        'num_comments': self._safe_int_convert(row.get('num_comments')),
-                        'num_shares': self._safe_int_convert(row.get('num_shares')),
-                        'likes': self._safe_int_convert(row.get('likes')),
-                        'video_view_count': self._safe_int_convert(row.get('video_view_count')),
-                        'num_likes_type': num_likes_type,
-                        'count_reactions_type': count_reactions_type,
-                        
-                        # Page/Profile information
-                        'page_name': row.get('page_name', ''),
-                        'profile_id': row.get('profile_id', ''),
-                        'page_intro': row.get('page_intro', ''),
-                        'page_category': row.get('page_category', ''),
-                        'page_logo': row.get('page_logo', ''),
-                        'page_external_website': row.get('page_external_website', ''),
-                        'page_likes': self._safe_int_convert(row.get('page_likes')),
-                        'page_followers': self._safe_int_convert(row.get('page_followers')),
-                        'page_is_verified': self._safe_bool_convert(row.get('page_is_verified')),
-                        'followers': self._safe_int_convert(row.get('followers')),
-                        'page_phone': row.get('page_phone', ''),
-                        'page_email': row.get('page_email', ''),
-                        'page_creation_time': self._parse_date(row.get('page_creation_time')),
-                        'page_reviews_score': row.get('page_reviews_score', ''),
-                        'page_reviewers_amount': self._safe_int_convert(row.get('page_reviewers_amount')),
-                        'page_price_range': row.get('page_price_range', ''),
-                        
-                        # Media content
-                        'photos': row.get('photos', ''),
-                        'videos': row.get('videos', ''),
-                        'attachments_data': attachments_data,
-                        'thumbnail': row.get('thumbnail', ''),
-                        'external_link': row.get('external_link', ''),
-                        'post_image': row.get('post_image', ''),
-                        
-                        # External content
-                        'post_external_link': row.get('post_external_link', ''),
-                        'post_external_title': row.get('post_external_title', ''),
-                        'post_external_image': row.get('post_external_image', ''),
-                        'link_description_text': row.get('link_description_text', ''),
-                        
-                        # Profile images and URLs
-                        'page_url': row.get('page_url', ''),
-                        'header_image': row.get('header_image', ''),
-                        'avatar_image_url': row.get('avatar_image_url', ''),
-                        'profile_handle': row.get('profile_handle', ''),
-                        'profile_image_link': row.get('profile_image_link', ''),
-                        
-                        # Reel specific fields
-                        'shortcode': row.get('shortcode', ''),
-                        'length': self._safe_float_convert(row.get('length')),
-                        'audio': row.get('audio', ''),
-                        
-                        # Metadata and flags
-                        'is_verified': self._safe_bool_convert(row.get('is_verified')),
-                        'has_handshake': self._safe_bool_convert(row.get('has_handshake')),
-                        'is_sponsored': self._safe_bool_convert(row.get('is_sponsored')),
-                        'sponsor_name': row.get('sponsor_name', ''),
-                        'is_paid_partnership': self._safe_bool_convert(row.get('is_paid_partnership')),
-                        'is_page': self._safe_bool_convert(row.get('is_page')),
-                        'include_profile_data': self._safe_bool_convert(row.get('include_profile_data')),
-                        
-                        # Additional metadata
-                        'location': row.get('location', ''),
-                        'latest_comments': row.get('latest_comments', ''),
-                        'about': row.get('about', ''),
-                        'active_ads_urls': active_ads_urls,
-                        'delegate_page_id': row.get('delegate_page_id', ''),
-                        'original_post': original_post,
-                        'other_posts_url': row.get('other_posts_url', ''),
-                        
-                        # Content type information
-                        'content_type': content_type,  # Set from the request parameter
-                        'platform_type': 'FB Post' if content_type == 'post' else 'FB Reel',
-                        'post_type': row.get('post_type', ''),
-                        
-                        # Fetch parameters
-                        'days_range': self._safe_int_convert(row.get('days_range')),
-                        'num_of_posts': self._safe_int_convert(row.get('num_of_posts')),
-                        'posts_count': self._safe_int_convert(row.get('posts_count')),
-                        'posts_to_not_include': row.get('posts_to_not_include', ''),
-                        'until_date': self._parse_date(row.get('until_date')),
-                        'from_date': self._parse_date(row.get('from_date')),
-                        'start_date': self._parse_date(row.get('start_date')),
-                        'end_date': self._parse_date(row.get('end_date')),
-                        'following': self._safe_int_convert(row.get('following')),
-                        
-                        # API response fields
-                        'timestamp': self._parse_date(row.get('timestamp')),
-                        'input': input_data,
-                        'error': row.get('error', ''),
-                        'error_code': row.get('error_code', ''),
-                        'warning': row.get('warning', ''),
-                        'warning_code': row.get('warning_code', ''),
-                        
-                        # Other fields
-                        'tagged_users': row.get('tagged_users', ''),
-                        'engagement_score': self._safe_float_convert(row.get('engagement_score_view', 0)),
-                        'discovery_input': row.get('discovery_input', ''),
+                        'post_url': get_field(row, 'post_url', 'url'),
+                        'user_name': get_field(row, 'user_name', 'username'),
+                        'user_id': get_field(row, 'user_id', 'userid'),
+                        'user_url': get_field(row, 'user_url', 'profile_url'),
+                        'commentator_profile': get_field(row, 'commentator_profile', 'profile'),
+                        'comment_text': clean_comment_text,
+                        'date_created': parsed_date,
+                        'comment_link': get_field(row, 'comment_link', 'link'),
+                        'num_likes': safe_int(row.get('num_likes', 0)),
+                        'num_replies': safe_int(row.get('num_replies', 0)),
+                        'attached_files': get_field(row, 'attached_files', 'attachments'),
+                        'video_length': safe_int(row.get('video_length')) if row.get('video_length') else None,
+                        'source_type': get_field(row, 'source_type', 'type'),
+                        'subtype': get_field(row, 'subtype'),
+                        'type': get_field(row, 'type', 'comment_type'),
                     }
                     
-                    # Set folder relationship if provided
-                    if folder:
-                        default_data['folder'] = folder
+                    # Debug: Print comment data for first few rows
+                    if rows_processed <= 3:
+                        print(f"Comment data for row {rows_processed}: {comment_data}")
                     
-                    # Try to find existing record with the same post_id and folder
-                    existing_post = FacebookPost.objects.filter(
-                        post_id=post_id,
+                    # Try to find existing comment
+                    existing_comment = FacebookComment.objects.filter(
+                        comment_id=comment_id,
                         folder=folder
                     ).first()
                     
-                    if existing_post:
+                    if existing_comment:
                         # Update the existing record
-                        for key, value in default_data.items():
-                            setattr(existing_post, key, value)
-                        existing_post.save()
+                        for key, value in comment_data.items():
+                            if key != 'folder':  # Don't update the folder field
+                                setattr(existing_comment, key, value)
+                        existing_comment.save()
                         rows_updated += 1
+                        print(f"Updated comment: {comment_id}")
                     else:
                         # Create a new record
-                        FacebookPost.objects.create(**default_data)
+                        new_comment = FacebookComment.objects.create(**comment_data)
                         rows_added += 1
+                        print(f"Created new comment: {comment_id}")
                         
                 except Exception as e:
-                    errors.append(f"Error processing row {rows_processed}: {str(e)}")
+                    error_msg = f"Error processing row {rows_processed}: {str(e)}"
+                    errors.append(error_msg)
                     rows_skipped += 1
+                    print(error_msg)
+                    # Continue processing other rows
+                    continue
             
             # Prepare response
             response_data = {
@@ -571,6 +647,8 @@ class FacebookPostViewSet(viewsets.ModelViewSet):
                 'rows_added': rows_added,
                 'rows_updated': rows_updated,
                 'rows_skipped': rows_skipped,
+                'detected_content_type': content_type,
+                'detection_reason': detected_reason,
             }
             
             if errors:
@@ -678,9 +756,12 @@ class FacebookPostViewSet(viewsets.ModelViewSet):
             # Get posts
             posts = FacebookPost.objects.filter(**query).order_by('-date_posted')
             
-            # Create CSV response
-            response = HttpResponse(content_type='text/csv')
+            # Create CSV response with explicit UTF-8 encoding and BOM
+            response = HttpResponse(content_type='text/csv; charset=utf-8')
             response['Content-Disposition'] = f'attachment; filename="facebook_data_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+            
+            # Add UTF-8 BOM for better CSV compatibility
+            response.write('\ufeff')
             
             # Create CSV writer and write header
             writer = csv.writer(response)
@@ -713,8 +794,22 @@ class FacebookPostViewSet(viewsets.ModelViewSet):
                     'warning', 'warning_code'
                 ])
             
-            # Write the data rows
+            # Write the data rows with proper Unicode handling
             for post in posts:
+                # Ensure all text fields are properly encoded
+                def safe_text(value):
+                    if value is None:
+                        return ''
+                    try:
+                        # Ensure the value is a string and handle Unicode properly
+                        text_value = str(value)
+                        # Remove any null bytes or control characters that might cause issues
+                        text_value = text_value.replace('\x00', '').replace('\r', '').replace('\n', ' ')
+                        return text_value
+                    except (UnicodeEncodeError, UnicodeDecodeError):
+                        # If there are encoding issues, use replace mode
+                        return str(value).encode('utf-8', errors='replace').decode('utf-8')
+                
                 # Convert JSON fields to strings if needed
                 def safe_json_stringify(field_value):
                     """Safely convert any value to a JSON string or return empty string"""
@@ -728,20 +823,20 @@ class FacebookPostViewSet(viewsets.ModelViewSet):
                             try:
                                 # Try to validate it by parsing and re-stringifying
                                 parsed = json.loads(field_value)
-                                return json.dumps(parsed)
+                                return json.dumps(parsed, ensure_ascii=False)
                             except json.JSONDecodeError:
                                 # Just return as is if it looks like JSON but isn't valid
-                                return field_value
+                                return safe_text(field_value)
                         else:
                             # Regular string, return as is
-                            return field_value
+                            return safe_text(field_value)
                     
                     # Try to convert to JSON
                     try:
-                        return json.dumps(field_value)
+                        return json.dumps(field_value, ensure_ascii=False)
                     except (TypeError, ValueError):
                         # If all else fails, convert to string
-                        return str(field_value)
+                        return safe_text(field_value)
                 
                 num_likes_type_str = safe_json_stringify(post.num_likes_type)
                 count_reactions_type_str = safe_json_stringify(post.count_reactions_type)
@@ -762,38 +857,607 @@ class FacebookPostViewSet(viewsets.ModelViewSet):
                 # Write row based on content type
                 if post.content_type == 'reel':
                     writer.writerow([
-                        post.url, post.post_id, post.user_url, post.user_username_raw, post.content,
-                        date_posted_str, post.hashtags, post.num_comments, post.num_shares,
-                        post.video_view_count, post.likes, post.page_name, post.profile_id,
-                        post.page_intro, post.page_category, post.page_logo, post.page_external_website,
-                        post.page_likes, post.page_followers, post.page_is_verified, post.thumbnail,
-                        post.external_link, post.page_url, post.header_image, post.avatar_image_url,
-                        post.profile_handle, post.shortcode, post.length, post.audio, post.num_of_posts,
-                        post.posts_to_not_include, until_date_str, from_date_str, start_date_str,
-                        end_date_str, timestamp_str, input_str, post.error, post.error_code,
-                        post.warning, post.warning_code
+                        safe_text(post.url), safe_text(post.post_id), safe_text(post.user_url), 
+                        safe_text(post.user_username_raw), safe_text(post.content),
+                        date_posted_str, safe_text(post.hashtags), post.num_comments, post.num_shares,
+                        post.video_view_count, post.likes, safe_text(post.page_name), safe_text(post.profile_id),
+                        safe_text(post.page_intro), safe_text(post.page_category), safe_text(post.page_logo), 
+                        safe_text(post.page_external_website), post.page_likes, post.page_followers, 
+                        post.page_is_verified, safe_text(post.thumbnail), safe_text(post.external_link), 
+                        safe_text(post.page_url), safe_text(post.header_image), safe_text(post.avatar_image_url),
+                        safe_text(post.profile_handle), safe_text(post.shortcode), safe_text(post.length), 
+                        safe_text(post.audio), post.num_of_posts, safe_text(post.posts_to_not_include), 
+                        until_date_str, from_date_str, start_date_str, end_date_str, timestamp_str, 
+                        input_str, safe_text(post.error), safe_text(post.error_code), safe_text(post.warning), 
+                        safe_text(post.warning_code)
                     ])
                 else:  # Post
                     writer.writerow([
-                        post.url, post.post_id, post.user_url, post.user_username_raw, post.content,
-                        date_posted_str, post.hashtags, post.num_comments, post.num_shares,
-                        num_likes_type_str, post.page_name, post.profile_id, post.page_intro,
-                        post.page_category, post.page_logo, post.page_external_website, post.page_likes,
-                        post.page_followers, post.page_is_verified, original_post_str, attachments_data_str,
-                        post.other_posts_url, post.post_external_link, post.post_external_title,
-                        post.post_external_image, post.page_url, post.header_image, post.avatar_image_url,
-                        post.profile_handle, post.has_handshake, post.is_sponsored, post.sponsor_name,
-                        post.shortcode, post.video_view_count, post.likes, post.days_range,
-                        post.num_of_posts, post.post_image, post.posts_to_not_include, until_date_str,
-                        from_date_str, post.post_type, post.following, start_date_str, end_date_str,
-                        post.link_description_text, count_reactions_type_str, post.is_page,
-                        post.include_profile_data, post.page_phone, post.page_email, page_creation_time_str,
-                        post.page_reviews_score, post.page_reviewers_amount, post.page_price_range,
-                        post.about, active_ads_urls_str, post.delegate_page_id, timestamp_str, input_str,
-                        post.error, post.error_code, post.warning, post.warning_code
+                        safe_text(post.url), safe_text(post.post_id), safe_text(post.user_url), 
+                        safe_text(post.user_username_raw), safe_text(post.content), date_posted_str, 
+                        safe_text(post.hashtags), post.num_comments, post.num_shares, num_likes_type_str, 
+                        safe_text(post.page_name), safe_text(post.profile_id), safe_text(post.page_intro),
+                        safe_text(post.page_category), safe_text(post.page_logo), safe_text(post.page_external_website), 
+                        post.page_likes, post.page_followers, post.page_is_verified, original_post_str, 
+                        attachments_data_str, safe_text(post.other_posts_url), safe_text(post.post_external_link), 
+                        safe_text(post.post_external_title), safe_text(post.post_external_image), 
+                        safe_text(post.page_url), safe_text(post.header_image), safe_text(post.avatar_image_url),
+                        safe_text(post.profile_handle), post.has_handshake, post.is_sponsored, 
+                        safe_text(post.sponsor_name), safe_text(post.shortcode), post.video_view_count, 
+                        post.likes, post.days_range, post.num_of_posts, safe_text(post.post_image), 
+                        safe_text(post.posts_to_not_include), until_date_str, from_date_str, 
+                        safe_text(post.post_type), post.following, start_date_str, end_date_str,
+                        safe_text(post.link_description_text), count_reactions_type_str, post.is_page,
+                        post.include_profile_data, safe_text(post.page_phone), safe_text(post.page_email), 
+                        page_creation_time_str, post.page_reviews_score, post.page_reviewers_amount, 
+                        safe_text(post.page_price_range), safe_text(post.about), active_ads_urls_str, 
+                        safe_text(post.delegate_page_id), timestamp_str, input_str, safe_text(post.error), 
+                        safe_text(post.error_code), safe_text(post.warning), safe_text(post.warning_code)
                     ])
             
             return response
         
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class FacebookCommentViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for Facebook Comments
+    """
+    serializer_class = FacebookCommentSerializer
+    permission_classes = [AllowAny]  # For testing, use proper permissions in production
+    
+    def get_queryset(self):
+        """
+        Filter comments by post_id, user_name, or date range
+        """
+        try:
+            queryset = FacebookComment.objects.all()
+            
+            # Filter by post_id if specified
+            post_id = self.request.query_params.get('post_id')
+            if post_id:
+                queryset = queryset.filter(post_id=post_id)
+            
+            # Filter by user_name if specified
+            user_name = self.request.query_params.get('user_name')
+            if user_name:
+                queryset = queryset.filter(user_name__icontains=user_name)
+            
+            # Filter by date range
+            start_date = self.request.query_params.get('start_date')
+            end_date = self.request.query_params.get('end_date')
+            
+            if start_date:
+                try:
+                    start_date_obj = datetime.datetime.strptime(start_date, '%Y-%m-%d').date()
+                    queryset = queryset.filter(date_created__gte=start_date_obj)
+                except ValueError:
+                    pass
+            
+            if end_date:
+                try:
+                    end_date_obj = datetime.datetime.strptime(end_date, '%Y-%m-%d').date()
+                    queryset = queryset.filter(date_created__lte=end_date_obj)
+                except ValueError:
+                    pass
+            
+            # Add search functionality
+            search_query = self.request.query_params.get('search', '')
+            if search_query:
+                search_filter = Q()
+                search_filter |= Q(user_name__icontains=search_query)
+                search_filter |= Q(comment_text__icontains=search_query)
+                search_filter |= Q(post_id__icontains=search_query)
+                queryset = queryset.filter(search_filter)
+            
+            return queryset
+        except Exception as e:
+            print(f"Error in get_queryset: {str(e)}")
+            return FacebookComment.objects.none()
+    
+    @action(detail=False, methods=['GET'])
+    def stats(self, request):
+        """
+        Get statistics about comments
+        """
+        try:
+            post_id = request.query_params.get('post_id')
+            folder_id = request.query_params.get('folder_id')
+            
+            # Base queryset
+            queryset = self.get_queryset()
+            if post_id:
+                queryset = queryset.filter(post_id=post_id)
+            if folder_id:
+                queryset = queryset.filter(folder_id=folder_id)
+            
+            # Calculate statistics
+            total_comments = queryset.count()
+            unique_commenters = queryset.values('user_id').distinct().count()
+            avg_likes = queryset.aggregate(avg_likes=models.Avg('num_likes'))['avg_likes'] or 0
+            avg_replies = queryset.aggregate(avg_replies=models.Avg('num_replies'))['avg_replies'] or 0
+            
+            stats = {
+                'totalComments': total_comments,
+                'uniqueCommenters': unique_commenters,
+                'avgLikes': round(avg_likes, 2),
+                'avgReplies': round(avg_replies, 2),
+            }
+            
+            return Response(stats, status=status.HTTP_200_OK)
+        except Exception as e:
+            print(f"Error in stats view: {str(e)}")
+            return Response(
+                {'error': 'An error occurred while retrieving statistics'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['POST'])
+    def upload_csv(self, request):
+        """
+        Upload CSV file and parse comment data
+        """
+        try:
+            csv_file = request.FILES.get('file')
+            if not csv_file:
+                return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            folder_id = request.data.get('folder_id')
+            folder = None
+            if folder_id:
+                try:
+                    folder = Folder.objects.get(id=folder_id)
+                    # Verify this is a comments folder
+                    if folder.category != 'comments':
+                        return Response(
+                            {'error': 'Selected folder is not configured for comments'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                except Folder.DoesNotExist:
+                    return Response(
+                        {'error': f'Folder with id {folder_id} does not exist'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            # Decode and parse CSV with proper encoding handling
+            try:
+                # Try UTF-8 first, then UTF-8 with BOM, then fallback to other encodings
+                try:
+                    decoded_file = csv_file.read().decode('utf-8-sig')
+                except UnicodeDecodeError:
+                    csv_file.seek(0)  # Reset file pointer
+                    try:
+                        decoded_file = csv_file.read().decode('utf-8')
+                    except UnicodeDecodeError:
+                        csv_file.seek(0)  # Reset file pointer
+                        try:
+                            decoded_file = csv_file.read().decode('latin1')
+                        except UnicodeDecodeError:
+                            csv_file.seek(0)  # Reset file pointer
+                            decoded_file = csv_file.read().decode('cp1252', errors='replace')
+                
+                # Clean up any problematic characters that might cause issues
+                # Replace null bytes and other control characters
+                decoded_file = decoded_file.replace('\x00', '').replace('\r\n', '\n').replace('\r', '\n')
+                
+            except Exception as e:
+                return Response(
+                    {'error': f'Error reading CSV file. Please ensure it is a valid UTF-8 encoded CSV file. Error: {str(e)}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            csv_data = csv.DictReader(io.StringIO(decoded_file))
+            
+            rows_processed = 0
+            rows_added = 0
+            rows_updated = 0
+            rows_skipped = 0
+            errors = []
+            
+            # Debug: Check CSV headers
+            fieldnames = csv_data.fieldnames
+            print(f"CSV Headers: {fieldnames}")
+            
+            for row in csv_data:
+                # Skip empty rows
+                if not row or all(not v for v in row.values()):
+                    continue
+                
+                rows_processed += 1
+                
+                # Debug: Print first few rows
+                if rows_processed <= 3:
+                    print(f"Row {rows_processed}: {dict(row)}")
+                
+                # Check if this row has warning or error messages indicating no comments
+                warning = row.get('warning', '').strip()
+                error = row.get('error', '').strip()
+                
+                # Skip rows with specific warnings/errors that indicate no actual comment data
+                if warning in ['This post has no comments.', 'For this type of posts (reels) comments are not available.'] or \
+                   error in ['Crawl failed after multiple attempts, please try again later']:
+                    rows_skipped += 1
+                    print(f"Skipping row {rows_processed}: {warning or error}")
+                    continue
+                
+                # Extract and validate required fields - be flexible with field extraction
+                comment_id = ''
+                for key in ['comment_id', 'id']:
+                    if key in row and row[key]:
+                        comment_id = str(row[key]).strip().strip('"').strip("'")
+                        break
+                
+                # Check if comment text exists
+                comment_text = ''
+                for key in ['comment_text', 'text', 'content', 'comment']:
+                    if key in row and row[key]:
+                        comment_text = str(row[key]).strip().strip('"').strip("'")
+                        break
+                
+                # Skip rows with empty comment text
+                if not comment_text:
+                    rows_skipped += 1
+                    print(f"Skipping row {rows_processed}: Empty comment text")
+                    continue
+                
+                # Try to extract post_id from multiple possible sources
+                post_id = ''
+                for key in ['post_id', 'id', 'original_post_id']:
+                    if key in row and row[key]:
+                        post_id = str(row[key]).strip().strip('"').strip("'")
+                        break
+                
+                # Debug: Print field extraction
+                if rows_processed <= 3:
+                    print(f"Extracted comment_id: '{comment_id}', comment_text: '{comment_text}', post_id: '{post_id}'")
+                
+                if not comment_id:
+                    errors.append(f"Row {rows_processed}: Missing comment_id")
+                    rows_skipped += 1
+                    print(f"Skipping row {rows_processed}: Missing comment_id")
+                    continue
+                
+                try:
+                    # Parse date field
+                    date_created_raw = row.get('date_created', None)
+                    parsed_date = None
+                    if date_created_raw:
+                        try:
+                            # Try parsing with dateutil first
+                            from dateutil import parser as date_parser
+                            parsed_date = date_parser.parse(str(date_created_raw))
+                        except (ValueError, TypeError, ImportError):
+                            # Fallback parsing
+                            try:
+                                parsed_date = datetime.datetime.fromisoformat(str(date_created_raw).replace('Z', '+00:00'))
+                            except (ValueError, TypeError):
+                                print(f"Could not parse date_created: {date_created_raw}")
+                    
+                    # Safe integer conversion
+                    def safe_int(value, default=0):
+                        try:
+                            if value is None or value == '' or value == '""':
+                                return default
+                            # Handle string numbers
+                            cleaned_value = str(value).strip().strip('"').strip("'")
+                            if not cleaned_value:
+                                return default
+                            return int(float(cleaned_value))  # Convert via float to handle decimal strings
+                        except (ValueError, TypeError):
+                            return default
+                    
+                    # Extract fields with flexible key names and safe string handling
+                    def get_field(row, *keys):
+                        for key in keys:
+                            if key in row and row[key] is not None:
+                                try:
+                                    value = str(row[key]).strip().strip('"').strip("'")
+                                    return value if value else ''
+                                except (UnicodeEncodeError, UnicodeDecodeError):
+                                    # Handle problematic Unicode characters
+                                    try:
+                                        value = str(row[key]).encode('utf-8', errors='replace').decode('utf-8').strip().strip('"').strip("'")
+                                        return value if value else ''
+                                    except:
+                                        return ''
+                        return ''
+                    
+                    # Try to find related Facebook post
+                    facebook_post = None
+                    if post_id:
+                        try:
+                            facebook_post = FacebookPost.objects.filter(post_id=post_id).first()
+                        except FacebookPost.DoesNotExist:
+                            pass
+                    
+                    # Handle Unicode characters properly in comment text
+                    try:
+                        clean_comment_text = comment_text.encode('utf-8', errors='replace').decode('utf-8')
+                    except:
+                        clean_comment_text = comment_text
+                    
+                    # Prepare the comment data
+                    comment_data = {
+                        'comment_id': comment_id,
+                        'folder': folder,
+                        'facebook_post': facebook_post,
+                        'url': get_field(row, 'url', 'post_url'),
+                        'post_id': post_id,
+                        'post_url': get_field(row, 'post_url', 'url'),
+                        'user_name': get_field(row, 'user_name', 'username'),
+                        'user_id': get_field(row, 'user_id', 'userid'),
+                        'user_url': get_field(row, 'user_url', 'profile_url'),
+                        'commentator_profile': get_field(row, 'commentator_profile', 'profile'),
+                        'comment_text': clean_comment_text,
+                        'date_created': parsed_date,
+                        'comment_link': get_field(row, 'comment_link', 'link'),
+                        'num_likes': safe_int(row.get('num_likes', 0)),
+                        'num_replies': safe_int(row.get('num_replies', 0)),
+                        'attached_files': get_field(row, 'attached_files', 'attachments'),
+                        'video_length': safe_int(row.get('video_length')) if row.get('video_length') else None,
+                        'source_type': get_field(row, 'source_type', 'type'),
+                        'subtype': get_field(row, 'subtype'),
+                        'type': get_field(row, 'type', 'comment_type'),
+                    }
+                    
+                    # Debug: Print comment data for first few rows
+                    if rows_processed <= 3:
+                        print(f"Comment data for row {rows_processed}: {comment_data}")
+                    
+                    # Try to find existing comment
+                    existing_comment = FacebookComment.objects.filter(
+                        comment_id=comment_id,
+                        folder=folder
+                    ).first()
+                    
+                    if existing_comment:
+                        # Update the existing record
+                        for key, value in comment_data.items():
+                            if key != 'folder':  # Don't update the folder field
+                                setattr(existing_comment, key, value)
+                        existing_comment.save()
+                        rows_updated += 1
+                        print(f"Updated comment: {comment_id}")
+                    else:
+                        # Create a new record
+                        new_comment = FacebookComment.objects.create(**comment_data)
+                        rows_added += 1
+                        print(f"Created new comment: {comment_id}")
+                        
+                except Exception as e:
+                    error_msg = f"Error processing row {rows_processed}: {str(e)}"
+                    errors.append(error_msg)
+                    rows_skipped += 1
+                    print(error_msg)
+                    # Continue processing other rows
+                    continue
+            
+            # Prepare response
+            response_data = {
+                'status': 'success',
+                'message': f'CSV processed successfully. {rows_processed} rows processed, {rows_added} added, {rows_updated} updated, {rows_skipped} skipped.',
+                'rows_processed': rows_processed,
+                'rows_added': rows_added,
+                'rows_updated': rows_updated,
+                'rows_skipped': rows_skipped,
+            }
+            
+            if errors:
+                response_data['errors'] = errors[:10]  # Limit number of errors returned
+                response_data['total_errors'] = len(errors)
+            
+            print(f"Upload completed: {response_data}")
+            return Response(response_data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            error_msg = f'Error processing CSV file: {str(e)}'
+            print(error_msg)
+            return Response(
+                {'error': error_msg},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=False, methods=['GET'])
+    def download_csv(self, request):
+        """
+        Download comments as CSV
+        """
+        try:
+            # Get filtered queryset
+            comments = self.get_queryset()
+            
+            # Filter by folder_id if provided
+            folder_id = request.query_params.get('folder_id')
+            if folder_id:
+                comments = comments.filter(folder_id=folder_id)
+            
+            # Create CSV response with explicit UTF-8 encoding and BOM
+            response = HttpResponse(content_type='text/csv; charset=utf-8')
+            response['Content-Disposition'] = f'attachment; filename="facebook_comments_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+            
+            # Add UTF-8 BOM for better CSV compatibility
+            response.write('\ufeff')
+            
+            # Create CSV writer and write header
+            writer = csv.writer(response)
+            writer.writerow([
+                'comment_id', 'post_id', 'post_url', 'user_name', 'user_id', 'user_url',
+                'comment_text', 'date_created', 'num_likes', 'num_replies', 'source_type',
+                'type', 'commentator_profile', 'comment_link'
+            ])
+            
+            # Write data rows with proper Unicode handling
+            for comment in comments:
+                date_created_str = comment.date_created.isoformat() if comment.date_created else ''
+                
+                # Ensure all text fields are properly encoded
+                def safe_text(value):
+                    if value is None:
+                        return ''
+                    try:
+                        # Ensure the value is a string and handle Unicode properly
+                        text_value = str(value)
+                        # Remove any null bytes or control characters that might cause issues
+                        text_value = text_value.replace('\x00', '').replace('\r', '').replace('\n', ' ')
+                        return text_value
+                    except (UnicodeEncodeError, UnicodeDecodeError):
+                        # If there are encoding issues, use replace mode
+                        return str(value).encode('utf-8', errors='replace').decode('utf-8')
+                
+                writer.writerow([
+                    safe_text(comment.comment_id),
+                    safe_text(comment.post_id),
+                    safe_text(comment.post_url),
+                    safe_text(comment.user_name),
+                    safe_text(comment.user_id),
+                    safe_text(comment.user_url),
+                    safe_text(comment.comment_text),
+                    date_created_str,
+                    comment.num_likes,
+                    comment.num_replies,
+                    safe_text(comment.source_type),
+                    safe_text(comment.type),
+                    safe_text(comment.commentator_profile),
+                    safe_text(comment.comment_link)
+                ])
+            
+            return response
+        
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class CommentScrapingJobViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for Comment Scraping Jobs
+    """
+    serializer_class = CommentScrapingJobSerializer
+    permission_classes = [AllowAny]  # For testing, use proper permissions in production
+    
+    def get_queryset(self):
+        """
+        Filter jobs by project if specified
+        """
+        queryset = CommentScrapingJob.objects.all()
+        
+        # Filter by project if specified
+        project_id = self.request.query_params.get('project')
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+            
+        return queryset
+    
+    @action(detail=False, methods=['POST'])
+    def create_job(self, request):
+        """
+        Create and execute a new comment scraping job
+        """
+        try:
+            # Get request data
+            name = request.data.get('name')
+            project_id = request.data.get('project_id')
+            selected_folders = request.data.get('selected_folders', [])
+            comment_limit = request.data.get('comment_limit', 10)
+            get_all_replies = request.data.get('get_all_replies', False)
+            result_folder_name = request.data.get('result_folder_name')
+            
+            # Validate required fields
+            if not name:
+                return Response({'error': 'Job name is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            if not selected_folders:
+                return Response({'error': 'At least one folder must be selected'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            if not result_folder_name:
+                return Response({'error': 'Result folder name is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Import the service
+            from .services import create_and_execute_comment_scraping_job
+            
+            # Create and execute the job
+            job, success = create_and_execute_comment_scraping_job(
+                name=name,
+                project_id=project_id,
+                selected_folders=selected_folders,
+                comment_limit=comment_limit,
+                get_all_replies=get_all_replies,
+                result_folder_name=result_folder_name
+            )
+            
+            # Serialize and return the job
+            serializer = self.get_serializer(job)
+            
+            return Response({
+                'job': serializer.data,
+                'success': success,
+                'message': 'Job created and submitted successfully' if success else 'Job created but submission failed'
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=True, methods=['POST'])
+    def execute(self, request, pk=None):
+        """
+        Execute an existing comment scraping job
+        """
+        try:
+            job = self.get_object()
+            
+            if job.status != 'pending':
+                return Response(
+                    {'error': f'Job is in {job.status} status and cannot be executed'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Import the service
+            from .services import FacebookCommentScraper
+            
+            # Execute the job
+            scraper = FacebookCommentScraper()
+            success = scraper.execute_comment_scraping_job(job.id)
+            
+            # Refresh job from database
+            job.refresh_from_db()
+            serializer = self.get_serializer(job)
+            
+            return Response({
+                'job': serializer.data,
+                'success': success,
+                'message': 'Job executed successfully' if success else 'Job execution failed'
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['POST'])
+    def process_webhook(self, request):
+        """
+        Process webhook data from BrightData
+        """
+        try:
+            webhook_data = request.data
+            
+            if not isinstance(webhook_data, list):
+                return Response({'error': 'Webhook data must be a list'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Import the service
+            from .services import FacebookCommentScraper
+            
+            # Process the webhook data
+            scraper = FacebookCommentScraper()
+            result = scraper.process_comment_webhook_data(webhook_data)
+            
+            if result['success']:
+                return Response({
+                    'message': 'Webhook data processed successfully',
+                    'result': result
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    'error': 'Error processing webhook data',
+                    'result': result
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST) 

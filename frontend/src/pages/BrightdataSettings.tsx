@@ -47,6 +47,9 @@ import FacebookIcon from '@mui/icons-material/Facebook';
 import InstagramIcon from '@mui/icons-material/Instagram';
 import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import MusicVideoIcon from '@mui/icons-material/MusicVideo';
+import CommentIcon from '@mui/icons-material/Comment';
+import ArticleIcon from '@mui/icons-material/Article';
+import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
 import { apiFetch } from '../utils/api';
 
 interface BrightdataConfig {
@@ -83,8 +86,12 @@ const BrightdataSettings = () => {
   const [configToDelete, setConfigToDelete] = useState<number | null>(null);
 
   const platformOptions = [
-    { value: 'facebook', label: 'Facebook', icon: <FacebookIcon /> },
-    { value: 'instagram', label: 'Instagram', icon: <InstagramIcon /> },
+    { value: 'facebook_posts', label: 'Facebook Posts', icon: <FacebookIcon /> },
+    { value: 'facebook_reels', label: 'Facebook Reels', icon: <VideoLibraryIcon /> },
+    { value: 'facebook_comments', label: 'Facebook Comments', icon: <CommentIcon /> },
+    { value: 'instagram_posts', label: 'Instagram Posts', icon: <InstagramIcon /> },
+    { value: 'instagram_reels', label: 'Instagram Reels', icon: <VideoLibraryIcon /> },
+    { value: 'instagram_comments', label: 'Instagram Comments', icon: <CommentIcon /> },
     { value: 'linkedin', label: 'LinkedIn', icon: <LinkedInIcon /> },
     { value: 'tiktok', label: 'TikTok', icon: <MusicVideoIcon /> },
   ];

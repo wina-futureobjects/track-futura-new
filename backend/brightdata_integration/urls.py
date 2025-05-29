@@ -11,4 +11,5 @@ urlpatterns = [
     path('', include(router.urls)),
     path('webhook/', views.brightdata_webhook, name='brightdata_webhook'),
     path('notify/', views.brightdata_notify, name='brightdata_notify'),
+    path('comments/scrape/', views.scrape_comments, name='scrape_comments'),
 ] 

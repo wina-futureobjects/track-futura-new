@@ -29,10 +29,17 @@ import {
   TableCell,
   Tooltip,
   Alert,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Chip,
 } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
 import FolderIcon from '@mui/icons-material/Folder';
+import CommentIcon from '@mui/icons-material/Comment';
+import PostAddIcon from '@mui/icons-material/PostAdd';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import GridViewIcon from '@mui/icons-material/GridView';
@@ -44,9 +51,11 @@ interface Folder {
   id: number;
   name: string;
   description: string | null;
+  category: 'posts' | 'comments';
+  category_display: string;
   created_at: string;
   updated_at: string;
-  post_count: number;
+  content_count: number;
 }
 
 const FacebookFolders = () => {
@@ -63,6 +72,7 @@ const FacebookFolders = () => {
   const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null);
   const [folderName, setFolderName] = useState('');
   const [folderDescription, setFolderDescription] = useState('');
+  const [folderCategory, setFolderCategory] = useState<'posts' | 'comments'>('posts');
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
 
@@ -123,6 +133,7 @@ const FacebookFolders = () => {
   const handleNewFolder = () => {
     setFolderName('');
     setFolderDescription('');
+    setFolderCategory('posts');
     setOpenNewFolderDialog(true);
   };
 
@@ -130,6 +141,7 @@ const FacebookFolders = () => {
     setSelectedFolder(folder);
     setFolderName(folder.name);
     setFolderDescription(folder.description || '');
+    setFolderCategory(folder.category);
     setOpenEditFolderDialog(true);
   };
 
@@ -147,6 +159,7 @@ const FacebookFolders = () => {
         body: JSON.stringify({
           name: folderName,
           description: folderDescription || null,
+          category: folderCategory,
           project: projectId ? parseInt(projectId, 10) : null,
         }),
       });
@@ -178,6 +191,7 @@ const FacebookFolders = () => {
         body: JSON.stringify({
           name: folderName,
           description: folderDescription || null,
+          category: folderCategory,
           project: projectId ? parseInt(projectId, 10) : null,
         }),
       });
@@ -248,10 +262,23 @@ const FacebookFolders = () => {
               onClick={() => handleOpenFolder(folder.id)}
             >
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <FolderIcon color="primary" sx={{ mr: 1, fontSize: 30 }} />
+                {folder.category === 'comments' ? (
+                  <CommentIcon color="secondary" sx={{ mr: 1, fontSize: 30 }} />
+                ) : (
+                  <PostAddIcon color="primary" sx={{ mr: 1, fontSize: 30 }} />
+                )}
                 <Typography variant="h6" component="div">
                   {folder.name}
                 </Typography>
+              </Box>
+              
+              <Box sx={{ mb: 1 }}>
+                <Chip 
+                  label={folder.category_display} 
+                  size="small" 
+                  color={folder.category === 'comments' ? 'secondary' : 'primary'}
+                  variant="outlined"
+                />
               </Box>
               
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -259,7 +286,10 @@ const FacebookFolders = () => {
               </Typography>
               
               <Typography variant="body2" color="text.secondary">
-                {folder.post_count} {folder.post_count === 1 ? 'post' : 'posts'}
+                {folder.content_count} {folder.category === 'comments' ? 
+                  (folder.content_count === 1 ? 'comment' : 'comments') : 
+                  (folder.content_count === 1 ? 'post' : 'posts')
+                }
               </Typography>
               
               <Typography variant="caption" color="text.secondary" display="block">
@@ -300,8 +330,9 @@ const FacebookFolders = () => {
         <TableHead>
           <TableRow>
             <TableCell>Name</TableCell>
+            <TableCell>Category</TableCell>
             <TableCell>Description</TableCell>
-            <TableCell align="right">Posts</TableCell>
+            <TableCell align="right">Content Count</TableCell>
             <TableCell>Created</TableCell>
             <TableCell align="center">Actions</TableCell>
           </TableRow>
@@ -316,12 +347,29 @@ const FacebookFolders = () => {
             >
               <TableCell>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <FolderIcon color="primary" sx={{ mr: 1 }} />
+                  {folder.category === 'comments' ? (
+                    <CommentIcon color="secondary" sx={{ mr: 1 }} />
+                  ) : (
+                    <PostAddIcon color="primary" sx={{ mr: 1 }} />
+                  )}
                   <Typography variant="body1">{folder.name}</Typography>
                 </Box>
               </TableCell>
+              <TableCell>
+                <Chip 
+                  label={folder.category_display} 
+                  size="small" 
+                  color={folder.category === 'comments' ? 'secondary' : 'primary'}
+                  variant="outlined"
+                />
+              </TableCell>
               <TableCell>{folder.description || 'No description'}</TableCell>
-              <TableCell align="right">{folder.post_count}</TableCell>
+              <TableCell align="right">
+                {folder.content_count} {folder.category === 'comments' ? 
+                  (folder.content_count === 1 ? 'comment' : 'comments') : 
+                  (folder.content_count === 1 ? 'post' : 'posts')
+                }
+              </TableCell>
               <TableCell>{new Date(folder.created_at).toLocaleDateString()}</TableCell>
               <TableCell align="center">
                 <IconButton 
@@ -455,6 +503,29 @@ const FacebookFolders = () => {
             required
             sx={{ mb: 2 }}
           />
+          
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel>Category</InputLabel>
+            <Select
+              value={folderCategory}
+              label="Category"
+              onChange={(e) => setFolderCategory(e.target.value as 'posts' | 'comments')}
+            >
+              <MenuItem value="posts">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <PostAddIcon sx={{ mr: 1 }} />
+                  Posts & Reels
+                </Box>
+              </MenuItem>
+              <MenuItem value="comments">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <CommentIcon sx={{ mr: 1 }} />
+                  Comments
+                </Box>
+              </MenuItem>
+            </Select>
+          </FormControl>
+          
           <TextField
             margin="dense"
             label="Description (optional)"
@@ -489,6 +560,29 @@ const FacebookFolders = () => {
             required
             sx={{ mb: 2 }}
           />
+          
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel>Category</InputLabel>
+            <Select
+              value={folderCategory}
+              label="Category"
+              onChange={(e) => setFolderCategory(e.target.value as 'posts' | 'comments')}
+            >
+              <MenuItem value="posts">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <PostAddIcon sx={{ mr: 1 }} />
+                  Posts & Reels
+                </Box>
+              </MenuItem>
+              <MenuItem value="comments">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <CommentIcon sx={{ mr: 1 }} />
+                  Comments
+                </Box>
+              </MenuItem>
+            </Select>
+          </FormControl>
+          
           <TextField
             margin="dense"
             label="Description (optional)"

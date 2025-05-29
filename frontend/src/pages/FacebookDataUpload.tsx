@@ -26,8 +26,6 @@ import {
   Breadcrumbs,
   Tooltip,
   Snackbar,
-  Tab,
-  Tabs,
   FormControl,
   InputLabel,
   Select,
@@ -66,34 +64,55 @@ interface FacebookPost {
   is_paid_partnership: boolean;
 }
 
+interface FacebookComment {
+  id: number;
+  comment_id: string;
+  post_id: string;
+  post_url: string;
+  user_name: string;
+  user_id: string;
+  comment_text: string;
+  date_created: string;
+  num_likes: number;
+  num_replies: number;
+  source_type: string;
+  type: string;
+}
+
 interface Folder {
   id: number;
   name: string;
   description: string | null;
+  category: 'posts' | 'comments';
+  category_display: string;
 }
 
 interface FolderStats {
-  totalPosts: number;
-  uniqueUsers: number;
-  avgLikes: number;
-  verifiedAccounts: number;
+  totalPosts?: number;
+  uniqueUsers?: number;
+  avgLikes?: number;
+  verifiedAccounts?: number;
+  totalComments?: number;
+  uniqueCommenters?: number;
+  avgReplies?: number;
 }
 
 const FacebookDataUpload = () => {
   const { folderId } = useParams();
   const navigate = useNavigate();
   
-  const [postFile, setPostFile] = useState<File | null>(null);
-  const [reelFile, setReelFile] = useState<File | null>(null);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [posts, setPosts] = useState<FacebookPost[]>([]);
+  const [comments, setComments] = useState<FacebookComment[]>([]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredPosts, setFilteredPosts] = useState<FacebookPost[]>([]);
+  const [filteredComments, setFilteredComments] = useState<FacebookComment[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [currentFolder, setCurrentFolder] = useState<Folder | null>(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -104,7 +123,6 @@ const FacebookDataUpload = () => {
     avgLikes: 0,
     verifiedAccounts: 0
   });
-  const [uploadTabValue, setUploadTabValue] = useState(0);
   const [contentTypeFilter, setContentTypeFilter] = useState<string>('all');
   const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
 
@@ -112,43 +130,65 @@ const FacebookDataUpload = () => {
   const fetchPosts = async (pageNumber = 0, pageSize = 10, searchTerm = '', contentType = '') => {
     try {
       setIsLoading(true);
-      // Add folder filtering if folderId is present
-      const folderParam = folderId ? `&folder_id=${folderId}` : '';
-      // Add search param if search term exists
-      const searchParam = searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : '';
-      // Add content type filter if not 'all'
-      const contentTypeParam = contentType && contentType !== 'all' 
-        ? `&content_type=${contentType}` 
-        : '';
       
-      const response = await apiFetch(`/api/facebook-data/posts/?page=${pageNumber + 1}&page_size=${pageSize}${folderParam}${searchParam}${contentTypeParam}`);
+      if (!folderId) {
+        setPosts([]);
+        setComments([]);
+        setFilteredPosts([]);
+        setFilteredComments([]);
+        setTotalCount(0);
+        return;
+      }
+      
+      // Use the new folder contents endpoint
+      const searchParam = searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : '';
+      
+      const response = await apiFetch(`/api/facebook-data/folders/${folderId}/contents/?page=${pageNumber + 1}&page_size=${pageSize}${searchParam}`);
       
       if (!response.ok) {
-        throw new Error('Failed to fetch posts');
+        throw new Error('Failed to fetch folder contents');
       }
       const data = await response.json();
       
       // Check if the response has the expected pagination structure
-      if (data && typeof data === 'object' && 'results' in data) {
-        setPosts(data.results || []);
-        setFilteredPosts(data.results || []);
-        setTotalCount(data.count || 0);
-      } else if (Array.isArray(data)) {
-        // Handle case where API might return a direct array
-        setPosts(data);
-        setFilteredPosts(data);
-        setTotalCount(data.length);
-        console.warn('API returned an array instead of paginated results');
+      if (data && typeof data === 'object') {
+        // Check if this is a comments folder based on the current folder category
+        if (currentFolder?.category === 'comments') {
+          // Handle comments
+          const results = data.results || [];
+          setComments(results);
+          setFilteredComments(results);
+          setPosts([]);
+          setFilteredPosts([]);
+          setTotalCount(data.count || results.length);
+        } else {
+          // Handle posts (default)
+          const results = data.results || [];
+          // Apply content type filter on frontend if needed
+          let filteredResults = results;
+          if (contentType && contentType !== 'all') {
+            filteredResults = results.filter((post: FacebookPost) => post.content_type === contentType);
+          }
+          setPosts(filteredResults);
+          setFilteredPosts(filteredResults);
+          setComments([]);
+          setFilteredComments([]);
+          setTotalCount(data.count || filteredResults.length);
+        }
       } else {
         console.error('API returned unexpected data format:', data);
         setPosts([]);
+        setComments([]);
         setFilteredPosts([]);
+        setFilteredComments([]);
         setTotalCount(0);
       }
     } catch (error) {
-      console.error('Error fetching posts:', error);
+      console.error('Error fetching folder contents:', error);
       setPosts([]);
+      setComments([]);
       setFilteredPosts([]);
+      setFilteredComments([]);
       setTotalCount(0);
     } finally {
       setIsLoading(false);
@@ -172,17 +212,40 @@ const FacebookDataUpload = () => {
 
   // Add function to fetch folder statistics
   const fetchFolderStats = async () => {
-    if (!folderId) return;
+    if (!folderId || !currentFolder) return;
     
     try {
-      const response = await apiFetch(`/api/facebook-data/posts/stats/?folder_id=${folderId}`);
+      let response;
+      if (currentFolder.category === 'comments') {
+        // Use comments stats endpoint
+        response = await apiFetch(`/api/facebook-data/comments/stats/?folder_id=${folderId}`);
+      } else {
+        // Use posts stats endpoint
+        response = await apiFetch(`/api/facebook-data/posts/stats/?folder_id=${folderId}`);
+      }
       
       if (!response.ok) {
         throw new Error('Failed to fetch folder statistics');
       }
       
       const stats = await response.json();
-      setFolderStats(stats);
+      
+      // Update stats based on folder category
+      if (currentFolder.category === 'comments') {
+        setFolderStats({
+          totalComments: stats.totalComments || 0,
+          uniqueCommenters: stats.uniqueCommenters || 0,
+          avgLikes: stats.avgLikes || 0,
+          avgReplies: stats.avgReplies || 0,
+        });
+      } else {
+        setFolderStats({
+          totalPosts: stats.totalPosts || 0,
+          uniqueUsers: stats.uniqueUsers || 0,
+          avgLikes: stats.avgLikes || 0,
+          verifiedAccounts: stats.verifiedAccounts || 0,
+        });
+      }
     } catch (error) {
       console.error('Error fetching folder statistics:', error);
     }
@@ -201,28 +264,23 @@ const FacebookDataUpload = () => {
   // Initial data loading
   useEffect(() => {
     fetchFolderDetails();
-    fetchFolderStats();
-    fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter);
-    checkServerStatus();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [folderId]);
 
-  // Handle tab change for upload section
-  const handleUploadTabChange = (_event: React.SyntheticEvent, newValue: number) => {
-    setUploadTabValue(newValue);
-  };
+  // Fetch stats and posts after folder details are loaded
+  useEffect(() => {
+    if (currentFolder) {
+      fetchFolderStats();
+      fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter);
+      checkServerStatus();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentFolder]);
 
   // Handle file input changes
-  const handlePostFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleUploadFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files.length > 0) {
-      setPostFile(event.target.files[0]);
-      setUploadError(null);
-    }
-  };
-
-  const handleReelFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files.length > 0) {
-      setReelFile(event.target.files[0]);
+      setUploadFile(event.target.files[0]);
       setUploadError(null);
     }
   };
@@ -277,17 +335,17 @@ const FacebookDataUpload = () => {
     }
   };
 
-  // Handle post upload
-  const handlePostUpload = async () => {
-    if (!postFile || !folderId) {
+  // Handle upload
+  const handleUpload = async () => {
+    if (!uploadFile || !folderId) {
       setUploadError('Please select a file and ensure you are in a folder');
       return;
     }
     
     // Validate file
-    const validation = await validateCsvFile(postFile);
+    const validation = await validateCsvFile(uploadFile);
     if (!validation.valid) {
-      setUploadError(validation.message);
+      setUploadError(validation.message || 'File validation failed');
       return;
     }
     
@@ -297,11 +355,16 @@ const FacebookDataUpload = () => {
     
     try {
       const formData = new FormData();
-      formData.append('file', postFile);
+      formData.append('file', uploadFile);
       formData.append('folder_id', folderId);
-      formData.append('content_type', 'post');
       
-      const response = await apiFetch('/api/facebook-data/posts/upload_csv/', {
+      // Determine the API endpoint based on folder category
+      const isCommentsFolder = currentFolder?.category === 'comments';
+      const apiEndpoint = isCommentsFolder 
+        ? '/api/facebook-data/comments/upload_csv/'
+        : '/api/facebook-data/posts/upload_csv/';
+      
+      const response = await apiFetch(apiEndpoint, {
         method: 'POST',
         body: formData,
       });
@@ -312,68 +375,21 @@ const FacebookDataUpload = () => {
       }
       
       const result = await response.json();
-      setUploadSuccess(`Upload successful. ${result.rows_processed} rows processed, ${result.rows_added} added, ${result.rows_updated} updated.`);
-      setPostFile(null);
+      let successMessage = `Upload successful. ${result.rows_processed} rows processed, ${result.rows_added} added, ${result.rows_updated} updated.`;
       
-      // Refresh data
-      fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter);
-      fetchFolderStats();
-      
-      // Reset file input
-      const input = document.getElementById('post-file-input') as HTMLInputElement;
-      if (input) input.value = '';
-    } catch (error) {
-      console.error('Error uploading file:', error);
-      setUploadError(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  // Handle reel upload
-  const handleReelUpload = async () => {
-    if (!reelFile || !folderId) {
-      setUploadError('Please select a file and ensure you are in a folder');
-      return;
-    }
-    
-    // Validate file
-    const validation = await validateCsvFile(reelFile);
-    if (!validation.valid) {
-      setUploadError(validation.message);
-      return;
-    }
-    
-    setIsUploading(true);
-    setUploadSuccess(null);
-    setUploadError(null);
-    
-    try {
-      const formData = new FormData();
-      formData.append('file', reelFile);
-      formData.append('folder_id', folderId);
-      formData.append('content_type', 'reel');
-      
-      const response = await apiFetch('/api/facebook-data/posts/upload_csv/', {
-        method: 'POST',
-        body: formData,
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Upload failed');
+      if (result.detected_content_type && !isCommentsFolder) {
+        successMessage += ` Content type detected: ${result.detected_content_type}`;
       }
       
-      const result = await response.json();
-      setUploadSuccess(`Upload successful. ${result.rows_processed} rows processed, ${result.rows_added} added, ${result.rows_updated} updated.`);
-      setReelFile(null);
+      setUploadSuccess(successMessage);
+      setUploadFile(null);
       
       // Refresh data
       fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter);
       fetchFolderStats();
       
       // Reset file input
-      const input = document.getElementById('reel-file-input') as HTMLInputElement;
+      const input = document.getElementById('upload-file-input') as HTMLInputElement;
       if (input) input.value = '';
     } catch (error) {
       console.error('Error uploading file:', error);
@@ -384,11 +400,18 @@ const FacebookDataUpload = () => {
   };
 
   // Handle download CSV
-  const handleDownloadCSV = async (contentType: 'post' | 'reel' | undefined) => {
+  const handleDownloadCSV = async () => {
     try {
-      let url = `/api/facebook-data/posts/download_csv/?folder_id=${folderId}`;
-      if (contentType) {
-        url += `&content_type=${contentType}`;
+      const isCommentsFolder = currentFolder?.category === 'comments';
+      
+      let url;
+      if (isCommentsFolder) {
+        url = `/api/facebook-data/comments/download_csv/?folder_id=${folderId}`;
+      } else {
+        url = `/api/facebook-data/posts/download_csv/?folder_id=${folderId}`;
+        if (contentTypeFilter && contentTypeFilter !== 'all') {
+          url += `&content_type=${contentTypeFilter}`;
+        }
       }
       
       window.open(url, '_blank');
@@ -452,12 +475,12 @@ const FacebookDataUpload = () => {
       {/* Page title with folder details */}
       <Box mb={4}>
         <Typography variant="h4" component="h1" gutterBottom>
-          {currentFolder ? currentFolder.name : 'Facebook Data'}
+          Facebook Data {currentFolder && `- ${currentFolder.name}`}
         </Typography>
         {currentFolder?.description && (
-          <Typography variant="body1" color="text.secondary" paragraph>
+          <Box color="text.secondary" sx={{ mt: 1 }}>
             {currentFolder.description}
-          </Typography>
+          </Box>
         )}
       </Box>
       
@@ -472,25 +495,19 @@ const FacebookDataUpload = () => {
           Only the 'url' field is required in the CSV file. The 'user_posted' field is optional and can be derived from 'page_name' or 'user_username_raw' fields if available.
         </Alert>
         
-        <Grid container spacing={2}>
-          <Grid item xs={12}>
-            <Breadcrumbs aria-label="breadcrumb" style={{ marginBottom: '1rem' }}>
-              <Link 
-                style={{cursor: 'pointer', textDecoration: 'underline'}} 
-                onClick={handleGoToFolders}
-              >
-                Folders
-              </Link>
-              {currentFolder && (
-                <Typography color="textPrimary">{currentFolder.name}</Typography>
-              )}
-            </Breadcrumbs>
-          </Grid>
-        </Grid>
-
-        <Typography variant="h4" component="h1" gutterBottom>
-          Facebook Data {currentFolder && `- ${currentFolder.name}`}
-        </Typography>
+        <Box sx={{ mb: 2 }}>
+          <Breadcrumbs aria-label="breadcrumb" style={{ marginBottom: '1rem' }}>
+            <Link 
+              style={{cursor: 'pointer', textDecoration: 'underline'}} 
+              onClick={handleGoToFolders}
+            >
+              Folders
+            </Link>
+            {currentFolder && (
+              <Typography color="textPrimary">{currentFolder.name}</Typography>
+            )}
+          </Breadcrumbs>
+        </Box>
         
         <Paper sx={{ p: 3, mb: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -506,32 +523,32 @@ const FacebookDataUpload = () => {
             </Button>
           </Box>
           
-          <Grid container spacing={3}>
-            <Grid item xs={12} sm={6} md={3}>
+          <Stack direction="row" spacing={3} flexWrap="wrap" useFlexGap>
+            <Box sx={{ minWidth: 200 }}>
               <Card>
                 <CardContent>
                   <Typography color="text.secondary" gutterBottom>
-                    Total Posts
+                    {currentFolder?.category === 'comments' ? 'Total Comments' : 'Total Posts'}
                   </Typography>
                   <Typography variant="h4">
-                    {folderStats.totalPosts}
+                    {currentFolder?.category === 'comments' ? folderStats.totalComments : folderStats.totalPosts}
                   </Typography>
                 </CardContent>
               </Card>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            </Box>
+            <Box sx={{ minWidth: 200 }}>
               <Card>
                 <CardContent>
                   <Typography color="text.secondary" gutterBottom>
-                    Unique Users
+                    {currentFolder?.category === 'comments' ? 'Unique Commenters' : 'Unique Users'}
                   </Typography>
                   <Typography variant="h4">
-                    {folderStats.uniqueUsers}
+                    {currentFolder?.category === 'comments' ? folderStats.uniqueCommenters : folderStats.uniqueUsers}
                   </Typography>
                 </CardContent>
               </Card>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            </Box>
+            <Box sx={{ minWidth: 200 }}>
               <Card>
                 <CardContent>
                   <Typography color="text.secondary" gutterBottom>
@@ -542,129 +559,75 @@ const FacebookDataUpload = () => {
                   </Typography>
                 </CardContent>
               </Card>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            </Box>
+            <Box sx={{ minWidth: 200 }}>
               <Card>
                 <CardContent>
                   <Typography color="text.secondary" gutterBottom>
-                    Verified Accounts
+                    {currentFolder?.category === 'comments' ? 'Average Replies' : 'Verified Accounts'}
                   </Typography>
                   <Typography variant="h4">
-                    {folderStats.verifiedAccounts}
+                    {currentFolder?.category === 'comments' ? folderStats.avgReplies : folderStats.verifiedAccounts}
                   </Typography>
                 </CardContent>
               </Card>
-            </Grid>
-          </Grid>
+            </Box>
+          </Stack>
         </Paper>
-
+        
         <Paper sx={{ p: 3, mb: 3 }}>
           <Typography variant="h5" component="h2" gutterBottom>
             Upload Data
           </Typography>
           
-          <Box sx={{ mb: 2 }}>
-            <Tabs
-              value={uploadTabValue}
-              onChange={handleUploadTabChange}
-              aria-label="upload tabs"
-            >
-              <Tab label="Upload Posts" />
-              <Tab label="Upload Reels" />
-            </Tabs>
+          <Box>
+            <Typography variant="body1" gutterBottom>
+              Upload CSV file containing Facebook {currentFolder?.category === 'comments' ? 'comments' : 'posts/reels'} data.
+            </Typography>
+            {currentFolder?.category !== 'comments' && (
+              <Box color="text.secondary" sx={{ mt: 1, fontSize: '0.875rem' }}>
+                The system will automatically detect whether your CSV contains posts or reels based on the column headers.
+              </Box>
+            )}
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <Button
+                variant="contained"
+                component="label"
+                startIcon={<CloudUploadIcon />}
+                sx={{ mr: 2 }}
+              >
+                Select File
+                <input
+                  id="upload-file-input"
+                  type="file"
+                  accept=".csv"
+                  hidden
+                  onChange={handleUploadFileChange}
+                />
+              </Button>
+              <Typography>
+                {uploadFile ? uploadFile.name : 'No file selected'}
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Button
+                variant="contained"
+                onClick={handleUpload}
+                disabled={!uploadFile || isUploading || serverStatus !== 'online'}
+                sx={{ mr: 2 }}
+              >
+                {isUploading ? <CircularProgress size={24} /> : 'Upload'}
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<DownloadIcon />}
+                onClick={handleDownloadCSV}
+                disabled={currentFolder?.category === 'comments' ? !folderStats.totalComments : !folderStats.totalPosts}
+              >
+                Download
+              </Button>
+            </Box>
           </Box>
-          
-          {uploadTabValue === 0 && (
-            <Box>
-              <Typography variant="body1" gutterBottom>
-                Upload CSV file containing Facebook posts data.
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Button
-                  variant="contained"
-                  component="label"
-                  startIcon={<CloudUploadIcon />}
-                  sx={{ mr: 2 }}
-                >
-                  Select File
-                  <input
-                    id="post-file-input"
-                    type="file"
-                    accept=".csv"
-                    hidden
-                    onChange={handlePostFileChange}
-                  />
-                </Button>
-                <Typography>
-                  {postFile ? postFile.name : 'No file selected'}
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Button
-                  variant="contained"
-                  onClick={handlePostUpload}
-                  disabled={!postFile || isUploading || serverStatus !== 'online'}
-                  sx={{ mr: 2 }}
-                >
-                  {isUploading ? <CircularProgress size={24} /> : 'Upload Posts'}
-                </Button>
-                <Button
-                  variant="outlined"
-                  startIcon={<DownloadIcon />}
-                  onClick={() => handleDownloadCSV('post')}
-                  disabled={folderStats.totalPosts === 0}
-                >
-                  Download Posts
-                </Button>
-              </Box>
-            </Box>
-          )}
-          
-          {uploadTabValue === 1 && (
-            <Box>
-              <Typography variant="body1" gutterBottom>
-                Upload CSV file containing Facebook reels data.
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Button
-                  variant="contained"
-                  component="label"
-                  startIcon={<CloudUploadIcon />}
-                  sx={{ mr: 2 }}
-                >
-                  Select File
-                  <input
-                    id="reel-file-input"
-                    type="file"
-                    accept=".csv"
-                    hidden
-                    onChange={handleReelFileChange}
-                  />
-                </Button>
-                <Typography>
-                  {reelFile ? reelFile.name : 'No file selected'}
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Button
-                  variant="contained"
-                  onClick={handleReelUpload}
-                  disabled={!reelFile || isUploading || serverStatus !== 'online'}
-                  sx={{ mr: 2 }}
-                >
-                  {isUploading ? <CircularProgress size={24} /> : 'Upload Reels'}
-                </Button>
-                <Button
-                  variant="outlined"
-                  startIcon={<DownloadIcon />}
-                  onClick={() => handleDownloadCSV('reel')}
-                  disabled={folderStats.totalPosts === 0}
-                >
-                  Download Reels
-                </Button>
-              </Box>
-            </Box>
-          )}
           
           {uploadSuccess && (
             <Alert severity="success" sx={{ mt: 2 }}>
@@ -688,23 +651,25 @@ const FacebookDataUpload = () => {
         <Paper sx={{ p: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
             <Typography variant="h5" component="h2">
-              Facebook Posts ({totalCount})
+              {currentFolder?.category === 'comments' ? `Facebook Comments (${totalCount})` : `Facebook Posts (${totalCount})`}
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <FormControl sx={{ minWidth: 120, mr: 2 }}>
-                <InputLabel id="content-type-filter-label">Content Type</InputLabel>
-                <Select
-                  labelId="content-type-filter-label"
-                  value={contentTypeFilter}
-                  label="Content Type"
-                  onChange={handleContentTypeFilterChange}
-                  size="small"
-                >
-                  <MenuItem value="all">All</MenuItem>
-                  <MenuItem value="post">Posts</MenuItem>
-                  <MenuItem value="reel">Reels</MenuItem>
-                </Select>
-              </FormControl>
+              {currentFolder?.category !== 'comments' && (
+                <FormControl sx={{ minWidth: 120, mr: 2 }}>
+                  <InputLabel id="content-type-filter-label">Content Type</InputLabel>
+                  <Select
+                    labelId="content-type-filter-label"
+                    value={contentTypeFilter}
+                    label="Content Type"
+                    onChange={handleContentTypeFilterChange}
+                    size="small"
+                  >
+                    <MenuItem value="all">All</MenuItem>
+                    <MenuItem value="post">Posts</MenuItem>
+                    <MenuItem value="reel">Reels</MenuItem>
+                  </Select>
+                </FormControl>
+              )}
               <TextField
                 placeholder="Search..."
                 variant="outlined"
@@ -726,10 +691,10 @@ const FacebookDataUpload = () => {
             <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
               <CircularProgress />
             </Box>
-          ) : posts.length === 0 ? (
+          ) : (currentFolder?.category === 'comments' ? comments.length === 0 : posts.length === 0) ? (
             <Box sx={{ textAlign: 'center', p: 4 }}>
               <Typography variant="h6" gutterBottom>
-                No posts found
+                {currentFolder?.category === 'comments' ? 'No comments found' : 'No posts found'}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Upload some data or adjust your search filters.
@@ -741,74 +706,132 @@ const FacebookDataUpload = () => {
                 <Table>
                   <TableHead>
                     <TableRow>
-                      <TableCell>User</TableCell>
-                      <TableCell>Content</TableCell>
-                      <TableCell>Posted Date</TableCell>
-                      <TableCell align="right">Likes</TableCell>
-                      <TableCell align="right">Comments</TableCell>
-                      <TableCell align="right">Type</TableCell>
-                      <TableCell align="right">Actions</TableCell>
+                      {currentFolder?.category === 'comments' ? (
+                        <>
+                          <TableCell>Commenter</TableCell>
+                          <TableCell>Comment</TableCell>
+                          <TableCell>Post ID</TableCell>
+                          <TableCell>Created Date</TableCell>
+                          <TableCell align="right">Likes</TableCell>
+                          <TableCell align="right">Replies</TableCell>
+                          <TableCell align="right">Actions</TableCell>
+                        </>
+                      ) : (
+                        <>
+                          <TableCell>User</TableCell>
+                          <TableCell>Content</TableCell>
+                          <TableCell>Posted Date</TableCell>
+                          <TableCell align="right">Likes</TableCell>
+                          <TableCell align="right">Comments</TableCell>
+                          <TableCell align="right">Type</TableCell>
+                          <TableCell align="right">Actions</TableCell>
+                        </>
+                      )}
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {posts.map((post) => (
-                      <TableRow key={post.id} hover>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <Typography>{post.user_posted}</Typography>
-                            {post.is_verified && (
-                              <Tooltip title="Verified Account">
-                                <Chip
-                                  label="Verified"
-                                  size="small"
-                                  color="primary"
-                                  sx={{ ml: 1 }}
-                                />
-                              </Tooltip>
-                            )}
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Typography noWrap sx={{ maxWidth: 300 }}>
-                            {post.description || '-'}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          {post.date_posted 
-                            ? new Date(post.date_posted).toLocaleDateString() 
-                            : '-'}
-                        </TableCell>
-                        <TableCell align="right">{post.likes.toLocaleString()}</TableCell>
-                        <TableCell align="right">{post.num_comments.toLocaleString()}</TableCell>
-                        <TableCell align="right">
-                          <Chip
-                            label={post.content_type === 'post' ? 'Post' : 'Reel'}
-                            size="small"
-                            color={post.content_type === 'post' ? 'default' : 'secondary'}
-                          />
-                        </TableCell>
-                        <TableCell align="right">
-                          <Tooltip title="Open URL">
-                            <IconButton
+                    {currentFolder?.category === 'comments' ? 
+                      comments.map((comment) => (
+                        <TableRow key={comment.id} hover>
+                          <TableCell>
+                            <Typography>{comment.user_name || 'Unknown'}</Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography noWrap sx={{ maxWidth: 300 }}>
+                              {comment.comment_text || '-'}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2">{comment.post_id}</Typography>
+                          </TableCell>
+                          <TableCell>
+                            {comment.date_created 
+                              ? new Date(comment.date_created).toLocaleDateString() 
+                              : '-'}
+                          </TableCell>
+                          <TableCell align="right">{comment.num_likes.toLocaleString()}</TableCell>
+                          <TableCell align="right">{comment.num_replies.toLocaleString()}</TableCell>
+                          <TableCell align="right">
+                            <Tooltip title="Open Post URL">
+                              <IconButton
+                                size="small"
+                                href={comment.post_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <OpenInNewIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Copy Post Link">
+                              <IconButton
+                                size="small"
+                                onClick={() => handleCopyLink(comment.post_url)}
+                              >
+                                <ContentCopyIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </TableCell>
+                        </TableRow>
+                      )) :
+                      posts.map((post) => (
+                        <TableRow key={post.id} hover>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <Typography>{post.user_posted}</Typography>
+                              {post.is_verified && (
+                                <Tooltip title="Verified Account">
+                                  <Chip
+                                    label="Verified"
+                                    size="small"
+                                    color="primary"
+                                    sx={{ ml: 1 }}
+                                  />
+                                </Tooltip>
+                              )}
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Typography noWrap sx={{ maxWidth: 300 }}>
+                              {post.description || '-'}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            {post.date_posted 
+                              ? new Date(post.date_posted).toLocaleDateString() 
+                              : '-'}
+                          </TableCell>
+                          <TableCell align="right">{post.likes.toLocaleString()}</TableCell>
+                          <TableCell align="right">{post.num_comments.toLocaleString()}</TableCell>
+                          <TableCell align="right">
+                            <Chip
+                              label={post.content_type === 'post' ? 'Post' : 'Reel'}
                               size="small"
-                              href={post.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <OpenInNewIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Copy Link">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleCopyLink(post.url)}
-                            >
-                              <ContentCopyIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                              color={post.content_type === 'post' ? 'default' : 'secondary'}
+                            />
+                          </TableCell>
+                          <TableCell align="right">
+                            <Tooltip title="Open URL">
+                              <IconButton
+                                size="small"
+                                href={post.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <OpenInNewIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Copy Link">
+                              <IconButton
+                                size="small"
+                                onClick={() => handleCopyLink(post.url)}
+                              >
+                                <ContentCopyIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    }
                   </TableBody>
                 </Table>
               </TableContainer>

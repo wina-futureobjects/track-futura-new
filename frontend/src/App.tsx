@@ -10,6 +10,7 @@ import InstagramDataUpload from './pages/InstagramDataUpload';
 import InstagramFolders from './pages/InstagramFolders';
 import FacebookDataUpload from './pages/FacebookDataUpload';
 import FacebookFolders from './pages/FacebookFolders';
+import FacebookCommentScraper from './pages/FacebookCommentScraper';
 import LinkedInDataUpload from './pages/LinkedInDataUpload';
 import LinkedInFolders from './pages/LinkedInFolders';
 import TikTokDataUpload from './pages/TikTokDataUpload';
@@ -36,6 +37,7 @@ import TenantAdminDashboard from './pages/admin/TenantAdminDashboard';
 import Analysis from './pages/Analysis';
 import type { UserRole } from './utils/auth';
 import { isAuthenticated, hasRole } from './utils/auth';
+import CommentsScraper from './pages/CommentsScraper';
 
 // Route guard component for protected routes
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -180,6 +182,42 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <FacebookDataUpload />
+              </Layout>
+            </ProtectedRoute>
+          } />
+
+          {/* Comments Scraper - Cross-platform */}
+          <Route path="/comments-scraper" element={
+            <ProtectedRoute>
+              <Layout>
+                <CommentsScraper />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          {/* Comments Scraper with organization and project IDs */}
+          <Route path="/organizations/:organizationId/projects/:projectId/comments-scraper" element={
+            <ProtectedRoute>
+              <Layout>
+                <CommentsScraper />
+              </Layout>
+            </ProtectedRoute>
+          } />
+
+          {/* Facebook Comment Scraper */}
+          <Route path="/facebook-comment-scraper" element={
+            <ProtectedRoute>
+              <Layout>
+                <FacebookCommentScraper />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          {/* Facebook Comment Scraper with organization and project IDs */}
+          <Route path="/organizations/:organizationId/projects/:projectId/facebook-comment-scraper" element={
+            <ProtectedRoute>
+              <Layout>
+                <FacebookCommentScraper />
               </Layout>
             </ProtectedRoute>
           } />
@@ -417,6 +455,13 @@ function App() {
               </Layout>
             </ProtectedRoute>
           } />
+          <Route path="/automated-batch-scraper" element={
+            <ProtectedRoute>
+              <Layout>
+                <AutomatedBatchScraper />
+              </Layout>
+            </ProtectedRoute>
+          } />
 
           {/* Social Media Data with organization and project IDs */}
           {/* Instagram routes */}
@@ -535,6 +580,14 @@ function App() {
           } />
           
           <Route path="/organizations/:organizationId/projects/:projectId/brightdata-scraper" element={
+            <ProtectedRoute>
+              <Layout>
+                <AutomatedBatchScraper />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/organizations/:organizationId/projects/:projectId/automated-batch-scraper" element={
             <ProtectedRoute>
               <Layout>
                 <AutomatedBatchScraper />

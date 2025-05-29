@@ -28,6 +28,11 @@ import {
   TableRow,
   TableCell,
   Tooltip,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Chip,
 } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
@@ -37,15 +42,22 @@ import EditIcon from '@mui/icons-material/Edit';
 import GridViewIcon from '@mui/icons-material/GridView';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import HomeIcon from '@mui/icons-material/Home';
+import PostAddIcon from '@mui/icons-material/PostAdd';
+import CommentIcon from '@mui/icons-material/Comment';
+import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
 import { apiFetch } from '../utils/api';
 
 interface Folder {
   id: number;
   name: string;
   description: string | null;
+  category: 'posts' | 'reels' | 'comments';
+  category_display: string;
   created_at: string;
   updated_at: string;
   post_count: number;
+  reel_count: number;
+  comment_count: number;
 }
 
 const InstagramFolders = () => {
@@ -58,6 +70,7 @@ const InstagramFolders = () => {
   const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null);
   const [folderName, setFolderName] = useState('');
   const [folderDescription, setFolderDescription] = useState('');
+  const [folderCategory, setFolderCategory] = useState<'posts' | 'reels' | 'comments'>('posts');
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   
@@ -122,6 +135,7 @@ const InstagramFolders = () => {
   const handleNewFolder = () => {
     setFolderName('');
     setFolderDescription('');
+    setFolderCategory('posts');
     setOpenNewFolderDialog(true);
   };
 
@@ -129,6 +143,7 @@ const InstagramFolders = () => {
     setSelectedFolder(folder);
     setFolderName(folder.name);
     setFolderDescription(folder.description || '');
+    setFolderCategory(folder.category);
     setOpenEditFolderDialog(true);
   };
 
@@ -146,6 +161,7 @@ const InstagramFolders = () => {
         body: JSON.stringify({
           name: folderName,
           description: folderDescription || null,
+          category: folderCategory,
           project: projectId ? parseInt(projectId, 10) : null,
         }),
       });
@@ -177,6 +193,7 @@ const InstagramFolders = () => {
         body: JSON.stringify({
           name: folderName,
           description: folderDescription || null,
+          category: folderCategory,
           project: projectId ? parseInt(projectId, 10) : null,
         }),
       });
@@ -225,6 +242,45 @@ const InstagramFolders = () => {
     }
   };
 
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'posts':
+        return <PostAddIcon />;
+      case 'reels':
+        return <VideoLibraryIcon />;
+      case 'comments':
+        return <CommentIcon />;
+      default:
+        return <FolderIcon />;
+    }
+  };
+
+  const getCategoryColor = (category: string) => {
+    switch (category) {
+      case 'posts':
+        return 'primary';
+      case 'reels':
+        return 'secondary';
+      case 'comments':
+        return 'success';
+      default:
+        return 'default';
+    }
+  };
+
+  const getContentCount = (folder: Folder) => {
+    switch (folder.category) {
+      case 'posts':
+        return folder.post_count || 0;
+      case 'reels':
+        return folder.reel_count || 0;
+      case 'comments':
+        return folder.comment_count || 0;
+      default:
+        return 0;
+    }
+  };
+
   const renderGridView = () => (
     <Stack spacing={3} direction="row" useFlexGap flexWrap="wrap">
       {folders.map((folder) => (
@@ -248,9 +304,18 @@ const InstagramFolders = () => {
             >
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <FolderIcon color="primary" sx={{ mr: 1, fontSize: 30 }} />
-                <Typography variant="h6" component="div">
-                  {folder.name}
-                </Typography>
+                <Box sx={{ flexGrow: 1 }}>
+                  <Typography variant="h6" component="div">
+                    {folder.name}
+                  </Typography>
+                  <Chip 
+                    icon={getCategoryIcon(folder.category)}
+                    label={folder.category_display || folder.category}
+                    size="small"
+                    color={getCategoryColor(folder.category) as any}
+                    sx={{ mt: 0.5 }}
+                  />
+                </Box>
               </Box>
               
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -258,7 +323,7 @@ const InstagramFolders = () => {
               </Typography>
               
               <Typography variant="body2" color="text.secondary">
-                {folder.post_count} {folder.post_count === 1 ? 'post' : 'posts'}
+                {getContentCount(folder)} {folder.category === 'comments' ? 'comments' : folder.category === 'reels' ? 'reels' : 'posts'}
               </Typography>
               
               <Typography variant="caption" color="text.secondary" display="block">
@@ -299,8 +364,9 @@ const InstagramFolders = () => {
         <TableHead>
           <TableRow>
             <TableCell>Name</TableCell>
+            <TableCell>Category</TableCell>
             <TableCell>Description</TableCell>
-            <TableCell align="right">Posts</TableCell>
+            <TableCell align="right">Content Count</TableCell>
             <TableCell>Created</TableCell>
             <TableCell align="center">Actions</TableCell>
           </TableRow>
@@ -308,10 +374,12 @@ const InstagramFolders = () => {
         <TableBody>
           {folders.map((folder) => (
             <TableRow 
-              key={folder.id}
-              hover
+              key={folder.id} 
               onClick={() => handleOpenFolder(folder.id)}
-              sx={{ cursor: 'pointer' }}
+              sx={{ 
+                cursor: 'pointer', 
+                '&:hover': { backgroundColor: 'action.hover' } 
+              }}
             >
               <TableCell>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -319,8 +387,16 @@ const InstagramFolders = () => {
                   <Typography variant="body1">{folder.name}</Typography>
                 </Box>
               </TableCell>
+              <TableCell>
+                <Chip 
+                  icon={getCategoryIcon(folder.category)}
+                  label={folder.category_display || folder.category}
+                  size="small"
+                  color={getCategoryColor(folder.category) as any}
+                />
+              </TableCell>
               <TableCell>{folder.description || 'No description'}</TableCell>
-              <TableCell align="right">{folder.post_count}</TableCell>
+              <TableCell align="right">{getContentCount(folder)}</TableCell>
               <TableCell>{new Date(folder.created_at).toLocaleDateString()}</TableCell>
               <TableCell align="center">
                 <IconButton 
@@ -439,7 +515,7 @@ const InstagramFolders = () => {
       {/* New Folder Dialog */}
       <Dialog open={openNewFolderDialog} onClose={() => setOpenNewFolderDialog(false)}>
         <DialogTitle>Create New Folder</DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ minWidth: 400 }}>
           <TextField
             autoFocus
             margin="dense"
@@ -452,6 +528,35 @@ const InstagramFolders = () => {
             variant="outlined"
             sx={{ mb: 2, mt: 1 }}
           />
+          
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel>Category</InputLabel>
+            <Select
+              value={folderCategory}
+              label="Category"
+              onChange={(e) => setFolderCategory(e.target.value as 'posts' | 'reels' | 'comments')}
+            >
+              <MenuItem value="posts">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <PostAddIcon sx={{ mr: 1 }} />
+                  Posts
+                </Box>
+              </MenuItem>
+              <MenuItem value="reels">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <VideoLibraryIcon sx={{ mr: 1 }} />
+                  Reels
+                </Box>
+              </MenuItem>
+              <MenuItem value="comments">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <CommentIcon sx={{ mr: 1 }} />
+                  Comments
+                </Box>
+              </MenuItem>
+            </Select>
+          </FormControl>
+          
           <TextField
             margin="dense"
             label="Description (optional)"
@@ -475,7 +580,7 @@ const InstagramFolders = () => {
       {/* Edit Folder Dialog */}
       <Dialog open={openEditFolderDialog} onClose={() => setOpenEditFolderDialog(false)}>
         <DialogTitle>Edit Folder</DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ minWidth: 400 }}>
           <TextField
             autoFocus
             margin="dense"
@@ -488,6 +593,35 @@ const InstagramFolders = () => {
             variant="outlined"
             sx={{ mb: 2, mt: 1 }}
           />
+          
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel>Category</InputLabel>
+            <Select
+              value={folderCategory}
+              label="Category"
+              onChange={(e) => setFolderCategory(e.target.value as 'posts' | 'reels' | 'comments')}
+            >
+              <MenuItem value="posts">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <PostAddIcon sx={{ mr: 1 }} />
+                  Posts
+                </Box>
+              </MenuItem>
+              <MenuItem value="reels">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <VideoLibraryIcon sx={{ mr: 1 }} />
+                  Reels
+                </Box>
+              </MenuItem>
+              <MenuItem value="comments">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <CommentIcon sx={{ mr: 1 }} />
+                  Comments
+                </Box>
+              </MenuItem>
+            </Select>
+          </FormControl>
+          
           <TextField
             margin="dense"
             label="Description (optional)"

@@ -14,7 +14,14 @@ export const getApiBaseUrl = (): string => {
     return 'https://api.' + hostname.replace(/^www\./, '');
   }
   
-  // In development, use relative URLs which will be handled by the Vite proxy
+  // In development, try to use the direct backend URL if proxy is not working
+  // Check if we're running on localhost:5173 (Vite dev server)
+  if (typeof window !== 'undefined' && window.location.port === '5173') {
+    // Use direct backend URL to bypass potential proxy issues
+    return 'http://localhost:8000';
+  }
+  
+  // Default: use relative URLs which will be handled by the Vite proxy
   return '';
 };
 

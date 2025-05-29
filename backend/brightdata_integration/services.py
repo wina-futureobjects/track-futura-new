@@ -41,7 +41,9 @@ class AutomatedBatchScraper:
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
     
     def create_batch_job(self, name: str, project_id: int, source_folder_ids: List[int], 
-                        platforms_to_scrape: List[str] = None, num_of_posts: int = 10,
+                        platforms_to_scrape: List[str] = None, 
+                        content_types_to_scrape: Dict[str, List[str]] = None,
+                        num_of_posts: int = 10,
                         start_date: str = None, end_date: str = None, 
                         auto_create_folders: bool = True, output_folder_pattern: str = None) -> BatchScraperJob:
         """
@@ -50,14 +52,18 @@ class AutomatedBatchScraper:
         if platforms_to_scrape is None:
             platforms_to_scrape = ['facebook', 'instagram', 'linkedin', 'tiktok']
         
+        if content_types_to_scrape is None:
+            content_types_to_scrape = {}
+        
         if output_folder_pattern is None:
-            output_folder_pattern = "{platform}_{date}_{job_name}"
+            output_folder_pattern = "{platform}_{content_type}_{date}_{job_name}"
         
         job = BatchScraperJob.objects.create(
             name=name,
             project_id=project_id,
             source_folder_ids=source_folder_ids,
             platforms_to_scrape=platforms_to_scrape,
+            content_types_to_scrape=content_types_to_scrape,
             num_of_posts=num_of_posts,
             start_date=datetime.datetime.strptime(start_date, '%Y-%m-%d').date() if start_date else None,
             end_date=datetime.datetime.strptime(end_date, '%Y-%m-%d').date() if end_date else None,
@@ -174,7 +180,7 @@ class AutomatedBatchScraper:
     
     def _process_account(self, job: BatchScraperJob, account: TrackAccount) -> Dict:
         """
-        Process a single account for all specified platforms
+        Process a single account for all specified platforms and content types
         """
         result = {
             'platforms_scraped': [],
@@ -191,33 +197,48 @@ class AutomatedBatchScraper:
                     self.logger.debug(f"No {platform} URL found for account {account.name}")
                     continue
                 
-                # Get platform-specific configuration
-                config = self._get_platform_config(platform)
-                if not config:
-                    error_msg = f"No active {platform} configuration found"
-                    self.logger.error(error_msg)
-                    result['errors'].append(error_msg)
-                    result['failed_requests'] += 1
-                    continue
+                # Get content types for this platform (default to ['post'] if not specified)
+                content_types = job.content_types_to_scrape.get(platform, ['post'])
+                if not content_types:
+                    content_types = ['post']  # Default fallback
                 
-                # Create or get output folder
-                folder_id = self._get_or_create_output_folder(job, platform, account)
-                
-                # Create scraper request
-                scraper_request = self._create_scraper_request(
-                    job, account, platform, url, config, folder_id
-                )
-                
-                if scraper_request:
-                    result['platforms_scraped'].append(platform)
-                    result['requests_created'].append(scraper_request.id)
-                    result['successful_requests'] += 1
-                    
-                    # Trigger the actual scrape
-                    self._trigger_scrape(scraper_request)
-                else:
-                    result['failed_requests'] += 1
-                    
+                # Process each content type for this platform
+                for content_type in content_types:
+                    try:
+                        # Get platform-specific configuration for this content type
+                        config = self._get_platform_config(platform, content_type)
+                        if not config:
+                            error_msg = f"No active {platform}_{content_type}s configuration found"
+                            self.logger.error(error_msg)
+                            result['errors'].append(error_msg)
+                            result['failed_requests'] += 1
+                            continue
+                        
+                        # Create or get output folder
+                        folder_id = self._get_or_create_output_folder(job, platform, account, content_type)
+                        
+                        # Create scraper request
+                        scraper_request = self._create_scraper_request(
+                            job, account, platform, url, config, folder_id, content_type
+                        )
+                        
+                        if scraper_request:
+                            platform_content = f"{platform}_{content_type}"
+                            result['platforms_scraped'].append(platform_content)
+                            result['requests_created'].append(scraper_request.id)
+                            result['successful_requests'] += 1
+                            
+                            # Trigger the actual scrape
+                            self._trigger_scrape(scraper_request)
+                        else:
+                            result['failed_requests'] += 1
+                            
+                    except Exception as e:
+                        error_msg = f"Error processing {platform} {content_type} for {account.name}: {str(e)}"
+                        self.logger.error(error_msg)
+                        result['errors'].append(error_msg)
+                        result['failed_requests'] += 1
+                        
             except Exception as e:
                 error_msg = f"Error processing {platform} for {account.name}: {str(e)}"
                 self.logger.error(error_msg)
@@ -242,13 +263,36 @@ class AutomatedBatchScraper:
             return url.strip()
         return None
     
-    def _get_platform_config(self, platform: str) -> Optional[BrightdataConfig]:
+    def _get_platform_config(self, platform: str, content_type: str = 'post') -> Optional[BrightdataConfig]:
         """
-        Get the active configuration for a specific platform
+        Get the active configuration for a specific platform and content type
         """
-        return BrightdataConfig.objects.filter(platform=platform, is_active=True).first()
+        # Ensure content type is in plural form for config lookup
+        if content_type in ['post', 'posts']:
+            content_type = 'posts'
+        elif content_type in ['reel', 'reels']:
+            content_type = 'reels'
+        elif content_type in ['comment', 'comments']:
+            content_type = 'comments'
+        
+        platform_config_key = f'{platform}_{content_type}'  # e.g., instagram_posts, facebook_reels
+        return BrightdataConfig.objects.filter(platform=platform_config_key, is_active=True).first()
     
-    def _get_or_create_output_folder(self, job: BatchScraperJob, platform: str, account: TrackAccount) -> Optional[int]:
+    def _get_platform_config_key(self, platform: str, content_type: str = 'post') -> str:
+        """
+        Get the platform configuration key for a given platform and content type
+        """
+        # Ensure content type is in plural form for config lookup
+        if content_type in ['post', 'posts']:
+            content_type = 'posts'
+        elif content_type in ['reel', 'reels']:
+            content_type = 'reels'
+        elif content_type in ['comment', 'comments']:
+            content_type = 'comments'
+        
+        return f'{platform}_{content_type}'
+    
+    def _get_or_create_output_folder(self, job: BatchScraperJob, platform: str, account: TrackAccount, content_type: str) -> Optional[int]:
         """
         Get or create an output folder for the scraped data
         """
@@ -256,13 +300,29 @@ class AutomatedBatchScraper:
             return None
         
         try:
+            # Convert content type to the appropriate category for folder creation
+            # Handle both singular and plural forms
+            if content_type in ['post', 'posts']:
+                folder_category = 'posts'
+                content_type_for_name = 'posts'
+            elif content_type in ['reel', 'reels']:
+                folder_category = 'reels'
+                content_type_for_name = 'reels'
+            elif content_type in ['comment', 'comments']:
+                folder_category = 'comments'
+                content_type_for_name = 'comments'
+            else:
+                folder_category = 'posts'  # Default fallback
+                content_type_for_name = content_type
+            
             # Generate folder name using the pattern
             folder_name = job.output_folder_pattern.format(
                 platform=platform.title(),
+                content_type=content_type_for_name.upper(),
                 date=timezone.now().strftime('%Y-%m-%d'),
                 job_name=job.name,
                 account_name=account.name,
-                iac_no=account.iac_no
+                iac_no=account.iac_no,
             )
             
             # Get the appropriate folder model for this platform
@@ -271,14 +331,22 @@ class AutomatedBatchScraper:
                 self.logger.error(f"No folder model found for platform: {platform}")
                 return None
             
-            # Create or get the folder
+            # Create or get the folder with the appropriate category
+            folder_defaults = {'project_id': job.project_id}
+            
+            # Only set category if the model supports it (Instagram and Facebook do)
+            if hasattr(FolderModel, '_meta') and any(field.name == 'category' for field in FolderModel._meta.fields):
+                folder_defaults['category'] = folder_category
+            
             folder, created = FolderModel.objects.get_or_create(
                 name=folder_name,
-                defaults={'project_id': job.project_id}
+                defaults=folder_defaults
             )
             
             if created:
-                self.logger.info(f"Created new {platform} folder: {folder_name}")
+                self.logger.info(f"Created new {platform} {folder_category} folder: {folder_name}")
+            else:
+                self.logger.info(f"Using existing {platform} folder: {folder_name}")
             
             return folder.id
             
@@ -288,16 +356,19 @@ class AutomatedBatchScraper:
     
     def _create_scraper_request(self, job: BatchScraperJob, account: TrackAccount, 
                               platform: str, url: str, config: BrightdataConfig, 
-                              folder_id: Optional[int]) -> Optional[ScraperRequest]:
+                              folder_id: Optional[int], content_type: str) -> Optional[ScraperRequest]:
         """
         Create a scraper request for the account and platform
         """
         try:
+            # Get the platform config key that includes content type
+            platform_config_key = self._get_platform_config_key(platform, content_type)
+            
             scraper_request = ScraperRequest.objects.create(
                 config=config,
                 batch_job=job,
-                platform=platform,
-                content_type='post',  # Default to posts
+                platform=platform_config_key,
+                content_type=content_type,
                 target_url=url,
                 account_name=account.name,
                 iac_no=account.iac_no,
@@ -308,7 +379,7 @@ class AutomatedBatchScraper:
                 status='pending'
             )
             
-            self.logger.info(f"Created scraper request for {account.name} on {platform}")
+            self.logger.info(f"Created scraper request for {account.name} on {platform} ({content_type})")
             return scraper_request
             
         except Exception as e:
@@ -320,7 +391,10 @@ class AutomatedBatchScraper:
         Trigger the actual scrape using BrightData API
         """
         try:
-            # Prepare the API request based on platform
+            # Extract base platform from the platform field (e.g., 'facebook' from 'facebook_posts')
+            base_platform = scraper_request.platform.split('_')[0]
+            
+            # Prepare the API request based on base platform
             platform_trigger_methods = {
                 'facebook': self._trigger_facebook_scrape,
                 'instagram': self._trigger_instagram_scrape,
@@ -328,9 +402,9 @@ class AutomatedBatchScraper:
                 'tiktok': self._trigger_tiktok_scrape,
             }
             
-            trigger_method = platform_trigger_methods.get(scraper_request.platform)
+            trigger_method = platform_trigger_methods.get(base_platform)
             if not trigger_method:
-                self.logger.error(f"No trigger method found for platform: {scraper_request.platform}")
+                self.logger.error(f"No trigger method found for platform: {base_platform}")
                 return False
             
             return trigger_method(scraper_request)
@@ -358,6 +432,8 @@ class AutomatedBatchScraper:
                 "Authorization": f"Bearer {config.api_token}",
                 "Content-Type": "application/json",
             }
+            
+            # Base parameters
             params = {
                 "dataset_id": config.dataset_id,
                 "endpoint": f"{base_url}/api/brightdata/webhook/",
@@ -367,6 +443,13 @@ class AutomatedBatchScraper:
                 "uncompressed_webhook": "true",
                 "include_errors": "true",
             }
+            
+            # Add Instagram-specific parameters
+            if scraper_request.platform.startswith('instagram'):
+                params.update({
+                    "type": "discover_new",
+                    "discover_by": "url",
+                })
             
             # Store the request payload
             scraper_request.request_payload = payload
@@ -412,13 +495,29 @@ class AutomatedBatchScraper:
         return self._make_brightdata_request(scraper_request, payload)
     
     def _trigger_instagram_scrape(self, scraper_request: ScraperRequest) -> bool:
-        """Trigger Instagram scrape"""
-        payload = [{
-            "url": scraper_request.target_url,
-            "num_of_posts": scraper_request.num_of_posts,
-            "start_date": scraper_request.start_date.strftime('%m-%d-%Y') if scraper_request.start_date else "",
-            "end_date": scraper_request.end_date.strftime('%m-%d-%Y') if scraper_request.end_date else "",
-        }]
+        """Trigger Instagram scrape - Different parameters for posts vs reels"""
+        # Determine content type from platform field (e.g., 'instagram_posts' -> 'posts')
+        content_type = scraper_request.platform.split('_')[-1]  # gets 'posts', 'reels', etc.
+        
+        if content_type == 'reels':
+            # Instagram Reels API format
+            payload = [{
+                "url": scraper_request.target_url,
+                "start_date": scraper_request.start_date.strftime('%m-%d-%Y') if scraper_request.start_date else "",
+                "end_date": scraper_request.end_date.strftime('%m-%d-%Y') if scraper_request.end_date else "",
+                "all_reels": False,  # Default to specific date range instead of all reels
+            }]
+        else:
+            # Instagram Posts API format (includes posts and other content types)
+            payload = [{
+                "url": scraper_request.target_url,
+                "num_of_posts": scraper_request.num_of_posts,
+                "start_date": scraper_request.start_date.strftime('%m-%d-%Y') if scraper_request.start_date else "",
+                "end_date": scraper_request.end_date.strftime('%m-%d-%Y') if scraper_request.end_date else "",
+                "post_type": "Post" if content_type == 'posts' else content_type.title(),
+                "posts_to_not_include": [],  # Could be extended to support excluded posts
+            }]
+        
         return self._make_brightdata_request(scraper_request, payload)
     
     def _trigger_linkedin_scrape(self, scraper_request: ScraperRequest) -> bool:
@@ -443,11 +542,14 @@ class AutomatedBatchScraper:
 
 # Convenience function for external use
 def create_and_execute_batch_job(name: str, project_id: int, source_folder_ids: List[int], 
-                                 platforms_to_scrape: List[str] = None, **kwargs) -> Tuple[BatchScraperJob, bool]:
+                                 platforms_to_scrape: List[str] = None, 
+                                 content_types_to_scrape: Dict[str, List[str]] = None,
+                                 **kwargs) -> Tuple[BatchScraperJob, bool]:
     """
     Create and immediately execute a batch scraper job
     """
     scraper = AutomatedBatchScraper()
-    job = scraper.create_batch_job(name, project_id, source_folder_ids, platforms_to_scrape, **kwargs)
+    job = scraper.create_batch_job(name, project_id, source_folder_ids, platforms_to_scrape, 
+                                   content_types_to_scrape=content_types_to_scrape, **kwargs)
     success = scraper.execute_batch_job(job.id)
     return job, success 

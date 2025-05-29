@@ -7,14 +7,18 @@ class BrightdataConfig(models.Model):
     """Model to store Brightdata API configuration with platform-specific datasets"""
     
     PLATFORM_CHOICES = (
-        ('facebook', 'Facebook'),
-        ('instagram', 'Instagram'),
+        ('facebook_posts', 'Facebook Posts'),
+        ('facebook_reels', 'Facebook Reels'),
+        ('facebook_comments', 'Facebook Comments'),
+        ('instagram_posts', 'Instagram Posts'),
+        ('instagram_reels', 'Instagram Reels'),
+        ('instagram_comments', 'Instagram Comments'),
         ('tiktok', 'TikTok'),
         ('linkedin', 'LinkedIn'),
     )
     
     name = models.CharField(max_length=100, default="Default")
-    platform = models.CharField(max_length=20, choices=PLATFORM_CHOICES, default='facebook')
+    platform = models.CharField(max_length=30, choices=PLATFORM_CHOICES, default='facebook_posts')
     api_token = models.CharField(max_length=255)
     dataset_id = models.CharField(max_length=100)
     is_active = models.BooleanField(default=True)
@@ -53,6 +57,7 @@ class BatchScraperJob(models.Model):
     # Source configuration
     source_folder_ids = models.JSONField(help_text="List of project IDs to scrape from (folders have been removed)")
     platforms_to_scrape = models.JSONField(default=list, help_text="List of platforms to scrape: ['facebook', 'instagram', 'linkedin', 'tiktok']")
+    content_types_to_scrape = models.JSONField(default=dict, help_text="Dictionary mapping platforms to content types: {'facebook': ['post', 'reel'], 'instagram': ['post', 'comment']}")
     
     # Scraping parameters
     num_of_posts = models.IntegerField(default=10)
@@ -61,7 +66,7 @@ class BatchScraperJob(models.Model):
     
     # Output configuration
     auto_create_folders = models.BooleanField(default=True, help_text="Auto-create folders for results by platform and date")
-    output_folder_pattern = models.CharField(max_length=255, default="{platform}_{date}_{job_name}", 
+    output_folder_pattern = models.CharField(max_length=255, default="{platform}_{content_type}_{date}_{job_name}", 
                                            help_text="Pattern for auto-created folder names")
     
     # Job status and metadata
@@ -94,6 +99,16 @@ class BatchScraperJob(models.Model):
         if not self.platforms_to_scrape:
             return "All platforms"
         return ", ".join([p.title() for p in self.platforms_to_scrape])
+    
+    def get_content_types_display(self):
+        """Get a readable display of content types to scrape"""
+        if not self.content_types_to_scrape:
+            return "Default content types"
+        display_items = []
+        for platform, content_types in self.content_types_to_scrape.items():
+            if content_types:
+                display_items.append(f"{platform.title()}: {', '.join(content_types)}")
+        return "; ".join(display_items) if display_items else "Default content types"
 
 class ScraperRequest(models.Model):
     """Model to store Brightdata scraper requests"""
@@ -105,8 +120,12 @@ class ScraperRequest(models.Model):
     )
     
     PLATFORM_CHOICES = (
-        ('facebook', 'Facebook'),
-        ('instagram', 'Instagram'),
+        ('facebook_posts', 'Facebook Posts'),
+        ('facebook_reels', 'Facebook Reels'),
+        ('facebook_comments', 'Facebook Comments'),
+        ('instagram_posts', 'Instagram Posts'),
+        ('instagram_reels', 'Instagram Reels'),
+        ('instagram_comments', 'Instagram Comments'),
         ('tiktok', 'TikTok'),
         ('linkedin', 'LinkedIn'),
     )
@@ -115,6 +134,7 @@ class ScraperRequest(models.Model):
         ('post', 'Post'),
         ('reel', 'Reel'),
         ('profile', 'Profile'),
+        ('comment', 'Comment'),
     )
     
     config = models.ForeignKey(BrightdataConfig, on_delete=models.CASCADE)
@@ -122,7 +142,7 @@ class ScraperRequest(models.Model):
     
     # Request information
     request_id = models.CharField(max_length=255, blank=True, null=True)
-    platform = models.CharField(max_length=20, choices=PLATFORM_CHOICES)
+    platform = models.CharField(max_length=30, choices=PLATFORM_CHOICES)
     content_type = models.CharField(max_length=20, choices=CONTENT_TYPE_CHOICES, default='post')
     target_url = models.URLField(max_length=500)
     account_name = models.CharField(max_length=255, blank=True, null=True, help_text="Name of the tracked account")

@@ -8,9 +8,15 @@ from rest_framework.response import Response
 from rest_framework.decorators import action, permission_classes
 from rest_framework.permissions import AllowAny
 from django.http import HttpResponse
-from .models import InstagramPost, Folder
-from .serializers import InstagramPostSerializer, FolderSerializer
+from .models import InstagramPost, Folder, InstagramComment, CommentScrapingJob
+from .serializers import (
+    InstagramPostSerializer, 
+    FolderSerializer, 
+    InstagramCommentSerializer,
+    CommentScrapingJobSerializer
+)
 from django.db.models import Q
+from .services import create_and_execute_instagram_comment_scraping_job
 
 # Try to import dateparser, but provide a fallback if it's not available
 try:
@@ -92,6 +98,107 @@ class FolderViewSet(viewsets.ModelViewSet):
         
         return Response(serializer.data)
 
+    @action(detail=True, methods=['GET'])
+    def contents(self, request, pk=None):
+        """
+        Get the contents of a folder based on its category
+        """
+        try:
+            folder = self.get_object()
+            
+            if folder.category == 'posts':
+                # Return Instagram posts (excluding reels)
+                posts = InstagramPost.objects.filter(folder=folder).exclude(content_type='reel')
+                
+                # Apply search if provided
+                search_query = request.query_params.get('search', '')
+                if search_query:
+                    search_filter = Q()
+                    search_filter |= Q(user_posted__icontains=search_query)
+                    search_filter |= Q(description__icontains=search_query) 
+                    search_filter |= Q(hashtags__icontains=search_query)
+                    posts = posts.filter(search_filter)
+                
+                # Paginate results
+                page = self.paginate_queryset(posts)
+                if page is not None:
+                    serializer = InstagramPostSerializer(page, many=True)
+                    paginated_response = self.get_paginated_response(serializer.data)
+                    # Add category to the paginated response for frontend detection
+                    response_data = paginated_response.data
+                    response_data['category'] = 'posts'
+                    return Response(response_data)
+                
+                serializer = InstagramPostSerializer(posts, many=True)
+                return Response({
+                    'category': 'posts',
+                    'results': serializer.data
+                })
+                
+            elif folder.category == 'reels':
+                # Return Instagram reels
+                reels = InstagramPost.objects.filter(folder=folder, content_type='reel')
+                
+                # Apply search if provided
+                search_query = request.query_params.get('search', '')
+                if search_query:
+                    search_filter = Q()
+                    search_filter |= Q(user_posted__icontains=search_query)
+                    search_filter |= Q(description__icontains=search_query) 
+                    search_filter |= Q(hashtags__icontains=search_query)
+                    reels = reels.filter(search_filter)
+                
+                # Paginate results
+                page = self.paginate_queryset(reels)
+                if page is not None:
+                    serializer = InstagramPostSerializer(page, many=True)
+                    paginated_response = self.get_paginated_response(serializer.data)
+                    # Add category to the paginated response for frontend detection
+                    response_data = paginated_response.data
+                    response_data['category'] = 'reels'
+                    return Response(response_data)
+                
+                serializer = InstagramPostSerializer(reels, many=True)
+                return Response({
+                    'category': 'reels',
+                    'results': serializer.data
+                })
+                
+            elif folder.category == 'comments':
+                # Return Instagram comments
+                comments = InstagramComment.objects.filter(folder=folder)
+                
+                # Apply search if provided
+                search_query = request.query_params.get('search', '')
+                if search_query:
+                    search_filter = Q()
+                    search_filter |= Q(comment_user__icontains=search_query)
+                    search_filter |= Q(comment__icontains=search_query)
+                    search_filter |= Q(post_id__icontains=search_query)
+                    comments = comments.filter(search_filter)
+                
+                # Paginate results
+                page = self.paginate_queryset(comments)
+                if page is not None:
+                    serializer = InstagramCommentSerializer(page, many=True)
+                    paginated_response = self.get_paginated_response(serializer.data)
+                    # Add category to the paginated response for frontend detection
+                    response_data = paginated_response.data
+                    response_data['category'] = 'comments'
+                    return Response(response_data)
+                
+                serializer = InstagramCommentSerializer(comments, many=True)
+                return Response({
+                    'category': 'comments',
+                    'results': serializer.data
+                })
+            
+            else:
+                return Response({'error': 'Unknown folder category'}, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 class InstagramPostViewSet(viewsets.ModelViewSet):
     """
     API endpoint for Instagram Posts
@@ -151,25 +258,28 @@ class InstagramPostViewSet(viewsets.ModelViewSet):
             return 0.0
             
     def _safe_bool_convert(self, value):
-        """
-        Safely convert a value to boolean
-        """
-        if value is None or value == '' or value == '""':
+        """Safe boolean conversion"""
+        if value is None or value == '':
             return False
-        
         if isinstance(value, bool):
             return value
-        
-        # Convert string values
         if isinstance(value, str):
-            value = value.strip().lower()
-            return value in ('true', 'yes', '1', 't', 'y')
-        
-        # Try to convert numbers to bool
-        try:
-            return bool(int(value))
-        except (ValueError, TypeError):
-            return False
+            return value.lower() in ['true', '1', 'yes', 'on']
+        return bool(value)
+    
+    def _safe_json_parse(self, value):
+        """Safely parse JSON data, return original value if not JSON"""
+        if not value:
+            return None
+        if isinstance(value, (dict, list)):
+            return value
+        if isinstance(value, str):
+            try:
+                import json
+                return json.loads(value)
+            except (json.JSONDecodeError, ValueError):
+                return value
+        return value
 
     def _parse_date(self, date_str):
         """
@@ -272,21 +382,91 @@ class InstagramPostViewSet(viewsets.ModelViewSet):
             if folder_id:
                 folder = get_object_or_404(Folder, id=folder_id)
             
-            # Get content_type from request data (post or reel)
-            content_type = request.data.get('content_type', 'post')
+            # Decode and parse CSV with comprehensive Unicode handling
+            try:
+                # Read the file content as bytes first
+                csv_content_bytes = csv_file.read()
+                
+                # Try multiple encoding strategies
+                decoded_file = None
+                encoding_used = None
+                
+                # Strategy 1: UTF-8 with BOM
+                try:
+                    decoded_file = csv_content_bytes.decode('utf-8-sig')
+                    encoding_used = 'utf-8-sig'
+                except UnicodeDecodeError:
+                    pass
+                
+                # Strategy 2: UTF-8
+                if decoded_file is None:
+                    try:
+                        decoded_file = csv_content_bytes.decode('utf-8')
+                        encoding_used = 'utf-8'
+                    except UnicodeDecodeError:
+                        pass
+                
+                # Strategy 3: Latin-1 (covers most Windows encodings)
+                if decoded_file is None:
+                    try:
+                        decoded_file = csv_content_bytes.decode('latin1')
+                        encoding_used = 'latin1'
+                    except UnicodeDecodeError:
+                        pass
+                
+                # Strategy 4: CP1252 with error replacement (last resort)
+                if decoded_file is None:
+                    decoded_file = csv_content_bytes.decode('cp1252', errors='replace')
+                    encoding_used = 'cp1252-replace'
+                
+                print(f"CSV decoded using: {encoding_used}")
+                
+                # Clean up any problematic characters that might cause issues
+                # Replace null bytes and normalize line endings
+                decoded_file = decoded_file.replace('\x00', '').replace('\r\n', '\n').replace('\r', '\n')
+                
+                # Create StringIO object safely
+                csv_string_io = io.StringIO(decoded_file)
+                csv_data = csv.DictReader(csv_string_io)
+                
+            except Exception as e:
+                safe_error = str(e).encode('ascii', errors='replace').decode('ascii')
+                return Response(
+                    {'error': f'Error reading CSV file. Please ensure it is properly encoded. Error: {safe_error}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             
-            # Read the CSV file
-            decoded_file = csv_file.read().decode('utf-8', errors='replace')  # Handle encoding issues
-            io_string = io.StringIO(decoded_file)
+            # Auto-detect content type based on CSV headers
+            headers = set(csv_data.fieldnames or [])
             
-            # Get CSV header and determine format
-            first_line = io_string.readline().strip()
-            header = first_line.split(',')
-            print(f"CSV Header: {header}")
+            # Define unique fields for each content type based on actual API responses
+            # Instagram posts typically have these fields
+            post_unique_fields = {'latest_comments', 'engagement_score_view', 'post_content', 'videos_duration', 'images', 'photos_number'}
+            # Instagram reels typically have these video-specific fields
+            reel_unique_fields = {'video_play_count', 'length', 'video_url', 'audio_url', 'top_comments', 'product_type'}
             
-            # Reset file pointer to beginning
-            io_string.seek(0)
-            reader = csv.DictReader(io_string)
+            # Detect content type based on presence of unique fields
+            post_matches = len(headers.intersection(post_unique_fields))
+            reel_matches = len(headers.intersection(reel_unique_fields))
+            
+            # Additional detection logic
+            # Check for "clips" in product_type or specific video indicators
+            has_clips_product_type = any('clips' in str(row.get('product_type', '')).lower() for row in csv.DictReader(io.StringIO(decoded_file)))
+            has_video_play_count = 'video_play_count' in headers
+            has_audio_url = 'audio_url' in headers
+            
+            # Reset file pointer for processing
+            csv_string_io.seek(0)
+            csv_data = csv.DictReader(csv_string_io)
+            
+            if has_clips_product_type or reel_matches > post_matches or (has_video_play_count and has_audio_url):
+                content_type = 'reel'
+                detected_reason = f"Detected as reel (found {reel_matches} reel-specific fields: {headers.intersection(reel_unique_fields)}, clips product type: {has_clips_product_type})"
+            else:
+                content_type = 'post'
+                detected_reason = f"Detected as post (found {post_matches} post-specific fields: {headers.intersection(post_unique_fields)})"
+            
+            print(f"Auto-detection result: {detected_reason}")
             
             # Lists to track created and updated objects
             created_objects = []
@@ -296,7 +476,7 @@ class InstagramPostViewSet(viewsets.ModelViewSet):
             total_rows = 0
             
             # Process each row
-            for row in reader:
+            for row in csv_data:
                 total_rows += 1
                 
                 # Debug log every 10 rows
@@ -346,30 +526,87 @@ class InstagramPostViewSet(viewsets.ModelViewSet):
                     if parsed_date is None and row.get('timestamp'):
                         parsed_date = self._parse_date(row.get('timestamp'))
                     
-                    # Prepare the default data dictionary
+                    # Prepare the default data dictionary with all new fields
                     default_data = {
+                        # Basic fields
                         'url': row.get('url', ''),
                         'user_posted': row.get('user_posted', ''),
                         'description': row.get('description', ''),
-                        'hashtags': row.get('hashtags', ''),
                         'num_comments': self._safe_int_convert(row.get('num_comments')),
-                        'date_posted': parsed_date,  # Use the parsed date
+                        'date_posted': parsed_date,
                         'likes': self._safe_int_convert(row.get('likes')),
-                        'photos': row.get('photos', ''),
-                        'videos': row.get('videos', ''),
-                        'location': row.get('location', ''),
-                        'latest_comments': row.get('latest_comments', ''),
-                        'discovery_input': row.get('discovery_input', ''),
+                        'post_id': post_id,
+                        
+                        # Handle hashtags (can be array or string)
+                        'hashtags': self._safe_json_parse(row.get('hashtags')) if row.get('hashtags') else None,
+                        
+                        # Media content fields
+                        'photos': self._safe_json_parse(row.get('photos')) if row.get('photos') else None,
+                        'videos': self._safe_json_parse(row.get('videos')) if row.get('videos') else None,
                         'thumbnail': row.get('thumbnail', ''),
-                        'content_type': content_type,  # Set from the request parameter
-                        'platform_type': 'IG Post' if content_type == 'post' else 'IG Reel',  # Set platform type based on content_type
-                        'engagement_score': self._safe_float_convert(row.get('engagement_score_view')),
-                        'tagged_users': row.get('tagged_users', ''),
+                        
+                        # Video-specific fields (mainly for reels)
+                        'views': self._safe_int_convert(row.get('views')),
+                        'video_play_count': self._safe_int_convert(row.get('video_play_count')),
+                        'video_view_count': self._safe_int_convert(row.get('video_view_count')),
+                        'length': row.get('length', ''),
+                        'video_url': row.get('video_url', ''),
+                        'audio_url': row.get('audio_url', ''),
+                        
+                        # Instagram-specific identifiers
+                        'shortcode': row.get('shortcode', ''),
+                        'content_id': row.get('content_id', ''),
+                        'instagram_pk': row.get('pk', ''),
+                        
+                        # Content classification
+                        'content_type': row.get('content_type', content_type),
+                        'platform_type': 'IG Post' if content_type == 'post' else 'IG Reel',
+                        'product_type': row.get('product_type', ''),
+                        
+                        # User profile information
+                        'user_posted_id': row.get('user_posted_id', ''),
                         'followers': self._safe_int_convert(row.get('followers')),
                         'posts_count': self._safe_int_convert(row.get('posts_count')),
+                        'following': self._safe_int_convert(row.get('following')),
                         'profile_image_link': row.get('profile_image_link', ''),
+                        'user_profile_url': row.get('user_profile_url', ''),
+                        'profile_url': row.get('profile_url', ''),
                         'is_verified': self._safe_bool_convert(row.get('is_verified')),
+                        
+                        # Partnership and collaboration
                         'is_paid_partnership': self._safe_bool_convert(row.get('is_paid_partnership')),
+                        'partnership_details': self._safe_json_parse(row.get('partnership_details')) if row.get('partnership_details') else None,
+                        'coauthor_producers': self._safe_json_parse(row.get('coauthor_producers')) if row.get('coauthor_producers') else None,
+                        
+                        # Comments and engagement
+                        'location': row.get('location', ''),
+                        'latest_comments': self._safe_json_parse(row.get('latest_comments')) if row.get('latest_comments') else None,
+                        'top_comments': self._safe_json_parse(row.get('top_comments')) if row.get('top_comments') else None,
+                        'engagement_score': self._safe_float_convert(row.get('engagement_score')),
+                        'engagement_score_view': self._safe_int_convert(row.get('engagement_score_view')),
+                        
+                        # Tagged users and content
+                        'tagged_users': self._safe_json_parse(row.get('tagged_users')) if row.get('tagged_users') else None,
+                        
+                        # Audio information (mainly for reels)
+                        'audio': self._safe_json_parse(row.get('audio')) if row.get('audio') else None,
+                        
+                        # Post content structure (for carousel posts)
+                        'post_content': self._safe_json_parse(row.get('post_content')) if row.get('post_content') else None,
+                        
+                        # Video duration details
+                        'videos_duration': self._safe_json_parse(row.get('videos_duration')) if row.get('videos_duration') else None,
+                        
+                        # Image-specific fields
+                        'images': self._safe_json_parse(row.get('images')) if row.get('images') else None,
+                        'photos_number': self._safe_int_convert(row.get('photos_number')),
+                        'alt_text': row.get('alt_text', ''),
+                        
+                        # Legacy fields (keep for backward compatibility)
+                        'discovery_input': row.get('discovery_input', ''),
+                        'has_handshake': self._safe_bool_convert(row.get('has_handshake')),
+                        
+                        # Folder
                         'folder': folder,
                     }
                     
@@ -419,7 +656,9 @@ class InstagramPostViewSet(viewsets.ModelViewSet):
                 'updated': len(updated_objects),
                 'rejected': len(rejected_rows),
                 'rejected_details': rejected_rows[:10] if rejected_rows else [],  # Only return first 10 rejected rows
-                'content_type': content_type
+                'content_type': content_type,
+                'detected_content_type': content_type,
+                'detection_reason': detected_reason,
             }, status=status.HTTP_201_CREATED)
             
         except Exception as e:
@@ -449,9 +688,12 @@ class InstagramPostViewSet(viewsets.ModelViewSet):
             else:
                 filename = "instagram_data.csv"
             
-            # Create the HttpResponse object with the appropriate CSV header
-            response = HttpResponse(content_type='text/csv')
+            # Create the HttpResponse object with explicit UTF-8 encoding and BOM
+            response = HttpResponse(content_type='text/csv; charset=utf-8')
             response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            
+            # Add UTF-8 BOM for better CSV compatibility
+            response.write('\ufeff')
             
             # Create the CSV writer
             writer = csv.writer(response)
@@ -465,14 +707,45 @@ class InstagramPostViewSet(viewsets.ModelViewSet):
                 'posts_count', 'profile_image_link', 'is_verified', 'is_paid_partnership'
             ])
             
-            # Write the data rows
+            # Write the data rows with proper Unicode handling
             for post in posts:
+                # Ensure all text fields are properly encoded
+                def safe_text(value):
+                    if value is None:
+                        return ''
+                    try:
+                        # Ensure the value is a string and handle Unicode properly
+                        text_value = str(value)
+                        # Remove any null bytes or control characters that might cause issues
+                        text_value = text_value.replace('\x00', '').replace('\r', '').replace('\n', ' ')
+                        return text_value
+                    except (UnicodeEncodeError, UnicodeDecodeError):
+                        # If there are encoding issues, use replace mode
+                        return str(value).encode('utf-8', errors='replace').decode('utf-8')
+                
                 writer.writerow([
-                    post.url, post.user_posted, post.description, post.hashtags, post.num_comments,
-                    post.date_posted, post.likes, post.photos, post.videos, post.location,
-                    post.latest_comments, post.post_id, post.discovery_input, post.thumbnail,
-                    post.content_type, post.platform_type, post.engagement_score, post.tagged_users, post.followers,
-                    post.posts_count, post.profile_image_link, post.is_verified, post.is_paid_partnership
+                    safe_text(post.url),
+                    safe_text(post.user_posted),
+                    safe_text(post.description),
+                    safe_text(post.hashtags),
+                    post.num_comments,
+                    post.date_posted,
+                    safe_text(post.photos),
+                    safe_text(post.videos),
+                    safe_text(post.location),
+                    safe_text(post.latest_comments),
+                    safe_text(post.post_id),
+                    safe_text(post.discovery_input),
+                    safe_text(post.thumbnail),
+                    safe_text(post.content_type),
+                    safe_text(post.platform_type),
+                    post.engagement_score,
+                    safe_text(post.tagged_users),
+                    post.followers,
+                    post.posts_count,
+                    safe_text(post.profile_image_link),
+                    post.is_verified,
+                    post.is_paid_partnership
                 ])
             
             return response
@@ -513,3 +786,741 @@ class InstagramPostViewSet(viewsets.ModelViewSet):
             
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class InstagramCommentViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for Instagram Comments
+    """
+    serializer_class = InstagramCommentSerializer
+    permission_classes = [AllowAny]  # For testing, use proper permissions in production
+    
+    def get_queryset(self):
+        """
+        Filter comments by post_id, comment_user, or date range
+        """
+        try:
+            queryset = InstagramComment.objects.all()
+            
+            # Filter by post_id if specified
+            post_id = self.request.query_params.get('post_id')
+            if post_id:
+                queryset = queryset.filter(post_id=post_id)
+            
+            # Filter by folder_id if specified
+            folder_id = self.request.query_params.get('folder_id')
+            if folder_id:
+                queryset = queryset.filter(folder_id=folder_id)
+            
+            # Filter by comment_user if specified
+            comment_user = self.request.query_params.get('comment_user')
+            if comment_user:
+                queryset = queryset.filter(comment_user__icontains=comment_user)
+            
+            # Filter by date range
+            start_date = self.request.query_params.get('start_date')
+            end_date = self.request.query_params.get('end_date')
+            
+            if start_date:
+                try:
+                    start_date_obj = datetime.datetime.strptime(start_date, '%Y-%m-%d').date()
+                    queryset = queryset.filter(comment_date__gte=start_date_obj)
+                except ValueError:
+                    pass
+            
+            if end_date:
+                try:
+                    end_date_obj = datetime.datetime.strptime(end_date, '%Y-%m-%d').date()
+                    queryset = queryset.filter(comment_date__lte=end_date_obj)
+                except ValueError:
+                    pass
+            
+            # Add search functionality
+            search_query = self.request.query_params.get('search', '')
+            if search_query:
+                search_filter = Q()
+                search_filter |= Q(comment_user__icontains=search_query)
+                search_filter |= Q(comment__icontains=search_query)
+                search_filter |= Q(post_id__icontains=search_query)
+                queryset = queryset.filter(search_filter)
+            
+            return queryset
+        except Exception as e:
+            print(f"Error in get_queryset: {str(e)}")
+            return InstagramComment.objects.none()
+    
+    def _parse_date(self, date_str):
+        """Parse date string similar to the post viewset"""
+        if not date_str or not date_str.strip() or date_str.strip() == '""':
+            return None
+        
+        clean_date = date_str.strip().strip('"\'')
+        if not clean_date:
+            return None
+        
+        # Handle ISO format dates (like 2025-05-26T03:49:32.000Z)
+        if 'T' in clean_date and (clean_date.endswith('Z') or '+' in clean_date):
+            try:
+                return datetime.datetime.fromisoformat(clean_date.replace('Z', '+00:00'))
+            except (ValueError, TypeError):
+                pass
+        
+        try:
+            if HAS_DATEPARSER:
+                return dateparser.parse(clean_date, settings={
+                    'TIMEZONE': 'UTC',
+                    'RETURN_AS_TIMEZONE_AWARE': False,
+                    'DATE_ORDER': 'YMD',
+                })
+            else:
+                # Basic parsing for common formats
+                formats_to_try = [
+                    '%Y-%m-%dT%H:%M:%S.%fZ',
+                    '%Y-%m-%dT%H:%M:%SZ',
+                    '%Y-%m-%dT%H:%M:%S.%f',
+                    '%Y-%m-%dT%H:%M:%S',
+                    '%Y-%m-%d',
+                    '%Y-%m-%d %H:%M:%S',
+                ]
+                
+                for fmt in formats_to_try:
+                    try:
+                        return datetime.datetime.strptime(clean_date, fmt)
+                    except ValueError:
+                        continue
+                        
+                return None
+        except Exception as e:
+            print(f"Error parsing date '{clean_date}': {e}")
+            return None
+    
+    @action(detail=False, methods=['GET'])
+    def stats(self, request):
+        """
+        Get statistics about comments
+        """
+        try:
+            post_id = request.query_params.get('post_id')
+            folder_id = request.query_params.get('folder_id')
+            
+            # Base queryset
+            queryset = self.get_queryset()
+            if post_id:
+                queryset = queryset.filter(post_id=post_id)
+            if folder_id:
+                queryset = queryset.filter(folder_id=folder_id)
+            
+            # Calculate statistics
+            from django.db import models
+            total_comments = queryset.count()
+            unique_commenters = queryset.values('comment_user').distinct().count()
+            avg_likes = queryset.aggregate(avg_likes=models.Avg('likes_number'))['avg_likes'] or 0
+            avg_replies = queryset.aggregate(avg_replies=models.Avg('replies_number'))['avg_replies'] or 0
+            
+            stats = {
+                'totalComments': total_comments,
+                'uniqueCommenters': unique_commenters,
+                'avgLikes': round(avg_likes, 2),
+                'avgReplies': round(avg_replies, 2),
+            }
+            
+            return Response(stats, status=status.HTTP_200_OK)
+        except Exception as e:
+            print(f"Error in stats view: {str(e)}")
+            return Response(
+                {'error': 'An error occurred while retrieving statistics'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['POST'])
+    def upload_csv(self, request):
+        """
+        Upload CSV file and parse Instagram comment data
+        """
+        try:
+            csv_file = request.FILES.get('file')
+            if not csv_file:
+                return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            folder_id = request.data.get('folder_id')
+            folder = None
+            if folder_id:
+                try:
+                    folder = Folder.objects.get(id=folder_id)
+                    # Verify this is a comments folder
+                    if folder.category != 'comments':
+                        return Response(
+                            {'error': 'Selected folder is not configured for comments'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                except Folder.DoesNotExist:
+                    return Response(
+                        {'error': f'Folder with id {folder_id} does not exist'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            # Decode and parse CSV with comprehensive Unicode handling
+            try:
+                # Read the file content as bytes first
+                csv_content_bytes = csv_file.read()
+                
+                # Try multiple encoding strategies
+                decoded_file = None
+                encoding_used = None
+                
+                # Strategy 1: UTF-8 with BOM
+                try:
+                    decoded_file = csv_content_bytes.decode('utf-8-sig')
+                    encoding_used = 'utf-8-sig'
+                except UnicodeDecodeError:
+                    pass
+                
+                # Strategy 2: UTF-8
+                if decoded_file is None:
+                    try:
+                        decoded_file = csv_content_bytes.decode('utf-8')
+                        encoding_used = 'utf-8'
+                    except UnicodeDecodeError:
+                        pass
+                
+                # Strategy 3: Latin-1 (covers most Windows encodings)
+                if decoded_file is None:
+                    try:
+                        decoded_file = csv_content_bytes.decode('latin1')
+                        encoding_used = 'latin1'
+                    except UnicodeDecodeError:
+                        pass
+                
+                # Strategy 4: CP1252 with error replacement (last resort)
+                if decoded_file is None:
+                    decoded_file = csv_content_bytes.decode('cp1252', errors='replace')
+                    encoding_used = 'cp1252-replace'
+                
+                print(f"CSV decoded using: {encoding_used}")
+                
+                # Clean up any problematic characters that might cause issues
+                # Replace null bytes and normalize line endings
+                decoded_file = decoded_file.replace('\x00', '').replace('\r\n', '\n').replace('\r', '\n')
+                
+                # Create StringIO object safely
+                csv_string_io = io.StringIO(decoded_file)
+                csv_data = csv.DictReader(csv_string_io)
+                
+            except Exception as e:
+                safe_error = str(e).encode('ascii', errors='replace').decode('ascii')
+                return Response(
+                    {'error': f'Error reading CSV file. Please ensure it is properly encoded. Error: {safe_error}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            rows_processed = 0
+            rows_added = 0
+            rows_updated = 0
+            rows_skipped = 0
+            errors = []
+            
+            # Debug: Check CSV headers
+            fieldnames = csv_data.fieldnames
+            try:
+                # Safe logging of CSV headers
+                safe_fieldnames = str(fieldnames).encode('ascii', errors='replace').decode('ascii')
+                print(f"CSV Headers: {safe_fieldnames}")
+            except Exception as e:
+                print(f"CSV Headers: [Unicode content - {len(fieldnames) if fieldnames else 0} columns]")
+            
+            for row in csv_data:
+                # Skip empty rows
+                if not row or all(not v for v in row.values()):
+                    continue
+                
+                rows_processed += 1
+                
+                # Debug: Print first few rows with safe Unicode handling
+                if rows_processed <= 3:
+                    try:
+                        # Create a safe version of row for printing
+                        safe_row = {}
+                        for key, value in row.items():
+                            if isinstance(value, str) and value:
+                                # Limit length and convert to ASCII for safe console output
+                                safe_value = value[:50] if len(value) > 50 else value
+                                safe_value = safe_value.encode('ascii', errors='replace').decode('ascii')
+                                safe_row[key] = safe_value
+                            else:
+                                safe_row[key] = value
+                        print(f"Row {rows_processed}: {safe_row}")
+                    except Exception as e:
+                        print(f"Row {rows_processed}: [Unicode content - unable to display safely]")
+                
+                # Check if this row has warning or error messages indicating no comments
+                warning = row.get('warning', '').strip()
+                error = row.get('error', '').strip()
+                
+                # Skip rows with specific warnings/errors that indicate no actual comment data
+                if warning or error:
+                    rows_skipped += 1
+                    # Safe logging for warnings/errors
+                    safe_warning_or_error = (warning or error).encode('ascii', errors='replace').decode('ascii')
+                    print(f"Skipping row {rows_processed}: {safe_warning_or_error}")
+                    continue
+                
+                # Extract and validate required fields
+                comment_id = ''
+                for key in ['comment_id', 'id']:
+                    if key in row and row[key]:
+                        comment_id = str(row[key]).strip().strip('"').strip("'")
+                        break
+                
+                # Check if comment text exists
+                comment_text = ''
+                for key in ['comment', 'comment_text', 'text']:
+                    if key in row and row[key]:
+                        comment_text = str(row[key]).strip().strip('"').strip("'")
+                        break
+                
+                # Skip rows with empty comment text (like njltheawesome row)
+                if not comment_text:
+                    rows_skipped += 1
+                    print(f"Skipping row {rows_processed}: Empty comment text")
+                    continue
+                
+                # Try to extract post_id from multiple possible sources
+                post_id = ''
+                for key in ['post_id', 'id']:
+                    if key in row and row[key]:
+                        post_id = str(row[key]).strip().strip('"').strip("'")
+                        break
+                
+                # Debug: Print field extraction
+                if rows_processed <= 3:
+                    try:
+                        # Safely print extracted fields with length limits and Unicode handling
+                        safe_comment_id = str(comment_id)[:50] if comment_id else ''
+                        safe_comment_preview = str(comment_text)[:50] if comment_text else ''
+                        safe_post_id = str(post_id)[:50] if post_id else ''
+                        # Remove problematic characters for printing and ensure safe console output
+                        safe_comment_id = safe_comment_id.encode('ascii', errors='replace').decode('ascii')
+                        safe_comment_preview = safe_comment_preview.encode('ascii', errors='replace').decode('ascii')
+                        safe_post_id = safe_post_id.encode('ascii', errors='replace').decode('ascii')
+                        print(f"Extracted comment_id: '{safe_comment_id}', comment: '{safe_comment_preview}', post_id: '{safe_post_id}'")
+                    except Exception as e:
+                        print(f"Debug print error for extracted fields: {e}")
+                
+                if not comment_id:
+                    errors.append(f"Row {rows_processed}: Missing comment_id")
+                    rows_skipped += 1
+                    print(f"Skipping row {rows_processed}: Missing comment_id")
+                    continue
+                
+                try:
+                    # Parse date field - Instagram uses 'comment_date'
+                    date_created_raw = row.get('comment_date', None)
+                    parsed_date = None
+                    if date_created_raw:
+                        parsed_date = self._parse_date(date_created_raw)
+                    
+                    # Safe integer conversion
+                    def safe_int(value, default=0):
+                        try:
+                            if value is None or value == '' or value == '""':
+                                return default
+                            # Handle string numbers
+                            cleaned_value = str(value).strip().strip('"').strip("'")
+                            if not cleaned_value:
+                                return default
+                            return int(float(cleaned_value))  # Convert via float to handle decimal strings
+                        except (ValueError, TypeError):
+                            return default
+                    
+                    # Extract fields with flexible key names and safe string handling
+                    def get_field(row, *keys):
+                        for key in keys:
+                            if key in row and row[key] is not None:
+                                try:
+                                    value = str(row[key]).strip().strip('"').strip("'")
+                                    # Clean problematic characters that might cause encoding issues
+                                    # Replace null bytes and control characters
+                                    value = value.replace('\x00', '').replace('\r', '').replace('\n', ' ')
+                                    return value if value else ''
+                                except (UnicodeEncodeError, UnicodeDecodeError):
+                                    # Handle problematic Unicode characters
+                                    try:
+                                        value = str(row[key]).encode('utf-8', errors='replace').decode('utf-8').strip().strip('"').strip("'")
+                                        # Clean problematic characters
+                                        value = value.replace('\x00', '').replace('\r', '').replace('\n', ' ')
+                                        return value if value else ''
+                                    except:
+                                        return ''
+                        return ''
+                    
+                    # Try to find related Instagram post
+                    instagram_post = None
+                    if post_id:
+                        try:
+                            instagram_post = InstagramPost.objects.filter(post_id=post_id).first()
+                        except:
+                            pass
+                    
+                    # Parse JSON fields safely
+                    def safe_json_parse(value):
+                        if not value:
+                            return None
+                        try:
+                            return json.loads(value)
+                        except (json.JSONDecodeError, TypeError):
+                            return value  # Return as string if not valid JSON
+                    
+                    # Prepare the comment data - map Instagram CSV fields to model fields
+                    # Handle Unicode characters properly with comprehensive cleaning
+                    def safe_text_processing(text):
+                        if not text:
+                            return ''
+                        try:
+                            # First, ensure we have a string
+                            text_str = str(text)
+                            # Clean null bytes and control characters
+                            text_str = text_str.replace('\x00', '').replace('\r', '').replace('\n', ' ')
+                            # Handle Unicode properly - keep original Unicode characters
+                            return text_str.strip().strip('"').strip("'")
+                        except Exception as e:
+                            # Fallback: try to extract readable characters only
+                            try:
+                                safe_chars = ''.join(char for char in str(text) if ord(char) < 127 or ord(char) > 159)
+                                return safe_chars.strip().strip('"').strip("'")
+                            except:
+                                return ''
+                    
+                    # Apply safe text processing to the comment
+                    clean_comment_text = safe_text_processing(comment_text)
+                    
+                    comment_data = {
+                        'comment_id': safe_text_processing(comment_id),
+                        'folder': folder,
+                        'instagram_post': instagram_post,
+                        'post_id': safe_text_processing(post_id),
+                        'post_url': safe_text_processing(get_field(row, 'post_url', 'url')),
+                        'post_user': safe_text_processing(get_field(row, 'post_user')),
+                        'comment': clean_comment_text,  # Already processed
+                        'comment_date': parsed_date,
+                        'comment_user': safe_text_processing(get_field(row, 'comment_user')),
+                        'comment_user_url': safe_text_processing(get_field(row, 'comment_user_url')),
+                        'likes_number': safe_int(row.get('likes_number', 0)),
+                        'replies_number': safe_int(row.get('replies_number', 0)),
+                        'replies': safe_json_parse(row.get('replies')),
+                        'hashtag_comment': safe_text_processing(get_field(row, 'hashtag_comment')),
+                        'tagged_users_in_comment': safe_json_parse(row.get('tagged_users_in_comment')),
+                        'url': safe_text_processing(get_field(row, 'url')),
+                    }
+                    
+                    # Debug: Print comment data for first few rows (with safe Unicode handling)
+                    if rows_processed <= 3:
+                        try:
+                            # Create a safe version of comment_data for printing
+                            safe_comment_data = {}
+                            for key, value in comment_data.items():
+                                if isinstance(value, str):
+                                    # Limit length and ensure safe printing by converting to ASCII for console
+                                    safe_value = value[:100] if len(value) > 100 else value
+                                    safe_value = safe_value.encode('ascii', errors='replace').decode('ascii')
+                                    safe_comment_data[key] = safe_value
+                                else:
+                                    safe_comment_data[key] = value
+                            print(f"Comment data for row {rows_processed}: {safe_comment_data}")
+                        except Exception as e:
+                            print(f"Debug print error for row {rows_processed}: {e}")
+                    
+                    # Try to find existing comment
+                    existing_comment = InstagramComment.objects.filter(
+                        comment_id=comment_id,
+                        folder=folder
+                    ).first()
+                    
+                    if existing_comment:
+                        # Update the existing record
+                        for key, value in comment_data.items():
+                            if key != 'folder':  # Don't update the folder field
+                                setattr(existing_comment, key, value)
+                        existing_comment.save()
+                        rows_updated += 1
+                        # Safe logging without Unicode characters that might cause console issues
+                        safe_comment_id_for_log = str(comment_id).encode('ascii', errors='replace').decode('ascii')
+                        print(f"Updated comment: {safe_comment_id_for_log}")
+                    else:
+                        # Create a new record
+                        new_comment = InstagramComment.objects.create(**comment_data)
+                        rows_added += 1
+                        # Safe logging without Unicode characters that might cause console issues
+                        safe_comment_id_for_log = str(comment_id).encode('ascii', errors='replace').decode('ascii')
+                        print(f"Created new comment: {safe_comment_id_for_log}")
+                        
+                except Exception as e:
+                    # Create safe error message that won't cause encoding issues
+                    try:
+                        error_msg = f"Error processing row {rows_processed}: {str(e)}"
+                        # Make the error message safe for both logging and response
+                        safe_error_msg = error_msg.encode('ascii', errors='replace').decode('ascii')
+                        errors.append(safe_error_msg)
+                        rows_skipped += 1
+                        print(safe_error_msg)
+                    except Exception as encoding_error:
+                        # Fallback error handling if even the safe encoding fails
+                        safe_error_msg = f"Error processing row {rows_processed}: Unicode encoding error"
+                        errors.append(safe_error_msg)
+                        rows_skipped += 1
+                        print(safe_error_msg)
+                    continue
+            
+            # Prepare response
+            response_data = {
+                'status': 'success',
+                'message': f'CSV processed successfully. {rows_processed} rows processed, {rows_added} added, {rows_updated} updated, {rows_skipped} skipped.',
+                'rows_processed': rows_processed,
+                'rows_added': rows_added,
+                'rows_updated': rows_updated,
+                'rows_skipped': rows_skipped,
+            }
+            
+            if errors:
+                response_data['errors'] = errors[:10]  # Limit number of errors returned
+                response_data['total_errors'] = len(errors)
+            
+            # Safe logging of upload completion without Unicode characters
+            try:
+                safe_response_msg = str(response_data['message']).encode('ascii', errors='replace').decode('ascii')
+                print(f"Upload completed: {safe_response_msg} (rows_processed: {response_data['rows_processed']}, rows_added: {response_data['rows_added']}, rows_updated: {response_data['rows_updated']}, rows_skipped: {response_data['rows_skipped']})")
+            except Exception as e:
+                print(f"Upload completed with some Unicode content. Rows processed: {response_data.get('rows_processed', 0)}")
+            
+            return Response(response_data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            # Create safe error message that won't cause encoding issues
+            try:
+                error_msg = f'Error processing CSV file: {str(e)}'
+                safe_error_msg = error_msg.encode('ascii', errors='replace').decode('ascii')
+                print(safe_error_msg)
+                return Response(
+                    {'error': safe_error_msg},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            except Exception as encoding_error:
+                # Fallback error handling if even the safe encoding fails
+                fallback_error_msg = 'Error processing CSV file: Unicode encoding error occurred'
+                print(fallback_error_msg)
+                return Response(
+                    {'error': fallback_error_msg},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+    @action(detail=False, methods=['GET'])
+    def download_csv(self, request):
+        """
+        Download comments as CSV
+        """
+        try:
+            # Get filtered queryset
+            comments = self.get_queryset()
+            
+            # Filter by folder_id if provided
+            folder_id = request.query_params.get('folder_id')
+            if folder_id:
+                comments = comments.filter(folder_id=folder_id)
+            
+            # Create CSV response with explicit UTF-8 encoding and BOM
+            response = HttpResponse(content_type='text/csv; charset=utf-8')
+            response['Content-Disposition'] = f'attachment; filename="instagram_comments_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+            
+            # Add UTF-8 BOM for better CSV compatibility
+            response.write('\ufeff')
+            
+            # Create CSV writer and write header
+            writer = csv.writer(response)
+            writer.writerow([
+                'comment_id', 'post_id', 'post_url', 'post_user', 'comment_user', 'comment_user_url',
+                'comment', 'comment_date', 'likes_number', 'replies_number', 'hashtag_comment',
+                'tagged_users_in_comment', 'url'
+            ])
+            
+            # Write data rows with proper Unicode handling
+            for comment in comments:
+                comment_date_str = comment.comment_date.isoformat() if comment.comment_date else ''
+                
+                # Convert JSON fields to strings safely
+                tagged_users_str = json.dumps(comment.tagged_users_in_comment, ensure_ascii=False) if comment.tagged_users_in_comment else ''
+                
+                # Ensure all text fields are properly encoded
+                def safe_text(value):
+                    if value is None:
+                        return ''
+                    try:
+                        # Ensure the value is a string and handle Unicode properly
+                        text_value = str(value)
+                        # Remove any null bytes or control characters that might cause issues
+                        text_value = text_value.replace('\x00', '').replace('\r', '').replace('\n', ' ')
+                        return text_value
+                    except (UnicodeEncodeError, UnicodeDecodeError):
+                        # If there are encoding issues, use replace mode
+                        return str(value).encode('utf-8', errors='replace').decode('utf-8')
+                
+                writer.writerow([
+                    safe_text(comment.comment_id),
+                    safe_text(comment.post_id),
+                    safe_text(comment.post_url),
+                    safe_text(comment.post_user),
+                    safe_text(comment.comment_user),
+                    safe_text(comment.comment_user_url),
+                    safe_text(comment.comment),
+                    comment_date_str,
+                    comment.likes_number,
+                    comment.replies_number,
+                    safe_text(comment.hashtag_comment),
+                    tagged_users_str,
+                    safe_text(comment.url)
+                ])
+            
+            return response
+        
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class CommentScrapingJobViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for Instagram Comment Scraping Jobs
+    """
+    serializer_class = CommentScrapingJobSerializer
+    permission_classes = [AllowAny]  # For testing, use proper permissions in production
+    
+    def get_queryset(self):
+        """
+        Filter jobs by project if specified
+        """
+        try:
+            queryset = CommentScrapingJob.objects.all()
+            
+            # Filter by project_id if specified
+            project_id = self.request.query_params.get('project')
+            if project_id:
+                queryset = queryset.filter(project_id=project_id)
+            
+            return queryset.order_by('-created_at')
+        except Exception as e:
+            print(f"Error in get_queryset: {str(e)}")
+            return CommentScrapingJob.objects.none()
+    
+    @action(detail=False, methods=['POST'])
+    def create_job(self, request):
+        """
+        Create and execute a new Instagram comment scraping job
+        """
+        try:
+            # Get request data
+            name = request.data.get('name')
+            project_id = request.data.get('project_id')
+            selected_folders = request.data.get('selected_folders', [])
+            result_folder_name = request.data.get('result_folder_name')
+            
+            # Validate required fields
+            if not name:
+                return Response(
+                    {'error': 'Job name is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            if not result_folder_name:
+                return Response(
+                    {'error': 'Result folder name is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            if not selected_folders or not isinstance(selected_folders, list):
+                return Response(
+                    {'error': 'At least one folder must be selected'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Check if folders exist and contain posts
+            existing_folders = Folder.objects.filter(
+                id__in=selected_folders,
+                category__in=['posts', 'reels']  # Only post/reel folders can be used for comment scraping
+            )
+            
+            if len(existing_folders) != len(selected_folders):
+                return Response(
+                    {'error': 'One or more selected folders do not exist or are not post/reel folders'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Check if folders have posts
+            total_posts = InstagramPost.objects.filter(
+                folder_id__in=selected_folders
+            ).exclude(url__isnull=True).exclude(url__exact='').count()
+            
+            if total_posts == 0:
+                return Response(
+                    {'error': 'Selected folders do not contain any posts with valid URLs'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Create and execute the job
+            job, success = create_and_execute_instagram_comment_scraping_job(
+                name=name,
+                project_id=project_id,
+                selected_folders=selected_folders,
+                result_folder_name=result_folder_name
+            )
+            
+            # Serialize the job data
+            serializer = CommentScrapingJobSerializer(job)
+            
+            return Response({
+                'success': success,
+                'message': 'Instagram comment scraping job created and submitted successfully' if success else 'Job created but submission failed',
+                'job': serializer.data,
+                'total_posts_found': total_posts
+            }, status=status.HTTP_201_CREATED if success else status.HTTP_400_BAD_REQUEST)
+            
+        except Exception as e:
+            print(f"Error creating Instagram comment scraping job: {str(e)}")
+            return Response(
+                {'error': f'An error occurred while creating the job: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['POST'])
+    def process_webhook(self, request):
+        """
+        Process webhook data from BrightData for Instagram comments
+        """
+        try:
+            webhook_data = request.data
+            
+            if not isinstance(webhook_data, list):
+                return Response({'error': 'Webhook data must be a list'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Import the service
+            from .services import InstagramCommentScraper
+            
+            # Get job_id from query parameters if available
+            job_id = request.query_params.get('job_id')
+            if job_id:
+                try:
+                    job_id = int(job_id)
+                except (ValueError, TypeError):
+                    job_id = None
+            
+            # Process the webhook data
+            scraper = InstagramCommentScraper()
+            result = scraper.process_comment_webhook_data(webhook_data, job_id=job_id)
+            
+            if result['success']:
+                return Response({
+                    'message': 'Instagram comment webhook data processed successfully',
+                    'result': result
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    'error': 'Error processing Instagram comment webhook data',
+                    'result': result
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+        except Exception as e:
+            print(f"Error processing Instagram comment webhook: {str(e)}")

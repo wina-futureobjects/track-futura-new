@@ -45,6 +45,7 @@ import {
 } from '@mui/icons-material';
 import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import MusicVideoIcon from '@mui/icons-material/MusicVideo';
+import CommentIcon from '@mui/icons-material/Comment';
 import { useNavigate, useLocation } from 'react-router-dom';
 // Import the GE logo
 import GELogo from '../../assets/images/logos/GE-logo.png';
@@ -126,7 +127,15 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
         { text: 'Facebook Data', path: getSocialMediaPath('facebook-folders'), icon: <FacebookIcon /> },
         { text: 'LinkedIn Data', path: getSocialMediaPath('linkedin-folders'), icon: <LinkedInIcon /> },
         { text: 'TikTok Data', path: getSocialMediaPath('tiktok-folders'), icon: <MusicVideoIcon /> },
-        { text: 'Brightdata Scraper', path: getSocialMediaPath('brightdata-scraper'), icon: <AutoAwesomeIcon /> },
+      ]
+    },
+    { 
+      text: 'Data Scrapers', 
+      path: '#scrapers', 
+      icon: <AutoAwesomeIcon />,
+      subItems: [
+        { text: 'Posts & Reels Scraper', path: getSocialMediaPath('automated-batch-scraper'), icon: <AutoAwesomeIcon /> },
+        { text: 'Comments Scraper', path: getSocialMediaPath('comments-scraper'), icon: <CommentIcon /> },
         { text: 'Brightdata Settings', path: getSocialMediaPath('brightdata-settings'), icon: <SettingsSuggestIcon /> },
       ]
     },
@@ -222,6 +231,10 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
     }
     if (itemPath.includes('brightdata-settings')) {
       return location.pathname.includes('brightdata-settings');
+    }
+    
+    if (itemPath.includes('facebook-comment-scraper')) {
+      return location.pathname.includes('facebook-comment-scraper');
     }
     
     // Special handling for analysis page

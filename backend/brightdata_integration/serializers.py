@@ -15,12 +15,14 @@ class BrightdataConfigSerializer(serializers.ModelSerializer):
 class BatchScraperJobSerializer(serializers.ModelSerializer):
     """Serializer for Batch Scraper Jobs"""
     platforms_display = serializers.CharField(source='get_platforms_display', read_only=True)
+    content_types_display = serializers.CharField(source='get_content_types_display', read_only=True)
     project_name = serializers.CharField(source='project.name', read_only=True)
     
     class Meta:
         model = BatchScraperJob
         fields = [
             'id', 'name', 'project', 'project_name', 'source_folder_ids', 'platforms_to_scrape', 'platforms_display',
+            'content_types_to_scrape', 'content_types_display',
             'num_of_posts', 'start_date', 'end_date', 'auto_create_folders', 'output_folder_pattern',
             'status', 'total_accounts', 'processed_accounts', 'successful_requests', 'failed_requests',
             'job_metadata', 'error_log', 'created_at', 'updated_at', 'started_at', 'completed_at'
@@ -32,7 +34,7 @@ class BatchScraperJobCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = BatchScraperJob
         fields = [
-            'name', 'project', 'source_folder_ids', 'platforms_to_scrape',
+            'name', 'project', 'source_folder_ids', 'platforms_to_scrape', 'content_types_to_scrape',
             'num_of_posts', 'start_date', 'end_date', 'auto_create_folders', 'output_folder_pattern'
         ]
 

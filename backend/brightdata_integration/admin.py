@@ -35,7 +35,7 @@ class BatchScraperJobAdmin(admin.ModelAdmin):
             'fields': ('name', 'project', 'status')
         }),
         ('Source Configuration', {
-            'fields': ('source_folder_ids', 'platforms_to_scrape')
+            'fields': ('source_folder_ids', 'platforms_to_scrape', 'content_types_to_scrape')
         }),
         ('Scraping Parameters', {
             'fields': ('num_of_posts', 'start_date', 'end_date')
