@@ -24,10 +24,12 @@ class BatchScraperJobSerializer(serializers.ModelSerializer):
             'id', 'name', 'project', 'project_name', 'source_folder_ids', 'platforms_to_scrape', 'platforms_display',
             'content_types_to_scrape', 'content_types_display',
             'num_of_posts', 'start_date', 'end_date', 'auto_create_folders', 'output_folder_pattern',
-            'status', 'total_accounts', 'processed_accounts', 'successful_requests', 'failed_requests',
+            'status', 'total_sources', 'processed_sources', 'successful_requests', 'failed_requests',
+            # Legacy fields for backward compatibility
+            'total_accounts', 'processed_accounts',
             'job_metadata', 'error_log', 'created_at', 'updated_at', 'started_at', 'completed_at'
         ]
-        read_only_fields = ['total_accounts', 'processed_accounts', 'successful_requests', 'failed_requests', 'started_at', 'completed_at']
+        read_only_fields = ['total_sources', 'processed_sources', 'total_accounts', 'processed_accounts', 'successful_requests', 'failed_requests', 'started_at', 'completed_at']
 
 class BatchScraperJobCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating batch scraper jobs with simplified fields"""
@@ -47,8 +49,10 @@ class ScraperRequestSerializer(serializers.ModelSerializer):
         model = ScraperRequest
         fields = [
             'id', 'config', 'batch_job', 'batch_job_name', 'request_id', 'platform', 'platform_display', 
-            'content_type', 'target_url', 'account_name', 'iac_no', 'num_of_posts', 'posts_to_not_include', 
+            'content_type', 'target_url', 'source_name', 'iac_no', 'num_of_posts', 'posts_to_not_include', 
             'start_date', 'end_date', 'status', 'request_payload', 'response_metadata', 'error_message',
+            # Legacy field for backward compatibility
+            'account_name',
             'folder_id', 'created_at', 'updated_at', 'completed_at'
         ]
         read_only_fields = ['request_id', 'status', 'response_metadata', 'error_message', 'completed_at']
@@ -58,7 +62,7 @@ class ScraperRequestCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ScraperRequest
         fields = [
-            'platform', 'content_type', 'target_url', 'account_name', 'iac_no', 'num_of_posts',
+            'platform', 'content_type', 'target_url', 'source_name', 'iac_no', 'num_of_posts',
             'posts_to_not_include', 'start_date', 'end_date', 'folder_id'
         ]
     

@@ -12,7 +12,7 @@ import datetime
 from typing import List, Dict, Optional, Tuple
 from django.utils import timezone
 from django.db import transaction
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 from django.conf import settings
 
 from .models import BatchScraperJob, ScraperRequest, BrightdataConfig
@@ -94,7 +94,7 @@ class AutomatedBatchScraper:
     
     def execute_batch_job(self, job_id: int) -> bool:
         """
-        Execute a batch scraper job
+        Execute a batch scraper job by collecting all requests and sending batch API calls
         """
         try:
             job = BatchScraperJob.objects.get(id=job_id)
@@ -130,36 +130,35 @@ class AutomatedBatchScraper:
                 'start_time': timezone.now().isoformat(),
             }
             
-            successful_requests = 0
-            failed_requests = 0
+            # First phase: Create all scraper requests (but don't trigger them individually)
+            all_scraper_requests = []
             
-            # Process each source
             for source in sources:
                 try:
-                    source_result = self._process_account(job, source)
+                    source_requests = self._create_scraper_requests_for_source(job, source)
+                    all_scraper_requests.extend(source_requests)
+                    
                     job_metadata['sources_processed'].append({
                         'source_name': source.name,
                         'iac_no': source.iac_no,
-                        'platforms_scraped': source_result['platforms_scraped'],
-                        'requests_created': source_result['requests_created'],
-                        'errors': source_result['errors']
+                        'requests_created': [req.id for req in source_requests],
                     })
-                    
-                    successful_requests += source_result['successful_requests']
-                    failed_requests += source_result['failed_requests']
                     
                     # Update progress
                     job.processed_sources += 1
                     job.processed_accounts += 1  # Keep legacy field in sync
-                    job.successful_requests = successful_requests
-                    job.failed_requests = failed_requests
                     job.save()
                     
                 except Exception as e:
-                    self.logger.error(f"Error processing source {source.name}: {str(e)}")
-                    failed_requests += 1
-                    job.failed_requests = failed_requests
-                    job.save()
+                    self.logger.error(f"Error creating requests for source {source.name}: {str(e)}")
+            
+            # Second phase: Group requests by platform+content_type and send batch API calls
+            batch_results = self._execute_batch_requests(all_scraper_requests)
+            
+            # Update job metadata with batch results
+            job_metadata['batch_results'] = batch_results
+            successful_requests = sum(result['successful'] for result in batch_results.values())
+            failed_requests = sum(result['failed'] for result in batch_results.values())
             
             # Complete the job
             job_metadata['end_time'] = timezone.now().isoformat()
@@ -167,19 +166,26 @@ class AutomatedBatchScraper:
                 'total_sources': job.total_sources,
                 'processed_sources': job.processed_sources,
                 'successful_requests': successful_requests,
-                'failed_requests': failed_requests
+                'failed_requests': failed_requests,
+                'batch_calls_made': len(batch_results)
             }
             
             job.job_metadata = job_metadata
+            job.successful_requests = successful_requests
+            job.failed_requests = failed_requests
             job.status = 'completed' if failed_requests == 0 else 'completed'  # Consider partial success as completed
             job.completed_at = timezone.now()
             job.save()
             
-            self.logger.info(f"Completed batch job: {job.name}. Success: {successful_requests}, Failed: {failed_requests}")
+            self.logger.info(f"Completed batch job: {job.name}. Success: {successful_requests}, Failed: {failed_requests}, Batch calls: {len(batch_results)}")
             return True
             
+        except BatchScraperJob.DoesNotExist:
+            self.logger.error(f"Batch job with ID {job_id} not found")
+            return False
         except Exception as e:
             self.logger.error(f"Error executing batch job {job_id}: {str(e)}")
+            # Update job status to failed
             try:
                 job = BatchScraperJob.objects.get(id=job_id)
                 job.status = 'failed'
@@ -225,17 +231,12 @@ class AutomatedBatchScraper:
         
         return list(sources)
     
-    def _process_account(self, job: BatchScraperJob, source: TrackSource) -> Dict:
+    def _create_scraper_requests_for_source(self, job: BatchScraperJob, source: TrackSource) -> List[ScraperRequest]:
         """
-        Process a single source for all specified platforms and content types
+        Create scraper requests for a single source for all specified platforms and content types
+        (but don't trigger them yet - they will be batched later)
         """
-        result = {
-            'platforms_scraped': [],
-            'requests_created': [],
-            'successful_requests': 0,
-            'failed_requests': 0,
-            'errors': []
-        }
+        created_requests = []
         
         for platform in job.platforms_to_scrape:
             try:
@@ -257,42 +258,106 @@ class AutomatedBatchScraper:
                         if not config:
                             error_msg = f"No active {platform}_{content_type}s configuration found"
                             self.logger.error(error_msg)
-                            result['errors'].append(error_msg)
-                            result['failed_requests'] += 1
                             continue
                         
                         # Create or get output folder
                         folder_id = self._get_or_create_output_folder(job, platform, source, content_type)
                         
-                        # Create scraper request
+                        # Create scraper request (but don't trigger it yet)
                         scraper_request = self._create_scraper_request(
                             job, source, platform, url, config, folder_id, content_type
                         )
                         
                         if scraper_request:
-                            platform_content = f"{platform}_{content_type}"
-                            result['platforms_scraped'].append(platform_content)
-                            result['requests_created'].append(scraper_request.id)
-                            result['successful_requests'] += 1
-                            
-                            # Trigger the actual scrape
-                            self._trigger_scrape(scraper_request)
-                        else:
-                            result['failed_requests'] += 1
-                            
+                            created_requests.append(scraper_request)
+                            self.logger.debug(f"Created scraper request for {source.name} on {platform}_{content_type}")
+                        
                     except Exception as e:
-                        error_msg = f"Error processing {platform} {content_type} for {source.name}: {str(e)}"
-                        self.logger.error(error_msg)
-                        result['errors'].append(error_msg)
-                        result['failed_requests'] += 1
+                        self.logger.error(f"Error creating scraper request for {source.name} on {platform}_{content_type}: {str(e)}")
                         
             except Exception as e:
-                error_msg = f"Error processing {platform} for {source.name}: {str(e)}"
-                self.logger.error(error_msg)
-                result['errors'].append(error_msg)
-                result['failed_requests'] += 1
+                self.logger.error(f"Error processing platform {platform} for source {source.name}: {str(e)}")
         
-        return result
+        return created_requests
+    
+    def _execute_batch_requests(self, scraper_requests: List[ScraperRequest]) -> Dict:
+        """
+        Group scraper requests by platform+content_type and execute batch API calls
+        """
+        # Group requests by platform+content_type combination
+        request_groups = {}
+        for request in scraper_requests:
+            key = f"{request.platform}_{request.content_type}"
+            if key not in request_groups:
+                request_groups[key] = []
+            request_groups[key].append(request)
+        
+        batch_results = {}
+        
+        for group_key, requests in request_groups.items():
+            self.logger.info(f"Executing batch API call for {group_key} with {len(requests)} sources")
+            
+            try:
+                # Get the platform from the first request (all requests in group have same platform)
+                base_platform = requests[0].platform.split('_')[0]
+                
+                # Execute batch call based on platform
+                success = self._execute_batch_for_platform(base_platform, requests)
+                
+                batch_results[group_key] = {
+                    'successful': len(requests) if success else 0,
+                    'failed': 0 if success else len(requests),
+                    'total_sources': len(requests)
+                }
+                
+                # Update request statuses
+                status = 'pending' if success else 'failed'
+                for request in requests:
+                    request.status = status
+                    if not success:
+                        request.error_message = f"Batch API call failed for {group_key}"
+                    request.save()
+                    
+            except Exception as e:
+                self.logger.error(f"Error executing batch for {group_key}: {str(e)}")
+                batch_results[group_key] = {
+                    'successful': 0,
+                    'failed': len(requests),
+                    'total_sources': len(requests)
+                }
+                
+                # Mark all requests as failed
+                for request in requests:
+                    request.status = 'failed'
+                    request.error_message = f"Batch execution error: {str(e)}"
+                    request.save()
+        
+        return batch_results
+    
+    def _execute_batch_for_platform(self, platform: str, requests: List[ScraperRequest]) -> bool:
+        """
+        Execute a batch API call for a specific platform with multiple sources
+        """
+        if not requests:
+            return True
+        
+        # Use the first request to get config and determine the trigger method
+        first_request = requests[0]
+        
+        # Map platform to batch trigger method
+        platform_batch_methods = {
+            'facebook': self._trigger_facebook_batch,
+            'instagram': self._trigger_instagram_batch,
+            'linkedin': self._trigger_linkedin_batch,
+            'tiktok': self._trigger_tiktok_batch,
+        }
+        
+        batch_method = platform_batch_methods.get(platform)
+        if not batch_method:
+            self.logger.error(f"No batch trigger method found for platform: {platform}")
+            return False
+        
+        return batch_method(requests)
     
     def _get_platform_url(self, source: TrackSource, platform: str) -> Optional[str]:
         """
@@ -307,7 +372,24 @@ class AutomatedBatchScraper:
         
         url = url_mapping.get(platform)
         if url and url.strip():
-            return url.strip()
+            cleaned_url = url.strip()
+            
+            # Clean Instagram URLs by removing query parameters
+            # BrightData API expects clean URLs like: https://www.instagram.com/username/
+            # but rejects URLs with query params like: https://www.instagram.com/username/?hl=en
+            if platform == 'instagram' and cleaned_url:
+                try:
+                    parsed = urlparse(cleaned_url)
+                    # Remove query parameters and fragments for Instagram URLs
+                    cleaned_parsed = parsed._replace(query='', fragment='')
+                    cleaned_url = urlunparse(cleaned_parsed)
+                    self.logger.info(f"Cleaned Instagram URL: {url} -> {cleaned_url}")
+                except Exception as e:
+                    self.logger.warning(f"Could not clean Instagram URL {url}: {str(e)}")
+                    # Fall back to original URL if parsing fails
+                    cleaned_url = url.strip()
+            
+            return cleaned_url
         return None
     
     def _get_platform_config(self, platform: str, content_type: str = 'post') -> Optional[BrightdataConfig]:
@@ -499,6 +581,15 @@ class AutomatedBatchScraper:
                     "discover_by": "url",
                 })
             
+            # Log batch details
+            self.logger.info(f"Sending batch API request for {scraper_request.platform} with {len(payload)} sources")
+            if len(payload) <= 5:  # Log URLs for small batches
+                urls = [item.get('url', 'N/A') for item in payload]
+                self.logger.info(f"Batch URLs: {urls}")
+            else:
+                first_few = [item.get('url', 'N/A') for item in payload[:3]]
+                self.logger.info(f"Batch URLs (first 3): {first_few} ... and {len(payload) - 3} more")
+            
             # Store the request payload
             scraper_request.request_payload = payload
             scraper_request.status = 'processing'
@@ -513,10 +604,10 @@ class AutomatedBatchScraper:
                 scraper_request.response_metadata = response_data
                 scraper_request.save()
                 
-                self.logger.info(f"Successfully triggered scrape for request {scraper_request.id}")
+                self.logger.info(f"Successfully triggered batch scrape for {scraper_request.platform} with {len(payload)} sources. Request ID: {scraper_request.request_id}")
                 return True
             else:
-                error_msg = f"BrightData API error: {response.status_code} - {response.text}"
+                error_msg = f"BrightData API error for {scraper_request.platform} batch: {response.status_code} - {response.text}"
                 self.logger.error(error_msg)
                 scraper_request.status = 'failed'
                 scraper_request.error_message = error_msg
@@ -524,7 +615,7 @@ class AutomatedBatchScraper:
                 return False
                 
         except Exception as e:
-            error_msg = f"Error making BrightData request: {str(e)}"
+            error_msg = f"Exception during BrightData batch request for {scraper_request.platform}: {str(e)}"
             self.logger.error(error_msg)
             scraper_request.status = 'failed'
             scraper_request.error_message = error_msg
@@ -587,6 +678,94 @@ class AutomatedBatchScraper:
             "end_date": scraper_request.end_date.strftime('%m-%d-%Y') if scraper_request.end_date else "",
         }]
         return self._make_brightdata_request(scraper_request, payload)
+
+    def _trigger_facebook_batch(self, requests: List[ScraperRequest]) -> bool:
+        """Trigger Facebook batch scrape with multiple sources"""
+        if not requests:
+            return True
+            
+        # Create batch payload with all sources
+        payload = []
+        for request in requests:
+            payload.append({
+                "url": request.target_url,
+                "num_of_posts": request.num_of_posts,
+                "posts_to_not_include": [],
+                "start_date": request.start_date.strftime('%m-%d-%Y') if request.start_date else "",
+                "end_date": request.end_date.strftime('%m-%d-%Y') if request.end_date else "",
+            })
+        
+        # Use the first request for API call configuration
+        return self._make_brightdata_request(requests[0], payload)
+    
+    def _trigger_instagram_batch(self, requests: List[ScraperRequest]) -> bool:
+        """Trigger Instagram batch scrape with multiple sources"""
+        if not requests:
+            return True
+            
+        # Get content type from the first request (all requests in batch have same content type)
+        content_type = requests[0].platform.split('_')[-1]  # gets 'posts', 'reels', etc.
+        
+        # Create batch payload with all sources
+        payload = []
+        for request in requests:
+            if content_type == 'reels':
+                # Instagram Reels API format
+                payload.append({
+                    "url": request.target_url,
+                    "start_date": request.start_date.strftime('%m-%d-%Y') if request.start_date else "",
+                    "end_date": request.end_date.strftime('%m-%d-%Y') if request.end_date else "",
+                    "all_reels": False,  # Default to specific date range instead of all reels
+                })
+            else:
+                # Instagram Posts API format (includes posts and other content types)
+                payload.append({
+                    "url": request.target_url,
+                    "num_of_posts": request.num_of_posts,
+                    "start_date": request.start_date.strftime('%m-%d-%Y') if request.start_date else "",
+                    "end_date": request.end_date.strftime('%m-%d-%Y') if request.end_date else "",
+                    "post_type": "Post" if content_type == 'posts' else content_type.title(),
+                    "posts_to_not_include": [],  # Could be extended to support excluded posts
+                })
+        
+        # Use the first request for API call configuration
+        return self._make_brightdata_request(requests[0], payload)
+    
+    def _trigger_linkedin_batch(self, requests: List[ScraperRequest]) -> bool:
+        """Trigger LinkedIn batch scrape with multiple sources"""
+        if not requests:
+            return True
+            
+        # Create batch payload with all sources
+        payload = []
+        for request in requests:
+            payload.append({
+                "url": request.target_url,
+                "num_of_posts": request.num_of_posts,
+                "start_date": request.start_date.strftime('%m-%d-%Y') if request.start_date else "",
+                "end_date": request.end_date.strftime('%m-%d-%Y') if request.end_date else "",
+            })
+        
+        # Use the first request for API call configuration
+        return self._make_brightdata_request(requests[0], payload)
+    
+    def _trigger_tiktok_batch(self, requests: List[ScraperRequest]) -> bool:
+        """Trigger TikTok batch scrape with multiple sources"""
+        if not requests:
+            return True
+            
+        # Create batch payload with all sources
+        payload = []
+        for request in requests:
+            payload.append({
+                "url": request.target_url,
+                "num_of_posts": request.num_of_posts,
+                "start_date": request.start_date.strftime('%m-%d-%Y') if request.start_date else "",
+                "end_date": request.end_date.strftime('%m-%d-%Y') if request.end_date else "",
+            })
+        
+        # Use the first request for API call configuration
+        return self._make_brightdata_request(requests[0], payload)
 
 # Convenience function for external use
 def create_and_execute_batch_job(name: str, project_id: int, source_folder_ids: List[int], 

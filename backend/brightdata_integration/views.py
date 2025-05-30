@@ -19,7 +19,7 @@ from .serializers import (
 )
 from .services import AutomatedBatchScraper, create_and_execute_batch_job
 import traceback
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse, urlunparse
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -322,6 +322,20 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
             if not target_url:
                 return Response({'error': 'Target URL is required'}, 
                                status=status.HTTP_400_BAD_REQUEST)
+            
+            # Clean Instagram URLs by removing query parameters 
+            # BrightData API expects clean URLs like: https://www.instagram.com/username/
+            # but rejects URLs with query params like: https://www.instagram.com/username/?hl=en
+            try:
+                parsed = urlparse(target_url)
+                # Remove query parameters and fragments for Instagram URLs
+                cleaned_parsed = parsed._replace(query='', fragment='')
+                cleaned_url = urlunparse(cleaned_parsed)
+                logger.info(f"Cleaned Instagram URL: {target_url} -> {cleaned_url}")
+                target_url = cleaned_url
+            except Exception as e:
+                logger.warning(f"Could not clean Instagram URL {target_url}: {str(e)}")
+                # Continue with original URL if parsing fails
             
             # Get content type and determine platform configuration key
             content_type = request.data.get('content_type', 'post')
