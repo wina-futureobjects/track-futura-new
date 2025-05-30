@@ -28,14 +28,14 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import { apiFetch } from '../../utils/api';
 
 // Types
-interface TrackAccountFormProps {
-  accountId?: string; // Optional - if provided, we're editing an existing account
+interface TrackSourceFormProps {
+  sourceId?: string; // Optional - if provided, we're editing an existing source
   organizationId?: string; // Optional - for navigation with organization context
   projectId?: string; // Optional - for navigation with project context
-  onSuccess?: (account: TrackAccount) => void;
+  onSuccess?: (source: TrackSource) => void;
 }
 
-interface TrackAccount {
+interface TrackSource {
   id: number;
   name: string;
   iac_no: string;
@@ -65,20 +65,20 @@ const postingFrequencies = [
   'High'
 ];
 
-const TrackAccountForm: React.FC<TrackAccountFormProps> = ({ 
-  accountId, 
+const TrackSourceForm: React.FC<TrackSourceFormProps> = ({ 
+  sourceId, 
   organizationId,
   projectId,
   onSuccess 
 }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [loadingAccount, setLoadingAccount] = useState(!!accountId);
+  const [loadingSource, setLoadingSource] = useState(!!sourceId);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   
   // Form state
-  const [formData, setFormData] = useState<TrackAccount>({
+  const [formData, setFormData] = useState<TrackSource>({
     id: 0,
     name: '',
     iac_no: '',
@@ -96,34 +96,34 @@ const TrackAccountForm: React.FC<TrackAccountFormProps> = ({
   // Form errors
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  // Load account data if editing
+  // Load source data if editing
   useEffect(() => {
-    if (accountId) {
-      const fetchAccountData = async () => {
+    if (sourceId) {
+      const fetchSourceData = async () => {
         try {
-          setLoadingAccount(true);
-          const response = await apiFetch(`/api/track-accounts/accounts/${accountId}/`);
+          setLoadingSource(true);
+          const response = await apiFetch(`/api/track-accounts/sources/${sourceId}/`);
           
           if (!response.ok) {
-            throw new Error('Failed to load account data');
+            throw new Error('Failed to load source data');
           }
           
-          const accountData = await response.json();
+          const sourceData = await response.json();
           setFormData({
-            ...accountData,
-            project: accountData.project || (projectId ? parseInt(projectId, 10) : null)
+            ...sourceData,
+            project: sourceData.project || (projectId ? parseInt(projectId, 10) : null)
           });
         } catch (error) {
-          console.error('Error loading account:', error);
-          setError('Failed to load account data. Please try again.');
+          console.error('Error loading source:', error);
+          setError('Failed to load source data. Please try again.');
         } finally {
-          setLoadingAccount(false);
+          setLoadingSource(false);
         }
       };
       
-      fetchAccountData();
+      fetchSourceData();
     }
-  }, [accountId, projectId]);
+  }, [sourceId, projectId]);
 
   // Handle form field changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -181,7 +181,7 @@ const TrackAccountForm: React.FC<TrackAccountFormProps> = ({
     ];
     
     urlFields.forEach(({ field, label }) => {
-      const value = formData[field as keyof TrackAccount] as string;
+      const value = formData[field as keyof TrackSource] as string;
       if (value && value.trim() !== '') {
         try {
           new URL(value);
@@ -208,15 +208,17 @@ const TrackAccountForm: React.FC<TrackAccountFormProps> = ({
     setSuccess(null);
     
     try {
-      const url = accountId 
-        ? `/api/track-accounts/accounts/${accountId}/`
-        : '/api/track-accounts/accounts/';
+      const url = sourceId 
+        ? `/api/track-accounts/sources/${sourceId}/`
+        : '/api/track-accounts/sources/';
       
-      const method = accountId ? 'PUT' : 'POST';
+      const method = sourceId ? 'PUT' : 'POST';
       
       // Add project ID to request body if available
       let requestData = { ...formData };
-      if (projectId && !accountId) { // Only for new accounts
+      
+      // Ensure project ID is set if available from props
+      if (projectId) {
         requestData.project = parseInt(projectId, 10);
       }
       
@@ -230,28 +232,58 @@ const TrackAccountForm: React.FC<TrackAccountFormProps> = ({
       
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to save account');
+        
+        // Handle field-specific validation errors
+        if (errorData && typeof errorData === 'object' && !errorData.detail) {
+          // This is likely a validation error with field-specific messages
+          const newFormErrors: Record<string, string> = {};
+          let hasFieldErrors = false;
+          
+          // Extract field-specific errors
+          Object.keys(errorData).forEach(field => {
+            const fieldError = errorData[field];
+            
+            // Handle both array format ["error message"] and string format "error message"
+            if (Array.isArray(fieldError) && fieldError.length > 0) {
+              newFormErrors[field] = fieldError[0]; // Take the first error for arrays
+              hasFieldErrors = true;
+            } else if (typeof fieldError === 'string' && fieldError.trim() !== '') {
+              newFormErrors[field] = fieldError; // Use string directly
+              hasFieldErrors = true;
+            }
+          });
+          
+          if (hasFieldErrors) {
+            setFormErrors(newFormErrors);
+            setError('Please correct the errors below.');
+            return;
+          }
+        }
+        
+        // Handle general error messages
+        throw new Error(errorData.detail || errorData.message || 'Failed to save source');
       }
       
-      const savedAccount = await response.json();
+      const savedSource = await response.json();
       
-      setSuccess(`Account ${accountId ? 'updated' : 'created'} successfully!`);
+      setSuccess(`Source ${sourceId ? 'updated' : 'created'} successfully!`);
       
       // Callback if provided
       if (onSuccess) {
-        onSuccess(savedAccount);
+        onSuccess(savedSource);
       } else {
         // Otherwise, navigate back after a short delay
         setTimeout(() => {
           if (organizationId && projectId) {
-            navigate(`/organizations/${organizationId}/projects/${projectId}/track-accounts/accounts`);
+            navigate(`/organizations/${organizationId}/projects/${projectId}/source-tracking/sources`);
           } else {
-            navigate('/track-accounts/accounts');
+            // If no organization/project context, navigate to home
+            navigate('/');
           }
         }, 1500);
       }
     } catch (error) {
-      console.error('Error saving account:', error);
+      console.error('Error saving source:', error);
       setError(error instanceof Error ? error.message : 'An unknown error occurred');
     } finally {
       setLoading(false);
@@ -261,13 +293,14 @@ const TrackAccountForm: React.FC<TrackAccountFormProps> = ({
   // Function to navigate back based on context
   const handleCancel = () => {
     if (organizationId && projectId) {
-      navigate(`/organizations/${organizationId}/projects/${projectId}/track-accounts/accounts`);
+      navigate(`/organizations/${organizationId}/projects/${projectId}/source-tracking/sources`);
     } else {
-      navigate('/track-accounts/accounts');
+      // If no organization/project context, navigate to home
+      navigate('/');
     }
   };
 
-  if (loadingAccount) {
+  if (loadingSource) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
         <CircularProgress />
@@ -278,7 +311,7 @@ const TrackAccountForm: React.FC<TrackAccountFormProps> = ({
   return (
     <Paper elevation={3} sx={{ p: 3, maxWidth: 800, mx: 'auto' }}>
       <Typography variant="h5" component="h1" gutterBottom>
-        {accountId ? 'Edit Track Account' : 'Create New Track Account'}
+        {sourceId ? 'Edit Track Source' : 'Create New Track Source'}
       </Typography>
       
       {error && (
@@ -506,7 +539,7 @@ const TrackAccountForm: React.FC<TrackAccountFormProps> = ({
             >
               {loading ? 
                 <CircularProgress size={24} /> : 
-                (accountId ? 'Update Account' : 'Create Account')
+                (sourceId ? 'Update Source' : 'Create Source')
               }
             </Button>
           </Box>
@@ -516,4 +549,4 @@ const TrackAccountForm: React.FC<TrackAccountFormProps> = ({
   );
 };
 
-export default TrackAccountForm;
+export default TrackSourceForm;

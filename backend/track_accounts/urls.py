@@ -3,7 +3,9 @@ from rest_framework.routers import DefaultRouter
 from . import views
 
 router = DefaultRouter()
-router.register(r'accounts', views.TrackAccountViewSet, basename='track-account')
+router.register(r'sources', views.TrackSourceViewSet, basename='track-source')
+# Keep accounts endpoint for backward compatibility - point to same viewset
+router.register(r'accounts', views.TrackSourceViewSet, basename='track-account')
 router.register(r'reports', views.ReportFolderViewSet, basename='report-folder')
 
 urlpatterns = [

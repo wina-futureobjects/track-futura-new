@@ -1,5 +1,5 @@
 import { useState, useEffect, ChangeEvent } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -52,7 +52,7 @@ import {
   VisibilityOff as VisibilityOffIcon,
 } from '@mui/icons-material';
 
-interface TrackAccount {
+interface TrackSource {
   id: number;
   name: string;
   iac_no: string;
@@ -89,14 +89,26 @@ interface FilterStats {
   };
 }
 
-const TrackAccountsList = () => {
+const TrackSourcesList = () => {
   const navigate = useNavigate();
-  const { organizationId, projectId } = useParams<{ 
-    organizationId?: string;
-    projectId?: string;
-  }>();
+  const location = useLocation();
   
-  const [accounts, setAccounts] = useState<TrackAccount[]>([]);
+  // Extract project ID from URL path or query parameters
+  const getProjectId = () => {
+    // First try to extract from URL path: /organizations/{orgId}/projects/{projectId}/...
+    const pathMatch = location.pathname.match(/\/organizations\/\d+\/projects\/(\d+)/);
+    if (pathMatch) {
+      return pathMatch[1];
+    }
+    
+    // Fallback to query parameter: ?project=13
+    const queryParams = new URLSearchParams(location.search);
+    return queryParams.get('project');
+  };
+  
+  const projectId = getProjectId();
+  
+  const [sources, setSources] = useState<TrackSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
@@ -127,8 +139,8 @@ const TrackAccountsList = () => {
     severity: 'success' as 'success' | 'error'
   });
 
-  // Fetch accounts with filters
-  const fetchAccounts = async (
+  // Fetch sources with filters
+  const fetchSources = async (
     pageNumber = 0, 
     pageSize = 25, 
     searchQuery = '',
@@ -139,13 +151,20 @@ const TrackAccountsList = () => {
     try {
       setLoading(true);
       
+      // Don't fetch sources if no project is found
+      if (!projectId) {
+        console.error('No project ID found in URL');
+        setSources([]);
+        setTotalCount(0);
+        setLoading(false);
+        return;
+      }
+      
       // Build query parameters
       let queryParams = `page=${pageNumber + 1}&page_size=${pageSize}`;
       
-      // Add project ID if available
-      if (projectId) {
-        queryParams += `&project=${projectId}`;
-      }
+      // Add project ID (required)
+      queryParams += `&project=${projectId}`;
       
       // Add search parameter
       if (searchQuery) {
@@ -176,16 +195,26 @@ const TrackAccountsList = () => {
         queryParams += '&has_tiktok=true';
       }
       
-      const response = await fetch(`/api/track-accounts/accounts/?${queryParams}`);
+      console.log('=== FRONTEND FETCH SOURCES DEBUG ===');
+      console.log('Project ID from URL:', projectId);
+      console.log('Current URL:', location.pathname);
+      console.log('Fetch URL:', `/api/track-accounts/sources/?${queryParams}`);
+      
+      const response = await fetch(`/api/track-accounts/sources/?${queryParams}`);
+      console.log('Fetch response status:', response.status);
+      console.log('Fetch response ok:', response.ok);
       
       if (!response.ok) {
-        throw new Error('Failed to fetch accounts');
+        throw new Error('Failed to fetch sources');
       }
       
       const data = await response.json();
+      console.log('Raw response data:', data);
       
       if (data && typeof data === 'object' && 'results' in data) {
-        setAccounts(data.results || []);
+        console.log('Using paginated data, count:', data.count);
+        console.log('Results:', data.results);
+        setSources(data.results || []);
         setTotalCount(data.count || 0);
         
         // Update filter stats
@@ -194,13 +223,15 @@ const TrackAccountsList = () => {
         }
       } else {
         console.error('Unexpected data format from API:', data);
-        setAccounts([]);
+        setSources([]);
         setTotalCount(0);
       }
+      console.log('=== END FRONTEND FETCH SOURCES DEBUG ===');
     } catch (error) {
-      console.error('Error fetching accounts:', error);
-      showSnackbar('Failed to load accounts', 'error');
-      setAccounts([]);
+      console.error('Error fetching sources:', error);
+      setSources([]);
+      setTotalCount(0);
+      showSnackbar('Failed to load sources. Please try again.', 'error');
     } finally {
       setLoading(false);
     }
@@ -214,7 +245,7 @@ const TrackAccountsList = () => {
         queryParams = `?project=${projectId}`;
       }
       
-      const response = await fetch(`/api/track-accounts/accounts/stats/${queryParams}`);
+      const response = await fetch(`/api/track-accounts/sources/stats/${queryParams}`);
       if (response.ok) {
         const stats = await response.json();
         setFilterStats(stats);
@@ -226,14 +257,14 @@ const TrackAccountsList = () => {
 
   // Initial data load
   useEffect(() => {
-    fetchAccounts(page, rowsPerPage, searchTerm, riskFilter, monitoringFilter, socialMediaFilters);
+    fetchSources(page, rowsPerPage, searchTerm, riskFilter, monitoringFilter, socialMediaFilters);
     fetchFilterStats();
   }, []);
 
   // Handle pagination change
   const handleChangePage = (_event: unknown, newPage: number) => {
     setPage(newPage);
-    fetchAccounts(newPage, rowsPerPage, searchTerm, riskFilter, monitoringFilter, socialMediaFilters);
+    fetchSources(newPage, rowsPerPage, searchTerm, riskFilter, monitoringFilter, socialMediaFilters);
   };
 
   // Handle rows per page change
@@ -241,7 +272,7 @@ const TrackAccountsList = () => {
     const newRowsPerPage = parseInt(event.target.value, 10);
     setRowsPerPage(newRowsPerPage);
     setPage(0);
-    fetchAccounts(0, newRowsPerPage, searchTerm, riskFilter, monitoringFilter, socialMediaFilters);
+    fetchSources(0, newRowsPerPage, searchTerm, riskFilter, monitoringFilter, socialMediaFilters);
   };
 
   // Handle search
@@ -251,7 +282,7 @@ const TrackAccountsList = () => {
 
   const handleSearch = () => {
     setPage(0);
-    fetchAccounts(0, rowsPerPage, searchTerm, riskFilter, monitoringFilter, socialMediaFilters);
+    fetchSources(0, rowsPerPage, searchTerm, riskFilter, monitoringFilter, socialMediaFilters);
   };
 
   const handleKeyPress = (event: React.KeyboardEvent) => {
@@ -264,13 +295,13 @@ const TrackAccountsList = () => {
   const handleRiskFilterChange = (event: SelectChangeEvent) => {
     setRiskFilter(event.target.value);
     setPage(0);
-    fetchAccounts(0, rowsPerPage, searchTerm, event.target.value, monitoringFilter, socialMediaFilters);
+    fetchSources(0, rowsPerPage, searchTerm, event.target.value, monitoringFilter, socialMediaFilters);
   };
 
   const handleMonitoringFilterChange = (event: SelectChangeEvent) => {
     setMonitoringFilter(event.target.value);
     setPage(0);
-    fetchAccounts(0, rowsPerPage, searchTerm, riskFilter, event.target.value, socialMediaFilters);
+    fetchSources(0, rowsPerPage, searchTerm, riskFilter, event.target.value, socialMediaFilters);
   };
 
   const handleSocialMediaFilterChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -281,7 +312,7 @@ const TrackAccountsList = () => {
     };
     setSocialMediaFilters(updatedFilters);
     setPage(0);
-    fetchAccounts(0, rowsPerPage, searchTerm, riskFilter, monitoringFilter, updatedFilters);
+    fetchSources(0, rowsPerPage, searchTerm, riskFilter, monitoringFilter, updatedFilters);
   };
 
   // Clear all filters
@@ -296,7 +327,7 @@ const TrackAccountsList = () => {
       hasTikTok: false,
     });
     setPage(0);
-    fetchAccounts(0, rowsPerPage, '', '', '', {
+    fetchSources(0, rowsPerPage, '', '', '', {
       hasFacebook: false,
       hasInstagram: false,
       hasLinkedIn: false,
@@ -323,8 +354,10 @@ const TrackAccountsList = () => {
 
   // Navigation helper
   const getNavigationPath = (path: string) => {
-    if (organizationId && projectId) {
-      return `/organizations/${organizationId}/projects/${projectId}${path}`;
+    const pathMatch = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
+    if (pathMatch) {
+      const [, orgId, projId] = pathMatch;
+      return `/organizations/${orgId}/projects/${projId}${path}`;
     }
     return path;
   };
@@ -366,7 +399,7 @@ const TrackAccountsList = () => {
           {/* Search */}
           <TextField
             fullWidth
-            placeholder="Search accounts..."
+            placeholder="Search sources..."
             value={searchTerm}
             onChange={handleSearchChange}
             onKeyPress={handleKeyPress}
@@ -456,7 +489,7 @@ const TrackAccountsList = () => {
                   displayEmpty
                   sx={{ bgcolor: '#f8fafc' }}
                 >
-                  <MenuItem value="">All Accounts</MenuItem>
+                  <MenuItem value="">All Sources</MenuItem>
                   <MenuItem value="yes">
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -586,7 +619,7 @@ const TrackAccountsList = () => {
             <Button
               variant="contained"
               startIcon={<PersonAddIcon />}
-              onClick={() => navigate(getNavigationPath('/track-accounts/create'))}
+              onClick={() => navigate(getNavigationPath('/track-sources/create'))}
               sx={{ 
                 bgcolor: '#3b82f6',
                 '&:hover': { bgcolor: '#2563eb' },
@@ -594,7 +627,7 @@ const TrackAccountsList = () => {
                 px: 3
               }}
             >
-              Add Account
+              Add Source
             </Button>
           </Box>
           
@@ -611,7 +644,7 @@ const TrackAccountsList = () => {
                       {totalCount}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      Total Accounts
+                      Total Sources
                     </Typography>
                   </Box>
                 </Box>
@@ -679,21 +712,21 @@ const TrackAccountsList = () => {
               <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
                 <CircularProgress />
               </Box>
-            ) : accounts.length === 0 ? (
+            ) : sources.length === 0 ? (
               <Box sx={{ p: 4, textAlign: 'center' }}>
                 <Typography variant="h6" gutterBottom color="text.secondary">
-                  No accounts found
+                  No sources found
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                  {hasActiveFilters ? 'Try adjusting your filters or search terms.' : 'Get started by adding your first account.'}
+                  {hasActiveFilters ? 'Try adjusting your filters or search terms.' : 'Get started by adding your first source.'}
                 </Typography>
                 <Button
                   variant="contained"
                   startIcon={<AddIcon />}
-                  onClick={() => navigate(getNavigationPath('/track-accounts/create'))}
+                  onClick={() => navigate(getNavigationPath('/track-sources/create'))}
                   sx={{ bgcolor: '#3b82f6', '&:hover': { bgcolor: '#2563eb' } }}
                 >
-                  Add Account
+                  Add Source
                 </Button>
               </Box>
             ) : (
@@ -702,7 +735,7 @@ const TrackAccountsList = () => {
                   <Table>
                     <TableHead sx={{ bgcolor: '#f8fafc' }}>
                       <TableRow>
-                        <TableCell sx={{ fontWeight: 600, color: '#374151' }}>Account</TableCell>
+                        <TableCell sx={{ fontWeight: 600, color: '#374151' }}>Source</TableCell>
                         <TableCell sx={{ fontWeight: 600, color: '#374151' }}>IAC Number</TableCell>
                         <TableCell sx={{ fontWeight: 600, color: '#374151' }} align="center">Social Media</TableCell>
                         <TableCell sx={{ fontWeight: 600, color: '#374151' }}>Risk Level</TableCell>
@@ -711,33 +744,33 @@ const TrackAccountsList = () => {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {accounts.map((account) => (
-                        <TableRow key={account.id} sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
+                      {sources.map((source) => (
+                        <TableRow key={source.id} sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
                           <TableCell>
                             <Box>
                               <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                {account.name}
+                                {source.name}
                               </Typography>
                               <Typography variant="caption" color="text.secondary">
-                                ID: {account.id}
+                                ID: {source.id}
                               </Typography>
                             </Box>
                           </TableCell>
                           <TableCell>
                             <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                              {account.iac_no}
+                              {source.iac_no}
                             </Typography>
                           </TableCell>
                           <TableCell align="center">
                             <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
-                              {account.instagram_link && (
-                                <Tooltip title={`Instagram: ${account.instagram_link}`}>
+                              {source.instagram_link && (
+                                <Tooltip title={`Instagram: ${source.instagram_link}`}>
                                   <IconButton 
                                     size="small" 
                                     onClick={() => {
-                                      const url = account.instagram_link?.startsWith('http') 
-                                        ? account.instagram_link 
-                                        : `https://www.instagram.com/${account.instagram_link}`;
+                                      const url = source.instagram_link?.startsWith('http') 
+                                        ? source.instagram_link 
+                                        : `https://www.instagram.com/${source.instagram_link}`;
                                       window.open(url, '_blank');
                                     }}
                                     sx={{ 
@@ -751,14 +784,14 @@ const TrackAccountsList = () => {
                                 </Tooltip>
                               )}
                               
-                              {account.facebook_link && (
-                                <Tooltip title={`Facebook: ${account.facebook_link}`}>
+                              {source.facebook_link && (
+                                <Tooltip title={`Facebook: ${source.facebook_link}`}>
                                   <IconButton 
                                     size="small" 
                                     onClick={() => {
-                                      const url = account.facebook_link?.startsWith('http') 
-                                        ? account.facebook_link 
-                                        : `https://www.facebook.com/${account.facebook_link}`;
+                                      const url = source.facebook_link?.startsWith('http') 
+                                        ? source.facebook_link 
+                                        : `https://www.facebook.com/${source.facebook_link}`;
                                       window.open(url, '_blank');
                                     }}
                                     sx={{ 
@@ -772,14 +805,14 @@ const TrackAccountsList = () => {
                                 </Tooltip>
                               )}
                               
-                              {account.linkedin_link && (
-                                <Tooltip title={`LinkedIn: ${account.linkedin_link}`}>
+                              {source.linkedin_link && (
+                                <Tooltip title={`LinkedIn: ${source.linkedin_link}`}>
                                   <IconButton 
                                     size="small" 
                                     onClick={() => {
-                                      const url = account.linkedin_link?.startsWith('http') 
-                                        ? account.linkedin_link 
-                                        : `https://www.linkedin.com/in/${account.linkedin_link}`;
+                                      const url = source.linkedin_link?.startsWith('http') 
+                                        ? source.linkedin_link 
+                                        : `https://www.linkedin.com/in/${source.linkedin_link}`;
                                       window.open(url, '_blank');
                                     }}
                                     sx={{ 
@@ -793,14 +826,14 @@ const TrackAccountsList = () => {
                                 </Tooltip>
                               )}
                               
-                              {account.tiktok_link && (
-                                <Tooltip title={`TikTok: ${account.tiktok_link}`}>
+                              {source.tiktok_link && (
+                                <Tooltip title={`TikTok: ${source.tiktok_link}`}>
                                   <IconButton 
                                     size="small" 
                                     onClick={() => {
-                                      const url = account.tiktok_link?.startsWith('http') 
-                                        ? account.tiktok_link 
-                                        : `https://www.tiktok.com/@${account.tiktok_link}`;
+                                      const url = source.tiktok_link?.startsWith('http') 
+                                        ? source.tiktok_link 
+                                        : `https://www.tiktok.com/@${source.tiktok_link}`;
                                       window.open(url, '_blank');
                                     }}
                                     sx={{ 
@@ -814,8 +847,8 @@ const TrackAccountsList = () => {
                                 </Tooltip>
                               )}
                               
-                              {!account.instagram_link && !account.facebook_link && 
-                               !account.linkedin_link && !account.tiktok_link && (
+                              {!source.instagram_link && !source.facebook_link && 
+                               !source.linkedin_link && !source.tiktok_link && (
                                 <Typography variant="body2" color="text.secondary">
                                   No accounts
                                 </Typography>
@@ -823,17 +856,17 @@ const TrackAccountsList = () => {
                             </Box>
                           </TableCell>
                           <TableCell>
-                            {account.risk_classification ? (
+                            {source.risk_classification ? (
                               <Chip 
-                                label={account.risk_classification} 
+                                label={source.risk_classification} 
                                 size="small" 
                                 sx={{
-                                  bgcolor: account.risk_classification.toLowerCase() === 'critical' ? '#fee2e2' :
-                                          account.risk_classification.toLowerCase() === 'high' ? '#fef3c7' :
-                                          account.risk_classification.toLowerCase() === 'medium' ? '#fef3c7' : '#f0fdf4',
-                                  color: account.risk_classification.toLowerCase() === 'critical' ? '#dc2626' :
-                                         account.risk_classification.toLowerCase() === 'high' ? '#d97706' :
-                                         account.risk_classification.toLowerCase() === 'medium' ? '#d97706' : '#059669',
+                                  bgcolor: source.risk_classification.toLowerCase() === 'critical' ? '#fee2e2' :
+                                          source.risk_classification.toLowerCase() === 'high' ? '#fef3c7' :
+                                          source.risk_classification.toLowerCase() === 'medium' ? '#fef3c7' : '#f0fdf4',
+                                  color: source.risk_classification.toLowerCase() === 'critical' ? '#dc2626' :
+                                         source.risk_classification.toLowerCase() === 'high' ? '#d97706' :
+                                         source.risk_classification.toLowerCase() === 'medium' ? '#d97706' : '#059669',
                                   fontWeight: 600
                                 }}
                               />
@@ -845,14 +878,14 @@ const TrackAccountsList = () => {
                           </TableCell>
                           <TableCell>
                             <Chip 
-                              icon={account.close_monitoring ? <VisibilityIcon /> : <VisibilityOffIcon />}
-                              label={account.close_monitoring ? 'Monitored' : 'Not Monitored'} 
+                              icon={source.close_monitoring ? <VisibilityIcon /> : <VisibilityOffIcon />}
+                              label={source.close_monitoring ? 'Monitored' : 'Not Monitored'} 
                               size="small" 
-                              variant={account.close_monitoring ? 'filled' : 'outlined'}
+                              variant={source.close_monitoring ? 'filled' : 'outlined'}
                               sx={{
-                                bgcolor: account.close_monitoring ? '#dbeafe' : 'transparent',
-                                color: account.close_monitoring ? '#1d4ed8' : '#64748b',
-                                borderColor: account.close_monitoring ? '#3b82f6' : '#cbd5e1'
+                                bgcolor: source.close_monitoring ? '#dbeafe' : 'transparent',
+                                color: source.close_monitoring ? '#1d4ed8' : '#64748b',
+                                borderColor: source.close_monitoring ? '#3b82f6' : '#cbd5e1'
                               }}
                             />
                           </TableCell>
@@ -860,7 +893,7 @@ const TrackAccountsList = () => {
                             <Button
                               size="small"
                               startIcon={<EditIcon />}
-                              onClick={() => navigate(getNavigationPath(`/track-accounts/edit/${account.id}`))}
+                              onClick={() => navigate(getNavigationPath(`/track-sources/edit/${source.id}`))}
                               sx={{ 
                                 color: '#64748b',
                                 '&:hover': { 
@@ -913,4 +946,7 @@ const TrackAccountsList = () => {
   );
 };
 
-export default TrackAccountsList; 
+export default TrackSourcesList;
+
+// Keep backward compatibility alias
+export { TrackSourcesList as TrackAccountsList }; 

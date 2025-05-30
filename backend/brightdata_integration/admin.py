@@ -24,10 +24,10 @@ class BrightdataConfigAdmin(admin.ModelAdmin):
 
 @admin.register(BatchScraperJob)
 class BatchScraperJobAdmin(admin.ModelAdmin):
-    list_display = ('name', 'project', 'get_platforms_display', 'status', 'total_accounts', 'processed_accounts', 'created_at', 'completed_at')
+    list_display = ('name', 'project', 'get_platforms_display', 'status', 'total_sources', 'processed_sources', 'created_at', 'completed_at')
     list_filter = ('status', 'auto_create_folders', 'created_at')
     search_fields = ('name', 'project__name')
-    readonly_fields = ('created_at', 'updated_at', 'started_at', 'completed_at', 'total_accounts', 'processed_accounts', 'successful_requests', 'failed_requests')
+    readonly_fields = ('created_at', 'updated_at', 'started_at', 'completed_at', 'total_sources', 'processed_sources', 'successful_requests', 'failed_requests')
     ordering = ('-created_at',)
     
     fieldsets = (
@@ -44,7 +44,7 @@ class BatchScraperJobAdmin(admin.ModelAdmin):
             'fields': ('auto_create_folders', 'output_folder_pattern')
         }),
         ('Job Statistics', {
-            'fields': ('total_accounts', 'processed_accounts', 'successful_requests', 'failed_requests'),
+            'fields': ('total_sources', 'processed_sources', 'successful_requests', 'failed_requests'),
             'classes': ('collapse',)
         }),
         ('Job Details', {
@@ -59,15 +59,15 @@ class BatchScraperJobAdmin(admin.ModelAdmin):
 
 @admin.register(ScraperRequest)
 class ScraperRequestAdmin(admin.ModelAdmin):
-    list_display = ('account_name', 'platform', 'content_type', 'target_url', 'status', 'batch_job', 'created_at', 'completed_at')
+    list_display = ('source_name', 'platform', 'content_type', 'target_url', 'status', 'batch_job', 'created_at', 'completed_at')
     list_filter = ('platform', 'content_type', 'status', 'batch_job')
-    search_fields = ('target_url', 'request_id', 'account_name', 'iac_no')
+    search_fields = ('target_url', 'request_id', 'source_name', 'iac_no')
     readonly_fields = ('created_at', 'updated_at', 'completed_at', 'request_payload', 'response_metadata')
     ordering = ('-created_at',)
     
     fieldsets = (
         ('Request Info', {
-            'fields': ('config', 'batch_job', 'platform', 'content_type', 'target_url', 'account_name', 'iac_no', 'num_of_posts', 
+            'fields': ('config', 'batch_job', 'platform', 'content_type', 'target_url', 'source_name', 'iac_no', 'num_of_posts', 
                        'posts_to_not_include', 'start_date', 'end_date', 'folder_id')
         }),
         ('Response Info', {

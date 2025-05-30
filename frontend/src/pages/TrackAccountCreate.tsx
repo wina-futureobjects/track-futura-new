@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   Container,
   Typography,
@@ -11,16 +11,20 @@ import {
 import HomeIcon from '@mui/icons-material/Home';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import TrackChangesIcon from '@mui/icons-material/TrackChanges';
-import TrackAccountForm from '../components/track-accounts/TrackAccountForm';
+import TrackSourceForm from '../components/track-accounts/TrackSourceForm';
 
 const TrackAccountCreate = () => {
   const navigate = useNavigate();
+  const { organizationId, projectId } = useParams<{ 
+    organizationId?: string;
+    projectId?: string;
+  }>();
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" gutterBottom>
-          Create Track Account
+          Create Track Source
         </Typography>
         
         <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
@@ -33,23 +37,52 @@ const TrackAccountCreate = () => {
             <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
             Home
           </Link>
+          {organizationId && (
+            <Link
+              underline="hover"
+              color="inherit"
+              sx={{ display: 'flex', alignItems: 'center' }}
+              onClick={() => navigate(`/organizations/${organizationId}/projects`)}
+            >
+              Organization {organizationId}
+            </Link>
+          )}
+          {projectId && (
+            <Link
+              underline="hover"
+              color="inherit"
+              sx={{ display: 'flex', alignItems: 'center' }}
+              onClick={() => navigate(`/organizations/${organizationId}/projects/${projectId}`)}
+            >
+              Project {projectId}
+            </Link>
+          )}
           <Link
             underline="hover"
             color="inherit"
             sx={{ display: 'flex', alignItems: 'center' }}
-            onClick={() => navigate('/track-accounts/accounts')}
+            onClick={() => {
+              if (organizationId && projectId) {
+                navigate(`/organizations/${organizationId}/projects/${projectId}/source-tracking/sources`);
+              } else {
+                navigate('/');
+              }
+            }}
           >
             <TrackChangesIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            Input Collection
+            Source Tracking
           </Link>
           <Typography color="text.primary" sx={{ display: 'flex', alignItems: 'center' }}>
             <PersonAddIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            Create Account
+            Create Source
           </Typography>
         </Breadcrumbs>
       </Box>
       
-      <TrackAccountForm />
+      <TrackSourceForm 
+        organizationId={organizationId} 
+        projectId={projectId}
+      />
     </Container>
   );
 };

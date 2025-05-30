@@ -9,27 +9,48 @@ from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
 from django.http import HttpResponse
 from django.db.models import Q
-from .models import TrackAccount, ReportFolder, ReportEntry
+from .models import TrackSource, ReportFolder, ReportEntry
 from .serializers import (
-    TrackAccountSerializer,
+    TrackSourceSerializer,
     ReportFolderSerializer, ReportEntrySerializer, ReportFolderDetailSerializer
 )
 
-class TrackAccountViewSet(viewsets.ModelViewSet):
+class TrackSourceViewSet(viewsets.ModelViewSet):
     """
-    API endpoint for managing Track Accounts
+    API endpoint for managing Track Sources (formerly Track Accounts)
     """
-    serializer_class = TrackAccountSerializer
+    serializer_class = TrackSourceSerializer
     permission_classes = [AllowAny]  # For testing, use proper permissions in production
     
     def get_queryset(self):
         """
-        Get queryset with filtering options
+        Filter sources by project if project parameter is provided.
+        Require project parameter to prevent cross-project data leakage.
         """
-        queryset = TrackAccount.objects.all()
-        
-        # Get query parameters
+        # Get project ID from query parameters
         project_id = self.request.query_params.get('project')
+        
+        print(f"=== SOURCE QUERYSET DEBUG ===")
+        print(f"Requested project_id: {project_id}")
+        
+        # If no project ID is provided, return empty queryset to prevent data leakage
+        if not project_id:
+            print("No project_id provided - returning empty queryset for security")
+            print(f"=== END SOURCE QUERYSET DEBUG ===")
+            return TrackSource.objects.none()
+        
+        # Validate project ID format
+        try:
+            project_id = int(project_id)
+        except (ValueError, TypeError):
+            print(f"Invalid project_id format: {project_id}")
+            print(f"=== END SOURCE QUERYSET DEBUG ===")
+            return TrackSource.objects.none()
+        
+        # Filter by project
+        queryset = TrackSource.objects.filter(project_id=project_id)
+        
+        # Apply additional filters
         search = self.request.query_params.get('search')
         risk_classification = self.request.query_params.get('risk_classification')
         close_monitoring = self.request.query_params.get('close_monitoring')
@@ -37,10 +58,6 @@ class TrackAccountViewSet(viewsets.ModelViewSet):
         has_instagram = self.request.query_params.get('has_instagram')
         has_linkedin = self.request.query_params.get('has_linkedin')
         has_tiktok = self.request.query_params.get('has_tiktok')
-        
-        # Filter by project if specified
-        if project_id:
-            queryset = queryset.filter(project_id=project_id)
         
         # Filter by search term if provided
         if search:
@@ -81,11 +98,13 @@ class TrackAccountViewSet(viewsets.ModelViewSet):
                 Q(tiktok_link__isnull=True) | Q(tiktok_link='')
             )
         
+        print(f"Filtered queryset count: {queryset.count()}")
+        print(f"=== END SOURCE QUERYSET DEBUG ===")
         return queryset
     
     def perform_create(self, serializer):
         """
-        Set project when creating a new account
+        Set project when creating a new source
         """
         # Get project from request data directly
         project_id = self.request.data.get('project')
@@ -93,7 +112,7 @@ class TrackAccountViewSet(viewsets.ModelViewSet):
     
     def perform_update(self, serializer):
         """
-        Update project when updating account if needed
+        Update project when updating source if needed
         """
         # Get project from request data directly
         project_id = self.request.data.get('project')
@@ -102,7 +121,7 @@ class TrackAccountViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['POST'])
     def upload_csv(self, request):
         """
-        Upload CSV file and parse the track account data
+        Upload CSV file and parse the track source data
         """
         try:
             csv_file = request.FILES.get('file')
@@ -145,20 +164,20 @@ class TrackAccountViewSet(viewsets.ModelViewSet):
                     'project': project_id
                 }
                 
-                # Check if account with this IAC_NO already exists
-                existing_account = TrackAccount.objects.filter(iac_no=data['iac_no']).first()
+                # Check if source with this IAC_NO already exists
+                existing_source = TrackSource.objects.filter(iac_no=data['iac_no']).first()
                 
-                if existing_account:
-                    # Update existing account
+                if existing_source:
+                    # Update existing source
                     for key, value in data.items():
                         if key != 'project':  # Don't change project
-                            setattr(existing_account, key, value)
-                    existing_account.save()
-                    updated_objects.append(existing_account)
+                            setattr(existing_source, key, value)
+                    existing_source.save()
+                    updated_objects.append(existing_source)
                 else:
-                    # Create new account
-                    new_account = TrackAccount.objects.create(**data)
-                    created_objects.append(new_account)
+                    # Create new source
+                    new_source = TrackSource.objects.create(**data)
+                    created_objects.append(new_source)
             
             return Response({
                 'message': f'Successfully processed CSV. Created: {len(created_objects)}, Updated: {len(updated_objects)}',
@@ -172,14 +191,14 @@ class TrackAccountViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['GET'])
     def download_csv(self, request):
         """
-        Download track accounts as CSV
+        Download track sources as CSV
         """
         try:
             # Get query parameters for filtering
             project_id = request.query_params.get('project')
             
             # Start with base queryset
-            queryset = TrackAccount.objects.all()
+            queryset = TrackSource.objects.all()
             
             # Filter by project if specified
             if project_id:
@@ -187,7 +206,7 @@ class TrackAccountViewSet(viewsets.ModelViewSet):
             
             # Create CSV response
             response = HttpResponse(content_type='text/csv')
-            response['Content-Disposition'] = 'attachment; filename="track_accounts.csv"'
+            response['Content-Disposition'] = 'attachment; filename="track_sources.csv"'
             
             writer = csv.writer(response)
             
@@ -199,18 +218,18 @@ class TrackAccountViewSet(viewsets.ModelViewSet):
             ])
             
             # Write data rows
-            for account in queryset:
+            for source in queryset:
                 writer.writerow([
-                    account.name,
-                    account.iac_no,
-                    account.facebook_link or '',
-                    account.instagram_link or '',
-                    account.linkedin_link or '',
-                    account.tiktok_link or '',
-                    account.other_social_media or '',
-                    account.risk_classification or '',
-                    'Yes' if account.close_monitoring else 'No',
-                    account.posting_frequency or ''
+                    source.name,
+                    source.iac_no,
+                    source.facebook_link or '',
+                    source.instagram_link or '',
+                    source.linkedin_link or '',
+                    source.tiktok_link or '',
+                    source.other_social_media or '',
+                    source.risk_classification or '',
+                    'Yes' if source.close_monitoring else 'No',
+                    source.posting_frequency or ''
                 ])
             
             return response
@@ -228,7 +247,7 @@ class TrackAccountViewSet(viewsets.ModelViewSet):
             project_id = request.query_params.get('project')
             
             # Start with base queryset
-            queryset = TrackAccount.objects.all()
+            queryset = TrackSource.objects.all()
             
             # Filter by project if specified
             if project_id:
@@ -321,8 +340,8 @@ class ReportFolderViewSet(viewsets.ModelViewSet):
             print(f"Error creating report folder: {str(e)}")
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
     
-    def _find_matching_account(self, username):
-        """Find matching TrackAccount by Instagram username"""
+    def _find_matching_source(self, username):
+        """Find matching TrackSource by Instagram username"""
         if not username:
             return None
         
@@ -336,32 +355,32 @@ class ReportFolderViewSet(viewsets.ModelViewSet):
         
         # MATCHING STRATEGY: Extract username from instagram_link URL and compare
         try:
-            # Query accounts with instagram_link that's not null/empty
-            accounts = TrackAccount.objects.exclude(instagram_link__isnull=True).exclude(instagram_link='')
+            # Query sources with instagram_link that's not null/empty
+            sources = TrackSource.objects.exclude(instagram_link__isnull=True).exclude(instagram_link='')
             
-            for account in accounts:
+            for source in sources:
                 try:
                     # Extract username from instagram_link URL
                     import re
                     url_pattern = r'(?:https?:\/\/)?(?:www\.)?instagram\.com\/([^\/\?]+)'
-                    matches = re.search(url_pattern, account.instagram_link)
+                    matches = re.search(url_pattern, source.instagram_link)
                     if matches:
                         extracted_username = matches.group(1).lower().strip()
                         if extracted_username == normalized_username:
-                            print(f"Found URL match with instagram_link: {account.name} (ID: {account.id})")
-                            return account
+                            print(f"Found URL match with instagram_link: {source.name} (ID: {source.id})")
+                            return source
                 except Exception as e:
-                    print(f"Error processing account {account.id}: {str(e)}")
+                    print(f"Error processing source {source.id}: {str(e)}")
                     continue
         except Exception as e:
             print(f"Error during URL extraction match: {str(e)}")
             
         # No matches found
-        print(f"No matching account found for username: '{normalized_username}'")
+        print(f"No matching source found for username: '{normalized_username}'")
         return None
 
-    def _find_matching_facebook_account(self, user_url):
-        """Find matching TrackAccount by Facebook user_url"""
+    def _find_matching_facebook_source(self, user_url):
+        """Find matching TrackSource by Facebook user_url"""
         if not user_url:
             return None
         
@@ -376,13 +395,16 @@ class ReportFolderViewSet(viewsets.ModelViewSet):
         # MATCHING STRATEGY: Direct exact match with facebook_link
         try:
             # Direct match with facebook_link field
-            account = TrackAccount.objects.filter(facebook_link__iexact=normalized_user_url).first()
-            if account:
-                print(f"Found direct match with facebook_link: {account.name} (ID: {account.id})")
-                return account
+            source = TrackSource.objects.filter(facebook_link__iexact=normalized_user_url).first()
+            if source:
+                print(f"Found direct match with facebook_link: {source.name} (ID: {source.id})")
+                return source
         except Exception as e:
             print(f"Error during direct user_url match: {str(e)}")
         
         # No matches found
-        print(f"No matching account found for user_url: '{normalized_user_url}'")
+        print(f"No matching source found for user_url: '{normalized_user_url}'")
         return None 
+
+# Keep backward compatibility alias
+TrackAccountViewSet = TrackSourceViewSet 

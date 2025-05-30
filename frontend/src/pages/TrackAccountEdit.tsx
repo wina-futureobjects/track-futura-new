@@ -11,7 +11,7 @@ import {
 import HomeIcon from '@mui/icons-material/Home';
 import EditIcon from '@mui/icons-material/Edit';
 import TrackChangesIcon from '@mui/icons-material/TrackChanges';
-import TrackAccountForm from '../components/track-accounts/TrackAccountForm';
+import TrackSourceForm from '../components/track-accounts/TrackSourceForm';
 
 interface TrackAccount {
   id: number;
@@ -29,23 +29,23 @@ const TrackAccountEdit = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch account data
+  // Fetch source data
   useEffect(() => {
     if (!accountId) return;
     
     setLoading(true);
     
-    fetch(`/api/track-accounts/accounts/${accountId}/`)
+    fetch(`/api/track-accounts/sources/${accountId}/`)
       .then(response => {
-        if (!response.ok) throw new Error('Failed to load account');
+        if (!response.ok) throw new Error('Failed to load source');
         return response.json();
       })
-      .then(accountData => {
-        setAccount(accountData);
+      .then(sourceData => {
+        setAccount(sourceData);
       })
       .catch(err => {
         console.error('Error loading data:', err);
-        setError('Failed to load account data. Please try again.');
+        setError('Failed to load source data. Please try again.');
       })
       .finally(() => {
         setLoading(false);
@@ -64,7 +64,7 @@ const TrackAccountEdit = () => {
     return (
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
         <Typography variant="h5" color="error" align="center">
-          {error || 'Account ID is missing'}
+          {error || 'Source ID is missing'}
         </Typography>
       </Container>
     );
@@ -74,7 +74,7 @@ const TrackAccountEdit = () => {
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" gutterBottom>
-          Edit Track Account
+          Edit Track Source
         </Typography>
         
         <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
@@ -113,23 +113,23 @@ const TrackAccountEdit = () => {
             sx={{ display: 'flex', alignItems: 'center' }}
             onClick={() => {
               if (organizationId && projectId) {
-                navigate(`/organizations/${organizationId}/projects/${projectId}/track-accounts/accounts`);
+                navigate(`/organizations/${organizationId}/projects/${projectId}/source-tracking/sources`);
               } else {
-                navigate('/track-accounts/accounts');
+                navigate('/');
               }
             }}
           >
             <TrackChangesIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            Input Collection
+            Source Tracking
           </Link>
           <Typography color="text.primary" sx={{ display: 'flex', alignItems: 'center' }}>
             <EditIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            Edit {account?.name || 'Account'}
+            Edit {account?.name || 'Source'}
           </Typography>
         </Breadcrumbs>
       </Box>
       
-      <TrackAccountForm accountId={accountId} organizationId={organizationId} projectId={projectId} />
+      <TrackSourceForm sourceId={accountId} organizationId={organizationId} projectId={projectId} />
     </Container>
   );
 };

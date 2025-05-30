@@ -71,10 +71,14 @@ class BatchScraperJob(models.Model):
     
     # Job status and metadata
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    total_accounts = models.IntegerField(default=0)
-    processed_accounts = models.IntegerField(default=0)
+    total_sources = models.IntegerField(default=0, help_text="Total number of sources to process")
+    processed_sources = models.IntegerField(default=0, help_text="Number of sources processed so far")
     successful_requests = models.IntegerField(default=0)
     failed_requests = models.IntegerField(default=0)
+    
+    # Legacy fields for backward compatibility
+    total_accounts = models.IntegerField(default=0, help_text="Legacy field - use total_sources instead")
+    processed_accounts = models.IntegerField(default=0, help_text="Legacy field - use processed_sources instead")
     
     # Job execution details
     job_metadata = models.JSONField(null=True, blank=True, help_text="Stores detailed job execution information")
@@ -145,12 +149,15 @@ class ScraperRequest(models.Model):
     platform = models.CharField(max_length=30, choices=PLATFORM_CHOICES)
     content_type = models.CharField(max_length=20, choices=CONTENT_TYPE_CHOICES, default='post')
     target_url = models.URLField(max_length=500)
-    account_name = models.CharField(max_length=255, blank=True, null=True, help_text="Name of the tracked account")
-    iac_no = models.CharField(max_length=100, blank=True, null=True, help_text="IAC number of the tracked account")
+    source_name = models.CharField(max_length=255, blank=True, null=True, help_text="Name of the tracked source")
+    iac_no = models.CharField(max_length=100, blank=True, null=True, help_text="IAC number of the tracked source")
     num_of_posts = models.IntegerField(default=10)
     posts_to_not_include = models.TextField(blank=True, null=True)
     start_date = models.DateField(blank=True, null=True)
     end_date = models.DateField(blank=True, null=True)
+    
+    # Legacy field for backward compatibility
+    account_name = models.CharField(max_length=255, blank=True, null=True, help_text="Legacy field - use source_name instead")
     
     # Request metadata
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
@@ -172,5 +179,5 @@ class ScraperRequest(models.Model):
         verbose_name_plural = "Scraper Requests"
     
     def __str__(self):
-        display_name = self.account_name or self.target_url
+        display_name = self.source_name or self.target_url
         return f"{self.platform} - {display_name} ({self.status})"

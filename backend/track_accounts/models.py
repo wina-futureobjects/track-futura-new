@@ -4,12 +4,12 @@ from users.models import Project
 
 # Create your models here.
 
-class TrackAccount(models.Model):
+class TrackSource(models.Model):
     """
-    Model for storing Track Account data
+    Model for storing Track Source data (formerly Track Account)
     """
     # Reference to the project
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='track_accounts', null=True)
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='track_sources', null=True)
     
     # Fields from the CSV
     name = models.CharField(max_length=255)
@@ -35,13 +35,16 @@ class TrackAccount(models.Model):
     
     class Meta:
         ordering = ['name']
-        verbose_name = "Track Account"
-        verbose_name_plural = "Track Accounts"
+        verbose_name = "Track Source"
+        verbose_name_plural = "Track Sources"
         indexes = [
             models.Index(fields=['name']),
             models.Index(fields=['iac_no']),
             models.Index(fields=['risk_classification']),
         ]
+
+# Keep backward compatibility alias
+TrackAccount = TrackSource
 
 class ReportFolder(models.Model):
     """
@@ -105,8 +108,8 @@ class ReportEntry(models.Model):
     # Original post ID for reference
     post_id = models.CharField(max_length=100, blank=True, null=True)
     
-    # Track Account ID for reference (if matched)
-    track_account_id = models.IntegerField(blank=True, null=True)
+    # Track Source ID for reference (if matched) - updated from track_account_id
+    track_source_id = models.IntegerField(blank=True, null=True)
     
     created_at = models.DateTimeField(auto_now_add=True)
     

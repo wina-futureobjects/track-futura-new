@@ -1,15 +1,31 @@
 from rest_framework import serializers
-from .models import TrackAccount, ReportFolder, ReportEntry
+from .models import TrackSource, ReportFolder, ReportEntry
+from users.models import Project
 
-class TrackAccountSerializer(serializers.ModelSerializer):
+class TrackSourceSerializer(serializers.ModelSerializer):
     class Meta:
-        model = TrackAccount
+        model = TrackSource
         fields = [
             'id', 'name', 'iac_no', 
             'facebook_link', 'instagram_link', 'linkedin_link', 'tiktok_link', 
             'other_social_media', 'risk_classification', 'close_monitoring', 'posting_frequency',
             'project', 'created_at', 'updated_at'
         ]
+    
+    def create(self, validated_data):
+        """
+        Custom create method to ensure project ID is properly handled
+        """
+        return super().create(validated_data)
+    
+    def update(self, instance, validated_data):
+        """
+        Custom update method to handle project ID updates
+        """
+        return super().update(instance, validated_data)
+
+# Keep backward compatibility alias
+TrackAccountSerializer = TrackSourceSerializer
 
 class ReportEntrySerializer(serializers.ModelSerializer):
     class Meta:
@@ -17,7 +33,7 @@ class ReportEntrySerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'iac_no', 'entity', 'close_monitoring', 'posting_date',
             'platform_type', 'post_url', 'username', 'account_type', 'keywords',
-            'content', 'post_id', 'track_account_id', 'created_at'
+            'content', 'post_id', 'track_source_id', 'created_at'
         ]
 
 class ReportFolderSerializer(serializers.ModelSerializer):
@@ -29,7 +45,7 @@ class ReportFolderSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'description', 'start_date', 'end_date', 
             'total_posts', 'matched_posts', 'match_percentage', 
-            'entry_count', 'source_folders', 'created_at', 'updated_at'
+            'entry_count', 'source_folders', 'project', 'created_at', 'updated_at'
         ]
     
     def get_match_percentage(self, obj):

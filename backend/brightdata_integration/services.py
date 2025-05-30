@@ -2,7 +2,7 @@
 Automated Batch Scraper Services
 
 This module provides services for automated batch scraping of social media data
-from tracked accounts using BrightData's API.
+from tracked sources using BrightData's API.
 """
 
 import logging
@@ -16,7 +16,7 @@ from urllib.parse import urlparse
 from django.conf import settings
 
 from .models import BatchScraperJob, ScraperRequest, BrightdataConfig
-from track_accounts.models import TrackAccount
+from track_accounts.models import TrackSource
 from facebook_data.models import Folder as FacebookFolder
 from instagram_data.models import Folder as InstagramFolder
 from linkedin_data.models import Folder as LinkedInFolder
@@ -26,19 +26,17 @@ logger = logging.getLogger(__name__)
 
 class AutomatedBatchScraper:
     """
-    Main service class for automated batch scraping of social media accounts
+    Service for automated batch scraping from tracked sources across multiple platforms
     """
     
-    # Platform to folder model mapping
-    PLATFORM_FOLDER_MODELS = {
-        'facebook': FacebookFolder,
-        'instagram': InstagramFolder,
-        'linkedin': LinkedInFolder,
-        'tiktok': TikTokFolder,
-    }
-    
     def __init__(self):
-        self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
+        self.logger = logging.getLogger(__name__)
+        self.PLATFORM_FOLDER_MODELS = {
+            'facebook': FacebookFolder,
+            'instagram': InstagramFolder,
+            'linkedin': LinkedInFolder,
+            'tiktok': TikTokFolder,
+        }
     
     def create_batch_job(self, name: str, project_id: int, source_folder_ids: List[int], 
                         platforms_to_scrape: List[str] = None, 
@@ -48,31 +46,50 @@ class AutomatedBatchScraper:
                         auto_create_folders: bool = True, output_folder_pattern: str = None) -> BatchScraperJob:
         """
         Create a new batch scraper job
+        
+        Args:
+            name: Name for the batch job
+            project_id: Project ID to scrape sources from
+            source_folder_ids: List of folder IDs (deprecated but kept for compatibility)
+            platforms_to_scrape: List of platforms ['facebook', 'instagram', 'linkedin', 'tiktok']
+            content_types_to_scrape: Dict mapping platforms to content types
+            num_of_posts: Number of posts to scrape per source
+            start_date: Start date for scraping (YYYY-MM-DD)
+            end_date: End date for scraping (YYYY-MM-DD)
+            auto_create_folders: Whether to auto-create folders for results
+            output_folder_pattern: Pattern for folder naming
+            
+        Returns:
+            Created BatchScraperJob instance
         """
+        # Default values
         if platforms_to_scrape is None:
-            platforms_to_scrape = ['facebook', 'instagram', 'linkedin', 'tiktok']
-        
+            platforms_to_scrape = ['instagram', 'facebook']
+            
         if content_types_to_scrape is None:
-            content_types_to_scrape = {}
-        
+            content_types_to_scrape = {
+                'instagram': ['post'],
+                'facebook': ['post']
+            }
+            
         if output_folder_pattern is None:
             output_folder_pattern = "{platform}_{content_type}_{date}_{job_name}"
         
+        # Create the job
         job = BatchScraperJob.objects.create(
             name=name,
             project_id=project_id,
-            source_folder_ids=source_folder_ids,
+            source_folder_ids=source_folder_ids or [],  # Keep for compatibility but unused
             platforms_to_scrape=platforms_to_scrape,
             content_types_to_scrape=content_types_to_scrape,
             num_of_posts=num_of_posts,
-            start_date=datetime.datetime.strptime(start_date, '%Y-%m-%d').date() if start_date else None,
-            end_date=datetime.datetime.strptime(end_date, '%Y-%m-%d').date() if end_date else None,
+            start_date=start_date,
+            end_date=end_date,
             auto_create_folders=auto_create_folders,
             output_folder_pattern=output_folder_pattern,
-            status='pending'
         )
         
-        self.logger.info(f"Created batch scraper job: {job.name} (ID: {job.id})")
+        self.logger.info(f"Created batch job: {job.name} for project {project_id}")
         return job
     
     def execute_batch_job(self, job_id: int) -> bool:
@@ -82,20 +99,24 @@ class AutomatedBatchScraper:
         try:
             job = BatchScraperJob.objects.get(id=job_id)
             
+            # Set current job context for project filtering
+            self._current_job = job
+            
             with transaction.atomic():
                 job.status = 'processing'
                 job.started_at = timezone.now()
                 job.save()
             
-            self.logger.info(f"Starting execution of batch job: {job.name}")
+            self.logger.info(f"Starting execution of batch job: {job.name} for project {job.project_id}")
             
-            # Get all tracked accounts from source folders
-            accounts = self._get_accounts_from_folders(job.source_folder_ids)
-            job.total_accounts = len(accounts)
+            # Get all tracked sources from the project
+            sources = self._get_accounts_from_folders(job.source_folder_ids)
+            job.total_sources = len(sources)
+            job.total_accounts = len(sources)  # Keep legacy field in sync
             job.save()
             
-            if not accounts:
-                self.logger.warning(f"No accounts found in source folders for job {job.name}")
+            if not sources:
+                self.logger.warning(f"No sources found in project {job.project_id} for job {job.name}")
                 job.status = 'completed'
                 job.completed_at = timezone.now()
                 job.save()
@@ -103,7 +124,7 @@ class AutomatedBatchScraper:
             
             # Initialize job metadata
             job_metadata = {
-                'accounts_processed': [],
+                'sources_processed': [],
                 'platforms_attempted': {},
                 'folders_created': {},
                 'start_time': timezone.now().isoformat(),
@@ -112,29 +133,30 @@ class AutomatedBatchScraper:
             successful_requests = 0
             failed_requests = 0
             
-            # Process each account
-            for account in accounts:
+            # Process each source
+            for source in sources:
                 try:
-                    account_result = self._process_account(job, account)
-                    job_metadata['accounts_processed'].append({
-                        'account_name': account.name,
-                        'iac_no': account.iac_no,
-                        'platforms_scraped': account_result['platforms_scraped'],
-                        'requests_created': account_result['requests_created'],
-                        'errors': account_result['errors']
+                    source_result = self._process_account(job, source)
+                    job_metadata['sources_processed'].append({
+                        'source_name': source.name,
+                        'iac_no': source.iac_no,
+                        'platforms_scraped': source_result['platforms_scraped'],
+                        'requests_created': source_result['requests_created'],
+                        'errors': source_result['errors']
                     })
                     
-                    successful_requests += account_result['successful_requests']
-                    failed_requests += account_result['failed_requests']
+                    successful_requests += source_result['successful_requests']
+                    failed_requests += source_result['failed_requests']
                     
                     # Update progress
-                    job.processed_accounts += 1
+                    job.processed_sources += 1
+                    job.processed_accounts += 1  # Keep legacy field in sync
                     job.successful_requests = successful_requests
                     job.failed_requests = failed_requests
                     job.save()
                     
                 except Exception as e:
-                    self.logger.error(f"Error processing account {account.name}: {str(e)}")
+                    self.logger.error(f"Error processing source {source.name}: {str(e)}")
                     failed_requests += 1
                     job.failed_requests = failed_requests
                     job.save()
@@ -142,8 +164,8 @@ class AutomatedBatchScraper:
             # Complete the job
             job_metadata['end_time'] = timezone.now().isoformat()
             job_metadata['summary'] = {
-                'total_accounts': job.total_accounts,
-                'processed_accounts': job.processed_accounts,
+                'total_sources': job.total_sources,
+                'processed_sources': job.processed_sources,
                 'successful_requests': successful_requests,
                 'failed_requests': failed_requests
             }
@@ -167,20 +189,45 @@ class AutomatedBatchScraper:
             except:
                 pass
             return False
+        finally:
+            # Clean up job context
+            if hasattr(self, '_current_job'):
+                delattr(self, '_current_job')
     
-    def _get_accounts_from_folders(self, folder_ids: List[int]) -> List[TrackAccount]:
+    def _get_accounts_from_folders(self, folder_ids: List[int]) -> List[TrackSource]:
         """
-        Get all tracked accounts from the project (folders have been removed)
+        Get all tracked sources from the project
+        Note: folder_ids parameter is kept for backward compatibility but is now unused
+        since we now filter by project ID instead of folders
         """
-        # Since folders have been removed, we'll get all accounts from the project
-        # The folder_ids parameter is kept for backward compatibility but ignored
-        accounts = TrackAccount.objects.all()
-        self.logger.info(f"Found {accounts.count()} accounts (folders have been removed)")
-        return list(accounts)
+        # Get project ID from the job
+        if hasattr(self, '_current_job') and self._current_job:
+            project_id = self._current_job.project_id
+        else:
+            # Fallback: this shouldn't happen in normal operation
+            self.logger.warning("No current job context available - cannot filter by project")
+            return []
+        
+        if not project_id:
+            self.logger.warning("No project ID found in job - cannot filter sources")
+            return []
+        
+        # Filter sources by project
+        sources = TrackSource.objects.filter(project_id=project_id)
+        self.logger.info(f"Found {sources.count()} sources for project {project_id}")
+        
+        # Debug: Log source names for verification
+        if sources.exists():
+            source_names = [f"{s.name} ({s.iac_no})" for s in sources[:5]]  # Log first 5
+            self.logger.info(f"Sample sources: {source_names}")
+            if sources.count() > 5:
+                self.logger.info(f"... and {sources.count() - 5} more")
+        
+        return list(sources)
     
-    def _process_account(self, job: BatchScraperJob, account: TrackAccount) -> Dict:
+    def _process_account(self, job: BatchScraperJob, source: TrackSource) -> Dict:
         """
-        Process a single account for all specified platforms and content types
+        Process a single source for all specified platforms and content types
         """
         result = {
             'platforms_scraped': [],
@@ -192,9 +239,9 @@ class AutomatedBatchScraper:
         
         for platform in job.platforms_to_scrape:
             try:
-                url = self._get_platform_url(account, platform)
+                url = self._get_platform_url(source, platform)
                 if not url:
-                    self.logger.debug(f"No {platform} URL found for account {account.name}")
+                    self.logger.debug(f"No {platform} URL found for source {source.name}")
                     continue
                 
                 # Get content types for this platform (default to ['post'] if not specified)
@@ -215,11 +262,11 @@ class AutomatedBatchScraper:
                             continue
                         
                         # Create or get output folder
-                        folder_id = self._get_or_create_output_folder(job, platform, account, content_type)
+                        folder_id = self._get_or_create_output_folder(job, platform, source, content_type)
                         
                         # Create scraper request
                         scraper_request = self._create_scraper_request(
-                            job, account, platform, url, config, folder_id, content_type
+                            job, source, platform, url, config, folder_id, content_type
                         )
                         
                         if scraper_request:
@@ -234,28 +281,28 @@ class AutomatedBatchScraper:
                             result['failed_requests'] += 1
                             
                     except Exception as e:
-                        error_msg = f"Error processing {platform} {content_type} for {account.name}: {str(e)}"
+                        error_msg = f"Error processing {platform} {content_type} for {source.name}: {str(e)}"
                         self.logger.error(error_msg)
                         result['errors'].append(error_msg)
                         result['failed_requests'] += 1
                         
             except Exception as e:
-                error_msg = f"Error processing {platform} for {account.name}: {str(e)}"
+                error_msg = f"Error processing {platform} for {source.name}: {str(e)}"
                 self.logger.error(error_msg)
                 result['errors'].append(error_msg)
                 result['failed_requests'] += 1
         
         return result
     
-    def _get_platform_url(self, account: TrackAccount, platform: str) -> Optional[str]:
+    def _get_platform_url(self, source: TrackSource, platform: str) -> Optional[str]:
         """
-        Extract the appropriate platform URL from the account
+        Extract the appropriate platform URL from the source
         """
         url_mapping = {
-            'facebook': account.facebook_link,
-            'instagram': account.instagram_link,
-            'linkedin': account.linkedin_link,
-            'tiktok': account.tiktok_link,
+            'facebook': source.facebook_link,
+            'instagram': source.instagram_link,
+            'linkedin': source.linkedin_link,
+            'tiktok': source.tiktok_link,
         }
         
         url = url_mapping.get(platform)
@@ -292,7 +339,7 @@ class AutomatedBatchScraper:
         
         return f'{platform}_{content_type}'
     
-    def _get_or_create_output_folder(self, job: BatchScraperJob, platform: str, account: TrackAccount, content_type: str) -> Optional[int]:
+    def _get_or_create_output_folder(self, job: BatchScraperJob, platform: str, source: TrackSource, content_type: str) -> Optional[int]:
         """
         Get or create an output folder for the scraped data
         """
@@ -321,8 +368,8 @@ class AutomatedBatchScraper:
                 content_type=content_type_for_name.upper(),
                 date=timezone.now().strftime('%Y-%m-%d'),
                 job_name=job.name,
-                account_name=account.name,
-                iac_no=account.iac_no,
+                account_name=source.name,
+                iac_no=source.iac_no,
             )
             
             # Get the appropriate folder model for this platform
@@ -354,11 +401,11 @@ class AutomatedBatchScraper:
             self.logger.error(f"Error creating output folder for {platform}: {str(e)}")
             return None
     
-    def _create_scraper_request(self, job: BatchScraperJob, account: TrackAccount, 
+    def _create_scraper_request(self, job: BatchScraperJob, source: TrackSource, 
                               platform: str, url: str, config: BrightdataConfig, 
                               folder_id: Optional[int], content_type: str) -> Optional[ScraperRequest]:
         """
-        Create a scraper request for the account and platform
+        Create a scraper request for the source and platform
         """
         try:
             # Get the platform config key that includes content type
@@ -370,8 +417,9 @@ class AutomatedBatchScraper:
                 platform=platform_config_key,
                 content_type=content_type,
                 target_url=url,
-                account_name=account.name,
-                iac_no=account.iac_no,
+                source_name=source.name,
+                account_name=source.name,  # Keep legacy field in sync
+                iac_no=source.iac_no,
                 num_of_posts=job.num_of_posts,
                 start_date=job.start_date,
                 end_date=job.end_date,
@@ -379,7 +427,7 @@ class AutomatedBatchScraper:
                 status='pending'
             )
             
-            self.logger.info(f"Created scraper request for {account.name} on {platform} ({content_type})")
+            self.logger.info(f"Created scraper request for {source.name} on {platform} ({content_type})")
             return scraper_request
             
         except Exception as e:
