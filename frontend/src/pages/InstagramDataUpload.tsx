@@ -32,6 +32,14 @@ import {
   MenuItem,
   SelectChangeEvent,
   InputAdornment,
+  Tabs,
+  Tab,
+  Grid,
+  Avatar,
+  LinearProgress,
+  Menu,
+  ListItemIcon,
+  ListItemText,
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -43,6 +51,15 @@ import FolderIcon from '@mui/icons-material/Folder';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import EditIcon from '@mui/icons-material/Edit';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import GroupIcon from '@mui/icons-material/Group';
+import VerifiedIcon from '@mui/icons-material/Verified';
+import ThumbUpIcon from '@mui/icons-material/ThumbUp';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import GetAppIcon from '@mui/icons-material/GetApp';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import SortIcon from '@mui/icons-material/Sort';
 import { apiFetch } from '../utils/api';
 
 interface InstagramPost {
@@ -95,6 +112,39 @@ interface FolderStats {
   verifiedAccounts: number;
 }
 
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`simple-tabpanel-${index}`}
+      aria-labelledby={`simple-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ p: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
+
+function a11yProps(index: number) {
+  return {
+    id: `simple-tab-${index}`,
+    'aria-controls': `simple-tabpanel-${index}`,
+  };
+}
+
 const InstagramDataUpload = () => {
   const { folderId } = useParams();
   const navigate = useNavigate();
@@ -126,6 +176,10 @@ const InstagramDataUpload = () => {
   // Remove upload tab state as we're using single upload now
   const [contentTypeFilter, setContentTypeFilter] = useState<string>('all');
   const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+  const [tabValue, setTabValue] = useState(0);
+  const [sortMenuAnchor, setSortMenuAnchor] = useState<null | HTMLElement>(null);
+  const [sortBy, setSortBy] = useState<string>('date_posted');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Fetch Instagram posts/comments with pagination
   const fetchPosts = async (pageNumber = 0, pageSize = 10, searchTerm = '', contentType = '') => {
@@ -625,180 +679,224 @@ const InstagramDataUpload = () => {
     setPage(0); // Reset to first page when changing filter
   };
 
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
+
+  const handleSortMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setSortMenuAnchor(event.currentTarget);
+  };
+
+  const handleSortMenuClose = () => {
+    setSortMenuAnchor(null);
+  };
+
+  const handleSort = (field: string) => {
+    const newOrder = sortBy === field && sortOrder === 'desc' ? 'asc' : 'desc';
+    setSortBy(field);
+    setSortOrder(newOrder);
+    handleSortMenuClose();
+    // Trigger data refresh with new sorting
+    fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter);
+  };
+
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+    <Container maxWidth="xl" sx={{ mt: 2, mb: 4 }}>
       {/* Server status indicator */}
       {serverStatus !== 'online' && (
-        <Paper sx={{ p: 2, mb: 3, bgcolor: serverStatus === 'checking' ? 'info.light' : 'error.light' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            {serverStatus === 'checking' ? (
-              <>
-                <CircularProgress size={20} sx={{ mr: 1 }} />
-                <Typography>Checking server status...</Typography>
-              </>
-            ) : (
-              <Typography color="error" fontWeight="bold">
-                Server connection issue detected. File uploads may fail. 
-                Please check if the backend server is running.
-                <Button 
-                  variant="outlined" 
-                  size="small" 
-                  sx={{ ml: 2 }}
-                  onClick={checkServerStatus}
-                >
-                  Retry Connection
-                </Button>
-              </Typography>
-            )}
-          </Box>
-        </Paper>
+        <Alert 
+          severity={serverStatus === 'checking' ? 'info' : 'error'} 
+          sx={{ mb: 2 }}
+          icon={serverStatus === 'checking' ? <CircularProgress size={20} /> : undefined}
+        >
+          {serverStatus === 'checking' 
+            ? 'Checking server status...'
+            : 'Server connection issue detected. File uploads may fail.'
+          }
+          {serverStatus === 'offline' && (
+            <Button 
+              variant="outlined" 
+              size="small" 
+              sx={{ ml: 2 }}
+              onClick={checkServerStatus}
+            >
+              Retry Connection
+            </Button>
+          )}
+        </Alert>
       )}
       
-      <Box sx={{ my: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h4" component="h1" gutterBottom>
-            {currentFolder ? `Instagram Data: ${currentFolder.name}` : 'Instagram Data Management'}
-          </Typography>
-          <Button
-            variant="outlined"
-            onClick={handleGoToFolders}
-          >
-            View All Folders
-          </Button>
-        </Box>
-        <Divider sx={{ mb: 4 }} />
-
-        <Paper sx={{ p: 3, mb: 3 }}>
-          <Typography variant="h5" component="h2" gutterBottom>
-            Upload CSV Data
-          </Typography>
-          
-          {currentFolder && currentFolder.category && (
-            <Alert severity="info" sx={{ mb: 2 }}>
-              <strong>Current folder category: {currentFolder.category_display || currentFolder.category}</strong>
-              <br />
-              {currentFolder.category === 'comments' 
-                ? 'This folder is configured for comments. Upload comment CSV files here.'
-                : currentFolder.category === 'posts'
-                ? 'This folder is configured for posts. To upload comments, please create or select a folder with "Comments" category.'
-                : 'This folder is configured for reels. To upload comments, please create or select a folder with "Comments" category.'
-              }
-            </Alert>
-          )}
-          
-          {uploadError && (
-            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setUploadError(null)}>
-              {uploadError}
-            </Alert>
-          )}
-          
-          {uploadSuccess && (
-            <Alert severity="success" sx={{ mb: 2 }} onClose={() => setUploadSuccess(null)}>
-              {uploadSuccess}
-            </Alert>
-          )}
-          
-          <Typography variant="body1" gutterBottom>
-            Upload CSV file containing Instagram posts/reels data.
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            The system will automatically detect whether your CSV contains posts or reels based on the column headers.
-            Ensure date columns are in a standard format (YYYY-MM-DD). Empty date fields are allowed.
-          </Typography>
-          
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Button
-              variant="contained"
-              component="label"
-              startIcon={<CloudUploadIcon />}
-              disabled={isUploading}
-            >
-              Select CSV
-              <input
-                id="file-upload"
-                type="file"
-                hidden
-                accept=".csv"
-                onChange={handleFileChange}
-              />
-            </Button>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={handleUpload}
-              disabled={!uploadFile || isUploading}
-            >
-              {isUploading ? <CircularProgress size={24} /> : 'Upload'}
-            </Button>
-            {uploadFile && <Typography variant="body2">{uploadFile.name}</Typography>}
+      {/* Header Section */}
+      <Box sx={{ mb: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+          <Box>
+            <Typography variant="h4" component="h1" fontWeight={600} sx={{ mb: 1 }}>
+              {currentFolder ? currentFolder.name : 'Instagram Data Management'}
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              {currentFolder ? currentFolder.description || `${currentFolder.category_display || currentFolder.category} data analysis` : 'Manage and analyze your Instagram data'}
+            </Typography>
           </Box>
-          
-          <Box sx={{ mt: 2 }}>
+          <Box sx={{ display: 'flex', gap: 1 }}>
             <Button
               variant="outlined"
-              startIcon={<DownloadIcon />}
+              startIcon={<RefreshIcon />}
+              onClick={() => {
+                fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter);
+                fetchFolderStats();
+              }}
+            >
+              Refresh
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<GetAppIcon />}
               onClick={() => handleDownloadCSV(undefined)}
             >
-              Download CSV
+              Export
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={handleGoToFolders}
+            >
+              All Folders
             </Button>
           </Box>
-        </Paper>
+        </Box>
 
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
-          {/* Statistics Card */}
-          <Box sx={{ width: { xs: '100%', md: '50%' } }}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" component="h2">
-                  Data Statistics
-                </Typography>
-                <Stack direction="row" flexWrap="wrap" spacing={2} sx={{ mt: 1 }}>
-                  <Box sx={{ width: { xs: '100%', sm: '45%' } }}>
-                    <Paper sx={{ p: 2, textAlign: 'center' }}>
-                      <Typography variant="h4">{folderStats.totalPosts}</Typography>
-                      <Typography variant="body2">Total Posts</Typography>
-                    </Paper>
-                  </Box>
-                  <Box sx={{ width: { xs: '100%', sm: '45%' } }}>
-                    <Paper sx={{ p: 2, textAlign: 'center' }}>
-                      <Typography variant="h4">
-                        {folderStats.uniqueUsers}
-                      </Typography>
-                      <Typography variant="body2">Unique Users</Typography>
-                    </Paper>
-                  </Box>
-                  <Box sx={{ width: { xs: '100%', sm: '45%' } }}>
-                    <Paper sx={{ p: 2, textAlign: 'center' }}>
-                      <Typography variant="h4">
-                        {folderStats.avgLikes}
-                      </Typography>
-                      <Typography variant="body2">Avg. Likes Per Post</Typography>
-                    </Paper>
-                  </Box>
-                  <Box sx={{ width: { xs: '100%', sm: '45%' } }}>
-                    <Paper sx={{ p: 2, textAlign: 'center' }}>
-                      <Typography variant="h4">
-                        {folderStats.verifiedAccounts}
-                      </Typography>
-                      <Typography variant="body2">Verified Accounts</Typography>
-                    </Paper>
-                  </Box>
-                </Stack>
-              </CardContent>
-            </Card>
+        {/* Status Chip */}
+        {currentFolder && (
+          <Box sx={{ mb: 3 }}>
+            <Chip 
+              label={`${currentFolder.category_display || currentFolder.category} • Dynamic`} 
+              color="success" 
+              variant="outlined"
+              size="small"
+            />
           </Box>
-        </Stack>
+        )}
 
-        {/* Data display section - conditional based on folder category */}
-        <Paper sx={{ p: 3, mb: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            {currentFolder?.category === 'comments' ? 'Instagram Comments' : 'Instagram Posts'}
-          </Typography>
+        {/* Single Summary Box */}
+        <Paper sx={{ p: 3, mb: 3, border: '1px solid', borderColor: 'divider' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6" fontWeight={600}>
+              Data Overview
+            </Typography>
+            <IconButton
+              onClick={handleSortMenuOpen}
+              size="small"
+              sx={{ color: 'text.secondary' }}
+            >
+              <MoreVertIcon />
+            </IconButton>
+            <Menu
+              anchorEl={sortMenuAnchor}
+              open={Boolean(sortMenuAnchor)}
+              onClose={handleSortMenuClose}
+              anchorOrigin={{
+                vertical: 'bottom',
+                horizontal: 'right',
+              }}
+              transformOrigin={{
+                vertical: 'top',
+                horizontal: 'right',
+              }}
+            >
+              <MenuItem onClick={() => handleSort('date_posted')}>
+                <ListItemIcon>
+                  <SortIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Sort by Date</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => handleSort('likes')}>
+                <ListItemIcon>
+                  <ThumbUpIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Sort by Likes</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => handleSort('user_posted')}>
+                <ListItemIcon>
+                  <GroupIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Sort by User</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => handleSort('num_comments')}>
+                <ListItemIcon>
+                  <AnalyticsIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Sort by Comments</ListItemText>
+              </MenuItem>
+            </Menu>
+          </Box>
           
-          <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-            {/* Search field */}
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr' }, gap: 4 }}>
+            <Box sx={{ textAlign: 'center' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
+                <AnalyticsIcon sx={{ color: 'primary.main', mr: 1 }} />
+                <Typography variant="h4" fontWeight={600}>
+                  {folderStats.totalPosts.toLocaleString()}
+                </Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                Total {currentFolder?.category === 'comments' ? 'Comments' : 'Posts'}
+              </Typography>
+            </Box>
+            
+            <Box sx={{ textAlign: 'center' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
+                <GroupIcon sx={{ color: 'secondary.main', mr: 1 }} />
+                <Typography variant="h4" fontWeight={600}>
+                  {folderStats.uniqueUsers.toLocaleString()}
+                </Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                Unique Users
+              </Typography>
+            </Box>
+            
+            <Box sx={{ textAlign: 'center' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
+                <ThumbUpIcon sx={{ color: 'success.main', mr: 1 }} />
+                <Typography variant="h4" fontWeight={600}>
+                  {folderStats.avgLikes.toLocaleString()}
+                </Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                Avg. Engagement
+              </Typography>
+            </Box>
+            
+            <Box sx={{ textAlign: 'center' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
+                <VerifiedIcon sx={{ color: 'warning.main', mr: 1 }} />
+                <Typography variant="h4" fontWeight={600}>
+                  {folderStats.verifiedAccounts.toLocaleString()}
+                </Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                Verified Accounts
+              </Typography>
+            </Box>
+          </Box>
+        </Paper>
+      </Box>
+
+      {/* Tabs Section */}
+      <Paper sx={{ mb: 3 }}>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          <Tabs value={tabValue} onChange={handleTabChange} aria-label="data management tabs">
+            <Tab label="Data Overview" {...a11yProps(0)} />
+            <Tab label="Upload & Management" {...a11yProps(1)} />
+            <Tab label="Analytics" {...a11yProps(2)} />
+          </Tabs>
+        </Box>
+        
+        {/* Tab Panel 0: Data Overview */}
+        <TabPanel value={tabValue} index={0}>
+          {/* Search and Filter Controls */}
+          <Box sx={{ display: 'flex', gap: 2, mb: 3, alignItems: 'center' }}>
             <TextField
-              label="Search"
+              placeholder="Search users, content, or hashtags..."
               variant="outlined"
               size="small"
               value={searchTerm}
@@ -809,67 +907,115 @@ const InstagramDataUpload = () => {
                     <SearchIcon />
                   </InputAdornment>
                 ),
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      edge="end"
+                      onClick={handleSortMenuOpen}
+                      size="small"
+                    >
+                      <MoreVertIcon />
+                    </IconButton>
+                  </InputAdornment>
+                ),
               }}
-              sx={{ width: '300px' }}
+              sx={{ flexGrow: 1, maxWidth: 400 }}
             />
             
-            {/* Content type filter - only show for posts/reels folders */}
             {currentFolder?.category !== 'comments' && (
-              <FormControl size="small" sx={{ minWidth: 200 }}>
-                <InputLabel id="content-type-filter-label">Content Type</InputLabel>
+              <FormControl size="small" sx={{ minWidth: 180 }}>
+                <InputLabel>Content Type</InputLabel>
                 <Select
-                  labelId="content-type-filter-label"
-                  id="content-type-filter"
                   value={contentTypeFilter}
                   label="Content Type"
                   onChange={handleContentTypeFilterChange}
                   disabled={isLoading}
                 >
-                  <MenuItem value="all">All Content Types</MenuItem>
-                  <MenuItem value="post">Instagram Posts Only</MenuItem>
-                  <MenuItem value="reel">Instagram Reels Only</MenuItem>
+                  <MenuItem value="all">All Content</MenuItem>
+                  <MenuItem value="post">Posts Only</MenuItem>
+                  <MenuItem value="reel">Reels Only</MenuItem>
                 </Select>
-                {isLoading && (
-                  <CircularProgress
-                    size={24}
-                    sx={{
-                      position: 'absolute',
-                      right: 30,
-                      top: '50%',
-                      marginTop: '-12px',
-                    }}
-                  />
-                )}
               </FormControl>
             )}
+            
+            <IconButton onClick={() => fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter)}>
+              <FilterListIcon />
+            </IconButton>
           </Box>
-          
-          {/* Conditional table rendering */}
-          <TableContainer>
+
+          {/* Data Table */}
+          <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
             <Table stickyHeader>
               <TableHead>
-                <TableRow>
+                <TableRow sx={{ backgroundColor: 'grey.50' }}>
                   {currentFolder?.category === 'comments' ? (
-                    /* Comments table headers */
                     <>
-                      <TableCell>Comment User</TableCell>
-                      <TableCell>Comment</TableCell>
-                      <TableCell>Post User</TableCell>
-                      <TableCell>Date</TableCell>
-                      <TableCell align="right">Likes</TableCell>
-                      <TableCell align="right">Replies</TableCell>
-                      <TableCell>Actions</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          Comment User
+                          <IconButton size="small" onClick={handleSortMenuOpen}>
+                            <MoreVertIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Comment</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Post User</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          Date
+                          <IconButton size="small" onClick={handleSortMenuOpen}>
+                            <MoreVertIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          Likes
+                          <IconButton size="small" onClick={handleSortMenuOpen}>
+                            <MoreVertIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>Replies</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
                     </>
                   ) : (
-                    /* Posts table headers */
                     <>
-                      <TableCell>User</TableCell>
-                      <TableCell>Type</TableCell>
-                      <TableCell>Description</TableCell>
-                      <TableCell>Date Posted</TableCell>
-                      <TableCell align="right">Likes</TableCell>
-                      <TableCell align="right">Comments</TableCell>
-                      <TableCell>Actions</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          User
+                          <IconButton size="small" onClick={handleSortMenuOpen}>
+                            <MoreVertIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Type</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Content</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          Date Posted
+                          <IconButton size="small" onClick={handleSortMenuOpen}>
+                            <MoreVertIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          Likes
+                          <IconButton size="small" onClick={handleSortMenuOpen}>
+                            <MoreVertIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          Comments
+                          <IconButton size="small" onClick={handleSortMenuOpen}>
+                            <MoreVertIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
                     </>
                   )}
                 </TableRow>
@@ -877,7 +1023,7 @@ const InstagramDataUpload = () => {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} align="center">
+                    <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                       <CircularProgress size={40} />
                       <Typography variant="body2" sx={{ mt: 1 }}>
                         Loading data...
@@ -885,118 +1031,148 @@ const InstagramDataUpload = () => {
                     </TableCell>
                   </TableRow>
                 ) : currentFolder?.category === 'comments' ? (
-                  /* Comments table body */
                   comments.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} align="center">
-                        <Typography>No comments found</Typography>
+                      <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                        <Typography color="text.secondary">No comments found</Typography>
                       </TableCell>
                     </TableRow>
                   ) : (
                     comments.map((comment) => (
-                      <TableRow key={comment.id} hover>
+                      <TableRow key={comment.id} hover sx={{ '&:hover': { backgroundColor: 'grey.50' } }}>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            {comment.comment_user}
+                            <Avatar sx={{ width: 32, height: 32, mr: 2, fontSize: '0.875rem' }}>
+                              {comment.comment_user.charAt(0).toUpperCase()}
+                            </Avatar>
+                            <Typography variant="body2" fontWeight={500}>
+                              {comment.comment_user}
+                            </Typography>
                           </Box>
                         </TableCell>
                         <TableCell>
-                          <Typography variant="body2" noWrap sx={{ maxWidth: 300 }}>
+                          <Typography variant="body2" sx={{ maxWidth: 300 }} noWrap>
                             {comment.comment || 'No comment text'}
                           </Typography>
                         </TableCell>
-                        <TableCell>{comment.post_user || 'Unknown'}</TableCell>
                         <TableCell>
-                          {comment.comment_date 
-                            ? new Date(comment.comment_date).toLocaleDateString() 
-                            : 'Unknown'}
+                          <Typography variant="body2">{comment.post_user || 'Unknown'}</Typography>
                         </TableCell>
-                        <TableCell align="right">{comment.likes_number.toLocaleString()}</TableCell>
-                        <TableCell align="right">{comment.replies_number.toLocaleString()}</TableCell>
                         <TableCell>
-                          <Tooltip title="Open Post">
-                            <IconButton 
-                              size="small" 
-                              onClick={() => window.open(comment.post_url, '_blank')}
-                            >
-                              <OpenInNewIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Copy link">
-                            <IconButton 
-                              size="small" 
-                              onClick={() => handleCopyLink(comment.post_url)}
-                            >
-                              <ContentCopyIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
+                          <Typography variant="body2">
+                            {comment.comment_date 
+                              ? new Date(comment.comment_date).toLocaleDateString() 
+                              : 'Unknown'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography variant="body2">{comment.likes_number.toLocaleString()}</Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography variant="body2">{comment.replies_number.toLocaleString()}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', gap: 0.5 }}>
+                            <Tooltip title="Open Post">
+                              <IconButton 
+                                size="small" 
+                                onClick={() => window.open(comment.post_url, '_blank')}
+                              >
+                                <OpenInNewIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Copy Link">
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleCopyLink(comment.post_url)}
+                              >
+                                <ContentCopyIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
                         </TableCell>
                       </TableRow>
                     ))
                   )
                 ) : (
-                  /* Posts table body */
                   posts.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} align="center">
-                        <Typography>No posts found</Typography>
+                      <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                        <Typography color="text.secondary">No posts found</Typography>
                       </TableCell>
                     </TableRow>
                   ) : (
                     posts.map((post) => (
-                      <TableRow key={post.id} hover>
+                      <TableRow key={post.id} hover sx={{ '&:hover': { backgroundColor: 'grey.50' } }}>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            {post.is_verified && (
-                              <Tooltip title="Verified Account">
+                            <Avatar sx={{ width: 32, height: 32, mr: 2, fontSize: '0.875rem' }}>
+                              {post.user_posted.charAt(0).toUpperCase()}
+                            </Avatar>
+                            <Box>
+                              <Typography variant="body2" fontWeight={500}>
+                                {post.user_posted}
+                              </Typography>
+                              {post.is_verified && (
                                 <Chip 
                                   size="small" 
                                   color="primary" 
                                   label="Verified" 
-                                  sx={{ mr: 1 }} 
+                                  sx={{ mt: 0.5, height: 16, fontSize: '0.75rem' }}
                                 />
-                              </Tooltip>
-                            )}
-                            {post.user_posted}
+                              )}
+                            </Box>
                           </Box>
                         </TableCell>
                         <TableCell>
                           <Chip 
                             size="small" 
                             color={post.content_type === 'reel' ? 'secondary' : 'primary'}
-                            variant={post.content_type === 'reel' ? 'filled' : 'outlined'}
+                            variant="outlined"
                             label={post.content_type === 'reel' ? 'Reel' : 'Post'} 
                           />
                         </TableCell>
                         <TableCell>
-                          <Typography variant="body2" noWrap sx={{ maxWidth: 300 }}>
+                          <Typography variant="body2" sx={{ maxWidth: 300 }} noWrap>
                             {post.description || 'No description'}
                           </Typography>
                         </TableCell>
                         <TableCell>
-                          {post.date_posted 
-                            ? new Date(post.date_posted).toLocaleDateString() 
-                            : 'Unknown'}
+                          <Typography variant="body2">
+                            {post.date_posted 
+                              ? new Date(post.date_posted).toLocaleDateString() 
+                              : 'Unknown'}
+                          </Typography>
                         </TableCell>
-                        <TableCell align="right">{post.likes.toLocaleString()}</TableCell>
-                        <TableCell align="right">{post.num_comments.toLocaleString()}</TableCell>
+                        <TableCell align="right">
+                          <Typography variant="body2" fontWeight={500}>
+                            {post.likes.toLocaleString()}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography variant="body2">
+                            {post.num_comments.toLocaleString()}
+                          </Typography>
+                        </TableCell>
                         <TableCell>
-                          <Tooltip title="Open in Instagram">
-                            <IconButton 
-                              size="small" 
-                              onClick={() => window.open(post.url, '_blank')}
-                            >
-                              <OpenInNewIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Copy link">
-                            <IconButton 
-                              size="small" 
-                              onClick={() => handleCopyLink(post.url)}
-                            >
-                              <ContentCopyIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
+                          <Box sx={{ display: 'flex', gap: 0.5 }}>
+                            <Tooltip title="Open in Instagram">
+                              <IconButton 
+                                size="small" 
+                                onClick={() => window.open(post.url, '_blank')}
+                              >
+                                <OpenInNewIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Copy Link">
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleCopyLink(post.url)}
+                              >
+                                <ContentCopyIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
                         </TableCell>
                       </TableRow>
                     ))
@@ -1015,9 +1191,213 @@ const InstagramDataUpload = () => {
             page={page}
             onPageChange={handleChangePage}
             onRowsPerPageChange={handleChangeRowsPerPage}
+            sx={{ borderTop: '1px solid', borderColor: 'divider' }}
           />
-        </Paper>
-      </Box>
+        </TabPanel>
+
+        {/* Tab Panel 1: Upload & Management */}
+        <TabPanel value={tabValue} index={1}>
+          <Box sx={{ display: 'flex', gap: 3, flexDirection: { xs: 'column', md: 'row' } }}>
+            <Box sx={{ flex: 2 }}>
+              <Card sx={{ border: '1px solid', borderColor: 'divider' }}>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                    <CloudUploadIcon sx={{ mr: 1 }} />
+                    Upload CSV Data
+                  </Typography>
+                  
+                  {currentFolder && currentFolder.category && (
+                    <Alert severity="info" sx={{ mb: 2 }}>
+                      <strong>Current folder: {currentFolder.category_display || currentFolder.category}</strong>
+                      <br />
+                      {currentFolder.category === 'comments' 
+                        ? 'Upload comment CSV files here.'
+                        : 'Upload posts/reels CSV files here.'
+                      }
+                    </Alert>
+                  )}
+                  
+                  {uploadError && (
+                    <Alert severity="error" sx={{ mb: 2 }} onClose={() => setUploadError(null)}>
+                      {uploadError}
+                    </Alert>
+                  )}
+                  
+                  {uploadSuccess && (
+                    <Alert severity="success" sx={{ mb: 2 }} onClose={() => setUploadSuccess(null)}>
+                      {uploadSuccess}
+                    </Alert>
+                  )}
+                  
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                    Upload CSV files containing Instagram data. The system automatically detects content type 
+                    based on column headers. Ensure dates are in standard format (YYYY-MM-DD).
+                  </Typography>
+                  
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+                    <Button
+                      variant="outlined"
+                      component="label"
+                      startIcon={<CloudUploadIcon />}
+                      disabled={isUploading}
+                    >
+                      Select CSV File
+                      <input
+                        id="file-upload"
+                        type="file"
+                        hidden
+                        accept=".csv"
+                        onChange={handleFileChange}
+                      />
+                    </Button>
+                    <Button
+                      variant="contained"
+                      onClick={handleUpload}
+                      disabled={!uploadFile || isUploading}
+                      startIcon={isUploading ? <CircularProgress size={20} /> : undefined}
+                    >
+                      {isUploading ? 'Uploading...' : 'Upload'}
+                    </Button>
+                    {uploadFile && (
+                      <Typography variant="body2" color="text.secondary">
+                        {uploadFile.name}
+                      </Typography>
+                    )}
+                  </Box>
+                  
+                  <Divider sx={{ my: 2 }} />
+                  
+                  <Button
+                    variant="outlined"
+                    startIcon={<DownloadIcon />}
+                    onClick={() => handleDownloadCSV(undefined)}
+                  >
+                    Download Current Data as CSV
+                  </Button>
+                </CardContent>
+              </Card>
+            </Box>
+            
+            <Box sx={{ flex: 1 }}>
+              <Card sx={{ border: '1px solid', borderColor: 'divider' }}>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>
+                    Quick Actions
+                  </Typography>
+                  <Stack spacing={2}>
+                    <Button
+                      variant="outlined"
+                      startIcon={<DownloadIcon />}
+                      onClick={() => handleDownloadCSV('post')}
+                      disabled={currentFolder?.category === 'comments'}
+                    >
+                      Download Posts Only
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      startIcon={<DownloadIcon />}
+                      onClick={() => handleDownloadCSV('reel')}
+                      disabled={currentFolder?.category === 'comments'}
+                    >
+                      Download Reels Only
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      startIcon={<RefreshIcon />}
+                      onClick={() => {
+                        fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter);
+                        fetchFolderStats();
+                      }}
+                    >
+                      Refresh Data
+                    </Button>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Box>
+          </Box>
+        </TabPanel>
+
+        {/* Tab Panel 2: Analytics */}
+        <TabPanel value={tabValue} index={2}>
+          <Typography variant="h6" gutterBottom>
+            Analytics Overview
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Advanced analytics features coming soon. Current data insights are available in the overview cards above.
+          </Typography>
+          
+          {/* Progress bars for different metrics */}
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
+            <Card sx={{ border: '1px solid', borderColor: 'divider' }}>
+              <CardContent>
+                <Typography variant="subtitle1" gutterBottom>
+                  Engagement Distribution
+                </Typography>
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    High Engagement Posts
+                  </Typography>
+                  <LinearProgress variant="determinate" value={75} sx={{ height: 8, borderRadius: 4 }} />
+                </Box>
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Medium Engagement Posts
+                  </Typography>
+                  <LinearProgress variant="determinate" value={45} sx={{ height: 8, borderRadius: 4 }} />
+                </Box>
+                <Box>
+                  <Typography variant="body2" color="text.secondary">
+                    Low Engagement Posts
+                  </Typography>
+                  <LinearProgress variant="determinate" value={20} sx={{ height: 8, borderRadius: 4 }} />
+                </Box>
+              </CardContent>
+            </Card>
+            
+            <Card sx={{ border: '1px solid', borderColor: 'divider' }}>
+              <CardContent>
+                <Typography variant="subtitle1" gutterBottom>
+                  Content Performance
+                </Typography>
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Posts vs Reels Ratio
+                  </Typography>
+                  <LinearProgress 
+                    variant="determinate" 
+                    value={60} 
+                    sx={{ height: 8, borderRadius: 4 }}
+                    color="secondary" 
+                  />
+                </Box>
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Verified Account Content
+                  </Typography>
+                  <LinearProgress 
+                    variant="determinate" 
+                    value={30} 
+                    sx={{ height: 8, borderRadius: 4 }}
+                    color="success" 
+                  />
+                </Box>
+                <Box>
+                  <Typography variant="body2" color="text.secondary">
+                    Average Response Time
+                  </Typography>
+                  <LinearProgress 
+                    variant="determinate" 
+                    value={85} 
+                    sx={{ height: 8, borderRadius: 4 }}
+                    color="warning" 
+                  />
+                </Box>
+              </CardContent>
+            </Card>
+          </Box>
+        </TabPanel>
+      </Paper>
 
       <Snackbar
         open={snackbarOpen}

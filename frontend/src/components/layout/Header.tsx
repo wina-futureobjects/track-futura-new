@@ -363,6 +363,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
           color: '#2c3e50',
           textDecoration: 'none !important',
           cursor: 'pointer',
+        
           '&:hover': {
             color: theme.palette.primary.main,
           }
