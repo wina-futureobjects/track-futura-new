@@ -37,6 +37,9 @@ import ReportDetail from './pages/ReportDetail';
 import ReportGeneration from './pages/ReportGeneration';
 import MultiPlatformReportGeneration from './pages/MultiPlatformReportGeneration';
 import FolderReportGeneration from './pages/FolderReportGeneration';
+import Report from './pages/Report';
+import ReportView from './pages/ReportView';
+import GeneratedReports from './pages/GeneratedReports';
 
 // Admin and auth imports
 import OrganizationsList from './pages/OrganizationsList';
@@ -434,6 +437,57 @@ function App() {
                   </Layout>
                 </ProtectedRoute>
               } />
+              {/* New Report Marketplace Routes */}
+              <Route path="/report" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Report />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/report/:id" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <ReportView />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+              
+              {/* Report Marketplace with organization and project IDs */}
+              <Route path="/organizations/:organizationId/projects/:projectId/report" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Report />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/organizations/:organizationId/projects/:projectId/report/:id" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <ReportView />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+
+              {/* Generated Reports Routes */}
+              <Route path="/reports/generated" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <GeneratedReports />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/organizations/:organizationId/projects/:projectId/reports/generated" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <GeneratedReports />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+
               {/* Report Folder Routes */}
               <Route path="/reports" element={
                 <ProtectedRoute>

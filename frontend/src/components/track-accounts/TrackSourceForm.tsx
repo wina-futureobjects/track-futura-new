@@ -38,32 +38,15 @@ interface TrackSourceFormProps {
 interface TrackSource {
   id: number;
   name: string;
-  iac_no: string;
   facebook_link: string | null;
   instagram_link: string | null;
   linkedin_link: string | null;
   tiktok_link: string | null;
   other_social_media: string | null;
-  risk_classification: string | null;
-  close_monitoring: boolean;
-  posting_frequency: string | null;
   project?: number | null;
   created_at?: string;
   updated_at?: string;
 }
-
-const riskClassifications = [
-  'Low',
-  'Medium',
-  'High',
-  'Critical'
-];
-
-const postingFrequencies = [
-  'Low',
-  'Medium',
-  'High'
-];
 
 const TrackSourceForm: React.FC<TrackSourceFormProps> = ({ 
   sourceId, 
@@ -81,15 +64,11 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
   const [formData, setFormData] = useState<TrackSource>({
     id: 0,
     name: '',
-    iac_no: '',
     facebook_link: '',
     instagram_link: '',
     linkedin_link: '',
     tiktok_link: '',
     other_social_media: '',
-    risk_classification: null,
-    close_monitoring: false,
-    posting_frequency: null,
     project: projectId ? parseInt(projectId) : null
   });
 
@@ -166,10 +145,6 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
     
     if (!formData.name.trim()) {
       errors.name = 'Name is required';
-    }
-    
-    if (!formData.iac_no.trim()) {
-      errors.iac_no = 'IAC Number is required';
     }
     
     // Validate URLs if provided
@@ -352,85 +327,6 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
                 }}
               />
               
-              <TextField
-                fullWidth
-                label="IAC Number"
-                name="iac_no"
-                value={formData.iac_no}
-                onChange={handleChange}
-                error={!!formErrors.iac_no}
-                helperText={formErrors.iac_no}
-                required
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <InfoIcon fontSize="small" />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-              
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                <TextField
-                  sx={{ flex: 1, minWidth: 200 }}
-                  select
-                  label="Risk Classification"
-                  name="risk_classification"
-                  value={formData.risk_classification || ''}
-                  onChange={handleSelectChange}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <WarningIcon fontSize="small" />
-                      </InputAdornment>
-                    ),
-                  }}
-                >
-                  <MenuItem value="">None</MenuItem>
-                  {riskClassifications.map(option => (
-                    <MenuItem key={option} value={option}>
-                      {option}
-                    </MenuItem>
-                  ))}
-                </TextField>
-                
-                <TextField
-                  sx={{ flex: 1, minWidth: 200 }}
-                  select
-                  label="Posting Frequency"
-                  name="posting_frequency"
-                  value={formData.posting_frequency || ''}
-                  onChange={handleSelectChange}
-                >
-                  <MenuItem value="">None</MenuItem>
-                  {postingFrequencies.map(option => (
-                    <MenuItem key={option} value={option}>
-                      {option}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Box>
-              
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={formData.close_monitoring}
-                    onChange={handleSwitchChange}
-                    name="close_monitoring"
-                    color="primary"
-                  />
-                }
-                label="Close Monitoring"
-              />
-            </Stack>
-          </Box>
-          
-          {/* Social Media Links */}
-          <Box>
-            <Typography variant="h6" gutterBottom>Social Media Links</Typography>
-            <Divider sx={{ mb: 2 }} />
-            
-            <Stack spacing={2}>
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                 <TextField
                   sx={{ flex: 1, minWidth: 200 }}

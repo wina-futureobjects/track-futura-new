@@ -23,84 +23,22 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
     permission_classes = [AllowAny]  # For testing, use proper permissions in production
     
     def get_queryset(self):
-        """
-        Filter sources by project if project parameter is provided.
-        Require project parameter to prevent cross-project data leakage.
-        """
-        # Get project ID from query parameters
+        """Filter sources based on query parameters"""
+        queryset = TrackSource.objects.all()
+        
+        # Filter by project if specified
         project_id = self.request.query_params.get('project')
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
         
-        print(f"=== SOURCE QUERYSET DEBUG ===")
-        print(f"Requested project_id: {project_id}")
-        
-        # If no project ID is provided, return empty queryset to prevent data leakage
-        if not project_id:
-            print("No project_id provided - returning empty queryset for security")
-            print(f"=== END SOURCE QUERYSET DEBUG ===")
-            return TrackSource.objects.none()
-        
-        # Validate project ID format
-        try:
-            project_id = int(project_id)
-        except (ValueError, TypeError):
-            print(f"Invalid project_id format: {project_id}")
-            print(f"=== END SOURCE QUERYSET DEBUG ===")
-            return TrackSource.objects.none()
-        
-        # Filter by project
-        queryset = TrackSource.objects.filter(project_id=project_id)
-        
-        # Apply additional filters
+        # Search functionality
         search = self.request.query_params.get('search')
-        risk_classification = self.request.query_params.get('risk_classification')
-        close_monitoring = self.request.query_params.get('close_monitoring')
-        has_facebook = self.request.query_params.get('has_facebook')
-        has_instagram = self.request.query_params.get('has_instagram')
-        has_linkedin = self.request.query_params.get('has_linkedin')
-        has_tiktok = self.request.query_params.get('has_tiktok')
-        
-        # Filter by search term if provided
         if search:
             queryset = queryset.filter(
-                Q(name__icontains=search) |
-                Q(iac_no__icontains=search)
+                Q(name__icontains=search)
             )
         
-        # Filter by risk classification if provided
-        if risk_classification:
-            queryset = queryset.filter(risk_classification=risk_classification)
-        
-        # Filter by close monitoring if provided
-        if close_monitoring is not None:
-            if close_monitoring.lower() == 'true':
-                queryset = queryset.filter(close_monitoring=True)
-            elif close_monitoring.lower() == 'false':
-                queryset = queryset.filter(close_monitoring=False)
-                
-        # Filter by social media presence
-        if has_facebook:
-            queryset = queryset.exclude(
-                Q(facebook_link__isnull=True) | Q(facebook_link='')
-            )
-        
-        if has_instagram:
-            queryset = queryset.exclude(
-                Q(instagram_link__isnull=True) | Q(instagram_link='')
-            )
-            
-        if has_linkedin:
-            queryset = queryset.exclude(
-                Q(linkedin_link__isnull=True) | Q(linkedin_link='')
-            )
-            
-        if has_tiktok:
-            queryset = queryset.exclude(
-                Q(tiktok_link__isnull=True) | Q(tiktok_link='')
-            )
-        
-        print(f"Filtered queryset count: {queryset.count()}")
-        print(f"=== END SOURCE QUERYSET DEBUG ===")
-        return queryset
+        return queryset.order_by('name')
     
     def perform_create(self, serializer):
         """
@@ -145,27 +83,26 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
             
             # Process each row
             for row in reader:
-                # Check if the row has the required data
-                if not row.get('Name') or not row.get('IAC_NO'):
+                # Check if the row has the required data (only name is required now)
+                if not row.get('Name'):
                     continue
                 
                 # Prepare the data dictionary
                 data = {
                     'name': row.get('Name', '').strip(),
-                    'iac_no': row.get('IAC_NO', '').strip(),
                     'facebook_link': row.get('FACEBOOK_LINK', '').strip() or None,
                     'instagram_link': row.get('INSTAGRAM_LINK', '').strip() or None,
                     'linkedin_link': row.get('LINKEDIN_LINK', '').strip() or None,
                     'tiktok_link': row.get('TIKTOK_LINK', '').strip() or None,
                     'other_social_media': row.get('OTHER_SOCIAL_MEDIA', '').strip() or None,
-                    'risk_classification': row.get('RISK_CLASSIFICATION', '').strip() or None,
-                    'close_monitoring': row.get('CLOSE_MONITORING', '').strip().lower() in ['yes', 'true', '1'],
-                    'posting_frequency': row.get('POSTING_FREQUENCY', '').strip() or None,
                     'project': project_id
                 }
                 
-                # Check if source with this IAC_NO already exists
-                existing_source = TrackSource.objects.filter(iac_no=data['iac_no']).first()
+                # Check if source with this name already exists in the project
+                existing_source = TrackSource.objects.filter(
+                    name=data['name'], 
+                    project_id=project_id
+                ).first()
                 
                 if existing_source:
                     # Update existing source
@@ -212,24 +149,20 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
             
             # Write header
             writer.writerow([
-                'Name', 'IAC_NO', 
+                'Name', 
                 'FACEBOOK_LINK', 'INSTAGRAM_LINK', 'LINKEDIN_LINK', 'TIKTOK_LINK',
-                'OTHER_SOCIAL_MEDIA', 'RISK_CLASSIFICATION', 'CLOSE_MONITORING', 'POSTING_FREQUENCY'
+                'OTHER_SOCIAL_MEDIA'
             ])
             
             # Write data rows
             for source in queryset:
                 writer.writerow([
                     source.name,
-                    source.iac_no,
                     source.facebook_link or '',
                     source.instagram_link or '',
                     source.linkedin_link or '',
                     source.tiktok_link or '',
                     source.other_social_media or '',
-                    source.risk_classification or '',
-                    'Yes' if source.close_monitoring else 'No',
-                    source.posting_frequency or ''
                 ])
             
             return response
@@ -238,7 +171,7 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=False, methods=['GET'])
-    def stats(self, request):
+    def statistics(self, request):
         """
         Get statistics for filtering
         """
@@ -255,20 +188,6 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
             
             # Calculate statistics
             total = queryset.count()
-            
-            # Risk classification counts
-            risk_counts = {
-                'low': queryset.filter(risk_classification='Low').count(),
-                'medium': queryset.filter(risk_classification='Medium').count(),
-                'high': queryset.filter(risk_classification='High').count(),
-                'critical': queryset.filter(risk_classification='Critical').count(),
-            }
-            
-            # Monitoring counts
-            monitoring_counts = {
-                'monitored': queryset.filter(close_monitoring=True).count(),
-                'unmonitored': queryset.filter(close_monitoring=False).count(),
-            }
             
             # Social media counts
             social_media_counts = {
@@ -288,8 +207,6 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
             
             return Response({
                 'total': total,
-                'riskCounts': risk_counts,
-                'monitoringCounts': monitoring_counts,
                 'socialMediaCounts': social_media_counts,
             })
             

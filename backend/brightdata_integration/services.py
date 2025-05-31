@@ -140,7 +140,6 @@ class AutomatedBatchScraper:
                     
                     job_metadata['sources_processed'].append({
                         'source_name': source.name,
-                        'iac_no': source.iac_no,
                         'requests_created': [req.id for req in source_requests],
                     })
                     
@@ -224,7 +223,7 @@ class AutomatedBatchScraper:
         
         # Debug: Log source names for verification
         if sources.exists():
-            source_names = [f"{s.name} ({s.iac_no})" for s in sources[:5]]  # Log first 5
+            source_names = [s.name for s in sources[:5]]  # Log first 5
             self.logger.info(f"Sample sources: {source_names}")
             if sources.count() > 5:
                 self.logger.info(f"... and {sources.count() - 5} more")
@@ -451,7 +450,6 @@ class AutomatedBatchScraper:
                 date=timezone.now().strftime('%Y-%m-%d'),
                 job_name=job.name,
                 account_name=source.name,
-                iac_no=source.iac_no,
             )
             
             # Get the appropriate folder model for this platform
@@ -501,7 +499,6 @@ class AutomatedBatchScraper:
                 target_url=url,
                 source_name=source.name,
                 account_name=source.name,  # Keep legacy field in sync
-                iac_no=source.iac_no,
                 num_of_posts=job.num_of_posts,
                 start_date=job.start_date,
                 end_date=job.end_date,

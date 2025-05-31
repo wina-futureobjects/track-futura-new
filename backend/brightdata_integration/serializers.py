@@ -49,7 +49,7 @@ class ScraperRequestSerializer(serializers.ModelSerializer):
         model = ScraperRequest
         fields = [
             'id', 'config', 'batch_job', 'batch_job_name', 'request_id', 'platform', 'platform_display', 
-            'content_type', 'target_url', 'source_name', 'iac_no', 'num_of_posts', 'posts_to_not_include', 
+            'content_type', 'target_url', 'source_name', 'num_of_posts', 'posts_to_not_include', 
             'start_date', 'end_date', 'status', 'request_payload', 'response_metadata', 'error_message',
             # Legacy field for backward compatibility
             'account_name',
@@ -62,7 +62,7 @@ class ScraperRequestCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ScraperRequest
         fields = [
-            'platform', 'content_type', 'target_url', 'source_name', 'iac_no', 'num_of_posts',
+            'platform', 'content_type', 'target_url', 'source_name', 'num_of_posts',
             'posts_to_not_include', 'start_date', 'end_date', 'folder_id'
         ]
     

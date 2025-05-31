@@ -61,13 +61,13 @@ class BatchScraperJobAdmin(admin.ModelAdmin):
 class ScraperRequestAdmin(admin.ModelAdmin):
     list_display = ('source_name', 'platform', 'content_type', 'target_url', 'status', 'batch_job', 'created_at', 'completed_at')
     list_filter = ('platform', 'content_type', 'status', 'batch_job')
-    search_fields = ('target_url', 'request_id', 'source_name', 'iac_no')
+    search_fields = ('target_url', 'request_id', 'source_name')
     readonly_fields = ('created_at', 'updated_at', 'completed_at', 'request_payload', 'response_metadata')
     ordering = ('-created_at',)
     
     fieldsets = (
         ('Request Info', {
-            'fields': ('config', 'batch_job', 'platform', 'content_type', 'target_url', 'source_name', 'iac_no', 'num_of_posts', 
+            'fields': ('config', 'batch_job', 'platform', 'content_type', 'target_url', 'source_name', 'num_of_posts', 
                        'posts_to_not_include', 'start_date', 'end_date', 'folder_id')
         }),
         ('Response Info', {

@@ -8,7 +8,6 @@ import {
   ListItemIcon,
   ListItemText,
   Divider,
-  IconButton,
   Box,
   Typography,
   Tooltip,
@@ -17,38 +16,25 @@ import {
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
-  Timeline as TimelineIcon,
-  Language as LanguageIcon,
-  Message as MessageIcon,
-  BarChart as BarChartIcon,
   Settings as SettingsIcon,
-  ChevronLeft as ChevronLeftIcon,
-  ChevronRight as ChevronRightIcon,
-  Notifications as NotificationsIcon,
-  CloudQueue as CloudQueueIcon,
   Logout as LogoutIcon,
-  AccountBox as AccountBoxIcon,
   Description as DescriptionIcon,
-  Mood as MoodIcon,
   Assessment as AssessmentIcon,
   Instagram as InstagramIcon,
   Analytics as AnalyticsIcon,
-  TrackChanges as TrackChangesIcon,
   Facebook as FacebookIcon,
-  ExpandLess as ExpandLessIcon,
   ExpandMore as ExpandMoreIcon,
-  DataUsage as DataUsageIcon,
   InsertChart as ChartIcon,
   AutoAwesome as AutoAwesomeIcon,
   SettingsSuggest as SettingsSuggestIcon,
-  SpaceDashboard as SpaceDashboardIcon
+  Assignment as AssignmentIcon,
+  Input as InputIcon,
+  Storage as StorageIcon
 } from '@mui/icons-material';
 import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import MusicVideoIcon from '@mui/icons-material/MusicVideo';
 import CommentIcon from '@mui/icons-material/Comment';
 import { useNavigate, useLocation } from 'react-router-dom';
-// Import the GE logo
-import GELogo from '../../assets/images/logos/GE-logo.png';
 
 // Inline minimal implementation of useAuth to avoid path resolution issues
 const useAuth = () => {
@@ -60,15 +46,118 @@ const useAuth = () => {
   return { logout };
 };
 
-const drawerWidth = 240;
-const miniDrawerWidth = 65;
+const drawerWidth = 260;
+const miniDrawerWidth = 64;
 
-const DrawerHeader = styled('div')(({ theme }) => ({
+const StyledDrawer = styled(Drawer, {
+  shouldForwardProp: (prop) => prop !== 'open',
+})<{ open: boolean }>(({ theme, open }) => ({
+  width: open ? drawerWidth : miniDrawerWidth,
+  flexShrink: 0,
+  '& .MuiDrawer-paper': {
+    width: open ? drawerWidth : miniDrawerWidth,
+    boxSizing: 'border-box',
+    border: 'none',
+    background: '#ffffff',
+    boxShadow: 'none',
+    overflowX: 'hidden',
+    borderRight: '1px solid #e8eaed',
+    zIndex: theme.zIndex.drawer,
+    marginTop: '84px',
+    height: 'calc(100vh - 84px)',
+    transition: theme.transitions.create('width', {
+      easing: theme.transitions.easing.sharp,
+      duration: theme.transitions.duration.enteringScreen,
+    }),
+  },
+}));
+
+const MenuSection = styled(Box)(({ theme }) => ({
+  padding: theme.spacing(0, 1, 0, 1),
+  '& .section-title': {
+    fontSize: '0.75rem',
+    fontWeight: 600,
+    color: theme.palette.text.secondary,
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+    marginBottom: theme.spacing(0.5),
+    marginTop: theme.spacing(0.5),
+    '&:first-of-type': {
+      marginTop: theme.spacing(0.25),
+    }
+  }
+}));
+
+const StyledListItemButton = styled(ListItemButton, {
+  shouldForwardProp: (prop) => prop !== 'active',
+})<{ active?: boolean }>(({ theme, active }) => ({
+  minHeight: 40,
+  margin: theme.spacing(0.3, 0),
+  borderRadius: 10,
+  padding: theme.spacing(0.8, 1.2),
+  position: 'relative',
+  backgroundColor: active ? 'rgba(225, 37, 27, 0.08)' : 'transparent',
+  border: active ? '1px solid rgba(225, 37, 27, 0.12)' : '1px solid transparent',
+  '&:hover': {
+    backgroundColor: active ? 'rgba(225, 37, 27, 0.12)' : 'rgba(225, 37, 27, 0.04)',
+    transform: 'translateX(2px)',
+  },
+  '&:before': {
+    content: '""',
+    position: 'absolute',
+    left: 0,
+    top: '50%',
+    transform: 'translateY(-50%)',
+    width: 3,
+    height: active ? 20 : 0,
+    backgroundColor: theme.palette.primary.main,
+    borderRadius: '0 3px 3px 0',
+    transition: theme.transitions.create(['height'], {
+      easing: theme.transitions.easing.sharp,
+      duration: theme.transitions.duration.short,
+    }),
+  },
+  transition: theme.transitions.create(['background-color', 'transform', 'border-color'], {
+    easing: theme.transitions.easing.sharp,
+    duration: theme.transitions.duration.short,
+  }),
+}));
+
+const StyledListItemIcon = styled(ListItemIcon, {
+  shouldForwardProp: (prop) => prop !== 'active',
+})<{ active?: boolean }>(({ theme, active }) => ({
+  minWidth: 0,
+  marginRight: theme.spacing(1.5),
+  justifyContent: 'center',
+  color: active ? theme.palette.primary.main : theme.palette.text.secondary,
+  '& .MuiSvgIcon-root': {
+    fontSize: '1.1rem',
+  }
+}));
+
+const StyledListItemText = styled(ListItemText, {
+  shouldForwardProp: (prop) => prop !== 'active',
+})<{ active?: boolean }>(({ theme, active }) => ({
+  margin: 0,
+  '& .MuiListItemText-primary': {
+    fontSize: '0.82rem',
+    fontWeight: active ? 600 : 500,
+    color: active ? theme.palette.primary.main : theme.palette.text.primary,
+    lineHeight: 1.4,
+  }
+}));
+
+const CollapsibleIcon = styled(Box, {
+  shouldForwardProp: (prop) => prop !== 'expanded',
+})<{ expanded: boolean }>(({ theme, expanded }) => ({
   display: 'flex',
   alignItems: 'center',
-  justifyContent: 'space-between',
-  padding: theme.spacing(0, 1),
-  ...theme.mixins.toolbar,
+  justifyContent: 'center',
+  marginLeft: 'auto',
+  transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+  transition: theme.transitions.create('transform', {
+    duration: theme.transitions.duration.short,
+  }),
 }));
 
 interface SidebarProps {
@@ -83,6 +172,7 @@ interface MenuItem {
   path: string;
   icon: React.ReactNode;
   subItems?: MenuItem[];
+  category?: string;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
@@ -94,7 +184,9 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
   
   // State to track expanded menu categories
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({
-    socialMedia: true
+    'data-storage': true,
+    'data-scrapers': true,
+    'reports': true
   });
   
   // Function to get correct path for Dashboard based on URL
@@ -112,16 +204,23 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
 
   // Menu items with categories
   const menuItems: MenuItem[] = [
-    { text: 'Dashboard', path: getDashboardPath(), icon: <AnalyticsIcon /> },
+    { 
+      text: 'Dashboard', 
+      path: getDashboardPath(), 
+      icon: <AnalyticsIcon />,
+      category: 'main'
+    },
     { 
       text: 'Input Collection', 
       path: getTrackAccountsPath(), 
-      icon: <TrackChangesIcon /> 
+      icon: <InputIcon />,
+      category: 'main'
     },
     { 
       text: 'Data Storage', 
-      path: '#social-media', 
-      icon: <DataUsageIcon />,
+      path: '#data-storage', 
+      icon: <StorageIcon />,
+      category: 'data',
       subItems: [
         { text: 'Instagram Data', path: getSocialMediaPath('instagram-folders'), icon: <InstagramIcon /> },
         { text: 'Facebook Data', path: getSocialMediaPath('facebook-folders'), icon: <FacebookIcon /> },
@@ -131,8 +230,9 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
     },
     { 
       text: 'Data Scrapers', 
-      path: '#scrapers', 
+      path: '#data-scrapers', 
       icon: <AutoAwesomeIcon />,
+      category: 'data',
       subItems: [
         { text: 'Posts & Reels Scraper', path: getSocialMediaPath('automated-batch-scraper'), icon: <AutoAwesomeIcon /> },
         { text: 'Comments Scraper', path: getSocialMediaPath('comments-scraper'), icon: <CommentIcon /> },
@@ -143,8 +243,18 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
       text: 'AI Analysis', 
       path: getSocialMediaPath('analysis'),
       icon: <ChartIcon />,
+      category: 'analytics'
     },
-    { text: 'Report Generation', path: getReportFoldersPath(), icon: <DescriptionIcon /> },
+    { 
+      text: 'Reports', 
+      path: '#reports', 
+      icon: <DescriptionIcon />,
+      category: 'analytics',
+      subItems: [
+        { text: 'Report Marketplace', path: getReportMarketplacePath(), icon: <AssessmentIcon /> },
+        { text: 'Generated Reports', path: getGeneratedReportsPath(), icon: <AssignmentIcon /> },
+      ]
+    },
   ];
 
   // Function to get correct path for Track Accounts based on URL
@@ -171,6 +281,32 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
     }
     
     return `/${endpoint}`;
+  }
+
+  // Function to get correct path for Report Marketplace based on URL
+  function getReportMarketplacePath() {
+    // Extract organization and project IDs from URL
+    const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
+    
+    if (match) {
+      const [, orgId, projId] = match;
+      return `/organizations/${orgId}/projects/${projId}/report`;
+    }
+    
+    return '/report';
+  }
+
+  // Function to get correct path for Generated Reports based on URL
+  function getGeneratedReportsPath() {
+    // Extract organization and project IDs from URL
+    const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
+    
+    if (match) {
+      const [, orgId, projId] = match;
+      return `/organizations/${orgId}/projects/${projId}/reports/generated`;
+    }
+    
+    return '/reports/generated';
   }
 
   // Function to get correct path for Report Folders based on URL
@@ -247,6 +383,16 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
       return location.pathname.includes('report-folders');
     }
     
+    // Special handling for generated reports
+    if (itemPath.includes('/reports/generated')) {
+      return location.pathname.includes('/reports/generated');
+    }
+    
+    // Special handling for report marketplace
+    if (itemPath.includes('/report') && !itemPath.includes('report-folders') && !itemPath.includes('/reports/generated')) {
+      return location.pathname.includes('/report') && !location.pathname.includes('report-folders') && !location.pathname.includes('/reports/generated');
+    }
+    
     // For other paths, check if the current path starts with the menu item path
     return location.pathname.startsWith(itemPath);
   }, [location.pathname]);
@@ -276,10 +422,25 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
       return; // Already on dashboard, do nothing
     }
     
-    // Prevent navigation if already on the same path or subpath
-    if (location.pathname === path || 
-        (path !== '/' && path !== getDashboardPath() && location.pathname.startsWith(path))) {
+    // Prevent navigation if already on the exact same path
+    if (location.pathname === path) {
       return;
+    }
+    
+    // More specific subpath checking - only prevent navigation for direct subpaths
+    // Don't prevent navigation between different report sections
+    if (path !== '/' && path !== getDashboardPath()) {
+      // Allow navigation between different report paths even if they share a common base
+      const isReportPath = path.includes('/report');
+      const isCurrentReportPath = location.pathname.includes('/report');
+      
+      if (isReportPath && isCurrentReportPath) {
+        // Allow navigation between different report paths
+        // Only prevent if it's the exact same path (already handled above)
+      } else if (location.pathname.startsWith(path + '/')) {
+        // Only prevent if current path is a direct subpath (with trailing slash)
+        return;
+      }
     }
     
     navigate(path);
@@ -293,7 +454,16 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
     navigate('/login');
   }, [logout, navigate]);
 
+  // Group menu items by category
+  const menuCategories = {
+    main: menuItems.filter(item => item.category === 'main'),
+    data: menuItems.filter(item => item.category === 'data'),
+    analytics: menuItems.filter(item => item.category === 'analytics'),
+  };
+
   const renderMenuItem = (item: MenuItem, isSubItem = false) => {
+    const itemActive = isActive(item.path);
+    
     // For category headers with sub-items
     if (item.subItems) {
       const menuId = item.path.replace('#', '');
@@ -302,50 +472,33 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
       
       return (
         <React.Fragment key={item.text}>
-          <ListItem disablePadding sx={{ display: 'block', mb: 0.5 }}>
-            <ListItemButton
-              sx={{
-                minHeight: 48,
-                justifyContent: open ? 'initial' : 'center',
-                px: open ? 2 : 1.5,
-                borderRadius: 1,
-                backgroundColor: isAnySubItemActive ? 'rgba(52, 152, 219, 0.1)' : 'transparent',
-                '&:hover': {
-                  backgroundColor: 'rgba(52, 152, 219, 0.05)',
-                },
-              }}
+          <ListItem disablePadding sx={{ display: 'block' }}>
+            <StyledListItemButton
+              active={isAnySubItemActive}
               onClick={() => open ? handleToggleMenu(menuId) : onToggle()}
             >
               <Tooltip title={open ? '' : item.text} placement="right" arrow>
-                <ListItemIcon
-                  sx={{
-                    minWidth: 0,
-                    mr: open ? 2 : 'auto',
-                    justifyContent: 'center',
-                    color: isAnySubItemActive ? 'primary.main' : 'text.secondary',
-                  }}
-                >
+                <StyledListItemIcon active={isAnySubItemActive}>
                   {item.icon}
-                </ListItemIcon>
+                </StyledListItemIcon>
               </Tooltip>
               {open && (
                 <>
-                  <ListItemText 
-                    primary={item.text} 
-                    sx={{ 
-                      opacity: 1,
-                      color: isAnySubItemActive ? 'primary.main' : 'text.primary',
-                    }} 
+                  <StyledListItemText 
+                    active={isAnySubItemActive}
+                    primary={item.text}
                   />
-                  {isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                  <CollapsibleIcon expanded={isExpanded}>
+                    <ExpandMoreIcon sx={{ fontSize: '1rem' }} />
+                  </CollapsibleIcon>
                 </>
               )}
-            </ListItemButton>
+            </StyledListItemButton>
           </ListItem>
           
           {open && (
             <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-              <List component="div" disablePadding>
+              <List component="div" disablePadding sx={{ pl: 1 }}>
                 {item.subItems.map(subItem => renderMenuItem(subItem, true))}
               </List>
             </Collapse>
@@ -356,190 +509,108 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
     
     // For regular menu items
     return (
-      <ListItem key={item.text} disablePadding sx={{ display: 'block', mb: 0.5, pl: isSubItem && open ? 2 : 0 }}>
-        <ListItemButton
-          sx={{
-            minHeight: 48,
-            justifyContent: open ? 'initial' : 'center',
-            px: open ? 2 : 1.5,
-            borderRadius: 1,
-            backgroundColor: isActive(item.path) ? 'rgba(52, 152, 219, 0.1)' : 'transparent',
-            '&:hover': {
-              backgroundColor: 'rgba(52, 152, 219, 0.05)',
-            },
-          }}
+      <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
+        <StyledListItemButton
+          active={itemActive}
           onClick={() => handleNavigate(item.path)}
+          sx={{
+            pl: isSubItem && open ? 3 : 1.5,
+          }}
         >
           <Tooltip title={open ? '' : item.text} placement="right" arrow>
-            <ListItemIcon
-              sx={{
-                minWidth: 0,
-                mr: open ? 2 : 'auto',
-                justifyContent: 'center',
-                color: isActive(item.path) ? 'primary.main' : 'text.secondary',
-              }}
-            >
+            <StyledListItemIcon active={itemActive}>
               {item.icon}
-            </ListItemIcon>
+            </StyledListItemIcon>
           </Tooltip>
           {open && (
-            <ListItemText 
-              primary={item.text} 
-              sx={{ 
-                opacity: 1,
-                color: isActive(item.path) ? 'primary.main' : 'text.primary',
-              }} 
+            <StyledListItemText 
+              active={itemActive}
+              primary={item.text}
             />
           )}
-        </ListItemButton>
+        </StyledListItemButton>
       </ListItem>
     );
   };
 
+  const renderMenuSection = (title: string, items: MenuItem[]) => {
+    if (items.length === 0) return null;
+    
+    return (
+      <MenuSection key={title}>
+        {open && <Typography className="section-title">{title}</Typography>}
+        <List sx={{ py: 0 }}>
+          {items.map(item => renderMenuItem(item))}
+        </List>
+      </MenuSection>
+    );
+  };
+
   return (
-    <Drawer
-      sx={{
-        width: open ? drawerWidth : miniDrawerWidth,
-        flexShrink: 0,
-        '& .MuiDrawer-paper': {
-          width: open ? drawerWidth : miniDrawerWidth,
-          boxSizing: 'border-box',
-          border: 'none',
-          boxShadow: '0px 0px 15px rgba(0, 0, 0, 0.05)',
-          overflowX: 'hidden',
-          transition: theme.transitions.create('width', {
-            easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.enteringScreen,
-          }),
-        },
-        transition: theme.transitions.create('width', {
-          easing: theme.transitions.easing.sharp,
-          duration: theme.transitions.duration.enteringScreen,
-        }),
-      }}
+    <StyledDrawer
+      open={open}
       variant={isMobile ? "temporary" : "permanent"}
       anchor="left"
-      open={isMobile ? open : true}
       onClose={onClose}
-      className={open ? "" : "drawer-mini"}
-      PaperProps={{
-        sx: {
-          width: open ? drawerWidth : miniDrawerWidth,
-          overflow: 'hidden'
-        }
-      }}
     >
-      <DrawerHeader>
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          {open ? (
-            <img 
-              src={GELogo} 
-              alt="Great Eastern Logo" 
-              style={{ 
-                height: '32px', 
-                objectFit: 'contain',
-                marginLeft: '4px' 
-              }} 
-            />
-          ) : (
-            <img 
-              src={GELogo} 
-              alt="Great Eastern Logo" 
-              style={{ 
-                height: '24px', 
-                objectFit: 'contain',
-                margin: '0 auto'
-              }} 
-            />
-          )}
-        </Box>
-        <IconButton onClick={onToggle}>
-          {open ? <ChevronLeftIcon /> : <ChevronRightIcon />}
-        </IconButton>
-      </DrawerHeader>
-      <Divider />
+      <Box sx={{ flexGrow: 1, overflowY: 'auto', overflowX: 'hidden', py: 0.5 }}>
+        {renderMenuSection('Main', menuCategories.main)}
+        {renderMenuSection('Data Management', menuCategories.data)}
+        {renderMenuSection('Analytics', menuCategories.analytics)}
+      </Box>
       
-      {/* Main Menu Items */}
-      <List sx={{ px: 0.5, flexGrow: 1, overflowY: 'auto', overflowX: 'hidden' }}>
-        {menuItems.map(item => renderMenuItem(item))}
-      </List>
-      
-      <Divider />
+      <Divider sx={{ mx: 2 }} />
       
       {/* Settings and Logout */}
-      <List sx={{ px: 0.5 }}>
-        <ListItem disablePadding>
-          <ListItemButton
-            sx={{
-              minHeight: 48,
-              justifyContent: open ? 'initial' : 'center',
-              px: open ? 2 : 1.5,
-              borderRadius: 1,
-              backgroundColor: isActive('/settings') ? 'rgba(52, 152, 219, 0.1)' : 'transparent',
-            }}
-            onClick={() => handleNavigate('/settings')}
-          >
-            <Tooltip title={open ? '' : 'Settings'} placement="right" arrow>
-              <ListItemIcon
-                sx={{
-                  minWidth: 0,
-                  mr: open ? 2 : 'auto',
-                  justifyContent: 'center',
-                  color: isActive('/settings') ? 'primary.main' : 'text.secondary',
-                }}
-              >
-                <SettingsIcon />
-              </ListItemIcon>
-            </Tooltip>
-            {open && (
-              <ListItemText 
-                primary="Settings" 
-                sx={{ 
-                  opacity: 1,
-                  color: isActive('/settings') ? 'primary.main' : 'text.primary',
-                }}
-              />
-            )}
-          </ListItemButton>
-        </ListItem>
-        <ListItem disablePadding>
-          <ListItemButton
-            sx={{
-              minHeight: 48,
-              justifyContent: open ? 'initial' : 'center',
-              px: open ? 2 : 1.5,
-              borderRadius: 1,
-              '&:hover': {
-                backgroundColor: 'rgba(52, 152, 219, 0.05)',
-              },
-            }}
-            onClick={handleLogout}
-          >
-            <Tooltip title={open ? '' : 'Logout'} placement="right" arrow>
-              <ListItemIcon
-                sx={{
-                  minWidth: 0,
-                  mr: open ? 2 : 'auto',
-                  justifyContent: 'center',
-                  color: 'text.secondary',
-                }}
-              >
-                <LogoutIcon />
-              </ListItemIcon>
-            </Tooltip>
-            {open && (
-              <ListItemText 
-                primary="Logout" 
-                sx={{ 
-                  opacity: 1,
-                  color: 'text.primary',
-                }}
-              />
-            )}
-          </ListItemButton>
-        </ListItem>
-      </List>
-    </Drawer>
+      <MenuSection>
+        <List sx={{ py: 1 }}>
+          <ListItem disablePadding>
+            <StyledListItemButton
+              active={isActive('/settings')}
+              onClick={() => handleNavigate('/settings')}
+            >
+              <Tooltip title={open ? '' : 'Settings'} placement="right" arrow>
+                <StyledListItemIcon active={isActive('/settings')}>
+                  <SettingsIcon />
+                </StyledListItemIcon>
+              </Tooltip>
+              {open && (
+                <StyledListItemText 
+                  active={isActive('/settings')}
+                  primary="Settings"
+                />
+              )}
+            </StyledListItemButton>
+          </ListItem>
+          <ListItem disablePadding>
+            <StyledListItemButton
+              onClick={handleLogout}
+              sx={{
+                '&:hover': {
+                  backgroundColor: 'rgba(244, 67, 54, 0.04)',
+                },
+              }}
+            >
+              <Tooltip title={open ? '' : 'Logout'} placement="right" arrow>
+                <StyledListItemIcon sx={{ color: 'error.main' }}>
+                  <LogoutIcon />
+                </StyledListItemIcon>
+              </Tooltip>
+              {open && (
+                <StyledListItemText 
+                  primary="Logout"
+                  sx={{
+                    '& .MuiListItemText-primary': {
+                      color: 'error.main',
+                    }
+                  }}
+                />
+              )}
+            </StyledListItemButton>
+          </ListItem>
+        </List>
+      </MenuSection>
+    </StyledDrawer>
   );
 };
 

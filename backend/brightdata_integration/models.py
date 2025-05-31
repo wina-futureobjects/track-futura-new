@@ -150,7 +150,6 @@ class ScraperRequest(models.Model):
     content_type = models.CharField(max_length=20, choices=CONTENT_TYPE_CHOICES, default='post')
     target_url = models.URLField(max_length=500)
     source_name = models.CharField(max_length=255, blank=True, null=True, help_text="Name of the tracked source")
-    iac_no = models.CharField(max_length=100, blank=True, null=True, help_text="IAC number of the tracked source")
     num_of_posts = models.IntegerField(default=10)
     posts_to_not_include = models.TextField(blank=True, null=True)
     start_date = models.DateField(blank=True, null=True)

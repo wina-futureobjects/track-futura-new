@@ -28,7 +28,6 @@ import {
   Business as TenantIcon,
   LightMode as LightIcon,
   NavigateNext as NavigateNextIcon,
-  ArrowDropDown as ArrowDropDownIcon,
   Folder as FolderIcon,
   Dashboard as DashboardIcon,
   Description as DescriptionIcon,
@@ -41,7 +40,6 @@ import {
   Hub as HubIcon,
   BusinessOutlined as BusinessOutlinedIcon,
 } from '@mui/icons-material';
-import GELogo from '../../assets/images/logos/future-object.png';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { logout, getUserRole, getCurrentUser } from '../../utils/auth';
 import { apiFetch } from '../../utils/api';
@@ -322,14 +320,32 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
   // Memoize breadcrumb components to prevent re-rendering
   const renderBreadcrumbs = React.useMemo(() => (
     <Breadcrumbs 
-      separator={<NavigateNextIcon fontSize="small" sx={{ color: theme.palette.primary.main }} />} 
+      separator={
+        <Typography 
+          sx={{ 
+            color: '#9e9e9e', 
+            fontSize: '16px',
+            fontWeight: 300,
+            mx: 0.5
+          }}
+        >
+          |
+        </Typography>
+      } 
       aria-label="breadcrumb"
       sx={{ 
         display: 'flex', 
         alignItems: 'center',
+        height: '100%',
+        maxWidth: '60%',
+        flexShrink: 1,
+        '& .MuiBreadcrumbs-ol': {
+          alignItems: 'center',
+          height: '100%',
+        },
         '& a': {
           textDecoration: 'none !important',
-          color: '#000000',
+          color: '#2c3e50',
           '&:hover': {
             textDecoration: 'none !important',
             color: theme.palette.primary.main,
@@ -342,25 +358,19 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
         sx={{ 
           display: 'flex', 
           alignItems: 'center',
-          fontWeight: 500,
+          fontWeight: 600,
           fontSize: '16px',
-          color: '#000000',
+          color: '#2c3e50',
           textDecoration: 'none !important',
+          cursor: 'pointer',
+          '&:hover': {
+            color: theme.palette.primary.main,
+          }
         }}
-        color="inherit"
         onClick={() => navigate('/')}
         component="button"
         underline="none"
       >
-        <img 
-          src={GELogo} 
-          alt="Logo" 
-          style={{ 
-            height: '36px',
-            marginRight: '8px'
-          }} 
-          onError={handleImageError}
-        />
         Track Futura
       </Link>
       
@@ -369,21 +379,34 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
         <Link
           sx={{ 
             fontWeight: 500,
-            fontSize: '16px',
+            fontSize: '15px',
             display: 'flex',
             alignItems: 'center',
-            color: '#000000',
+            color: '#2c3e50',
             textDecoration: 'none !important',
+            cursor: 'pointer',
+            height: '32px',
+            padding: '0 8px',
+            borderRadius: '6px',
+            transition: 'all 0.2s ease',
+            '&:hover': {
+              color: theme.palette.primary.main,
+              backgroundColor: 'rgba(225, 37, 27, 0.04)',
+            }
           }}
-          color="inherit"
           component="button"
           onClick={handleOrgDropdownOpen}
           aria-describedby={orgDropdownId}
           underline="none"
         >
-          <BusinessOutlinedIcon sx={{ mr: 0.5, fontSize: 20 }} />
+          <BusinessOutlinedIcon sx={{ mr: 0.5, fontSize: 18 }} />
           {organizationName}
-          <ArrowDropDownIcon sx={{ ml: 0.5 }} />
+          <KeyboardArrowDown sx={{ 
+            ml: 0.5, 
+            fontSize: 18,
+            transition: 'transform 0.2s ease',
+            transform: orgDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)'
+          }} />
         </Link>
       )}
       
@@ -392,14 +415,14 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
         <Typography
           sx={{ 
             fontWeight: 500,
-            fontSize: '16px',
-            color: '#000000',
+            fontSize: '15px',
+            color: '#2c3e50',
             display: 'flex',
             alignItems: 'center',
+            height: '32px',
           }}
-          color="text.primary"
         >
-          <FolderOutlinedIcon sx={{ mr: 0.5, fontSize: 20 }} />
+          <FolderOutlinedIcon sx={{ mr: 0.5, fontSize: 18 }} />
           All Projects
         </Typography>
       )}
@@ -409,21 +432,34 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
         <Link
           sx={{ 
             fontWeight: 500,
-            fontSize: '16px',
+            fontSize: '15px',
             display: 'flex',
             alignItems: 'center',
-            color: '#000000',
+            color: '#2c3e50',
             textDecoration: 'none !important',
+            cursor: 'pointer',
+            height: '32px',
+            padding: '0 8px',
+            borderRadius: '6px',
+            transition: 'all 0.2s ease',
+            '&:hover': {
+              color: theme.palette.primary.main,
+              backgroundColor: 'rgba(225, 37, 27, 0.04)',
+            }
           }}
-          color="inherit"
           component="button"
           onClick={handleProjectDropdownOpen}
           aria-describedby={projectDropdownId}
           underline="none"
         >
-          <FolderOutlinedIcon sx={{ mr: 0.5, fontSize: 20 }} />
+          <FolderOutlinedIcon sx={{ mr: 0.5, fontSize: 18 }} />
           {projectName}
-          <ArrowDropDownIcon sx={{ ml: 0.5 }} />
+          <KeyboardArrowDown sx={{ 
+            ml: 0.5, 
+            fontSize: 18,
+            transition: 'transform 0.2s ease',
+            transform: projectDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)'
+          }} />
         </Link>
       )}
       
@@ -432,14 +468,14 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
         <Typography
           sx={{ 
             fontWeight: 500,
-            fontSize: '16px',
-            color: '#000000',
+            fontSize: '15px',
+            color: '#2c3e50',
             display: 'flex',
             alignItems: 'center',
+            height: '32px',
           }}
-          color="text.primary"
         >
-          <DashboardOutlinedIcon sx={{ mr: 0.5, fontSize: 20 }} />
+          <DashboardOutlinedIcon sx={{ mr: 0.5, fontSize: 18 }} />
           Dashboard
         </Typography>
       )}
@@ -449,157 +485,145 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
         <Link
           sx={{ 
             fontWeight: 500,
-            fontSize: '16px',
+            fontSize: '15px',
             display: 'flex',
             alignItems: 'center',
-            color: '#000000',
+            color: '#2c3e50',
             textDecoration: 'none !important',
+            height: '32px',
+            padding: '0 8px',
+            borderRadius: '6px',
+            transition: 'all 0.2s ease',
+            '&:hover': {
+              color: theme.palette.primary.main,
+              backgroundColor: 'rgba(225, 37, 27, 0.04)',
+            }
           }}
-          color="inherit"
-          component="button"
           onClick={handleProjectDropdownOpen}
           aria-describedby={projectDropdownId}
           underline="none"
         >
-          <FolderOutlinedIcon sx={{ mr: 0.5, fontSize: 20 }} />
+          <FolderOutlinedIcon sx={{ mr: 0.5, fontSize: 18 }} />
           {projectName}
-          <ArrowDropDownIcon sx={{ ml: 0.5 }} />
+          <KeyboardArrowDown sx={{ 
+            ml: 0.5, 
+            fontSize: 18,
+            transition: 'transform 0.2s ease',
+            transform: projectDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)'
+          }} />
         </Link>
       )}
       
-      {/* Current page (only show if not a project path or projects list) */}
-      {!isProjectPath && !isProjectsListPath && projectId === null && (
+      {/* Current page (if not at dashboard root) */}
+      {(isDashboardPath || (projectId && !isProjectPath && !isProjectsListPath)) && currentPage !== 'Dashboard' && (
         <Typography
           sx={{ 
             fontWeight: 500,
-            fontSize: '16px',
-            color: '#000000',
+            fontSize: '15px',
+            color: '#2c3e50',
             display: 'flex',
             alignItems: 'center',
+            height: '32px',
           }}
-          color="text.primary"
         >
-          <DatabaseIcon sx={{ mr: 0.5, fontSize: 20 }} />
+          <DashboardOutlinedIcon sx={{ mr: 0.5, fontSize: 18 }} />
           {currentPage}
         </Typography>
       )}
     </Breadcrumbs>
-  ), [
-    theme, 
-    organizationId, 
-    organizationName, 
-    projectId, 
-    projectName, 
-    isProjectsListPath, 
-    isProjectPath, 
-    showDashboardLabel, 
-    currentPage, 
-    orgDropdownId, 
-    projectDropdownId,
-    handleOrgDropdownOpen,
-    handleProjectDropdownOpen,
-    handleImageError,
-    navigate
-  ]);
-  
-  // Function to fetch organization name with caching
+  ), [theme, navigate, organizationId, organizationName, handleOrgDropdownOpen, orgDropdownId, orgDropdownOpen, isProjectsListPath, isProjectPath, projectId, projectName, handleProjectDropdownOpen, projectDropdownId, projectDropdownOpen, showDashboardLabel, isDashboardPath, currentPage]);
+
+  // Handle menu operations
+  const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  const handleNavigateToAdmin = () => {
+    if (userRole === 'super_admin') {
+      navigate('/super');
+    } else if (userRole === 'tenant_admin') {
+      navigate('/tenant');
+    }
+  };
+
+  // Handle dropdown closes
+  const handleOrgDropdownClose = () => {
+    setOrgDropAnchorEl(null);
+  };
+
+  const handleProjectDropdownClose = () => {
+    setProjectDropAnchorEl(null);
+  };
+
+  // Handle organization selection
+  const handleOrganizationSelect = (orgId: number) => {
+    navigate(`/organizations/${orgId}/projects`);
+    handleOrgDropdownClose();
+  };
+
+  // Handle project selection
+  const handleProjectSelect = (projId: number) => {
+    if (organizationId) {
+      navigate(`/organizations/${organizationId}/projects/${projId}`);
+    } else {
+      navigate(`/dashboard/${projId}`);
+    }
+    handleProjectDropdownClose();
+  };
+
+  // Async functions that are used in effects
   const fetchOrganizationName = async (id: string) => {
     try {
       const response = await apiFetch(`/api/users/organizations/${id}/`);
-      
       if (response.ok) {
         const data = await response.json();
-        if (data && data.name) {
-          setOrganizationName(data.name);
-        }
+        setOrganizationName(data.name || 'Organization');
       }
     } catch (error) {
-      console.error('Error fetching organization:', error);
+      console.error('Error fetching organization name:', error);
+      setOrganizationName('Organization');
     }
   };
-  
-  // Function to fetch project name with caching
+
   const fetchProjectName = async (id: string) => {
     try {
       const response = await apiFetch(`/api/users/projects/${id}/`);
-      
       if (response.ok) {
         const data = await response.json();
-        if (data && data.name) {
-          setProjectName(data.name);
-        }
+        setProjectName(data.name || 'Project');
       }
     } catch (error) {
-      console.error('Error fetching project:', error);
+      console.error('Error fetching project name:', error);
+      setProjectName('Project');
     }
   };
-  
-  // Handle organization dropdown close
-  const handleOrgDropdownClose = useCallback(() => {
-    setOrgDropAnchorEl(null);
-  }, []);
-  
-  // Handle project dropdown close
-  const handleProjectDropdownClose = useCallback(() => {
-    setProjectDropAnchorEl(null);
-  }, []);
-  
-  // Handle organization selection
-  const handleOrganizationSelect = useCallback((orgId: number) => {
-    navigate(`/organizations/${orgId}/projects`);
-    handleOrgDropdownClose();
-  }, [navigate, handleOrgDropdownClose]);
-  
-  // Handle project selection
-  const handleProjectSelect = useCallback((projectId: number) => {
-    navigate(`/organizations/${organizationId}/projects/${projectId}`);
-    handleProjectDropdownClose();
-  }, [navigate, organizationId, handleProjectDropdownClose]);
 
-  const handleProfileMenuOpen = useCallback((event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget);
-  }, []);
-
-  const handleMenuClose = useCallback(() => {
-    setAnchorEl(null);
-  }, []);
-  
-  const handleLogout = useCallback(() => {
-    handleMenuClose();
-    logout();
-    // Redirect to login page
-    window.location.href = '/login';
-  }, [handleMenuClose]);
-  
-  const handleNavigateToAdmin = useCallback(() => {
-    if (userRole === 'super_admin') {
-      navigate('/admin/super');
-    }
-  }, [userRole, navigate]);
-
-  // Function to get correct project URL
-  const getProjectUrl = useCallback((projectId: string): string => {
-    // If we have an organization ID, use the new URL structure
-    if (organizationId) {
-      return `/organizations/${organizationId}/projects/${projectId}`;
-    }
-    // Legacy fallback
-    return `/dashboard/${projectId}`;
-  }, [organizationId]);
-  
-  // If we're on a legacy dashboard path, redirect to new URL structure
+  // Watch for organization/project changes in the URL
   useEffect(() => {
-    if (isDashboardPath && projectId && !organizationId) {
-      // We need to fetch the project to find its organization
+    // For project pages where we don't have organization in breadcrumb but have project
+    if (projectId && !organizationId && !isDashboardPath) {
+      // This is for URLs like /dashboard/1 where we need to get org from project
       const fetchProjectOrganization = async (id: string) => {
         try {
           const response = await apiFetch(`/api/users/projects/${id}/`);
-          
           if (response.ok) {
             const data = await response.json();
-            if (data && data.organization && data.organization.id) {
-              // Redirect to the new URL structure
-              navigate(`/organizations/${data.organization.id}/projects/${id}`);
+            if (data.organization) {
+              // Fetch organization name for this project
+              const orgResponse = await apiFetch(`/api/users/organizations/${data.organization}/`);
+              if (orgResponse.ok) {
+                const orgData = await orgResponse.json();
+                setOrganizationName(orgData.name || 'Organization');
+              }
             }
           }
         } catch (error) {
@@ -630,56 +654,92 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
       sx={{
         mt: 1.5,
         '& .MuiPaper-root': {
-          borderRadius: '8px',
-          boxShadow: '0px 5px 15px rgba(0, 0, 0, 0.05)',
+          borderRadius: '12px',
+          boxShadow: 'none',
+          border: '1px solid #e0e0e0',
           minWidth: '240px',
         }
       }}
     >
       {/* User Info */}
-      <Box sx={{ px: 2, py: 1 }}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
+      <Box sx={{ px: 2, py: 1.5 }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 600, fontSize: '14px' }}>
           {userName}
         </Typography>
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body2" color="text.secondary" sx={{ fontSize: '13px' }}>
           {userEmail}
         </Typography>
       </Box>
       
-      <Divider sx={{ my: 1 }} />
+      <Divider sx={{ my: 1, borderColor: '#f0f0f0' }} />
       
-      <MenuItem onClick={() => { handleMenuClose(); navigate('/settings'); }}>
+      <MenuItem 
+        onClick={() => { handleMenuClose(); navigate('/settings'); }}
+        sx={{ 
+          fontSize: '14px',
+          py: 1,
+          '&:hover': { backgroundColor: '#f8f9fa' }
+        }}
+      >
         Account
       </MenuItem>
       
-      <MenuItem onClick={() => { handleMenuClose(); navigate('/settings'); }}>
+      <MenuItem 
+        onClick={() => { handleMenuClose(); navigate('/settings'); }}
+        sx={{ 
+          fontSize: '14px',
+          py: 1,
+          '&:hover': { backgroundColor: '#f8f9fa' }
+        }}
+      >
         Billing
-        <Box component="span" sx={{ ml: 1, fontSize: '0.75rem', color: 'primary.main', fontWeight: 'bold' }}>
+        <Box component="span" sx={{ ml: 1, fontSize: '11px', color: 'primary.main', fontWeight: 'bold' }}>
           Upgrade
         </Box>
       </MenuItem>
       
-      <MenuItem onClick={() => { handleMenuClose(); navigate('/settings'); }}>
+      <MenuItem 
+        onClick={() => { handleMenuClose(); navigate('/settings'); }}
+        sx={{ 
+          fontSize: '14px',
+          py: 1,
+          '&:hover': { backgroundColor: '#f8f9fa' }
+        }}
+      >
         Organization settings
       </MenuItem>
       
-      <MenuItem onClick={() => { handleMenuClose(); }}>
+      <MenuItem 
+        onClick={() => { handleMenuClose(); }}
+        sx={{ 
+          fontSize: '14px',
+          py: 1,
+          '&:hover': { backgroundColor: '#f8f9fa' }
+        }}
+      >
         Product releases
-        <Box component="span" sx={{ ml: 1, fontSize: '0.75rem', color: 'primary.main', fontWeight: 'bold' }}>
+        <Box component="span" sx={{ ml: 1, fontSize: '11px', color: 'primary.main', fontWeight: 'bold' }}>
           New
         </Box>
       </MenuItem>
       
-      <MenuItem>
+      <MenuItem sx={{ fontSize: '14px', py: 1, '&:hover': { backgroundColor: '#f8f9fa' } }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
           <span>Theme: Light</span>
           <LightIcon fontSize="small" />
         </Box>
       </MenuItem>
       
-      <Divider sx={{ my: 1 }} />
+      <Divider sx={{ my: 1, borderColor: '#f0f0f0' }} />
       
-      <MenuItem onClick={handleLogout}>
+      <MenuItem 
+        onClick={handleLogout}
+        sx={{ 
+          fontSize: '14px',
+          py: 1,
+          '&:hover': { backgroundColor: '#f8f9fa' }
+        }}
+      >
         Log out
       </MenuItem>
     </Menu>
@@ -691,18 +751,33 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
         position="fixed" 
         sx={{ 
           backgroundColor: '#ffffff',
-          color: 'text.primary',
-          boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.1)',
+          color: '#2c3e50',
+          boxShadow: 'none',
+          borderBottom: '1px solid #e8eaed',
           zIndex: (theme) => theme.zIndex.drawer + 1,
+          top: '28px',
+          minHeight: '60px',
         }}
       >
-        <Toolbar>
+        <Toolbar sx={{ 
+          minHeight: '60px !important', 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 2,
+          px: 3
+        }}>
           <IconButton
-            size="large"
+            size="medium"
             edge="start"
             color="inherit"
-            aria-label="open drawer"
-            sx={{ mr: 1 }}
+            aria-label="toggle sidebar"
+            sx={{ 
+              flexShrink: 0,
+              '&:hover': {
+                backgroundColor: 'rgba(225, 37, 27, 0.08)',
+                color: '#E1251B',
+              }
+            }}
             onClick={onToggle}
           >
             <MenuIcon />
@@ -711,30 +786,40 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
           {/* Use memoized breadcrumb component */}
           {renderBreadcrumbs}
           
-          <Box sx={{ flexGrow: 1 }} />
-          
-          {/* Admin link based on role */}
-          {userRole === 'super_admin' && (
-            <Chip
-              icon={<AdminIcon />}
-              label="Admin Dashboard"
-              color="primary"
-              clickable
-              onClick={handleNavigateToAdmin}
-              sx={{ mr: 2 }}
-            />
-          )}
-          
-          {/* Right side buttons - simplified */}
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          {/* Right side content */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, ml: 'auto' }}>
+            {/* Admin link based on role */}
+            {userRole === 'super_admin' && (
+              <Chip
+                icon={<AdminIcon />}
+                label="Admin Dashboard"
+                color="primary"
+                clickable
+                onClick={handleNavigateToAdmin}
+                sx={{ 
+                  backgroundColor: '#E1251B',
+                  color: '#FFFFFF',
+                  '&:hover': {
+                    backgroundColor: '#B31D15',
+                  }
+                }}
+              />
+            )}
+            
             <Button 
               color="inherit" 
               sx={{ 
                 textTransform: 'none', 
-                fontWeight: 400,
-                mr: 1,
-                color: 'text.primary',
-                fontSize: '14px'
+                fontWeight: 500,
+                color: '#2c3e50',
+                fontSize: '14px',
+                px: 2,
+                py: 1,
+                borderRadius: '8px',
+                '&:hover': {
+                  backgroundColor: 'rgba(225, 37, 27, 0.04)',
+                  color: '#E1251B',
+                }
               }}
               onClick={() => {}}
             >
@@ -745,10 +830,16 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
               color="inherit" 
               sx={{ 
                 textTransform: 'none', 
-                fontWeight: 400,
-                mr: 1,
-                color: 'text.primary',
-                fontSize: '14px'
+                fontWeight: 500,
+                color: '#2c3e50',
+                fontSize: '14px',
+                px: 2,
+                py: 1,
+                borderRadius: '8px',
+                '&:hover': {
+                  backgroundColor: 'rgba(225, 37, 27, 0.04)',
+                  color: '#E1251B',
+                }
               }}
               onClick={() => navigate('/settings')}
             >
@@ -760,23 +851,24 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
                 display: 'flex', 
                 alignItems: 'center',
                 cursor: 'pointer',
-                p: 0.5,
-                borderRadius: 1,
-                '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.04)' },
-                ml: 1 
+                p: 1,
+                borderRadius: '8px',
+                '&:hover': { 
+                  backgroundColor: 'rgba(225, 37, 27, 0.04)',
+                }
               }}
               onClick={handleProfileMenuOpen}
             >
               <Avatar 
                 sx={{ 
-                  width: 28, 
-                  height: 28,
-                  fontSize: '12px',
-                  bgcolor: '#f0f0f0', // A light grey background
-                  color: '#5c5c5c'    // A darker grey for text
+                  width: 32, 
+                  height: 32,
+                  fontSize: '14px',
+                  bgcolor: '#E1251B',
+                  color: '#FFFFFF'
                 }}
               >
-                {userName ? userName.substring(0, 2).toLowerCase() : 'u'}
+                {userName ? userName.substring(0, 2).toUpperCase() : 'U'}
               </Avatar>
             </Box>
           </Box>
@@ -801,13 +893,14 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
         sx={{
           mt: 1,
           '& .MuiPaper-root': {
-            borderRadius: '8px',
-            boxShadow: '0px 5px 15px rgba(0, 0, 0, 0.05)',
+            borderRadius: '12px',
+            boxShadow: 'none',
+            border: '1px solid #e0e0e0',
             minWidth: '240px',
           }
         }}
       >
-        <List>
+        <List sx={{ py: 1 }}>
           {loadingOrgs ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
               <CircularProgress size={24} />
@@ -818,12 +911,28 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
                 key={org.id} 
                 onClick={() => handleOrganizationSelect(org.id)}
                 selected={organizationId === org.id.toString()}
+                sx={{
+                  mx: 1,
+                  borderRadius: '8px',
+                  '&:hover': { backgroundColor: '#f8f9fa' },
+                  '&.Mui-selected': { 
+                    backgroundColor: 'rgba(225, 37, 27, 0.08)',
+                    '&:hover': { backgroundColor: 'rgba(225, 37, 27, 0.12)' }
+                  }
+                }}
               >
                 <ListItemText 
                   primary={org.name} 
                   secondary={org.description || ''}
-                  primaryTypographyProps={{ noWrap: true }}
-                  secondaryTypographyProps={{ noWrap: true }}
+                  primaryTypographyProps={{ 
+                    noWrap: true,
+                    fontSize: '14px',
+                    fontWeight: 500
+                  }}
+                  secondaryTypographyProps={{ 
+                    noWrap: true,
+                    fontSize: '12px'
+                  }}
                 />
               </ListItemButton>
             ))
@@ -848,13 +957,14 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
         sx={{
           mt: 1,
           '& .MuiPaper-root': {
-            borderRadius: '8px',
-            boxShadow: '0px 5px 15px rgba(0, 0, 0, 0.05)',
+            borderRadius: '12px',
+            boxShadow: 'none',
+            border: '1px solid #e0e0e0',
             minWidth: '240px',
           }
         }}
       >
-        <List>
+        <List sx={{ py: 1 }}>
           {loadingProjects ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
               <CircularProgress size={24} />
@@ -865,12 +975,28 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
                 key={project.id} 
                 onClick={() => handleProjectSelect(project.id)}
                 selected={projectId === project.id.toString()}
+                sx={{
+                  mx: 1,
+                  borderRadius: '8px',
+                  '&:hover': { backgroundColor: '#f8f9fa' },
+                  '&.Mui-selected': { 
+                    backgroundColor: 'rgba(225, 37, 27, 0.08)',
+                    '&:hover': { backgroundColor: 'rgba(225, 37, 27, 0.12)' }
+                  }
+                }}
               >
                 <ListItemText 
                   primary={project.name} 
                   secondary={project.description || ''}
-                  primaryTypographyProps={{ noWrap: true }}
-                  secondaryTypographyProps={{ noWrap: true }}
+                  primaryTypographyProps={{ 
+                    noWrap: true,
+                    fontSize: '14px',
+                    fontWeight: 500
+                  }}
+                  secondaryTypographyProps={{ 
+                    noWrap: true,
+                    fontSize: '12px'
+                  }}
                 />
               </ListItemButton>
             ))

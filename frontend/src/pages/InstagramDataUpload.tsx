@@ -141,25 +141,63 @@ const InstagramDataUpload = () => {
         return;
       }
       
-      // Use the folder contents endpoint to get the right data type
+      // Always try the posts endpoint first (same as fetchFolderStats)
       const searchParam = searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : '';
+      const contentTypeParam = contentType && contentType !== 'all' ? `&content_type=${contentType}` : '';
+      const folderParam = `folder_id=${folderId}`;
       
-      const response = await apiFetch(`/api/instagram-data/folders/${folderId}/contents/?page=${pageNumber + 1}&page_size=${pageSize}${searchParam}`);
+      const postsApiUrl = `/api/instagram-data/posts/?${folderParam}&page=${pageNumber + 1}&page_size=${pageSize}${searchParam}${contentTypeParam}`;
+      console.log('🚀 Attempting to fetch posts from:', postsApiUrl);
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch folder contents');
+      try {
+        const response = await apiFetch(postsApiUrl);
+        console.log('📥 Posts API response status:', response.status, 'OK:', response.ok);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('📊 Posts endpoint response data:', data);
+          console.log('📊 Posts endpoint response structure:', {
+            hasResults: 'results' in data,
+            hasCount: 'count' in data,
+            resultsLength: data.results?.length || 0,
+            totalCount: data.count || 0,
+            dataType: typeof data,
+            dataKeys: Object.keys(data || {})
+          });
+          
+          if (data && typeof data === 'object' && 'results' in data) {
+            const results = data.results || [];
+            console.log('✅ Setting posts data with', results.length, 'items');
+            console.log('📋 First few posts:', results.slice(0, 2));
+            
+            setPosts(results);
+            setFilteredPosts(results);
+            setComments([]);
+            setFilteredComments([]);
+            setTotalCount(data.count || results.length);
+            return; // Success, exit function
+          } else {
+            console.error('❌ Posts endpoint returned data without results structure:', data);
+          }
+        } else {
+          console.error('❌ Posts endpoint HTTP error:', response.status, response.statusText);
+        }
+      } catch (postsError) {
+        console.log('❌ Posts endpoint failed with error:', postsError);
       }
-      const data = await response.json();
       
-      // Debug logging to help identify the issue
-      console.log('Folder contents response:', data);
-      console.log('Current folder:', currentFolder);
-      console.log('Data category:', data.category);
-      
-      // Check if the response has the expected pagination structure
-      if (data && typeof data === 'object') {
-        if (data.category === 'comments') {
-          // Handle comments
+      // Fallback: try the comments/folder contents endpoint if posts endpoint fails
+      if (currentFolder?.category === 'comments') {
+        const response = await apiFetch(`/api/instagram-data/folders/${folderId}/contents/?page=${pageNumber + 1}&page_size=${pageSize}${searchParam}`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch folder contents');
+        }
+        const data = await response.json();
+        
+        console.log('Comments folder contents response:', data);
+        
+        if (data && typeof data === 'object') {
           const results = data.results || [];
           console.log('Setting comments data:', results);
           setComments(results);
@@ -167,23 +205,10 @@ const InstagramDataUpload = () => {
           setPosts([]);
           setFilteredPosts([]);
           setTotalCount(data.count || results.length);
-        } else {
-          // Handle posts (default)
-          const results = data.results || [];
-          console.log('Setting posts data:', results);
-          // Apply content type filter on frontend if needed
-          let filteredResults = results;
-          if (contentType && contentType !== 'all') {
-            filteredResults = results.filter((post: InstagramPost) => post.content_type === contentType);
-          }
-          setPosts(filteredResults);
-          setFilteredPosts(filteredResults);
-          setComments([]);
-          setFilteredComments([]);
-          setTotalCount(data.count || filteredResults.length);
         }
       } else {
-        console.error('API returned unexpected data format:', data);
+        // If posts endpoint failed and it's not a comments folder, set empty state
+        console.error('Posts endpoint failed and folder is not comments type');
         setPosts([]);
         setComments([]);
         setFilteredPosts([]);
@@ -224,14 +249,26 @@ const InstagramDataUpload = () => {
     
     try {
       const folderParam = `folder_id=${folderId}`;
+      const statsApiUrl = `/api/instagram-data/posts/?${folderParam}&page_size=1000`;
+      console.log('📈 Fetching folder stats from:', statsApiUrl);
+      
       // Get stats for all posts in the folder (no pagination)
-      const response = await apiFetch(`/api/instagram-data/posts/?${folderParam}&page_size=1000`);
+      const response = await apiFetch(statsApiUrl);
+      console.log('📈 Stats API response status:', response.status, 'OK:', response.ok);
       
       if (!response.ok) {
         throw new Error('Failed to fetch folder statistics');
       }
       
       const data = await response.json();
+      console.log('📈 Stats API response data:', data);
+      console.log('📈 Stats API response structure:', {
+        hasResults: 'results' in data,
+        hasCount: 'count' in data,
+        resultsLength: data.results?.length || 0,
+        totalCount: data.count || 0,
+        dataType: typeof data
+      });
       
       if (data && typeof data === 'object' && 'results' in data) {
         const allPosts = data.results || [];
@@ -239,6 +276,14 @@ const InstagramDataUpload = () => {
         const totalLikes = allPosts.reduce((acc: number, post: InstagramPost) => acc + post.likes, 0);
         const avgLikes = allPosts.length > 0 ? Math.round(totalLikes / allPosts.length) : 0;
         const verifiedAccounts = allPosts.filter((post: InstagramPost) => post.is_verified).length;
+        
+        console.log('📈 Calculated stats:', {
+          totalPosts: data.count || 0,
+          uniqueUsers,
+          avgLikes,
+          verifiedAccounts,
+          actualPostsLength: allPosts.length
+        });
         
         setFolderStats({
           totalPosts: data.count || 0,
@@ -388,6 +433,12 @@ const InstagramDataUpload = () => {
       if (currentFolder?.category === 'comments') {
         uploadEndpoint = '/api/instagram-data/comments/upload_csv/';
       }
+      
+      console.log('🔧 Upload Debug Info:');
+      console.log('🔧 Current folder:', currentFolder);
+      console.log('🔧 Folder category:', currentFolder?.category);
+      console.log('🔧 Selected upload endpoint:', uploadEndpoint);
+      console.log('🔧 File being uploaded:', uploadFile?.name);
       
       // Check if the backend server is running
       try {
@@ -618,9 +669,34 @@ const InstagramDataUpload = () => {
         <Divider sx={{ mb: 4 }} />
 
         <Paper sx={{ p: 3, mb: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Upload Instagram Data
+          <Typography variant="h5" component="h2" gutterBottom>
+            Upload CSV Data
           </Typography>
+          
+          {currentFolder && currentFolder.category && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              <strong>Current folder category: {currentFolder.category_display || currentFolder.category}</strong>
+              <br />
+              {currentFolder.category === 'comments' 
+                ? 'This folder is configured for comments. Upload comment CSV files here.'
+                : currentFolder.category === 'posts'
+                ? 'This folder is configured for posts. To upload comments, please create or select a folder with "Comments" category.'
+                : 'This folder is configured for reels. To upload comments, please create or select a folder with "Comments" category.'
+              }
+            </Alert>
+          )}
+          
+          {uploadError && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setUploadError(null)}>
+              {uploadError}
+            </Alert>
+          )}
+          
+          {uploadSuccess && (
+            <Alert severity="success" sx={{ mb: 2 }} onClose={() => setUploadSuccess(null)}>
+              {uploadSuccess}
+            </Alert>
+          )}
           
           <Typography variant="body1" gutterBottom>
             Upload CSV file containing Instagram posts/reels data.
@@ -666,22 +742,6 @@ const InstagramDataUpload = () => {
               Download CSV
             </Button>
           </Box>
-          
-          {uploadSuccess && (
-            <Alert severity="success" sx={{ mt: 2 }}>
-              {uploadSuccess}
-            </Alert>
-          )}
-          
-          {uploadError && (
-            <Alert severity="error" sx={{ mt: 2 }}>
-              <Typography component="div">
-                {uploadError.split('\n').map((line, index) => (
-                  <div key={index}>{line}</div>
-                ))}
-              </Typography>
-            </Alert>
-          )}
         </Paper>
 
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>

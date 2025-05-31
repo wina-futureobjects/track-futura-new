@@ -1,10 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { apiFetch } from '../../utils/api';
 import { setAuthToken, setCurrentUser, UserRole } from '../../utils/auth';
+import { 
+  Eye, 
+  EyeOff, 
+  Shield, 
+  TrendingUp, 
+  BarChart3,
+  Zap,
+  ArrowRight
+} from 'lucide-react';
 
 // Define local types and auth implementation
 interface LoginCredentials {
@@ -95,32 +104,6 @@ const useAuth = () => {
   return { login };
 };
 
-// Component to display demo account credentials
-const DemoAccountsInfo = () => {
-  return (
-    <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-100 text-sm">
-      <h3 className="font-medium text-blue-800 mb-2">Demo Accounts</h3>
-      <div className="space-y-3">
-        <div>
-          <p className="font-medium text-gray-700">Super Admin:</p>
-          <p className="text-gray-600">Username: <span className="font-mono bg-gray-100 px-1">superadmin</span></p>
-          <p className="text-gray-600">Password: <span className="font-mono bg-gray-100 px-1">superadmin123</span></p>
-        </div>
-        <div>
-          <p className="font-medium text-gray-700">Tenant Admin:</p>
-          <p className="text-gray-600">Username: <span className="font-mono bg-gray-100 px-1">tenantadmin</span></p>
-          <p className="text-gray-600">Password: <span className="font-mono bg-gray-100 px-1">tenantadmin123</span></p>
-        </div>
-        <div>
-          <p className="font-medium text-gray-700">Regular User:</p>
-          <p className="text-gray-600">Username: <span className="font-mono bg-gray-100 px-1">user</span></p>
-          <p className="text-gray-600">Password: <span className="font-mono bg-gray-100 px-1">user123</span></p>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -130,6 +113,129 @@ const Login: React.FC = () => {
   });
   const [error, setError] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [rememberMe, setRememberMe] = useState<boolean>(false);
+  const [isVisible, setIsVisible] = useState<boolean>(false);
+
+  useEffect(() => {
+    // Add custom CSS for animations
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes fadeInUp {
+        from {
+          opacity: 0;
+          transform: translateY(30px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes fadeInLeft {
+        from {
+          opacity: 0;
+          transform: translateX(-30px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+
+      @keyframes fadeInRight {
+        from {
+          opacity: 0;
+          transform: translateX(30px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+
+      @keyframes fadeInCenter {
+        from {
+          opacity: 0;
+          transform: translateY(20px) scale(0.95);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+
+      @keyframes floatingElement {
+        0%, 100% {
+          transform: translateY(0px) rotate(0deg);
+        }
+        50% {
+          transform: translateY(-20px) rotate(10deg);
+        }
+      }
+
+      @keyframes floatingElementDelayed {
+        0%, 100% {
+          transform: translateY(0px) rotate(0deg);
+        }
+        50% {
+          transform: translateY(-30px) rotate(-10deg);
+        }
+      }
+
+      @keyframes pulseGlow {
+        0%, 100% {
+          opacity: 0.3;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.1;
+          transform: scale(1.1);
+        }
+      }
+
+      .floating-1 {
+        animation: floatingElement 6s ease-in-out infinite;
+      }
+
+      .floating-2 {
+        animation: floatingElementDelayed 8s ease-in-out infinite;
+      }
+
+      .glow-pulse {
+        animation: pulseGlow 4s ease-in-out infinite;
+      }
+
+      .slide-in-left {
+        animation: fadeInLeft 0.8s ease-out forwards;
+      }
+
+      .slide-in-right {
+        animation: fadeInRight 0.8s ease-out forwards;
+      }
+
+      .fade-in-center {
+        animation: fadeInCenter 1s ease-out forwards;
+      }
+
+      .shake-error {
+        animation: shake 0.5s ease-in-out;
+      }
+
+      @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-5px); }
+        75% { transform: translateX(5px); }
+      }
+    `;
+    document.head.appendChild(style);
+
+    setIsVisible(true);
+
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCredentials({
@@ -184,130 +290,244 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center bg-[#f5f5f7] px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-5xl font-semibold text-[#1d1d1f] tracking-tight">
-            Sign in to continue
-          </h1>
-          <p className="mt-2 text-[#86868b] text-sm">
-            Enter your credentials to access your account
-          </p>
-        </div>
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Enhanced Background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900" />
+      <div className="absolute inset-0 bg-gradient-to-tr from-emerald-900/20 via-transparent to-violet-900/20" />
+      <div className="absolute inset-0 bg-gradient-to-bl from-cyan-900/10 via-transparent to-transparent" />
+      
+      {/* Animated floating elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-emerald-500/30 to-cyan-500/30 rounded-full mix-blend-multiply filter blur-3xl floating-1" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-tr from-violet-500/30 to-purple-500/30 rounded-full mix-blend-multiply filter blur-3xl floating-2" />
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-gradient-to-r from-cyan-500/20 to-emerald-500/20 rounded-full mix-blend-multiply filter blur-3xl glow-pulse" />
+      </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-[#e6e6e6] overflow-hidden">
-          {error && (
-            <div className="px-6 py-3 bg-red-50 border-b border-red-100 text-sm text-red-600">
-              {error}
-            </div>
-          )}
-          
-          <form className="p-6" onSubmit={handleSubmit}>
-            <div className="space-y-5">
-              <div>
-                <Label htmlFor="username" className="text-sm font-medium text-[#1d1d1f]">
-                  Username
-                </Label>
-                <Input
-                  id="username"
-                  name="username"
-                  type="text"
-                  required
-                  value={credentials.username}
-                  onChange={handleChange}
-                  placeholder="Enter your username"
-                  className="mt-1 w-full rounded-lg border-[#d2d2d7] bg-[#f5f5f7] focus-visible:ring-blue-500 text-[#1d1d1f]"
-                />
-              </div>
+      {/* Grid pattern overlay */}
+      <div className="absolute inset-0 opacity-[0.02]" style={{
+        backgroundImage: `radial-gradient(circle at 1px 1px, white 1px, transparent 0)`,
+        backgroundSize: '24px 24px'
+      }} />
 
-              <div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password" className="text-sm font-medium text-[#1d1d1f]">
-                    Password
-                  </Label>
-                  <a href="#" className="text-sm text-blue-600 hover:underline">
-                    Forgot password?
-                  </a>
-                </div>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  required
-                  value={credentials.password}
-                  onChange={handleChange}
-                  placeholder="Enter your password"
-                  className="mt-1 w-full rounded-lg border-[#d2d2d7] bg-[#f5f5f7] focus-visible:ring-blue-500 text-[#1d1d1f]"
-                />
-              </div>
-
-              <div className="flex items-center">
-                <input
-                  id="remember_me"
-                  name="remember_me"
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-[#d2d2d7] text-blue-600 focus:ring-blue-500"
-                />
-                <label htmlFor="remember_me" className="ml-2 text-sm text-[#1d1d1f]">
-                  Remember me
-                </label>
-              </div>
-
-              <Button
-                type="submit"
-                disabled={isLoading}
-                className={`w-full py-2.5 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
-                  isLoading ? 'opacity-75 cursor-not-allowed' : ''
-                }`}
-              >
-                {isLoading ? 'Signing in...' : 'Sign in'}
-              </Button>
-            </div>
+      {/* Content */}
+      <div className="relative z-10 min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="w-full max-w-6xl mx-auto">
+          <div className="grid lg:grid-cols-2 gap-20 items-center">
             
-            {/* Demo accounts information */}
-            <DemoAccountsInfo />
-          </form>
+            {/* Left side - Branding and features */}
+            <div className={`hidden lg:block space-y-12 ${isVisible ? 'slide-in-left' : 'opacity-0'}`}>
+              {/* Logo and title */}
+              <div className="space-y-8">
+                <div className="flex items-center gap-4">
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-500 to-cyan-600 rounded-3xl blur-lg opacity-50 glow-pulse" />
+                    <div className="relative p-4 bg-gradient-to-br from-emerald-500 to-cyan-600 rounded-3xl shadow-2xl">
+                      <TrendingUp className="w-10 h-10 text-white" />
+                    </div>
+                  </div>
+                  <div>
+                    <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent">
+                      Track Futura
+                    </h1>
+                    <p className="text-xl text-gray-300 font-medium">Analytics Platform</p>
+                  </div>
+                </div>
 
-          <div className="px-6 pb-6">
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-[#e6e6e6]" />
+                {/* Main headline */}
+                <div className="space-y-6">
+                  <h2 className="text-5xl lg:text-6xl font-bold text-white leading-tight">
+                    Transform Your
+                    <span className="block bg-gradient-to-r from-emerald-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent">
+                      Data Analytics
+                    </span>
+                  </h2>
+                  <p className="text-xl text-gray-300 leading-relaxed max-w-lg">
+                    Comprehensive data collection and insights across all major social platforms. 
+                    Monitor, analyze, and optimize your social media performance with cutting-edge AI.
+                  </p>
+                </div>
               </div>
-              <div className="relative flex justify-center">
-                <span className="bg-white px-2 text-sm text-[#86868b]">Or continue with</span>
+
+              {/* Features */}
+              <div className="space-y-6">
+                {[
+                  {
+                    icon: <BarChart3 className="w-6 h-6" />,
+                    title: "Multi-Platform Analytics",
+                    description: "Unified dashboard for Facebook, Instagram, LinkedIn, TikTok, and more.",
+                    gradient: "from-emerald-500 to-green-600"
+                  },
+                  {
+                    icon: <Shield className="w-6 h-6" />,
+                    title: "Enterprise Security",
+                    description: "Bank-level encryption and SOC 2 compliance for your data protection.",
+                    gradient: "from-cyan-500 to-blue-600"
+                  },
+                  {
+                    icon: <Zap className="w-6 h-6" />,
+                    title: "Real-time Insights",
+                    description: "AI-powered notifications and live data streams as events happen.",
+                    gradient: "from-violet-500 to-purple-600"
+                  }
+                ].map((feature, index) => (
+                  <div 
+                    key={index}
+                    className="flex items-start gap-4 group hover:translate-x-2 transition-transform duration-300 opacity-0"
+                    style={{ animation: `fadeInLeft 0.8s ease-out ${0.4 + index * 0.15}s forwards` }}
+                  >
+                    <div className={`p-3 rounded-2xl bg-gradient-to-br ${feature.gradient} shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                      {feature.icon}
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="text-xl font-semibold text-white group-hover:text-emerald-300 transition-colors">
+                        {feature.title}
+                      </h3>
+                      <p className="text-gray-300 leading-relaxed">{feature.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Footer */}
+              <div className="pt-8 border-t border-gray-700/50">
+                <p className="text-gray-400">
+                  © 2025 Future Objects. Built for the future of analytics.
+                </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                className="flex justify-center items-center gap-2 py-2.5 rounded-lg border border-[#d2d2d7] bg-white text-sm font-medium text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.17 6.839 9.49.5.09.682-.217.682-.48 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.699 1.028 1.592 1.028 2.683 0 3.841-2.337 4.687-4.565 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.741 0 .267.18.577.688.48C19.138 20.168 22 16.42 22 12c0-5.523-4.477-10-10-10z" />
-                </svg>
-                GitHub
-              </button>
-              <button
-                type="button"
-                className="flex justify-center items-center gap-2 py-2.5 rounded-lg border border-[#d2d2d7] bg-white text-sm font-medium text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" />
-                </svg>
-                Google
-              </button>
+            {/* Right side - Login form (Centered) */}
+            <div className="w-full flex items-center justify-center">
+              <div className={`w-full max-w-md mx-auto ${isVisible ? 'fade-in-center' : 'opacity-0'}`}>
+                
+                {/* Mobile header */}
+                <div className="lg:hidden text-center mb-12 opacity-0" style={{ animation: 'fadeInUp 0.8s ease-out 0.2s forwards' }}>
+                  <div className="flex items-center justify-center gap-3 mb-6">
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-gradient-to-br from-emerald-500 to-cyan-600 rounded-2xl blur-md opacity-50" />
+                      <div className="relative p-3 bg-gradient-to-br from-emerald-500 to-cyan-600 rounded-2xl">
+                        <TrendingUp className="w-8 h-8 text-white" />
+                      </div>
+                    </div>
+                    <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+                      Track Futura
+                    </h1>
+                  </div>
+                  <h2 className="text-3xl font-bold text-white mb-3">Welcome Back</h2>
+                  <p className="text-gray-300 text-lg">Sign in to continue to your dashboard</p>
+                </div>
+
+                {/* Login form card */}
+                <div className="relative group">
+                  {/* Glow effect */}
+                  <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 via-cyan-500 to-violet-500 rounded-3xl blur-2xl opacity-20 group-hover:opacity-30 transition-opacity duration-500" />
+                  
+                  <div className="relative backdrop-blur-xl bg-white/10 rounded-3xl border border-white/20 shadow-2xl overflow-hidden">
+                    {/* Header */}
+                    <div className="p-10 text-center border-b border-white/10">
+                      <h2 className="text-3xl font-bold text-white mb-3">Welcome Back</h2>
+                      <p className="text-gray-300 text-lg">Sign in to continue to your dashboard</p>
+                    </div>
+
+                    {/* Error message */}
+                    {error && (
+                      <div className="mx-10 mt-8 p-4 bg-red-500/20 border border-red-500/30 rounded-2xl shake-error">
+                        <p className="text-red-200 text-sm font-medium">{error}</p>
+                      </div>
+                    )}
+
+                    {/* Form */}
+                    <form onSubmit={handleSubmit} className="p-10 space-y-8">
+                      <div className="space-y-6">
+                        <div className="group">
+                          <Label htmlFor="username" className="text-white font-semibold text-lg mb-3 block">
+                            Username
+                          </Label>
+                          <div className="relative">
+                            <Input
+                              id="username"
+                              name="username"
+                              type="text"
+                              required
+                              value={credentials.username}
+                              onChange={handleChange}
+                              placeholder="Enter your username"
+                              className="w-full h-14 bg-white/10 border-white/20 text-white text-lg placeholder:text-gray-300 focus:border-emerald-400 focus:ring-emerald-400/20 rounded-2xl transition-all duration-300 group-hover:bg-white/15"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="group">
+                          <div className="flex items-center justify-between mb-3">
+                            <Label htmlFor="password" className="text-white font-semibold text-lg">
+                              Password
+                            </Label>
+                            <Link to="#" className="text-emerald-300 hover:text-emerald-200 transition-colors font-medium">
+                              Forgot password?
+                            </Link>
+                          </div>
+                          <div className="relative">
+                            <Input
+                              id="password"
+                              name="password"
+                              type={showPassword ? 'text' : 'password'}
+                              required
+                              value={credentials.password}
+                              onChange={handleChange}
+                              placeholder="Enter your password"
+                              className="w-full h-14 bg-white/10 border-white/20 text-white text-lg placeholder:text-gray-300 focus:border-emerald-400 focus:ring-emerald-400/20 rounded-2xl pr-14 transition-all duration-300 group-hover:bg-white/15"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword(!showPassword)}
+                              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-white transition-colors p-1"
+                            >
+                              {showPassword ? <EyeOff className="w-6 h-6" /> : <Eye className="w-6 h-6" />}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2">
+                          <div className="flex items-center">
+                            <input
+                              id="remember_me"
+                              name="remember_me"
+                              type="checkbox"
+                              checked={rememberMe}
+                              onChange={(e) => setRememberMe(e.target.checked)}
+                              className="h-5 w-5 rounded-lg border-white/20 bg-white/10 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-0"
+                            />
+                            <label htmlFor="remember_me" className="ml-3 text-gray-300 font-medium">
+                              Remember me
+                            </label>
+                          </div>
+                        </div>
+
+                        <Button
+                          type="submit"
+                          disabled={isLoading}
+                          className="group relative w-full h-14 bg-gradient-to-r from-emerald-600 via-cyan-600 to-violet-600 hover:from-emerald-500 hover:via-cyan-500 hover:to-violet-500 text-white font-semibold text-lg rounded-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl hover:shadow-emerald-500/25 hover:scale-[1.02] overflow-hidden"
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                          {isLoading ? (
+                            <div className="flex items-center gap-3">
+                              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              Signing in...
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-3">
+                              Sign In
+                              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
+                            </div>
+                          )}
+                        </Button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-        
-        <div className="mt-8 text-center">
-          <p className="text-sm text-[#86868b]">
-            Don't have an account?{' '}
-            <Link to="/register" className="text-blue-600 hover:underline">
-              Create an account
-            </Link>
-          </p>
         </div>
       </div>
     </div>

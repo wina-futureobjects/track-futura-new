@@ -3,10 +3,9 @@ from .models import TrackSource, TrackAccount, ReportFolder, ReportEntry
 
 @admin.register(TrackSource)
 class TrackSourceAdmin(admin.ModelAdmin):
-    list_display = ('name', 'iac_no', 'facebook_link', 'instagram_link', 'linkedin_link', 'tiktok_link', 
-                   'risk_classification', 'close_monitoring', 'project')
-    list_filter = ('risk_classification', 'close_monitoring', 'posting_frequency', 'project')
-    search_fields = ('name', 'iac_no')
+    list_display = ('name', 'facebook_link', 'instagram_link', 'linkedin_link', 'tiktok_link', 'project')
+    list_filter = ('project',)
+    search_fields = ('name',)
     readonly_fields = ('created_at', 'updated_at')
     ordering = ('name',)
     raw_id_fields = ('project',)
@@ -33,10 +32,8 @@ class ReportFolderAdmin(admin.ModelAdmin):
 
 @admin.register(ReportEntry)
 class ReportEntryAdmin(admin.ModelAdmin):
-    list_display = ('username', 'name', 'iac_no', 'platform_type', 'posting_date', 'track_source_id')
-    list_filter = ('platform_type', 'close_monitoring', 'report')
-    search_fields = ('name', 'iac_no', 'username', 'content')
+    list_display = ('username', 'name', 'platform_type', 'posting_date', 'track_source_id')
+    list_filter = ('platform_type', 'report')
+    search_fields = ('name', 'username', 'content')
     readonly_fields = ('created_at',)
     ordering = ('-posting_date',)
-    raw_id_fields = ('report',)
-    list_select_related = ('report',)

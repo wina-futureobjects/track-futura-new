@@ -3,11 +3,13 @@ import { styled } from '@mui/material/styles';
 import { Box, CssBaseline } from '@mui/material';
 import Header from './Header';
 import Sidebar from './Sidebar';
+import DemoBar from '../DemoBar';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 
-const drawerWidth = 240;
-const miniDrawerWidth = 65;
+const drawerWidth = 260;
+const miniDrawerWidth = 64;
+const demoBarHeight = 28;
 
 const Main = styled('main', { shouldForwardProp: (prop) => prop !== 'open' && prop !== 'isMobile' })<{
   open?: boolean;
@@ -15,31 +17,25 @@ const Main = styled('main', { shouldForwardProp: (prop) => prop !== 'open' && pr
 }>(({ theme, open, isMobile }) => ({
   flexGrow: 1,
   padding: 0,
-  transition: theme.transitions.create(['margin', 'width'], {
+  marginTop: '84px',
+  marginLeft: '0 !important',
+  transition: theme.transitions.create(['width'], {
     easing: theme.transitions.easing.sharp,
     duration: theme.transitions.duration.leavingScreen,
   }),
   ...(isMobile && {
-    marginLeft: 0,
     width: '100%',
   }),
   ...(!isMobile && {
-    marginLeft: 0,
     width: `calc(100% - ${open ? drawerWidth : miniDrawerWidth}px)`,
-    transition: theme.transitions.create(['margin', 'width'], {
+    transition: theme.transitions.create(['width'], {
       easing: theme.transitions.easing.easeOut,
       duration: theme.transitions.duration.enteringScreen,
     }),
   }),
-}));
-
-const DrawerHeader = styled('div')(({ theme }) => ({
-  display: 'flex',
-  alignItems: 'center',
-  padding: theme.spacing(0, 1),
-  // necessary for content to be below app bar
-  ...theme.mixins.toolbar,
-  justifyContent: 'flex-end',
+  '&.css-1riye17, &[class*="css-"]': {
+    marginLeft: '0 !important',
+  },
 }));
 
 interface LayoutProps {
@@ -71,19 +67,24 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         minHeight: '100vh', 
         bgcolor: 'background.default', 
         overflow: 'hidden',
-        position: 'relative'
+        position: 'relative',
+        margin: 0,
+        padding: 0,
+        width: '100%',
       }}
     >
       <CssBaseline />
+      <DemoBar />
       <Header open={open} onToggle={toggleDrawer} />
       <Sidebar open={open} onClose={handleDrawerClose} onToggle={toggleDrawer} />
       <Main open={open} isMobile={isMobile}>
-        <DrawerHeader />
         <Box
           sx={{
-            height: 'calc(100% - 64px)',
+            height: 'calc(100vh - 84px)',
             overflow: 'auto',
-            width: '100%'
+            width: '100%',
+            p: 0.5,
+            margin: 0,
           }}
         >
           {children}

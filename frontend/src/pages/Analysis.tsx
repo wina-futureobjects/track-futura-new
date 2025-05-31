@@ -42,11 +42,127 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SettingsIcon from '@mui/icons-material/Settings';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import ShowChartIcon from '@mui/icons-material/ShowChart';
+import TimelineIcon from '@mui/icons-material/Timeline';
 import { chatService, type Message, type ChatThread } from '../services/chatService';
 import ChatChart from '../components/ChatChart';
 
 // Fix for MUI Grid type issues with 'item' prop
 const Grid = (props: any) => <MuiGrid {...props} />;
+
+// Follow-up suggestions component
+const FollowUpSuggestions: React.FC<{ onSuggestionClick: (question: string) => void; messageContent: string }> = ({ onSuggestionClick, messageContent }) => {
+  // Generate contextual suggestions based on the message content
+  const getContextualSuggestions = () => {
+    if (messageContent.toLowerCase().includes('engagement') || messageContent.toLowerCase().includes('instagram')) {
+      return [
+        {
+          icon: <FilterListIcon sx={{ fontSize: 20, color: '#2563eb' }} />,
+          text: "Show engagement breakdown by content type",
+        },
+        {
+          icon: <ShowChartIcon sx={{ fontSize: 20, color: '#2563eb' }} />,
+          text: "Compare engagement with competitors",
+        },
+        {
+          icon: <TimelineIcon sx={{ fontSize: 20, color: '#2563eb' }} />,
+          text: "Analyze engagement trends over time",
+        }
+      ];
+    } else if (messageContent.toLowerCase().includes('roi') || messageContent.toLowerCase().includes('conversion')) {
+      return [
+        {
+          icon: <MonetizationOnIcon sx={{ fontSize: 20, color: '#2563eb' }} />,
+          text: "Show revenue attribution by channel",
+        },
+        {
+          icon: <TrendingUpIcon sx={{ fontSize: 20, color: '#2563eb' }} />,
+          text: "Analyze conversion funnel performance", 
+        },
+        {
+          icon: <CompareIcon sx={{ fontSize: 20, color: '#2563eb' }} />,
+          text: "Compare ROI across campaigns",
+        }
+      ];
+    } else if (messageContent.toLowerCase().includes('platform') || messageContent.toLowerCase().includes('compare')) {
+      return [
+        {
+          icon: <BarChartIcon sx={{ fontSize: 20, color: '#2563eb' }} />,
+          text: "Create detailed platform comparison chart",
+        },
+        {
+          icon: <ShowChartIcon sx={{ fontSize: 20, color: '#2563eb' }} />,
+          text: "Show growth rate by platform",
+        },
+        {
+          icon: <FilterListIcon sx={{ fontSize: 20, color: '#2563eb' }} />,
+          text: "Filter by audience demographics",
+        }
+      ];
+    } else {
+      // Default suggestions
+      return [
+        {
+          icon: <FilterListIcon sx={{ fontSize: 20, color: '#2563eb' }} />,
+          text: "Show breakdown by device type",
+        },
+        {
+          icon: <ShowChartIcon sx={{ fontSize: 20, color: '#2563eb' }} />,
+          text: "Compare with previous period",
+        },
+        {
+          icon: <TimelineIcon sx={{ fontSize: 20, color: '#2563eb' }} />,
+          text: "What's driving this trend?",
+        }
+      ];
+    }
+  };
+
+  const suggestions = getContextualSuggestions();
+
+  return (
+    <Box sx={{ mt: 3, p: 3, bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #e2e8f0' }}> {/* Made bigger with padding and background */}
+      <Typography variant="body2" sx={{ color: '#475569', mb: 2, fontSize: '1rem', fontWeight: 600 }}> {/* Larger, more visible text */}
+        💡 Continue exploring:
+      </Typography>
+      <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap> {/* Increased spacing */}
+        {suggestions.map((suggestion, index) => (
+          <Chip
+            key={index}
+            icon={suggestion.icon}
+            label={suggestion.text}
+            variant="outlined"
+            clickable
+            onClick={() => onSuggestionClick(suggestion.text)}
+            sx={{
+              fontSize: '0.9rem', // Increased font size
+              height: 'auto',
+              py: 1.5, // Increased padding
+              px: 2, // Increased padding
+              borderColor: '#cbd5e1',
+              bgcolor: '#ffffff',
+              color: '#334155',
+              fontWeight: 500,
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)', // Added subtle shadow
+              '&:hover': {
+                borderColor: '#2563eb',
+                bgcolor: '#eff6ff',
+                color: '#2563eb',
+                transform: 'translateY(-1px)', // Subtle lift effect
+                boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+              },
+              '& .MuiChip-icon': {
+                fontSize: 20, // Larger icons
+                ml: 0.5
+              }
+            }}
+          />
+        ))}
+      </Stack>
+    </Box>
+  );
+};
 
 const Analysis: React.FC = () => {
   const [input, setInput] = useState<string>('');
@@ -164,20 +280,20 @@ const Analysis: React.FC = () => {
 
   // Function to generate a chart description summary (MVP, static for now)
   const getChartDescription = () => (
-    <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1 }}>
-      <Typography component="span" sx={{ fontSize: 13, bgcolor: '#f1f5f9', px: 1.5, py: 0.5, borderRadius: 1, mr: 1 }}>
+    <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 2 }}>
+      <Typography component="span" sx={{ fontSize: '0.9rem', bgcolor: '#f1f5f9', px: 2, py: 0.75, borderRadius: 1, mr: 1 }}>
         Measuring <b>number of unique Users</b>
       </Typography>
-      <Typography component="span" sx={{ fontSize: 13, bgcolor: '#f1f5f9', px: 1.5, py: 0.5, borderRadius: 1, mr: 1 }}>
+      <Typography component="span" sx={{ fontSize: '0.9rem', bgcolor: '#f1f5f9', px: 2, py: 0.75, borderRadius: 1, mr: 1 }}>
         that perform <b>Any Active Event</b>
       </Typography>
-      <Typography component="span" sx={{ fontSize: 13, bgcolor: '#f1f5f9', px: 1.5, py: 0.5, borderRadius: 1, mr: 1 }}>
+      <Typography component="span" sx={{ fontSize: '0.9rem', bgcolor: '#f1f5f9', px: 2, py: 0.75, borderRadius: 1, mr: 1 }}>
         for <b>All Users</b>
       </Typography>
-      <Typography component="span" sx={{ fontSize: 13, bgcolor: '#f1f5f9', px: 1.5, py: 0.5, borderRadius: 1, mr: 1 }}>
+      <Typography component="span" sx={{ fontSize: '0.9rem', bgcolor: '#f1f5f9', px: 2, py: 0.75, borderRadius: 1, mr: 1 }}>
         grouped by <b>Country</b> <b>weekly</b>
       </Typography>
-      <Typography component="span" sx={{ fontSize: 13, bgcolor: '#f1f5f9', px: 1.5, py: 0.5, borderRadius: 1 }}>
+      <Typography component="span" sx={{ fontSize: '0.9rem', bgcolor: '#f1f5f9', px: 2, py: 0.75, borderRadius: 1 }}>
         over the <b>Last 12 weeks</b>
       </Typography>
     </Stack>
@@ -337,6 +453,11 @@ const Analysis: React.FC = () => {
     setInput(question);
   };
 
+  // Handle clicking a follow-up suggestion
+  const handleSuggestionClick = (suggestion: string) => {
+    setInput(suggestion);
+  };
+
   const toggleSuggestions = () => {
     setShowSuggestions(!showSuggestions);
   };
@@ -348,7 +469,170 @@ const Analysis: React.FC = () => {
     
     let aiResponse = '';
     
-    if (userInput.toLowerCase().includes('insights') || userInput.toLowerCase().includes('data')) {
+    // Handle follow-up questions with new chart generation
+    if (userInput.toLowerCase().includes('breakdown by device') || userInput.toLowerCase().includes('device type')) {
+      aiResponse = `
+## Device Type Breakdown
+
+Here's how your users are distributed across different device types:
+
+\`\`\`chart
+{
+  "type": "bar",
+  "title": "User Distribution by Device Type",
+  "data": {
+    "labels": ["Desktop", "Mobile", "Tablet", "Smart TV"],
+    "datasets": [
+      {
+        "label": "Active Users",
+        "data": [3200, 5800, 1200, 340],
+        "backgroundColor": [
+          "rgba(37, 99, 235, 0.8)",
+          "rgba(16, 185, 129, 0.8)",
+          "rgba(245, 158, 11, 0.8)",
+          "rgba(139, 92, 246, 0.8)"
+        ]
+      }
+    ]
+  }
+}
+\`\`\`
+
+Mobile users dominate with 56% of your audience, followed by desktop at 31%.
+      `;
+    } else if (userInput.toLowerCase().includes('compare with previous') || userInput.toLowerCase().includes('previous period')) {
+      aiResponse = `
+## Period Comparison Analysis
+
+Comparing current performance with the previous 12 weeks:
+
+\`\`\`chart
+{
+  "type": "line",
+  "title": "Current vs Previous Period Comparison",
+  "data": {
+    "labels": ["Week 1", "Week 2", "Week 3", "Week 4", "Week 5", "Week 6"],
+    "datasets": [
+      {
+        "label": "Current Period",
+        "data": [2400, 2100, 2800, 2600, 3100, 2900],
+        "borderColor": "#2563eb",
+        "backgroundColor": "rgba(37, 99, 235, 0.1)"
+      },
+      {
+        "label": "Previous Period",
+        "data": [1800, 1600, 2100, 1900, 2300, 2100],
+        "borderColor": "#dc2626",
+        "backgroundColor": "rgba(220, 38, 38, 0.1)"
+      }
+    ]
+  }
+}
+\`\`\`
+
+Your current period shows 28% improvement over the previous period!
+      `;
+    } else if (userInput.toLowerCase().includes('revenue attribution') || userInput.toLowerCase().includes('channel')) {
+      aiResponse = `
+## Revenue Attribution by Channel
+
+Here's how each marketing channel contributes to your revenue:
+
+\`\`\`chart
+{
+  "type": "bar",
+  "title": "Revenue Attribution by Marketing Channel",
+  "data": {
+    "labels": ["Organic Search", "Paid Social", "Email", "Direct", "Referral"],
+    "datasets": [
+      {
+        "label": "Revenue ($)",
+        "data": [45000, 32000, 28000, 38000, 15000],
+        "backgroundColor": [
+          "rgba(16, 185, 129, 0.8)",
+          "rgba(37, 99, 235, 0.8)",
+          "rgba(245, 158, 11, 0.8)",
+          "rgba(139, 92, 246, 0.8)",
+          "rgba(236, 72, 153, 0.8)"
+        ]
+      }
+    ]
+  }
+}
+\`\`\`
+
+Organic search is your top revenue driver at $45K (28.5% of total revenue).
+      `;
+    } else if (userInput.toLowerCase().includes('engagement breakdown') || userInput.toLowerCase().includes('content type')) {
+      aiResponse = `
+## Engagement Breakdown by Content Type
+
+Analyzing how different content types perform on Instagram:
+
+\`\`\`chart
+{
+  "type": "bar",
+  "title": "Instagram Engagement by Content Type",
+  "data": {
+    "labels": ["Reels", "Carousel Posts", "Single Image", "Stories", "IGTV"],
+    "datasets": [
+      {
+        "label": "Average Engagement Rate (%)",
+        "data": [8.2, 6.1, 4.3, 3.8, 2.9],
+        "backgroundColor": [
+          "rgba(236, 72, 153, 0.8)",
+          "rgba(37, 99, 235, 0.8)",
+          "rgba(16, 185, 129, 0.8)",
+          "rgba(245, 158, 11, 0.8)",
+          "rgba(139, 92, 246, 0.8)"
+        ]
+      }
+    ]
+  }
+}
+\`\`\`
+
+Reels are your star performers with 8.2% engagement rate - nearly double that of single images!
+      `;
+    } else if (userInput.toLowerCase().includes('platform comparison') || userInput.toLowerCase().includes('detailed platform')) {
+      aiResponse = `
+## Detailed Platform Comparison
+
+Comprehensive analysis across all your social media platforms:
+
+\`\`\`chart
+{
+  "type": "line",
+  "title": "Platform Performance Over Time",
+  "data": {
+    "labels": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+    "datasets": [
+      {
+        "label": "Instagram Followers",
+        "data": [12000, 13200, 14100, 15800, 16900, 18200],
+        "borderColor": "#e91e63",
+        "backgroundColor": "rgba(233, 30, 99, 0.1)"
+      },
+      {
+        "label": "Facebook Followers",
+        "data": [8500, 8800, 9100, 9600, 10200, 10800],
+        "borderColor": "#1976d2",
+        "backgroundColor": "rgba(25, 118, 210, 0.1)"
+      },
+      {
+        "label": "LinkedIn Followers",
+        "data": [3200, 3400, 3800, 4100, 4600, 5200],
+        "borderColor": "#0d47a1",
+        "backgroundColor": "rgba(13, 71, 161, 0.1)"
+      }
+    ]
+  }
+}
+\`\`\`
+
+Instagram shows the strongest growth trajectory with 52% increase over 6 months.
+      `;
+    } else if (userInput.toLowerCase().includes('insights') || userInput.toLowerCase().includes('data')) {
       aiResponse = `
 ## Social Media Data Insights
 
@@ -444,7 +728,7 @@ Here's a breakdown of your content performance:
 
 Would you like to focus on any of these areas?
       `;
-    } else if (userInput.toLowerCase().includes('compare') || userInput.toLowerCase().includes('engagement')) {
+    } else if (userInput.toLowerCase().includes('compare') || userInput.includes('engagement')) {
       aiResponse = `
 ## Cross-Platform Engagement Analysis
 
@@ -490,7 +774,7 @@ Here's a comparison of your platform performance:
 
 Would you like a detailed breakdown of any platform?
       `;
-    } else if (userInput.toLowerCase().includes('roi') || userInput.toLowerCase().includes('metrics')) {
+    } else if (userInput.toLowerCase().includes('roi') || userInput.includes('metrics')) {
       aiResponse = `
 ## Key ROI Metrics to Track
 
@@ -679,9 +963,9 @@ Feel free to ask about Instagram, Facebook, or metrics performance to see sample
             >
               <Box sx={{ 
                 width: '100%', 
-                maxWidth: 900, 
+                maxWidth: 1200, // Reduced from 1400px to lessen horizontal space
                 mx: 'auto',
-                px: 2 // Add some padding for the content
+                px: 4 // Increased padding for better spacing
               }}>
                 {messages.map((message) => (
                   <Fade in={true} key={message.id}>
@@ -699,8 +983,8 @@ Feel free to ask about Instagram, Facebook, or metrics performance to see sample
                       {message.sender === 'user' && (
                         <Avatar
                           sx={{
-                            width: 32,
-                            height: 32,
+                            width: 36, // Increased from 32px
+                            height: 36, // Increased from 32px
                             bgcolor: '#2563eb',
                             color: 'white'
                           }}
@@ -708,18 +992,18 @@ Feel free to ask about Instagram, Facebook, or metrics performance to see sample
                           <PersonIcon />
                         </Avatar>
                       )}
-                      <Box sx={{ flex: 1, maxWidth: message.sender === 'ai' ? 900 : 600 }}>
+                      <Box sx={{ flex: 1, maxWidth: message.sender === 'ai' ? 1100 : 700 }}> {/* Reduced AI max width from 1300 to 1100 */}
                         {/* Remove Paper for AI, keep for user */}
                         {message.sender === 'user' ? (
                           <Paper
                             elevation={0}
                             sx={{
-                              p: 2,
+                              p: 2.5, // Increased padding
                               borderRadius: 2,
-                              bgcolor: '#2563eb',
-                              color: 'white',
-                              border: 'none',
-                              fontSize: '1rem',
+                              bgcolor: '#f1f5f9', // Changed from blue to light gray
+                              color: '#1e293b', // Changed from white to dark text
+                              border: '1px solid #e2e8f0', // Added subtle border
+                              fontSize: '1.1rem', // Increased from 1rem
                               lineHeight: 1.7
                             }}
                           >
@@ -728,7 +1012,7 @@ Feel free to ask about Instagram, Facebook, or metrics performance to see sample
                         ) : (
                           <Box
                             sx={{
-                              fontSize: '1.05rem',
+                              fontSize: '1.05rem', // Reduced from 1.15rem to lower by 1 level
                               lineHeight: 1.8,
                               color: '#1e293b',
                               px: 0,
@@ -739,9 +1023,13 @@ Feel free to ask about Instagram, Facebook, or metrics performance to see sample
                             }}
                           >
                             {formatMessageText(message.content, message.sender)}
+                            {/* Add follow-up suggestions for AI messages */}
+                            {message.sender === 'ai' && (
+                              <FollowUpSuggestions onSuggestionClick={handleSuggestionClick} messageContent={message.content} />
+                            )}
                           </Box>
                         )}
-                        <Typography variant="caption" sx={{ color: '#94a3b8', mt: 0.5, textAlign: message.sender === 'user' ? 'right' : 'left' }}>
+                        <Typography variant="caption" sx={{ color: '#94a3b8', mt: 0.5, textAlign: message.sender === 'user' ? 'right' : 'left', fontSize: '0.8rem' }}> {/* Increased caption font size */}
                           {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </Typography>
                       </Box>
@@ -750,13 +1038,13 @@ Feel free to ask about Instagram, Facebook, or metrics performance to see sample
                 ))}
                 {isLoading && (
                   <Box sx={{ display: 'flex', gap: 2, maxWidth: '80%' }}>
-                    <Avatar sx={{ width: 32, height: 32, bgcolor: '#f1f5f9', color: '#2563eb' }}>
+                    <Avatar sx={{ width: 36, height: 36, bgcolor: '#f1f5f9', color: '#2563eb' }}> {/* Increased avatar size */}
                       <SmartToyIcon />
                     </Avatar>
                     <Paper
                       elevation={0}
                       sx={{
-                        p: 2,
+                        p: 2.5, // Increased padding
                         borderRadius: 2,
                         bgcolor: '#f8fafc',
                         border: '1px solid #e2e8f0',
@@ -765,8 +1053,8 @@ Feel free to ask about Instagram, Facebook, or metrics performance to see sample
                         gap: 1
                       }}
                     >
-                      <CircularProgress size={16} sx={{ color: '#2563eb' }} />
-                      <Typography variant="body2" sx={{ color: '#64748b' }}>
+                      <CircularProgress size={18} sx={{ color: '#2563eb' }} /> {/* Increased from 16 */}
+                      <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.95rem' }}> {/* Increased font size */}
                         Analyzing...
                       </Typography>
                     </Paper>
@@ -779,8 +1067,8 @@ Feel free to ask about Instagram, Facebook, or metrics performance to see sample
         )}
         {/* Input bar at the bottom */}
         <Box sx={{ position: 'absolute', left: 0, right: 0, bottom: 0, bgcolor: 'transparent', zIndex: 10, px: 0, pb: 3 }}>
-          <Box sx={{ maxWidth: 1200, mx: 'auto', width: '100%' }}>
-            <Paper elevation={2} sx={{ borderRadius: 99, px: 2, py: 1, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+          <Box sx={{ maxWidth: 1200, mx: 'auto', width: '100%', px: 4 }}>
+            <Paper elevation={2} sx={{ borderRadius: 99, px: 3, py: 1.5, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
                 <TextField
                   fullWidth
@@ -804,8 +1092,8 @@ Feel free to ask about Instagram, Facebook, or metrics performance to see sample
                     ml: 1,
                     '&:hover': { bgcolor: '#1d4ed8' },
                     '&.Mui-disabled': { bgcolor: '#94a3b8', color: 'white' },
-                    width: 40,
-                    height: 40
+                    width: 42,
+                    height: 42
                   }}
                 >
                   <SendIcon sx={{ fontSize: 22 }} />

@@ -20,10 +20,6 @@ import {
   Snackbar,
   Alert,
   Tooltip,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   FormGroup,
   FormControlLabel,
   Checkbox,
@@ -31,7 +27,6 @@ import {
   Card,
   CardContent,
   Stack,
-  SelectChangeEvent,
   Avatar,
 } from '@mui/material';
 import {
@@ -43,44 +38,25 @@ import {
   Instagram as InstagramIcon,
   LinkedIn as LinkedInIcon,
   MusicNote as TikTokIcon,
-  FilterList as FilterListIcon,
   Clear as ClearIcon,
   Folder as FolderIcon,
   TrendingUp as TrendingUpIcon,
-  Security as SecurityIcon,
-  Visibility as VisibilityIcon,
-  VisibilityOff as VisibilityOffIcon,
 } from '@mui/icons-material';
 
 interface TrackSource {
   id: number;
   name: string;
-  iac_no: string;
   facebook_link: string | null;
   instagram_link: string | null;
   linkedin_link: string | null;
   tiktok_link: string | null;
   other_social_media: string | null;
-  risk_classification: string | null;
-  close_monitoring: boolean;
-  posting_frequency: string | null;
-  folder: number | null;
   created_at: string;
   updated_at: string;
 }
 
 interface FilterStats {
   total: number;
-  riskCounts: {
-    low: number;
-    medium: number;
-    high: number;
-    critical: number;
-  };
-  monitoringCounts: {
-    monitored: number;
-    unmonitored: number;
-  };
   socialMediaCounts: {
     facebook: number;
     instagram: number;
@@ -116,8 +92,6 @@ const TrackSourcesList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   
   // Filter states
-  const [riskFilter, setRiskFilter] = useState<string>('');
-  const [monitoringFilter, setMonitoringFilter] = useState<string>('');
   const [socialMediaFilters, setSocialMediaFilters] = useState({
     hasFacebook: false,
     hasInstagram: false,
@@ -128,9 +102,12 @@ const TrackSourcesList = () => {
   // Stats for filter sidebar
   const [filterStats, setFilterStats] = useState<FilterStats>({
     total: 0,
-    riskCounts: { low: 0, medium: 0, high: 0, critical: 0 },
-    monitoringCounts: { monitored: 0, unmonitored: 0 },
-    socialMediaCounts: { facebook: 0, instagram: 0, linkedin: 0, tiktok: 0 },
+    socialMediaCounts: {
+      facebook: 0,
+      instagram: 0,
+      linkedin: 0,
+      tiktok: 0,
+    },
   });
   
   const [snackbar, setSnackbar] = useState({
@@ -144,8 +121,6 @@ const TrackSourcesList = () => {
     pageNumber = 0, 
     pageSize = 25, 
     searchQuery = '',
-    risk = '',
-    monitoring = '',
     socialMedia = socialMediaFilters
   ) => {
     try {
@@ -169,16 +144,6 @@ const TrackSourcesList = () => {
       // Add search parameter
       if (searchQuery) {
         queryParams += `&search=${encodeURIComponent(searchQuery)}`;
-      }
-      
-      // Add risk classification filter
-      if (risk) {
-        queryParams += `&risk_classification=${encodeURIComponent(risk)}`;
-      }
-      
-      // Add monitoring filter
-      if (monitoring !== '') {
-        queryParams += `&close_monitoring=${monitoring === 'yes' ? 'true' : 'false'}`;
       }
       
       // Add social media filters
@@ -245,7 +210,7 @@ const TrackSourcesList = () => {
         queryParams = `?project=${projectId}`;
       }
       
-      const response = await fetch(`/api/track-accounts/sources/stats/${queryParams}`);
+      const response = await fetch(`/api/track-accounts/sources/statistics/${queryParams}`);
       if (response.ok) {
         const stats = await response.json();
         setFilterStats(stats);
@@ -257,14 +222,14 @@ const TrackSourcesList = () => {
 
   // Initial data load
   useEffect(() => {
-    fetchSources(page, rowsPerPage, searchTerm, riskFilter, monitoringFilter, socialMediaFilters);
+    fetchSources(page, rowsPerPage, searchTerm, socialMediaFilters);
     fetchFilterStats();
   }, []);
 
   // Handle pagination change
   const handleChangePage = (_event: unknown, newPage: number) => {
     setPage(newPage);
-    fetchSources(newPage, rowsPerPage, searchTerm, riskFilter, monitoringFilter, socialMediaFilters);
+    fetchSources(newPage, rowsPerPage, searchTerm, socialMediaFilters);
   };
 
   // Handle rows per page change
@@ -272,7 +237,7 @@ const TrackSourcesList = () => {
     const newRowsPerPage = parseInt(event.target.value, 10);
     setRowsPerPage(newRowsPerPage);
     setPage(0);
-    fetchSources(0, newRowsPerPage, searchTerm, riskFilter, monitoringFilter, socialMediaFilters);
+    fetchSources(0, newRowsPerPage, searchTerm, socialMediaFilters);
   };
 
   // Handle search
@@ -282,26 +247,13 @@ const TrackSourcesList = () => {
 
   const handleSearch = () => {
     setPage(0);
-    fetchSources(0, rowsPerPage, searchTerm, riskFilter, monitoringFilter, socialMediaFilters);
+    fetchSources(0, rowsPerPage, searchTerm, socialMediaFilters);
   };
 
   const handleKeyPress = (event: React.KeyboardEvent) => {
     if (event.key === 'Enter') {
       handleSearch();
     }
-  };
-
-  // Handle filter changes
-  const handleRiskFilterChange = (event: SelectChangeEvent) => {
-    setRiskFilter(event.target.value);
-    setPage(0);
-    fetchSources(0, rowsPerPage, searchTerm, event.target.value, monitoringFilter, socialMediaFilters);
-  };
-
-  const handleMonitoringFilterChange = (event: SelectChangeEvent) => {
-    setMonitoringFilter(event.target.value);
-    setPage(0);
-    fetchSources(0, rowsPerPage, searchTerm, riskFilter, event.target.value, socialMediaFilters);
   };
 
   const handleSocialMediaFilterChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -312,14 +264,12 @@ const TrackSourcesList = () => {
     };
     setSocialMediaFilters(updatedFilters);
     setPage(0);
-    fetchSources(0, rowsPerPage, searchTerm, riskFilter, monitoringFilter, updatedFilters);
+    fetchSources(0, rowsPerPage, searchTerm, updatedFilters);
   };
 
   // Clear all filters
   const handleClearFilters = () => {
     setSearchTerm('');
-    setRiskFilter('');
-    setMonitoringFilter('');
     setSocialMediaFilters({
       hasFacebook: false,
       hasInstagram: false,
@@ -327,7 +277,7 @@ const TrackSourcesList = () => {
       hasTikTok: false,
     });
     setPage(0);
-    fetchSources(0, rowsPerPage, '', '', '', {
+    fetchSources(0, rowsPerPage, '', {
       hasFacebook: false,
       hasInstagram: false,
       hasLinkedIn: false,
@@ -363,7 +313,7 @@ const TrackSourcesList = () => {
   };
 
   // Check if any filters are active
-  const hasActiveFilters = searchTerm || riskFilter || monitoringFilter || 
+  const hasActiveFilters = searchTerm || 
     socialMediaFilters.hasFacebook || socialMediaFilters.hasInstagram || 
     socialMediaFilters.hasLinkedIn || socialMediaFilters.hasTikTok;
 
@@ -424,94 +374,6 @@ const TrackSourcesList = () => {
         {/* Filter Content */}
         <Box sx={{ flex: 1, overflow: 'auto', p: 3 }}>
           <Stack spacing={3}>
-            {/* Risk Classification */}
-            <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: '#374151' }}>
-                Risk Classification
-              </Typography>
-              <FormControl fullWidth size="small">
-                <Select
-                  value={riskFilter}
-                  onChange={handleRiskFilterChange}
-                  displayEmpty
-                  sx={{ bgcolor: '#f8fafc' }}
-                >
-                  <MenuItem value="">All Classifications</MenuItem>
-                  <MenuItem value="Low">
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#10b981', mr: 1 }} />
-                        Low Risk
-                      </Box>
-                      <Chip label={filterStats.riskCounts.low} size="small" variant="outlined" />
-                    </Box>
-                  </MenuItem>
-                  <MenuItem value="Medium">
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#f59e0b', mr: 1 }} />
-                        Medium Risk
-                      </Box>
-                      <Chip label={filterStats.riskCounts.medium} size="small" variant="outlined" />
-                    </Box>
-                  </MenuItem>
-                  <MenuItem value="High">
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#ef4444', mr: 1 }} />
-                        High Risk
-                      </Box>
-                      <Chip label={filterStats.riskCounts.high} size="small" variant="outlined" />
-                    </Box>
-                  </MenuItem>
-                  <MenuItem value="Critical">
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#dc2626', mr: 1 }} />
-                        Critical Risk
-                      </Box>
-                      <Chip label={filterStats.riskCounts.critical} size="small" variant="outlined" />
-                    </Box>
-                  </MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
-
-            {/* Close Monitoring */}
-            <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: '#374151' }}>
-                Monitoring Status
-              </Typography>
-              <FormControl fullWidth size="small">
-                <Select
-                  value={monitoringFilter}
-                  onChange={handleMonitoringFilterChange}
-                  displayEmpty
-                  sx={{ bgcolor: '#f8fafc' }}
-                >
-                  <MenuItem value="">All Sources</MenuItem>
-                  <MenuItem value="yes">
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <VisibilityIcon sx={{ fontSize: 16, color: '#3b82f6', mr: 1 }} />
-                        Monitored
-                      </Box>
-                      <Chip label={filterStats.monitoringCounts.monitored} size="small" variant="outlined" />
-                    </Box>
-                  </MenuItem>
-                  <MenuItem value="no">
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <VisibilityOffIcon sx={{ fontSize: 16, color: '#64748b', mr: 1 }} />
-                        Not Monitored
-                      </Box>
-                      <Chip label={filterStats.monitoringCounts.unmonitored} size="small" variant="outlined" />
-                    </Box>
-                  </MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
-
             {/* Social Media Presence */}
             <Box>
               <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: '#374151' }}>
@@ -610,10 +472,10 @@ const TrackSourcesList = () => {
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Box>
               <Typography variant="h4" sx={{ fontWeight: 700, color: '#1e293b', mb: 1 }}>
-                Input Collection
+                Source Collection
               </Typography>
               <Typography variant="body1" sx={{ color: '#64748b' }}>
-                Manage and track social media accounts for monitoring
+                Manage and track social media sources for monitoring
               </Typography>
             </Box>
             <Button
@@ -632,7 +494,7 @@ const TrackSourcesList = () => {
           </Box>
           
           {/* Stats Cards */}
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr' }, gap: 2 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }, gap: 2 }}>
             <Card sx={{ bgcolor: '#f8fafc', border: '1px solid #e2e8f0' }}>
               <CardContent sx={{ p: 2 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -645,40 +507,6 @@ const TrackSourcesList = () => {
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
                       Total Sources
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-            <Card sx={{ bgcolor: '#fef3c7', border: '1px solid #fbbf24' }}>
-              <CardContent sx={{ p: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Avatar sx={{ bgcolor: '#f59e0b', mr: 2 }}>
-                    <SecurityIcon />
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                      {filterStats.riskCounts.high + filterStats.riskCounts.critical}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      High Risk
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-            <Card sx={{ bgcolor: '#dbeafe', border: '1px solid #3b82f6' }}>
-              <CardContent sx={{ p: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Avatar sx={{ bgcolor: '#3b82f6', mr: 2 }}>
-                    <VisibilityIcon />
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                      {filterStats.monitoringCounts.monitored}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Monitored
                     </Typography>
                   </Box>
                 </Box>
@@ -736,10 +564,7 @@ const TrackSourcesList = () => {
                     <TableHead sx={{ bgcolor: '#f8fafc' }}>
                       <TableRow>
                         <TableCell sx={{ fontWeight: 600, color: '#374151' }}>Source</TableCell>
-                        <TableCell sx={{ fontWeight: 600, color: '#374151' }}>IAC Number</TableCell>
                         <TableCell sx={{ fontWeight: 600, color: '#374151' }} align="center">Social Media</TableCell>
-                        <TableCell sx={{ fontWeight: 600, color: '#374151' }}>Risk Level</TableCell>
-                        <TableCell sx={{ fontWeight: 600, color: '#374151' }}>Monitoring</TableCell>
                         <TableCell sx={{ fontWeight: 600, color: '#374151' }} align="right">Actions</TableCell>
                       </TableRow>
                     </TableHead>
@@ -755,11 +580,6 @@ const TrackSourcesList = () => {
                                 ID: {source.id}
                               </Typography>
                             </Box>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                              {source.iac_no}
-                            </Typography>
                           </TableCell>
                           <TableCell align="center">
                             <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
@@ -854,40 +674,6 @@ const TrackSourcesList = () => {
                                 </Typography>
                               )}
                             </Box>
-                          </TableCell>
-                          <TableCell>
-                            {source.risk_classification ? (
-                              <Chip 
-                                label={source.risk_classification} 
-                                size="small" 
-                                sx={{
-                                  bgcolor: source.risk_classification.toLowerCase() === 'critical' ? '#fee2e2' :
-                                          source.risk_classification.toLowerCase() === 'high' ? '#fef3c7' :
-                                          source.risk_classification.toLowerCase() === 'medium' ? '#fef3c7' : '#f0fdf4',
-                                  color: source.risk_classification.toLowerCase() === 'critical' ? '#dc2626' :
-                                         source.risk_classification.toLowerCase() === 'high' ? '#d97706' :
-                                         source.risk_classification.toLowerCase() === 'medium' ? '#d97706' : '#059669',
-                                  fontWeight: 600
-                                }}
-                              />
-                            ) : (
-                              <Typography variant="body2" color="text.secondary">
-                                Not set
-                              </Typography>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Chip 
-                              icon={source.close_monitoring ? <VisibilityIcon /> : <VisibilityOffIcon />}
-                              label={source.close_monitoring ? 'Monitored' : 'Not Monitored'} 
-                              size="small" 
-                              variant={source.close_monitoring ? 'filled' : 'outlined'}
-                              sx={{
-                                bgcolor: source.close_monitoring ? '#dbeafe' : 'transparent',
-                                color: source.close_monitoring ? '#1d4ed8' : '#64748b',
-                                borderColor: source.close_monitoring ? '#3b82f6' : '#cbd5e1'
-                              }}
-                            />
                           </TableCell>
                           <TableCell align="right">
                             <Button

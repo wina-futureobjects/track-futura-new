@@ -6,9 +6,9 @@ class TrackSourceSerializer(serializers.ModelSerializer):
     class Meta:
         model = TrackSource
         fields = [
-            'id', 'name', 'iac_no', 
+            'id', 'name',
             'facebook_link', 'instagram_link', 'linkedin_link', 'tiktok_link', 
-            'other_social_media', 'risk_classification', 'close_monitoring', 'posting_frequency',
+            'other_social_media',
             'project', 'created_at', 'updated_at'
         ]
     
@@ -31,7 +31,7 @@ class ReportEntrySerializer(serializers.ModelSerializer):
     class Meta:
         model = ReportEntry
         fields = [
-            'id', 'name', 'iac_no', 'entity', 'close_monitoring', 'posting_date',
+            'id', 'name', 'entity', 'posting_date',
             'platform_type', 'post_url', 'username', 'account_type', 'keywords',
             'content', 'post_id', 'track_source_id', 'created_at'
         ]

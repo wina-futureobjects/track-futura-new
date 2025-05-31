@@ -668,7 +668,7 @@ const AutomatedBatchScraper = () => {
                     sx={{ flex: 1 }}
                     value={outputFolderPattern}
                     onChange={(e) => setOutputFolderPattern(e.target.value)}
-                    helperText="Available variables: {platform}, {date}, {job_name}, {account_name}, {iac_no}"
+                    helperText="Available variables: {platform}, {date}, {job_name}, {account_name}"
                   />
                 </Box>
 

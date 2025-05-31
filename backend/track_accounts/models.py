@@ -6,32 +6,28 @@ from users.models import Project
 
 class TrackSource(models.Model):
     """
-    Model for storing Track Source data (formerly Track Account)
+    Model for storing Track Source data
     """
     # Reference to the project
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='track_sources', null=True)
     
-    # Fields from the CSV
+    # Core fields
     name = models.CharField(max_length=255)
-    iac_no = models.CharField(max_length=100, unique=True)
     
-    # Social media profile URLs (renamed from _id to _link for clarity)
+    # Social media profile URLs
     facebook_link = models.URLField(max_length=500, blank=True, null=True)
     instagram_link = models.URLField(max_length=500, blank=True, null=True)
     linkedin_link = models.URLField(max_length=500, blank=True, null=True)
     tiktok_link = models.URLField(max_length=500, blank=True, null=True)
     
     other_social_media = models.TextField(blank=True, null=True)
-    risk_classification = models.CharField(max_length=100, blank=True, null=True)
-    close_monitoring = models.BooleanField(default=False)
-    posting_frequency = models.CharField(max_length=100, blank=True, null=True)
     
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.name} ({self.iac_no})"
+        return self.name
     
     class Meta:
         ordering = ['name']
@@ -39,8 +35,6 @@ class TrackSource(models.Model):
         verbose_name_plural = "Track Sources"
         indexes = [
             models.Index(fields=['name']),
-            models.Index(fields=['iac_no']),
-            models.Index(fields=['risk_classification']),
         ]
 
 # Keep backward compatibility alias
@@ -94,9 +88,7 @@ class ReportEntry(models.Model):
     # Data from the report row
     sn = models.CharField(max_length=50, blank=True, null=True)  # S/N field, can be left empty
     name = models.CharField(max_length=255, blank=True, null=True)
-    iac_no = models.CharField(max_length=100, blank=True, null=True)
     entity = models.CharField(max_length=255, blank=True, null=True)
-    close_monitoring = models.CharField(max_length=5, blank=True, null=True)  # "Yes" or "No"
     posting_date = models.DateTimeField(blank=True, null=True)
     platform_type = models.CharField(max_length=50, blank=True, null=True)
     post_url = models.URLField(max_length=500, blank=True, null=True)
@@ -108,7 +100,7 @@ class ReportEntry(models.Model):
     # Original post ID for reference
     post_id = models.CharField(max_length=100, blank=True, null=True)
     
-    # Track Source ID for reference (if matched) - updated from track_account_id
+    # Track Source ID for reference (if matched)
     track_source_id = models.IntegerField(blank=True, null=True)
     
     created_at = models.DateTimeField(auto_now_add=True)

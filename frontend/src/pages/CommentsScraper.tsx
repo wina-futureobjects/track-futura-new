@@ -100,8 +100,13 @@ interface CommentScraperRequest {
 
 const CommentsScraper: React.FC = () => {
   const location = useLocation();
-  const queryParams = new URLSearchParams(location.search);
-  const projectId = queryParams.get('project');
+  
+  // Extract project ID from URL path: /organizations/3/projects/14/comments-scraper
+  const pathMatch = location.pathname.match(/\/organizations\/\d+\/projects\/(\d+)/);
+  const projectId = pathMatch ? pathMatch[1] : null;
+  
+  console.log('🔍 Comments Scraper - Current URL:', location.pathname);
+  console.log('🔍 Comments Scraper - Extracted Project ID:', projectId);
 
   // BrightData configurations
   const [configs, setConfigs] = useState<BrightdataConfig[]>([]);
@@ -171,22 +176,43 @@ const CommentsScraper: React.FC = () => {
     try {
       setLoadingFolders(true);
       const platformInfo = commentPlatforms.find(p => p.value === platform);
-      if (!platformInfo) return;
+      if (!platformInfo) {
+        console.error('❌ Platform info not found for platform:', platform);
+        return;
+      }
 
       const url = projectId 
         ? `${platformInfo.api_endpoint}folders/?project=${projectId}` 
         : `${platformInfo.api_endpoint}folders/`;
       
+      console.log('🔍 Comments Scraper - Fetching folders from:', url);
+      console.log('🔍 Platform:', platform, 'Project ID:', projectId);
+      
       const response = await apiFetch(url);
+      console.log('📥 Folders API response status:', response.status, 'OK:', response.ok);
+      
       if (!response.ok) {
         throw new Error('Failed to fetch folders');
       }
       
       const data = await response.json();
+      console.log('📊 Folders API response data:', data);
+      console.log('📊 Folders response structure:', {
+        hasResults: 'results' in data,
+        resultsLength: data.results?.length || 0,
+        isArray: Array.isArray(data),
+        arrayLength: Array.isArray(data) ? data.length : 0,
+        dataType: typeof data,
+        dataKeys: Object.keys(data || {})
+      });
+      
       const foldersData = data.results || data;
+      console.log('📁 Processed folders data:', foldersData);
+      console.log('📁 Setting folders with length:', Array.isArray(foldersData) ? foldersData.length : 0);
+      
       setFolders(Array.isArray(foldersData) ? foldersData : []);
     } catch (error) {
-      console.error('Error fetching folders:', error);
+      console.error('❌ Error fetching folders:', error);
       setError('Failed to load folders. Please try again.');
       setFolders([]);
     } finally {
@@ -549,7 +575,12 @@ const CommentsScraper: React.FC = () => {
                 </Box>
               ) : folders.length === 0 ? (
                 <Alert severity="info">
-                  No folders found for {commentPlatforms.find(p => p.value === platform)?.label.split(' ')[0]}. Please create folders and upload post data first.
+                  No folders found for {commentPlatforms.find(p => p.value === platform)?.label.split(' ')[0]} in this project. 
+                  {projectId ? (
+                    <><br/>Project ID: {projectId}. Please ensure you have created folders and uploaded data in this project, or try switching to URL-based scraping below.</>
+                  ) : (
+                    <><br/>No project context found. Please navigate to this page from within a project.</>
+                  )}
                 </Alert>
               ) : (
                 <List>
