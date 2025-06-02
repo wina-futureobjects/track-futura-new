@@ -14,6 +14,7 @@ import {
   Zap,
   ArrowRight
 } from 'lucide-react';
+import futureObjectLogo from '../../assets/images/logos/future-object.png';
 
 // Define local types and auth implementation
 interface LoginCredentials {
@@ -121,6 +122,12 @@ const Login: React.FC = () => {
     // Add custom CSS for animations
     const style = document.createElement('style');
     style.textContent = `
+      :root {
+        --color-primary: #62EF83;
+        --color-secondary: #6EE5D9;
+        --color-tertiary: #D291E2;
+      }
+
       @keyframes fadeInUp {
         from {
           opacity: 0;
@@ -227,6 +234,34 @@ const Login: React.FC = () => {
         25% { transform: translateX(-5px); }
         75% { transform: translateX(5px); }
       }
+
+      .custom-gradient-text {
+        background: linear-gradient(to right, var(--color-primary), var(--color-secondary), var(--color-tertiary));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      .custom-gradient-bg {
+        background: linear-gradient(to right, var(--color-primary), var(--color-secondary), var(--color-tertiary));
+      }
+
+      .custom-gradient-bg-hover:hover {
+        background: linear-gradient(to right, #4AE066, #51D4C7, #C673DD);
+      }
+
+      .custom-border-focus:focus {
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 3px rgba(98, 239, 131, 0.1);
+      }
+
+      .custom-text-primary {
+        color: var(--color-primary);
+      }
+
+      .custom-text-primary-hover:hover {
+        color: #4AE066;
+      }
     `;
     document.head.appendChild(style);
 
@@ -292,20 +327,11 @@ const Login: React.FC = () => {
   return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Enhanced Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900" />
-      <div className="absolute inset-0 bg-gradient-to-tr from-emerald-900/20 via-transparent to-violet-900/20" />
-      <div className="absolute inset-0 bg-gradient-to-bl from-cyan-900/10 via-transparent to-transparent" />
+      <div className="absolute inset-0 bg-white" />
       
-      {/* Animated floating elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-emerald-500/30 to-cyan-500/30 rounded-full mix-blend-multiply filter blur-3xl floating-1" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-tr from-violet-500/30 to-purple-500/30 rounded-full mix-blend-multiply filter blur-3xl floating-2" />
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-gradient-to-r from-cyan-500/20 to-emerald-500/20 rounded-full mix-blend-multiply filter blur-3xl glow-pulse" />
-      </div>
-
       {/* Grid pattern overlay */}
       <div className="absolute inset-0 opacity-[0.02]" style={{
-        backgroundImage: `radial-gradient(circle at 1px 1px, white 1px, transparent 0)`,
+        backgroundImage: `radial-gradient(circle at 1px 1px, rgb(0 0 0) 1px, transparent 0)`,
         backgroundSize: '24px 24px'
       }} />
 
@@ -317,31 +343,24 @@ const Login: React.FC = () => {
             {/* Left side - Branding and features */}
             <div className={`hidden lg:block space-y-12 ${isVisible ? 'slide-in-left' : 'opacity-0'}`}>
               {/* Logo and title */}
-              <div className="space-y-8">
-                <div className="flex items-center gap-4">
-                  <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-500 to-cyan-600 rounded-3xl blur-lg opacity-50 glow-pulse" />
-                    <div className="relative p-4 bg-gradient-to-br from-emerald-500 to-cyan-600 rounded-3xl shadow-2xl">
-                      <TrendingUp className="w-10 h-10 text-white" />
-                    </div>
-                  </div>
-                  <div>
-                    <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent">
-                      Track Futura
-                    </h1>
-                    <p className="text-xl text-gray-300 font-medium">Analytics Platform</p>
-                  </div>
+              <div className="space-y-0">
+                <div className="flex items-center gap-">
+                  <img 
+                    src={futureObjectLogo} 
+                    alt="Future Objects" 
+                    className="h-24 w-auto"
+                  />
                 </div>
 
                 {/* Main headline */}
                 <div className="space-y-6">
-                  <h2 className="text-5xl lg:text-6xl font-bold text-white leading-tight">
-                    Transform Your
-                    <span className="block bg-gradient-to-r from-emerald-400 via-cyan-400 to-violet-400 bg-clip-text text-transparent">
-                      Data Analytics
+                  <h2 className="text-5xl lg:text-6xl font-bold text-gray-900 leading-tight">
+                  Track Futura
+                  <span className="text-2xl block custom-gradient-text">
+                  Data & Analytics Platform
                     </span>
                   </h2>
-                  <p className="text-xl text-gray-300 leading-relaxed max-w-lg">
+                  <p className="text-xl text-gray-600 leading-relaxed max-w-lg">
                     Comprehensive data collection and insights across all major social platforms. 
                     Monitor, analyze, and optimize your social media performance with cutting-edge AI.
                   </p>
@@ -355,19 +374,19 @@ const Login: React.FC = () => {
                     icon: <BarChart3 className="w-6 h-6" />,
                     title: "Multi-Platform Analytics",
                     description: "Unified dashboard for Facebook, Instagram, LinkedIn, TikTok, and more.",
-                    gradient: "from-emerald-500 to-green-600"
+                    gradient: "from-[#62EF83] to-[#4AE066]"
                   },
                   {
                     icon: <Shield className="w-6 h-6" />,
                     title: "Enterprise Security",
                     description: "Bank-level encryption and SOC 2 compliance for your data protection.",
-                    gradient: "from-cyan-500 to-blue-600"
+                    gradient: "from-[#6EE5D9] to-[#51D4C7]"
                   },
                   {
                     icon: <Zap className="w-6 h-6" />,
                     title: "Real-time Insights",
                     description: "AI-powered notifications and live data streams as events happen.",
-                    gradient: "from-violet-500 to-purple-600"
+                    gradient: "from-[#D291E2] to-[#C673DD]"
                   }
                 ].map((feature, index) => (
                   <div 
@@ -379,18 +398,18 @@ const Login: React.FC = () => {
                       {feature.icon}
                     </div>
                     <div className="space-y-1">
-                      <h3 className="text-xl font-semibold text-white group-hover:text-emerald-300 transition-colors">
+                      <h3 className="text-xl font-semibold text-gray-900 group-hover:text-[#62EF83] transition-colors">
                         {feature.title}
                       </h3>
-                      <p className="text-gray-300 leading-relaxed">{feature.description}</p>
+                      <p className="text-gray-600 leading-relaxed">{feature.description}</p>
                     </div>
                   </div>
                 ))}
               </div>
 
               {/* Footer */}
-              <div className="pt-8 border-t border-gray-700/50">
-                <p className="text-gray-400">
+              <div className="pt-8 border-t border-gray-200">
+                <p className="text-gray-500">
                   © 2025 Future Objects. Built for the future of analytics.
                 </p>
               </div>
@@ -403,36 +422,32 @@ const Login: React.FC = () => {
                 {/* Mobile header */}
                 <div className="lg:hidden text-center mb-12 opacity-0" style={{ animation: 'fadeInUp 0.8s ease-out 0.2s forwards' }}>
                   <div className="flex items-center justify-center gap-3 mb-6">
-                    <div className="relative">
-                      <div className="absolute inset-0 bg-gradient-to-br from-emerald-500 to-cyan-600 rounded-2xl blur-md opacity-50" />
-                      <div className="relative p-3 bg-gradient-to-br from-emerald-500 to-cyan-600 rounded-2xl">
-                        <TrendingUp className="w-8 h-8 text-white" />
-                      </div>
-                    </div>
-                    <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
-                      Track Futura
-                    </h1>
+                    <img 
+                      src={futureObjectLogo} 
+                      alt="Future Objects" 
+                      className="h-12 w-auto"
+                    />
                   </div>
-                  <h2 className="text-3xl font-bold text-white mb-3">Welcome Back</h2>
-                  <p className="text-gray-300 text-lg">Sign in to continue to your dashboard</p>
+                  <h2 className="text-3xl font-bold text-gray-900 mb-3">Welcome Back</h2>
+                  <p className="text-gray-600 text-lg">Sign in to continue to your dashboard</p>
                 </div>
 
                 {/* Login form card */}
                 <div className="relative group">
                   {/* Glow effect */}
-                  <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 via-cyan-500 to-violet-500 rounded-3xl blur-2xl opacity-20 group-hover:opacity-30 transition-opacity duration-500" />
+                  <div className="absolute -inset-1 bg-gradient-to-r from-emerald-200 via-cyan-200 to-violet-200 rounded-3xl blur-xl opacity-50 group-hover:opacity-70 transition-opacity duration-500" />
                   
-                  <div className="relative backdrop-blur-xl bg-white/10 rounded-3xl border border-white/20 shadow-2xl overflow-hidden">
+                  <div className="relative backdrop-blur-sm bg-white/90 rounded-3xl border border-gray-200 shadow-2xl overflow-hidden">
                     {/* Header */}
-                    <div className="p-10 text-center border-b border-white/10">
-                      <h2 className="text-3xl font-bold text-white mb-3">Welcome Back</h2>
-                      <p className="text-gray-300 text-lg">Sign in to continue to your dashboard</p>
+                    <div className="p-10 text-center border-b border-gray-100">
+                      <h2 className="text-3xl font-bold text-gray-900 mb-3">Welcome Back</h2>
+                      <p className="text-gray-600 text-lg">Sign in to continue to your dashboard</p>
                     </div>
 
                     {/* Error message */}
                     {error && (
-                      <div className="mx-10 mt-8 p-4 bg-red-500/20 border border-red-500/30 rounded-2xl shake-error">
-                        <p className="text-red-200 text-sm font-medium">{error}</p>
+                      <div className="mx-10 mt-8 p-4 bg-red-50 border border-red-200 rounded-2xl shake-error">
+                        <p className="text-red-700 text-sm font-medium">{error}</p>
                       </div>
                     )}
 
@@ -440,7 +455,7 @@ const Login: React.FC = () => {
                     <form onSubmit={handleSubmit} className="p-10 space-y-8">
                       <div className="space-y-6">
                         <div className="group">
-                          <Label htmlFor="username" className="text-white font-semibold text-lg mb-3 block">
+                          <Label htmlFor="username" className="text-gray-900 font-semibold text-lg mb-3 block">
                             Username
                           </Label>
                           <div className="relative">
@@ -452,17 +467,17 @@ const Login: React.FC = () => {
                               value={credentials.username}
                               onChange={handleChange}
                               placeholder="Enter your username"
-                              className="w-full h-14 bg-white/10 border-white/20 text-white text-lg placeholder:text-gray-300 focus:border-emerald-400 focus:ring-emerald-400/20 rounded-2xl transition-all duration-300 group-hover:bg-white/15"
+                              className="w-full h-14 bg-gray-50/50 border-gray-200 text-gray-900 text-lg placeholder:text-gray-400 custom-border-focus rounded-2xl transition-all duration-300 group-hover:bg-gray-50"
                             />
                           </div>
                         </div>
 
                         <div className="group">
                           <div className="flex items-center justify-between mb-3">
-                            <Label htmlFor="password" className="text-white font-semibold text-lg">
+                            <Label htmlFor="password" className="text-gray-900 font-semibold text-lg">
                               Password
                             </Label>
-                            <Link to="#" className="text-emerald-300 hover:text-emerald-200 transition-colors font-medium">
+                            <Link to="#" className="custom-text-primary custom-text-primary-hover transition-colors font-medium">
                               Forgot password?
                             </Link>
                           </div>
@@ -475,12 +490,12 @@ const Login: React.FC = () => {
                               value={credentials.password}
                               onChange={handleChange}
                               placeholder="Enter your password"
-                              className="w-full h-14 bg-white/10 border-white/20 text-white text-lg placeholder:text-gray-300 focus:border-emerald-400 focus:ring-emerald-400/20 rounded-2xl pr-14 transition-all duration-300 group-hover:bg-white/15"
+                              className="w-full h-14 bg-gray-50/50 border-gray-200 text-gray-900 text-lg placeholder:text-gray-400 custom-border-focus rounded-2xl pr-14 transition-all duration-300 group-hover:bg-gray-50"
                             />
                             <button
                               type="button"
                               onClick={() => setShowPassword(!showPassword)}
-                              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-white transition-colors p-1"
+                              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors p-1"
                             >
                               {showPassword ? <EyeOff className="w-6 h-6" /> : <Eye className="w-6 h-6" />}
                             </button>
@@ -495,9 +510,9 @@ const Login: React.FC = () => {
                               type="checkbox"
                               checked={rememberMe}
                               onChange={(e) => setRememberMe(e.target.checked)}
-                              className="h-5 w-5 rounded-lg border-white/20 bg-white/10 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-0"
+                              className="h-5 w-5 rounded-lg border-gray-300 bg-gray-50 text-[#62EF83] focus:ring-[#62EF83] focus:ring-offset-0"
                             />
-                            <label htmlFor="remember_me" className="ml-3 text-gray-300 font-medium">
+                            <label htmlFor="remember_me" className="ml-3 text-gray-700 font-medium">
                               Remember me
                             </label>
                           </div>
@@ -506,7 +521,7 @@ const Login: React.FC = () => {
                         <Button
                           type="submit"
                           disabled={isLoading}
-                          className="group relative w-full h-14 bg-gradient-to-r from-emerald-600 via-cyan-600 to-violet-600 hover:from-emerald-500 hover:via-cyan-500 hover:to-violet-500 text-white font-semibold text-lg rounded-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl hover:shadow-emerald-500/25 hover:scale-[1.02] overflow-hidden"
+                          className="group relative w-full h-14 custom-gradient-bg custom-gradient-bg-hover text-black font-semibold text-lg rounded-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl hover:shadow-[#62EF83]/25 hover:scale-[1.02] overflow-hidden"
                         >
                           <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                           {isLoading ? (

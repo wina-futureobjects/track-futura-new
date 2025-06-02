@@ -228,17 +228,17 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
         { text: 'TikTok Data', path: getSocialMediaPath('tiktok-folders'), icon: <MusicVideoIcon /> },
       ]
     },
-    { 
-      text: 'Data Scrapers', 
-      path: '#data-scrapers', 
-      icon: <AutoAwesomeIcon />,
-      category: 'data',
-      subItems: [
-        { text: 'Posts & Reels Scraper', path: getSocialMediaPath('automated-batch-scraper'), icon: <AutoAwesomeIcon /> },
-        { text: 'Comments Scraper', path: getSocialMediaPath('comments-scraper'), icon: <CommentIcon /> },
-        { text: 'Brightdata Settings', path: getSocialMediaPath('brightdata-settings'), icon: <SettingsSuggestIcon /> },
-      ]
-    },
+    // { 
+    //   text: 'Data Scrapers', 
+    //   path: '#data-scrapers', 
+    //   icon: <AutoAwesomeIcon />,
+    //   category: 'data',
+    //   subItems: [
+    //     { text: 'Posts & Reels Scraper', path: getSocialMediaPath('automated-batch-scraper'), icon: <AutoAwesomeIcon /> },
+    //     { text: 'Comments Scraper', path: getSocialMediaPath('comments-scraper'), icon: <CommentIcon /> },
+    //     { text: 'Brightdata Settings', path: getSocialMediaPath('brightdata-settings'), icon: <SettingsSuggestIcon /> },
+    //   ]
+    // },
     { 
       text: 'AI Analysis', 
       path: getSocialMediaPath('analysis'),

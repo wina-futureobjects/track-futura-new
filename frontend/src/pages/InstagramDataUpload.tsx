@@ -156,6 +156,7 @@ const InstagramDataUpload = () => {
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [folderLoading, setFolderLoading] = useState(false);
   const [posts, setPosts] = useState<InstagramPost[]>([]);
   const [comments, setComments] = useState<InstagramComment[]>([]);
   const [page, setPage] = useState(0);
@@ -285,14 +286,31 @@ const InstagramDataUpload = () => {
   const fetchFolderDetails = async () => {
     if (folderId) {
       try {
-        const response = await apiFetch(`/api/instagram-data/folders/${folderId}/`);
+        setFolderLoading(true);
+        // Get project ID from URL params
+        const queryParams = new URLSearchParams(location.search);
+        const projectId = queryParams.get('project');
+        if (!projectId) {
+          console.error('Project ID is required but not found in URL params');
+          setUploadError('Project ID is missing. Please navigate from the projects page.');
+          return;
+        }
+        
+        // Include project parameter in the API request
+        const response = await apiFetch(`/api/instagram-data/folders/${folderId}/?project=${projectId}`);
         if (response.ok) {
           const data = await response.json();
           console.log('Folder details response:', data);
           setCurrentFolder(data);
+        } else {
+          console.error('Failed to fetch folder details:', response.status, response.statusText);
+          setUploadError(`Failed to load folder details. Please refresh the page.`);
         }
       } catch (error) {
         console.error('Error fetching folder details:', error);
+        setUploadError(`Error loading folder details: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      } finally {
+        setFolderLoading(false);
       }
     }
   };
@@ -354,8 +372,14 @@ const InstagramDataUpload = () => {
   // Check server status
   const checkServerStatus = async () => {
     try {
+      // Get project ID from URL params for the server status check
+      const queryParams = new URLSearchParams(location.search);
+      const projectId = queryParams.get('project');
+      
       // Use a simple endpoint to check if server is running
-      const response = await apiFetch('/api/instagram-data/folders/', { 
+      // Include project parameter if available to avoid 404 from security filtering
+      const endpoint = projectId ? `/api/instagram-data/folders/?project=${projectId}` : '/api/instagram-data/folders/';
+      const response = await apiFetch(endpoint, { 
         method: 'HEAD',
         headers: { 'Accept': 'application/json' }
       });
@@ -458,6 +482,12 @@ const InstagramDataUpload = () => {
       return;
     }
     
+    // Ensure folder details are loaded before upload
+    if (folderId && !currentFolder) {
+      setUploadError('Folder details are still loading. Please wait a moment and try again.');
+      return;
+    }
+    
     // Validate CSV before uploading
     try {
       const validationResult = await validateCsvFile(uploadFile);
@@ -484,15 +514,27 @@ const InstagramDataUpload = () => {
       
       // Determine the correct upload endpoint based on folder category
       let uploadEndpoint = '/api/instagram-data/posts/upload_csv/';
+      
+      // Enhanced debugging and validation
+      console.log('🔧 Upload Debug Info:');
+      console.log('🔧 Folder ID:', folderId);
+      console.log('🔧 Current folder object:', currentFolder);
+      console.log('🔧 Folder category:', currentFolder?.category);
+      console.log('🔧 File being uploaded:', uploadFile?.name);
+      
       if (currentFolder?.category === 'comments') {
         uploadEndpoint = '/api/instagram-data/comments/upload_csv/';
+        console.log('🔧 DETECTED COMMENTS FOLDER - Using comments endpoint');
+      } else {
+        console.log('🔧 Using posts endpoint (folder category is not "comments")');
       }
       
-      console.log('🔧 Upload Debug Info:');
-      console.log('🔧 Current folder:', currentFolder);
-      console.log('🔧 Folder category:', currentFolder?.category);
-      console.log('🔧 Selected upload endpoint:', uploadEndpoint);
-      console.log('🔧 File being uploaded:', uploadFile?.name);
+      console.log('🔧 Final upload endpoint:', uploadEndpoint);
+      
+      // Additional safety check
+      if (folderId && currentFolder && currentFolder.category === 'comments' && !uploadEndpoint.includes('comments')) {
+        throw new Error('ERROR: Comments folder detected but posts endpoint selected. This is a bug!');
+      }
       
       // Check if the backend server is running
       try {
@@ -1253,10 +1295,10 @@ const InstagramDataUpload = () => {
                     <Button
                       variant="contained"
                       onClick={handleUpload}
-                      disabled={!uploadFile || isUploading}
+                      disabled={!uploadFile || isUploading || folderLoading || (folderId ? !currentFolder : false)}
                       startIcon={isUploading ? <CircularProgress size={20} /> : undefined}
                     >
-                      {isUploading ? 'Uploading...' : 'Upload'}
+                      {isUploading ? 'Uploading...' : folderLoading ? 'Loading folder...' : 'Upload'}
                     </Button>
                     {uploadFile && (
                       <Typography variant="body2" color="text.secondary">

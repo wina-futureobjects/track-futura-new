@@ -101,6 +101,39 @@ class FolderViewSet(viewsets.ModelViewSet):
         
         return Response(serializer.data)
 
+    def destroy(self, request, *args, **kwargs):
+        """
+        Override destroy method to handle folder deletion properly without requiring project parameter
+        """
+        try:
+            # Get the folder instance directly by ID to avoid queryset filtering issues
+            folder_id = kwargs.get('pk')
+            if not folder_id:
+                return Response({'error': 'Folder ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            try:
+                folder = Folder.objects.get(id=folder_id)
+            except Folder.DoesNotExist:
+                return Response({'error': 'Folder not found'}, status=status.HTTP_404_NOT_FOUND)
+            
+            print(f"=== TIKTOK FOLDER DELETE DEBUG ===")
+            print(f"Deleting folder: {folder.name} (ID: {folder.id})")
+            
+            # Move all content in this folder to uncategorized (folder=None) before deletion
+            posts_moved = TikTokPost.objects.filter(folder=folder).update(folder=None)
+            print(f"Moved {posts_moved} posts to uncategorized")
+            
+            # Delete the folder
+            folder.delete()
+            print(f"Folder deleted successfully")
+            print(f"=== END TIKTOK FOLDER DELETE DEBUG ===")
+            
+            return Response(status=status.HTTP_204_NO_CONTENT)
+            
+        except Exception as e:
+            print(f"Error deleting folder: {str(e)}")
+            return Response({'error': f'Failed to delete folder: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 class TikTokPostViewSet(viewsets.ModelViewSet):
     """
     API endpoint for TikTok Posts

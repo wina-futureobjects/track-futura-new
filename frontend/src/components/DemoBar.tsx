@@ -4,7 +4,7 @@ import { styled } from '@mui/material/styles';
 
 const DemoBarContainer = styled(Box)(({ theme }) => ({
   backgroundColor: '#1976d2',
-  color: 'white',
+  color: '#333333',
   padding: theme.spacing(0.4, 1.5),
   display: 'flex',
   alignItems: 'center',
@@ -18,7 +18,7 @@ const DemoBarContainer = styled(Box)(({ theme }) => ({
   boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
   borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
   minHeight: '28px',
-  background: 'linear-gradient(90deg, #1976d2 0%, #1565c0 100%)',
+  background: '#A6FDED',
   [theme.breakpoints.down('md')]: {
     gap: theme.spacing(1),
     padding: theme.spacing(0.3, 1.2),
@@ -34,7 +34,7 @@ const DemoBarContainer = styled(Box)(({ theme }) => ({
 const DemoText = styled(Typography)(({ theme }) => ({
   fontSize: '12px',
   fontWeight: 500,
-  color: 'white',
+  color: '#333333',
   textAlign: 'center',
   [theme.breakpoints.down('md')]: {
     fontSize: '11px',
@@ -47,9 +47,9 @@ const DemoText = styled(Typography)(({ theme }) => ({
 }));
 
 const ScheduleButton = styled(Button)(({ theme }) => ({
-  backgroundColor: 'rgba(255, 255, 255, 0.15)',
-  color: 'white',
-  border: '1px solid rgba(255, 255, 255, 0.3)',
+  backgroundColor: 'rgba(0, 0, 0, 0.08)',
+  color: '#333333',
+  border: '1px solid rgba(0, 0, 0, 0.2)',
   borderRadius: '4px',
   padding: theme.spacing(0.25, 1),
   fontSize: '12px',
@@ -60,8 +60,8 @@ const ScheduleButton = styled(Button)(({ theme }) => ({
   transition: 'all 0.2s ease-in-out',
   backdropFilter: 'blur(10px)',
   '&:hover': {
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    border: '1px solid rgba(255, 255, 255, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.12)',
+    border: '1px solid rgba(0, 0, 0, 0.3)',
     transform: 'translateY(-1px)',
     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
   },
