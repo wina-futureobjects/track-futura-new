@@ -17,6 +17,15 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+# Disable DataDog tracing immediately if in production
+if os.getenv('PLATFORM_APPLICATION_NAME'):
+    os.environ['DD_TRACE_ENABLED'] = 'false'
+    os.environ['DD_PROFILING_ENABLED'] = 'false'
+    os.environ['DD_APM_ENABLED'] = 'false'
+    os.environ['DD_LOGS_ENABLED'] = 'false'
+    os.environ['DD_TRACE_STARTUP_LOGS'] = 'false'
+    os.environ['_DD_TRACE_ENABLED'] = 'false'
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -169,9 +178,24 @@ REST_FRAMEWORK = {
 CORS_ALLOW_ALL_ORIGINS = True  # For development only, set specific origins in production
 CORS_ALLOW_CREDENTIALS = True
 
-# CSRF settings - Auto-detect trusted origins for Upsun deployment
+# CSRF settings - Simple and robust for Upsun deployment
 def get_csrf_trusted_origins():
-    origins = ['http://localhost:5173', 'http://localhost:8000']  # Development origins
+    origins = [
+        'http://localhost:5173', 
+        'http://localhost:8000',
+        'http://127.0.0.1:8000',
+        'http://127.0.0.1:5173'
+    ]  # Development origins
+    
+    # Always add the specific Upsun URLs from the error logs
+    upsun_origins = [
+        "https://api.upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site",
+        "https://upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site"
+    ]
+    
+    for url in upsun_origins:
+        if url not in origins:
+            origins.append(url)
     
     # Auto-detect for Upsun/Platform.sh deployment
     if os.getenv('PLATFORM_APPLICATION_NAME'):
@@ -195,16 +219,6 @@ def get_csrf_trusted_origins():
         project_id = os.getenv('PLATFORM_PROJECT')
         environment = os.getenv('PLATFORM_ENVIRONMENT', 'main')
         
-        # Add the specific Upsun URL pattern from the error
-        upsun_url = "https://api.upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site"
-        if upsun_url not in origins:
-            origins.append(upsun_url)
-            
-        # Also add the frontend URL
-        frontend_url = "https://upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site"  
-        if frontend_url not in origins:
-            origins.append(frontend_url)
-        
         if app_name and project_id:
             fallback_url = f"https://{app_name}-{project_id}.{environment}.platformsh.site"
             if fallback_url not in origins:
@@ -214,6 +228,10 @@ def get_csrf_trusted_origins():
             api_url = f"https://api.{app_name}-{project_id}.{environment}.platformsh.site"
             if api_url not in origins:
                 origins.append(api_url)
+    
+    # Debug print in development
+    if DEBUG:
+        print(f"CSRF_TRUSTED_ORIGINS: {origins}")
     
     return origins
 
@@ -296,14 +314,20 @@ if (os.getenv('PLATFORM_APPLICATION_NAME') is not None):
     if os.getenv('DJANGO_ALLOWED_HOSTS'):
         ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS').split(',')
     else:
+        # Start with specific Upsun hostnames from the error logs
+        allowed_hosts = [
+            'api.upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site',
+            'upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site',
+            '127.0.0.1',
+            'localhost'
+        ]
+        
         # Auto-detect allowed hosts from Platform.sh routes
-        allowed_hosts = ['*']  # Fallback to allow all
         platform_routes = os.getenv('PLATFORM_ROUTES')
         if platform_routes:
             try:
                 import json
                 routes = json.loads(platform_routes)
-                allowed_hosts = []
                 for route_url in routes.keys():
                     if route_url.startswith('https://'):
                         # Extract hostname from URL
@@ -311,20 +335,13 @@ if (os.getenv('PLATFORM_APPLICATION_NAME') is not None):
                         hostname = urlparse(route_url).hostname
                         if hostname and hostname not in allowed_hosts:
                             allowed_hosts.append(hostname)
-                            
-                # Add specific Upsun hostnames from the error
-                upsun_hosts = [
-                    'api.upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site',
-                    'upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site'
-                ]
-                for host in upsun_hosts:
-                    if host not in allowed_hosts:
-                        allowed_hosts.append(host)
-                        
-                if not allowed_hosts:  # If no hosts found, allow all
-                    allowed_hosts = ['*']
             except (json.JSONDecodeError, AttributeError, ImportError):
-                allowed_hosts = ['*']
+                pass
+                
+        # Fallback: if no hosts found, allow all
+        if not allowed_hosts:
+            allowed_hosts = ['*']
+            
         ALLOWED_HOSTS = allowed_hosts
     
     # Production database configuration.
