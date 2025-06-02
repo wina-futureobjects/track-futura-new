@@ -43,6 +43,7 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import { logout, getUserRole, getCurrentUser } from '../../utils/auth';
 import { apiFetch } from '../../utils/api';
+import futureObjectLogo from '../../assets/images/logos/future-object.png';
 
 interface HeaderProps {
   open: boolean;
@@ -319,86 +320,98 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
   
   // Memoize breadcrumb components to prevent re-rendering
   const renderBreadcrumbs = React.useMemo(() => (
-    <Breadcrumbs 
-      separator={
+    <Box
+      sx={{ 
+        display: 'flex', 
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        height: '60px',
+        maxWidth: '60%',
+        flexShrink: 1,
+        gap: 1,
+      }}
+    >
+      {/* Logo Link */}
+      <Box
+        component="button"
+        onClick={() => navigate('/')}
+        sx={{ 
+          display: 'flex', 
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontWeight: 600,
+          fontSize: '16px',
+          color: '#2c3e50',
+          textDecoration: 'none',
+          cursor: 'pointer',
+          height: '60px',
+          border: 'none',
+          background: 'none',
+          padding: 0,
+          '&:hover': {
+            opacity: 0.8,
+            transform: 'scale(1.02)',
+          },
+          transition: 'all 0.2s ease',
+        }}
+      >
+        <img 
+          src={futureObjectLogo} 
+          alt="Future Objects Logo" 
+          style={{
+            height: '54px',
+            width: 'auto',
+            objectFit: 'contain',
+            display: 'block'
+          }}
+          onError={handleImageError}
+        />
+      </Box>
+      
+      {/* Separator */}
+      {organizationId && (
         <Typography 
           sx={{ 
             color: '#9e9e9e', 
             fontSize: '16px',
             fontWeight: 300,
-            mx: 0.5
+            display: 'flex',
+            alignItems: 'center',
+            height: '60px',
+            lineHeight: 1,
           }}
         >
           |
         </Typography>
-      } 
-      aria-label="breadcrumb"
-      sx={{ 
-        display: 'flex', 
-        alignItems: 'center',
-        height: '100%',
-        maxWidth: '60%',
-        flexShrink: 1,
-        '& .MuiBreadcrumbs-ol': {
-          alignItems: 'center',
-          height: '100%',
-        },
-        '& a': {
-          textDecoration: 'none !important',
-          color: '#2c3e50',
-          '&:hover': {
-            textDecoration: 'none !important',
-            color: theme.palette.primary.main,
-          }
-        }
-      }}
-    >
-      {/* Track Futura (always fixed) */}
-      <Link
-        sx={{ 
-          display: 'flex', 
-          alignItems: 'center',
-          fontWeight: 600,
-          fontSize: '16px',
-          color: '#2c3e50',
-          textDecoration: 'none !important',
-          cursor: 'pointer',
-        
-          '&:hover': {
-            color: theme.palette.primary.main,
-          }
-        }}
-        onClick={() => navigate('/')}
-        component="button"
-        underline="none"
-      >
-        Track Futura
-      </Link>
+      )}
       
       {/* Organization dropdown (if available) */}
       {organizationId && (
-        <Link
+        <Box
+          component="button"
+          onClick={handleOrgDropdownOpen}
+          aria-describedby={orgDropdownId}
           sx={{ 
             fontWeight: 500,
             fontSize: '15px',
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'center',
             color: '#2c3e50',
-            textDecoration: 'none !important',
+            textDecoration: 'none',
             cursor: 'pointer',
-            height: '32px',
+            height: '60px',
             padding: '0 8px',
             borderRadius: '6px',
             transition: 'all 0.2s ease',
+            lineHeight: 1,
+            border: 'none',
+            background: 'none',
             '&:hover': {
               color: theme.palette.primary.main,
               backgroundColor: 'rgba(225, 37, 27, 0.04)',
             }
           }}
-          component="button"
-          onClick={handleOrgDropdownOpen}
-          aria-describedby={orgDropdownId}
-          underline="none"
         >
           <BusinessOutlinedIcon sx={{ mr: 0.5, fontSize: 18 }} />
           {organizationName}
@@ -408,7 +421,24 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
             transition: 'transform 0.2s ease',
             transform: orgDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)'
           }} />
-        </Link>
+        </Box>
+      )}
+      
+      {/* Separator */}
+      {isProjectsListPath && (
+        <Typography 
+          sx={{ 
+            color: '#9e9e9e', 
+            fontSize: '16px',
+            fontWeight: 300,
+            display: 'flex',
+            alignItems: 'center',
+            height: '60px',
+            lineHeight: 1,
+          }}
+        >
+          |
+        </Typography>
       )}
       
       {/* Projects list link */}
@@ -420,7 +450,9 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
             color: '#2c3e50',
             display: 'flex',
             alignItems: 'center',
-            height: '32px',
+            justifyContent: 'center',
+            height: '60px',
+            lineHeight: 1,
           }}
         >
           <FolderOutlinedIcon sx={{ mr: 0.5, fontSize: 18 }} />
@@ -428,30 +460,50 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
         </Typography>
       )}
       
+      {/* Separator */}
+      {isProjectPath && projectId && (
+        <Typography 
+          sx={{ 
+            color: '#9e9e9e', 
+            fontSize: '16px',
+            fontWeight: 300,
+            display: 'flex',
+            alignItems: 'center',
+            height: '60px',
+            lineHeight: 1,
+          }}
+        >
+          |
+        </Typography>
+      )}
+      
       {/* Project dropdown (for specific project page) */}
       {isProjectPath && projectId && (
-        <Link
+        <Box
+          component="button"
+          onClick={handleProjectDropdownOpen}
+          aria-describedby={projectDropdownId}
           sx={{ 
             fontWeight: 500,
             fontSize: '15px',
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'center',
             color: '#2c3e50',
-            textDecoration: 'none !important',
+            textDecoration: 'none',
             cursor: 'pointer',
-            height: '32px',
+            height: '60px',
             padding: '0 8px',
             borderRadius: '6px',
             transition: 'all 0.2s ease',
+            lineHeight: 1,
+            border: 'none',
+            background: 'none',
             '&:hover': {
               color: theme.palette.primary.main,
               backgroundColor: 'rgba(225, 37, 27, 0.04)',
             }
           }}
-          component="button"
-          onClick={handleProjectDropdownOpen}
-          aria-describedby={projectDropdownId}
-          underline="none"
         >
           <FolderOutlinedIcon sx={{ mr: 0.5, fontSize: 18 }} />
           {projectName}
@@ -461,7 +513,24 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
             transition: 'transform 0.2s ease',
             transform: projectDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)'
           }} />
-        </Link>
+        </Box>
+      )}
+      
+      {/* Separator */}
+      {isProjectPath && showDashboardLabel && (
+        <Typography 
+          sx={{ 
+            color: '#9e9e9e', 
+            fontSize: '16px',
+            fontWeight: 300,
+            display: 'flex',
+            alignItems: 'center',
+            height: '60px',
+            lineHeight: 1,
+          }}
+        >
+          |
+        </Typography>
       )}
       
       {/* Current page (only in project and not at root project URL) */}
@@ -473,7 +542,9 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
             color: '#2c3e50',
             display: 'flex',
             alignItems: 'center',
-            height: '32px',
+            justifyContent: 'center',
+            height: '60px',
+            lineHeight: 1,
           }}
         >
           <DashboardOutlinedIcon sx={{ mr: 0.5, fontSize: 18 }} />
@@ -481,28 +552,50 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
         </Typography>
       )}
       
+      {/* Separator */}
+      {projectId && !isProjectPath && !isProjectsListPath && (
+        <Typography 
+          sx={{ 
+            color: '#9e9e9e', 
+            fontSize: '16px',
+            fontWeight: 300,
+            display: 'flex',
+            alignItems: 'center',
+            height: '60px',
+            lineHeight: 1,
+          }}
+        >
+          |
+        </Typography>
+      )}
+      
       {/* Legacy project (if not using the new URL pattern) */}
       {projectId && !isProjectPath && !isProjectsListPath && (
-        <Link
+        <Box
+          component="button"
+          onClick={handleProjectDropdownOpen}
+          aria-describedby={projectDropdownId}
           sx={{ 
             fontWeight: 500,
             fontSize: '15px',
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'center',
             color: '#2c3e50',
-            textDecoration: 'none !important',
-            height: '32px',
+            textDecoration: 'none',
+            height: '60px',
             padding: '0 8px',
             borderRadius: '6px',
             transition: 'all 0.2s ease',
+            lineHeight: 1,
+            border: 'none',
+            background: 'none',
+            cursor: 'pointer',
             '&:hover': {
               color: theme.palette.primary.main,
               backgroundColor: 'rgba(225, 37, 27, 0.04)',
             }
           }}
-          onClick={handleProjectDropdownOpen}
-          aria-describedby={projectDropdownId}
-          underline="none"
         >
           <FolderOutlinedIcon sx={{ mr: 0.5, fontSize: 18 }} />
           {projectName}
@@ -512,7 +605,24 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
             transition: 'transform 0.2s ease',
             transform: projectDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)'
           }} />
-        </Link>
+        </Box>
+      )}
+      
+      {/* Separator */}
+      {(isDashboardPath || (projectId && !isProjectPath && !isProjectsListPath)) && currentPage !== 'Dashboard' && (
+        <Typography 
+          sx={{ 
+            color: '#9e9e9e', 
+            fontSize: '16px',
+            fontWeight: 300,
+            display: 'flex',
+            alignItems: 'center',
+            height: '60px',
+            lineHeight: 1,
+          }}
+        >
+          |
+        </Typography>
       )}
       
       {/* Current page (if not at dashboard root) */}
@@ -524,14 +634,16 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
             color: '#2c3e50',
             display: 'flex',
             alignItems: 'center',
-            height: '32px',
+            justifyContent: 'center',
+            height: '60px',
+            lineHeight: 1,
           }}
         >
           <DashboardOutlinedIcon sx={{ mr: 0.5, fontSize: 18 }} />
           {currentPage}
         </Typography>
       )}
-    </Breadcrumbs>
+    </Box>
   ), [theme, navigate, organizationId, organizationName, handleOrgDropdownOpen, orgDropdownId, orgDropdownOpen, isProjectsListPath, isProjectPath, projectId, projectName, handleProjectDropdownOpen, projectDropdownId, projectDropdownOpen, showDashboardLabel, isDashboardPath, currentPage]);
 
   // Handle menu operations
@@ -655,7 +767,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
       sx={{
         mt: 1.5,
         '& .MuiPaper-root': {
-          borderRadius: '12px',
+          borderRadius: 0,
           boxShadow: 'none',
           border: '1px solid #e0e0e0',
           minWidth: '240px',
@@ -755,9 +867,14 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
           color: '#2c3e50',
           boxShadow: 'none',
           borderBottom: '1px solid #e8eaed',
+          borderRadius: 0,
           zIndex: (theme) => theme.zIndex.drawer + 1,
           top: '28px',
           minHeight: '60px',
+          '& .MuiAppBar-root': {
+            boxShadow: 'none',
+            borderRadius: 0,
+          }
         }}
       >
         <Toolbar sx={{ 
@@ -765,7 +882,8 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
           display: 'flex', 
           alignItems: 'center', 
           gap: 2,
-          px: 3
+          px: 3,
+          borderRadius: 0,
         }}>
           <IconButton
             size="medium"
@@ -894,7 +1012,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
         sx={{
           mt: 1,
           '& .MuiPaper-root': {
-            borderRadius: '12px',
+            borderRadius: 0,
             boxShadow: 'none',
             border: '1px solid #e0e0e0',
             minWidth: '240px',
@@ -914,7 +1032,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
                 selected={organizationId === org.id.toString()}
                 sx={{
                   mx: 1,
-                  borderRadius: '8px',
+                  borderRadius: 0,
                   '&:hover': { backgroundColor: '#f8f9fa' },
                   '&.Mui-selected': { 
                     backgroundColor: 'rgba(225, 37, 27, 0.08)',
@@ -958,7 +1076,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
         sx={{
           mt: 1,
           '& .MuiPaper-root': {
-            borderRadius: '12px',
+            borderRadius: 0,
             boxShadow: 'none',
             border: '1px solid #e0e0e0',
             minWidth: '240px',
@@ -978,7 +1096,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
                 selected={projectId === project.id.toString()}
                 sx={{
                   mx: 1,
-                  borderRadius: '8px',
+                  borderRadius: 0,
                   '&:hover': { backgroundColor: '#f8f9fa' },
                   '&.Mui-selected': { 
                     backgroundColor: 'rgba(225, 37, 27, 0.08)',

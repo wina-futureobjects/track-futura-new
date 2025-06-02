@@ -15,7 +15,6 @@ const DemoBarContainer = styled(Box)(({ theme }) => ({
   left: 0,
   right: 0,
   zIndex: theme.zIndex.drawer + 2,
-  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
   borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
   minHeight: '28px',
   background: '#A6FDED',
