@@ -318,16 +318,16 @@ const OrganizationProjects = () => {
             onClick={handleNewProject}
             sx={{
               borderRadius: 2,
-              bgcolor: '#1a73e8', 
-              color: 'white', 
+              bgcolor: '#62EF83', 
+              color: '#000000', 
               textTransform: 'none',
               fontWeight: 500,
               boxShadow: 'none',
               px: 3,
               py: 1,
               '&:hover': {
-                bgcolor: '#1558b3',
-                boxShadow: '0 2px 8px rgba(26, 115, 232, 0.3)'
+                bgcolor: '#4FD16C',
+                boxShadow: '0 2px 8px rgba(98, 239, 131, 0.3)'
               }
             }}
           >
@@ -598,16 +598,16 @@ const OrganizationProjects = () => {
                 onClick={handleNewProject}
                 sx={{ 
                   borderRadius: 8,
-                  bgcolor: '#1a73e8', 
-                  color: 'white', 
+                  bgcolor: '#62EF83', 
+                  color: '#000000', 
                   textTransform: 'none',
                   fontWeight: 500,
                   boxShadow: 'none',
                   px: 3,
                   py: 1.2,
                   '&:hover': {
-                    bgcolor: '#1558b3',
-                    boxShadow: '0 2px 8px rgba(26, 115, 232, 0.3)'
+                    bgcolor: '#4FD16C',
+                    boxShadow: '0 2px 8px rgba(98, 239, 131, 0.3)'
                   }
                 }}
               >
@@ -759,16 +759,16 @@ const OrganizationProjects = () => {
                 onClick={handleAddMember}
                 sx={{ 
                   borderRadius: 8,
-                  bgcolor: '#1a73e8', 
-                  color: 'white', 
+                  bgcolor: '#62EF83', 
+                  color: '#000000', 
                   textTransform: 'none',
                   fontWeight: 500,
                   boxShadow: 'none',
                   px: 3,
                   py: 1.2,
                   '&:hover': {
-                    bgcolor: '#1558b3',
-                    boxShadow: '0 2px 8px rgba(26, 115, 232, 0.3)'
+                    bgcolor: '#4FD16C',
+                    boxShadow: '0 2px 8px rgba(98, 239, 131, 0.3)'
                   }
                 }}
               >
@@ -906,16 +906,16 @@ const OrganizationProjects = () => {
                       onClick={handleAddMember}
                       sx={{
                         borderRadius: 8,
-                        bgcolor: '#1a73e8', 
-                        color: 'white', 
+                        bgcolor: '#62EF83', 
+                        color: '#000000', 
                         textTransform: 'none',
                         fontWeight: 500,
                         boxShadow: 'none',
                         px: 3,
                         py: 1.2,
                         '&:hover': {
-                          bgcolor: '#1558b3',
-                          boxShadow: '0 2px 8px rgba(26, 115, 232, 0.3)'
+                          bgcolor: '#4FD16C',
+                          boxShadow: '0 2px 8px rgba(98, 239, 131, 0.3)'
                         }
                       }}
                     >
@@ -1130,7 +1130,8 @@ const OrganizationProjects = () => {
             disabled={!projectName.trim()}
             sx={{ 
               borderRadius: 2,
-              bgcolor: '#1a73e8',
+              bgcolor: '#62EF83',
+              color: '#000000',
               textTransform: 'none',
               px: 3,
               '&.Mui-disabled': {
@@ -1214,7 +1215,8 @@ const OrganizationProjects = () => {
             disabled={!newMemberEmail.trim()}
             sx={{ 
               borderRadius: 2,
-              bgcolor: '#1a73e8',
+              bgcolor: '#62EF83',
+              color: '#000000',
               textTransform: 'none',
               px: 3,
               '&.Mui-disabled': {
