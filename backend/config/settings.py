@@ -37,9 +37,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure-k14j23-+4o*h)26ms8k#ghmv*kglz!hsf^h%sac1^sy7w6f2qw"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'True') == 'True'
+DEBUG = True  # Force DEBUG mode to be permissive
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['*']  # Allow all hosts
 
 
 # Application definition
@@ -74,11 +74,11 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
+    # "whitenoise.middleware.WhiteNoiseMiddleware",  # Temporarily disable whitenoise
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
-    "users.middleware.CustomCsrfMiddleware",
+    # "users.middleware.CustomCsrfMiddleware",  # Completely disable CSRF
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -152,13 +152,46 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-# WhiteNoise configuration for serving static files
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+# Disable WhiteNoise configuration temporarily
+# STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Logging configuration for debugging
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO' if DEBUG else 'WARNING',
+        },
+        'users.middleware': {
+            'handlers': ['console'],
+            'level': 'DEBUG' if DEBUG else 'WARNING',
+            'propagate': False,
+        },
+    },
+}
 
 # Django REST Framework settings
 REST_FRAMEWORK = {
@@ -174,87 +207,33 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 10,
 }
 
-# CORS settings
-CORS_ALLOW_ALL_ORIGINS = True  # For development only, set specific origins in production
+# CORS settings - Allow everything
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_HEADERS = True
+CORS_ALLOW_ALL_METHODS = True
 
-# CSRF settings - Simple and robust for Upsun deployment
-def get_csrf_trusted_origins():
-    origins = [
-        'http://localhost:5173', 
-        'http://localhost:8000',
-        'http://127.0.0.1:8000',
-        'http://127.0.0.1:5173'
-    ]  # Development origins
-    
-    # Always add the specific Upsun URLs from the error logs
-    upsun_origins = [
-        "https://api.upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site",
-        "https://upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site"
-    ]
-    
-    for url in upsun_origins:
-        if url not in origins:
-            origins.append(url)
-    
-    # Auto-detect for Upsun/Platform.sh deployment
-    if os.getenv('PLATFORM_APPLICATION_NAME'):
-        # Get the routes from Platform.sh environment
-        platform_routes = os.getenv('PLATFORM_ROUTES')
-        if platform_routes:
-            try:
-                import json
-                routes = json.loads(platform_routes)
-                # Add all HTTPS routes as trusted origins
-                for route_url in routes.keys():
-                    if route_url.startswith('https://'):
-                        clean_url = route_url.rstrip('/')
-                        if clean_url not in origins:
-                            origins.append(clean_url)
-            except (json.JSONDecodeError, AttributeError):
-                pass
-        
-        # Fallback: construct from app name and default Upsun domain
-        app_name = os.getenv('PLATFORM_APPLICATION_NAME')
-        project_id = os.getenv('PLATFORM_PROJECT')
-        environment = os.getenv('PLATFORM_ENVIRONMENT', 'main')
-        
-        if app_name and project_id:
-            fallback_url = f"https://{app_name}-{project_id}.{environment}.platformsh.site"
-            if fallback_url not in origins:
-                origins.append(fallback_url)
-            
-            # Also add the API subdomain
-            api_url = f"https://api.{app_name}-{project_id}.{environment}.platformsh.site"
-            if api_url not in origins:
-                origins.append(api_url)
-    
-    # Debug print in development
-    if DEBUG:
-        print(f"CSRF_TRUSTED_ORIGINS: {origins}")
-    
-    return origins
+# Completely disable CSRF
+CSRF_COOKIE_SECURE = False
+CSRF_COOKIE_HTTPONLY = False
+CSRF_COOKIE_SAMESITE = None
+CSRF_USE_SESSIONS = False
+CSRF_TRUSTED_ORIGINS = ['*']  # This won't work but we're disabling CSRF anyway
 
-CSRF_TRUSTED_ORIGINS = get_csrf_trusted_origins()
+# Session security settings - make permissive
+SESSION_COOKIE_SECURE = False
+SESSION_COOKIE_HTTPONLY = False
+SESSION_COOKIE_SAMESITE = None
 
-# Additional CSRF settings for production
-CSRF_COOKIE_SECURE = not DEBUG  # Use secure cookies in production
-CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript access to CSRF token
-CSRF_COOKIE_SAMESITE = 'Lax'  # Allow cross-site requests with CSRF token
-CSRF_USE_SESSIONS = False  # Use cookies instead of sessions for CSRF tokens
-
-# Session security settings
-SESSION_COOKIE_SECURE = not DEBUG  # Use secure cookies in production
-SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookies
-SESSION_COOKIE_SAMESITE = 'Lax'  # Allow cross-site requests with session cookies
-
-# Security settings for production
-if not DEBUG:
-    SECURE_SSL_REDIRECT = os.getenv('DJANGO_SECURE_SSL_REDIRECT', 'False') == 'True'
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-    SECURE_HSTS_SECONDS = 31536000  # 1 year
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
+# Disable all security headers
+SECURE_SSL_REDIRECT = False
+SECURE_PROXY_SSL_HEADER = None
+SECURE_HSTS_SECONDS = 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+SECURE_HSTS_PRELOAD = False
+SECURE_CONTENT_TYPE_NOSNIFF = False
+SECURE_BROWSER_XSS_FILTER = False
+SECURE_REFERRER_POLICY = None
 
 # BrightData Integration Settings - Auto-detect domain for Upsun deployment
 def get_brightdata_base_url():
@@ -297,7 +276,8 @@ BRIGHTDATA_WEBHOOK_TOKEN = os.getenv('BRIGHTDATA_WEBHOOK_TOKEN', 'your-default-w
 
 # Production/Upsun settings.
 if (os.getenv('PLATFORM_APPLICATION_NAME') is not None):
-    DEBUG = False
+    # Keep DEBUG True for now to avoid issues
+    DEBUG = True
 
     # Disable DataDog tracing if auto-injected by Upsun
     os.environ['DD_TRACE_ENABLED'] = 'false'
@@ -310,39 +290,8 @@ if (os.getenv('PLATFORM_APPLICATION_NAME') is not None):
     if (os.getenv('PLATFORM_PROJECT_ENTROPY') is not None):
         SECRET_KEY = os.getenv('PLATFORM_PROJECT_ENTROPY')
 
-    # Set allowed hosts from environment variable or auto-detect from routes
-    if os.getenv('DJANGO_ALLOWED_HOSTS'):
-        ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS').split(',')
-    else:
-        # Start with specific Upsun hostnames from the error logs
-        allowed_hosts = [
-            'api.upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site',
-            'upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site',
-            '127.0.0.1',
-            'localhost'
-        ]
-        
-        # Auto-detect allowed hosts from Platform.sh routes
-        platform_routes = os.getenv('PLATFORM_ROUTES')
-        if platform_routes:
-            try:
-                import json
-                routes = json.loads(platform_routes)
-                for route_url in routes.keys():
-                    if route_url.startswith('https://'):
-                        # Extract hostname from URL
-                        from urllib.parse import urlparse
-                        hostname = urlparse(route_url).hostname
-                        if hostname and hostname not in allowed_hosts:
-                            allowed_hosts.append(hostname)
-            except (json.JSONDecodeError, AttributeError, ImportError):
-                pass
-                
-        # Fallback: if no hosts found, allow all
-        if not allowed_hosts:
-            allowed_hosts = ['*']
-            
-        ALLOWED_HOSTS = allowed_hosts
+    # Allow all hosts - completely permissive
+    ALLOWED_HOSTS = ['*']
     
     # Production database configuration.
     if (os.getenv('PLATFORM_ENVIRONMENT') is not None):

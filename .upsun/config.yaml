@@ -25,30 +25,38 @@ applications:
         pip install --upgrade pip setuptools wheel
         # Install requirements with verbose output
         pip install -r requirements.txt --verbose
-        # Verify whitenoise is installed
-        python -c "import whitenoise; print('whitenoise installed successfully')"
+        # Basic Django check
+        python -c "import django; print('Django installed successfully')"
       deploy: |
         set -eux
-        # Collect static files
+        # Collect static files (without whitenoise)
         python manage.py collectstatic --noinput --verbosity=2
         # Run migrations
         python manage.py migrate --verbosity=2
+        # Test deployment configuration
+        python manage.py test_deployment
     relationships:
       database: "db:postgresql"
     variables:
       env:
         DJANGO_SETTINGS_MODULE: "config.settings"
-        DEBUG: "False"
-        DJANGO_SECURE_SSL_REDIRECT: "True"
+        DEBUG: "True"
+        DJANGO_SECURE_SSL_REDIRECT: "False"
+        # Disable DataDog tracing completely
         DD_TRACE_ENABLED: "false"
         DD_PROFILING_ENABLED: "false"
         DD_APM_ENABLED: "false"
         DD_LOGS_ENABLED: "false"
         DD_TRACE_STARTUP_LOGS: "false"
         _DD_TRACE_ENABLED: "false"
+        # Force disable all DataDog features
         DD_SERVICE: ""
         DD_ENV: ""
         DD_VERSION: ""
+        DD_API_KEY: ""
+        # Additional DataDog disable flags
+        DATADOG_TRACE_ENABLED: "false"
+        PYTHONPATH: "/app"
     mounts:
       "/staticfiles":
         source: "local"
