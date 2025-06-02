@@ -32,6 +32,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import { format } from 'date-fns';
+import { apiFetch } from '../utils/api';
 
 interface ReportFolder {
   id: number;
@@ -116,7 +117,7 @@ const ReportDetail = () => {
   const fetchReport = async (id: string) => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/track-accounts/reports/${id}/`);
+      const response = await apiFetch(`/track-accounts/reports/${id}/`);
       if (!response.ok) {
         throw new Error('Failed to fetch report');
       }

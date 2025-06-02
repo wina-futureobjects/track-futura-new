@@ -78,7 +78,8 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
-    # "users.middleware.CustomCsrfMiddleware",  # Completely disable CSRF
+    "users.middleware.CustomCsrfMiddleware",  # Use custom CSRF middleware that disables CSRF
+    # "django.middleware.csrf.CsrfViewMiddleware",  # Completely disable CSRF middleware
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -205,6 +206,18 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ],
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.FormParser',
+        'rest_framework.parsers.MultiPartParser',
+    ],
+    'EXCEPTION_HANDLER': 'rest_framework.views.exception_handler',
+    'UNAUTHENTICATED_USER': 'django.contrib.auth.models.AnonymousUser',
+    'UNAUTHENTICATED_TOKEN': None,
 }
 
 # CORS settings - Allow everything
@@ -218,12 +231,56 @@ CSRF_COOKIE_SECURE = False
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = None
 CSRF_USE_SESSIONS = False
-CSRF_TRUSTED_ORIGINS = ['*']  # This won't work but we're disabling CSRF anyway
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://localhost:8000',
+    'https://localhost:3000',
+    'https://localhost:5173',
+    'https://localhost:8000',
+]
+
+# Add Upsun/Platform.sh domains to trusted origins
+if os.getenv('PLATFORM_APPLICATION_NAME'):
+    app_name = os.getenv('PLATFORM_APPLICATION_NAME')
+    project_id = os.getenv('PLATFORM_PROJECT')
+    environment = os.getenv('PLATFORM_ENVIRONMENT', 'main')
+    if app_name and project_id:
+        upsun_domain = f"https://{app_name}-{project_id}.{environment}.platformsh.site"
+        CSRF_TRUSTED_ORIGINS.append(upsun_domain)
+    
+    # Also get from Platform routes if available
+    platform_routes = os.getenv('PLATFORM_ROUTES')
+    if platform_routes:
+        try:
+            import json
+            routes = json.loads(platform_routes)
+            for route_url in routes.keys():
+                if route_url.startswith(('http://', 'https://')):
+                    CSRF_TRUSTED_ORIGINS.append(route_url.rstrip('/'))
+        except (json.JSONDecodeError, AttributeError):
+            pass
+
+# Completely disable CSRF validation
+CSRF_COOKIE_NAME = 'csrftoken'
+CSRF_HEADER_NAME = 'HTTP_X_CSRFTOKEN'
+CSRF_FAILURE_VIEW = 'django.views.csrf.csrf_failure'
+
+# Additional CSRF bypass settings
+CSRF_COOKIE_DOMAIN = None
+CSRF_COOKIE_PATH = '/'
+CSRF_COOKIE_AGE = 31449600  # 1 year
+CSRF_TOKEN_VALID = True
+
+# Disable CSRF completely for development
+USE_CSRF = False
 
 # Session security settings - make permissive
 SESSION_COOKIE_SECURE = False
 SESSION_COOKIE_HTTPONLY = False
 SESSION_COOKIE_SAMESITE = None
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 
 # Disable all security headers
 SECURE_SSL_REDIRECT = False
@@ -234,6 +291,9 @@ SECURE_HSTS_PRELOAD = False
 SECURE_CONTENT_TYPE_NOSNIFF = False
 SECURE_BROWSER_XSS_FILTER = False
 SECURE_REFERRER_POLICY = None
+
+# Completely disable X-Frame-Options
+X_FRAME_OPTIONS = 'ALLOWALL'
 
 # BrightData Integration Settings - Auto-detect domain for Upsun deployment
 def get_brightdata_base_url():

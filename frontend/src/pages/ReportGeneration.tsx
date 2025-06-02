@@ -27,6 +27,7 @@ import FolderIcon from '@mui/icons-material/Folder';
 import DownloadIcon from '@mui/icons-material/Download';
 import SearchIcon from '@mui/icons-material/Search';
 import { useNavigate } from 'react-router-dom';
+import { apiFetch } from '../utils/api';
 
 interface Folder {
   id: number;
@@ -103,7 +104,7 @@ const ReportGeneration = () => {
     try {
       setLoading(true);
       console.log('Fetching Instagram folders...');
-      const response = await fetch('/api/instagram-data/folders/');
+      const response = await apiFetch('/instagram-data/folders/');
       console.log('Response status:', response.status);
       
       if (!response.ok) {
@@ -238,7 +239,7 @@ const ReportGeneration = () => {
       // Save the report to the database first
       const reportName = `Social Media Report ${new Date().toLocaleDateString()}`;
       try {
-        const saveReportResponse = await fetch('/api/track-accounts/reports/', {
+        const saveReportResponse = await apiFetch('/track-accounts/reports/', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -269,7 +270,7 @@ const ReportGeneration = () => {
       let accountPage = 1;
       
       while (hasMoreAccounts) {
-        const response = await fetch(`/api/track-accounts/accounts/?page=${accountPage}&page_size=100`);
+        const response = await apiFetch(`/track-accounts/accounts/?page=${accountPage}&page_size=100`);
         
         if (!response.ok) {
           throw new Error('Failed to fetch track accounts');
@@ -307,8 +308,8 @@ const ReportGeneration = () => {
         let page = 1;
         
         while (hasMorePosts) {
-          const response = await fetch(
-            `/api/instagram/posts/?folder_id=${folderId}&start_date=${startDate.toISOString()}&end_date=${endDate.toISOString()}&page=${page}&page_size=100`
+          const response = await apiFetch(
+            `/instagram/posts/?folder_id=${folderId}&start_date=${startDate.toISOString()}&end_date=${endDate.toISOString()}&page=${page}&page_size=100`
           );
           
           if (!response.ok) {
@@ -439,7 +440,7 @@ const ReportGeneration = () => {
       setPreviewLoading(true);
 
       // Fetch track accounts (limit to 1000 for preview speed)
-      const response1 = await fetch(`/api/track-accounts/accounts/?page_size=1000`);
+      const response1 = await apiFetch(`/track-accounts/accounts/?page_size=1000`);
       if (!response1.ok) throw new Error('Failed to fetch track accounts');
       const accountsData = await response1.json();
       const accounts = accountsData.results || [];
@@ -447,8 +448,8 @@ const ReportGeneration = () => {
       // Fetch sample of posts from selected folders (limit to 500 for preview speed)
       const postSamples: InstagramPost[] = [];
       for (const folderId of selectedFolders) {
-        const response2 = await fetch(
-          `/api/instagram/posts/?folder_id=${folderId}&start_date=${startDate.toISOString()}&end_date=${endDate.toISOString()}&page_size=500`
+        const response2 = await apiFetch(
+          `/instagram/posts/?folder_id=${folderId}&start_date=${startDate.toISOString()}&end_date=${endDate.toISOString()}&page_size=500`
         );
         if (!response2.ok) throw new Error(`Failed to fetch posts for folder ${folderId}`);
         const data = await response2.json();

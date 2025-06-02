@@ -9,9 +9,9 @@ export const getApiBaseUrl = (): string => {
   
   // Fall back to environment-specific logic
   if (import.meta.env.PROD) {
-    // In production, use the API subdomain
+    // In production (Upsun/Platform.sh), use the api subdomain as configured in .upsun/config.yaml
     const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
-    return 'https://api.' + hostname.replace(/^www\./, '');
+    return `https://api.${hostname}`;
   }
   
   // In development, try to use the direct backend URL if proxy is not working

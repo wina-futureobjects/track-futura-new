@@ -42,6 +42,7 @@ interface LoginResult {
 const useAuth = () => {
   const login = async (credentials: LoginCredentials): Promise<LoginResult> => {
     try {
+      console.log('Starting login request...');
       const response = await apiFetch('/api/users/login/', {
         method: 'POST',
         headers: {
@@ -50,12 +51,39 @@ const useAuth = () => {
         body: JSON.stringify(credentials),
       });
       
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+      
       if (!response.ok) {
-        const errorData = await response.json();
+        let errorData;
+        try {
+          const responseText = await response.text();
+          console.log('Error response text:', responseText);
+          if (responseText.trim()) {
+            errorData = JSON.parse(responseText);
+          } else {
+            throw new Error(`HTTP ${response.status}: Empty response from server`);
+          }
+        } catch (parseError) {
+          console.error('Failed to parse error response:', parseError);
+          throw new Error(`HTTP ${response.status}: Unable to parse server error response`);
+        }
         throw new Error(errorData.detail || 'Login failed');
       }
       
-      const data = await response.json();
+      let data;
+      try {
+        const responseText = await response.text();
+        console.log('Success response text:', responseText);
+        if (responseText.trim()) {
+          data = JSON.parse(responseText);
+        } else {
+          throw new Error('Empty response from server');
+        }
+      } catch (parseError) {
+        console.error('Failed to parse success response:', parseError);
+        throw new Error('Unable to parse server response');
+      }
       
       // Save token using the auth utility
       setAuthToken(data.token);
@@ -68,7 +96,20 @@ const useAuth = () => {
       });
       
       if (userProfileResp.ok) {
-        const userProfileData = await userProfileResp.json();
+        let userProfileData;
+        try {
+          const profileResponseText = await userProfileResp.text();
+          if (profileResponseText.trim()) {
+            userProfileData = JSON.parse(profileResponseText);
+          } else {
+            console.warn('Empty profile response, using basic user data');
+            userProfileData = { user: {} };
+          }
+        } catch (parseError) {
+          console.warn('Failed to parse profile response, using basic user data:', parseError);
+          userProfileData = { user: {} };
+        }
+        
         // Store complete user data including role
         const userData: User = {
           id: data.user_id,

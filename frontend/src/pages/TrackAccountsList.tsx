@@ -42,6 +42,7 @@ import {
   Folder as FolderIcon,
   TrendingUp as TrendingUpIcon,
 } from '@mui/icons-material';
+import { apiFetch } from '../utils/api';
 
 interface TrackSource {
   id: number;
@@ -165,7 +166,7 @@ const TrackSourcesList = () => {
       console.log('Current URL:', location.pathname);
       console.log('Fetch URL:', `/api/track-accounts/sources/?${queryParams}`);
       
-      const response = await fetch(`/api/track-accounts/sources/?${queryParams}`);
+      const response = await apiFetch(`/track-accounts/sources/?${queryParams}`);
       console.log('Fetch response status:', response.status);
       console.log('Fetch response ok:', response.ok);
       
@@ -210,7 +211,7 @@ const TrackSourcesList = () => {
         queryParams = `?project=${projectId}`;
       }
       
-      const response = await fetch(`/api/track-accounts/sources/statistics/${queryParams}`);
+      const response = await apiFetch(`/track-accounts/sources/statistics/${queryParams}`);
       if (response.ok) {
         const stats = await response.json();
         setFilterStats(stats);

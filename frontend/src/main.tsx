@@ -14,7 +14,7 @@ declare global {
 
 // Set the API base URL based on environment
 window.API_BASE_URL = import.meta.env.PROD 
-  ? 'https://api.' + window.location.hostname.replace(/^www\./, '')
+  ? `https://api.${window.location.hostname}` // Use api subdomain in production (Upsun/Platform.sh)
   : '';
 
 const theme = createTheme({

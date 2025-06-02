@@ -12,6 +12,7 @@ import HomeIcon from '@mui/icons-material/Home';
 import EditIcon from '@mui/icons-material/Edit';
 import TrackChangesIcon from '@mui/icons-material/TrackChanges';
 import TrackSourceForm from '../components/track-accounts/TrackSourceForm';
+import { apiFetch } from '../utils/api';
 
 interface TrackAccount {
   id: number;
@@ -35,7 +36,7 @@ const TrackAccountEdit = () => {
     
     setLoading(true);
     
-    fetch(`/api/track-accounts/sources/${accountId}/`)
+    apiFetch(`/track-accounts/sources/${accountId}/`)
       .then(response => {
         if (!response.ok) throw new Error('Failed to load source');
         return response.json();
