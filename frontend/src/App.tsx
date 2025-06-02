@@ -182,6 +182,7 @@ function App() {
               {/* Legacy report routes */}
               <Route path="/report" element={<LegacyRouteRedirect><Report /></LegacyRouteRedirect>} />
               <Route path="/report/:id" element={<LegacyRouteRedirect><ReportView /></LegacyRouteRedirect>} />
+              <Route path="/report/generated/:id" element={<LegacyRouteRedirect><ReportView /></LegacyRouteRedirect>} />
               <Route path="/reports/generated" element={<LegacyRouteRedirect><GeneratedReports /></LegacyRouteRedirect>} />
               <Route path="/report-folders" element={<LegacyRouteRedirect><ReportFolders /></LegacyRouteRedirect>} />
               <Route path="/report-folders/:reportId" element={<LegacyRouteRedirect><ReportDetail /></LegacyRouteRedirect>} />
@@ -346,6 +347,14 @@ function App() {
               } />
               
               <Route path="/organizations/:organizationId/projects/:projectId/report/:id" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <ReportView />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/organizations/:organizationId/projects/:projectId/report/generated/:id" element={
                 <ProtectedRoute>
                   <Layout>
                     <ReportView />

@@ -13,8 +13,6 @@ import {
   CircularProgress,
   Alert,
   Snackbar,
-  Breadcrumbs,
-  Link,
   TextField,
   InputAdornment,
   FormControl,
@@ -179,9 +177,9 @@ const GeneratedReports: React.FC = () => {
 
   const handleViewReport = (reportId: number) => {
     if (organizationId && projectId) {
-      navigate(`/organizations/${organizationId}/projects/${projectId}/report/${reportId}`);
+      navigate(`/organizations/${organizationId}/projects/${projectId}/report/generated/${reportId}`);
     } else {
-      navigate(`/report/${reportId}`);
+      navigate(`/report/generated/${reportId}`);
     }
   };
 
@@ -228,59 +226,7 @@ const GeneratedReports: React.FC = () => {
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Header */}
-      <Box mb={4}>
-        <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
-          {organizationId && projectId ? (
-            <>
-              <Link 
-                color="inherit" 
-                onClick={(e) => {
-                  e.preventDefault();
-                  navigate('/organizations');
-                }}
-                sx={{ cursor: 'pointer' }}
-              >
-                Organizations
-              </Link>
-              <Link 
-                color="inherit" 
-                onClick={(e) => {
-                  e.preventDefault();
-                  navigate(`/organizations/${organizationId}/projects`);
-                }}
-                sx={{ cursor: 'pointer' }}
-              >
-                Projects
-              </Link>
-              <Link 
-                color="inherit" 
-                onClick={(e) => { 
-                  e.preventDefault(); 
-                  navigate(`/organizations/${organizationId}/projects/${projectId}/report`); 
-                }}
-                sx={{ cursor: 'pointer' }}
-              >
-                Report Marketplace
-              </Link>
-              <Typography color="text.primary">Generated Reports</Typography>
-            </>
-          ) : (
-            <>
-              <Link color="inherit" href="/">
-                Dashboard
-              </Link>
-              <Link 
-                color="inherit" 
-                href="#" 
-                onClick={(e) => { e.preventDefault(); navigate('/report'); }}
-              >
-                Report Marketplace
-              </Link>
-              <Typography color="text.primary">Generated Reports</Typography>
-            </>
-          )}
-        </Breadcrumbs>
-        
+      <Box mb={4}>        
         <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>
           Generated Reports
         </Typography>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Container,
   Typography,
@@ -12,8 +12,6 @@ import {
   CircularProgress,
   Alert,
   Snackbar,
-  Breadcrumbs,
-  Link,
   List,
   ListItem,
   ListItemIcon,
@@ -51,6 +49,8 @@ import {
   LineElement,
   Title,
 } from 'chart.js';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 // Register Chart.js components
 ChartJS.register(
@@ -243,6 +243,7 @@ const ReportView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
   const navigate = useNavigate();
+  const reportContentRef = useRef<HTMLDivElement>(null);
 
   const fetchReport = useCallback(async (reportId: string) => {
     try {
@@ -365,39 +366,154 @@ const ReportView: React.FC = () => {
     setSnackbar({ ...snackbar, open: false });
   };
 
-  const handleDownloadCSV = async () => {
+  const handleDownloadPDF = async () => {
     try {
-      // Simulate CSV download
-      const csvContent = generateMockCSV();
-      const blob = new Blob([csvContent], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${report?.title.replace(/\s+/g, '_')}_analysis.csv`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      setSnackbar({ open: true, message: 'Generating PDF...', severity: 'success' });
       
-      showSnackbar('Report downloaded successfully!', 'success');
-    } catch (error) {
-      console.error('Error downloading report:', error);
-      showSnackbar('Failed to download report', 'error');
-    }
-  };
+      // Create new PDF document
+      const pdf = new jsPDF();
+      
+      // Get page dimensions
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 20;
+      let yPosition = margin;
 
-  const generateMockCSV = () => {
-    if (!report?.results?.detailed_analysis) return '';
-    
-    const headers = ['Comment', 'Sentiment', 'Confidence', 'Timestamp'];
-    const rows = report.results.detailed_analysis.map(item => [
-      `"${item.comment.replace(/"/g, '""')}"`,
-      item.sentiment,
-      item.confidence.toFixed(1),
-      new Date(item.timestamp).toLocaleString()
-    ]);
-    
-    return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+      // Helper function to check if we need a new page
+      const addNewPageIfNeeded = (height: number) => {
+        if (yPosition + height > pageHeight - margin) {
+          pdf.addPage();
+          yPosition = margin;
+        }
+      };
+
+      // Title
+      pdf.setFontSize(20);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Social Media Analytics Report', margin, yPosition);
+      yPosition += 15;
+
+      pdf.setFontSize(16);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(report?.title || 'Generated Report', margin, yPosition);
+      yPosition += 10;
+
+      pdf.setFontSize(12);
+      pdf.text(`Generated: ${new Date(report?.created_at || '').toLocaleDateString()}`, margin, yPosition);
+      yPosition += 8;
+      pdf.text(`Template: ${report?.template.name || 'N/A'}`, margin, yPosition);
+      yPosition += 15;
+
+      // Summary Section
+      addNewPageIfNeeded(50);
+      pdf.setFontSize(14);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Summary', margin, yPosition);
+      yPosition += 10;
+
+      pdf.setFontSize(11);
+      pdf.setFont('helvetica', 'normal');
+      
+      const { summary } = report?.results || {};
+      if (summary) {
+        if (summary.total_comments_analyzed) {
+          pdf.text(`Total Comments Analyzed: ${summary.total_comments_analyzed.toLocaleString()}`, margin, yPosition);
+          yPosition += 6;
+        }
+        if (summary.total_posts_analyzed) {
+          pdf.text(`Total Posts Analyzed: ${summary.total_posts_analyzed.toLocaleString()}`, margin, yPosition);
+          yPosition += 6;
+        }
+        if (summary.overall_sentiment) {
+          pdf.text(`Overall Sentiment: ${summary.overall_sentiment}`, margin, yPosition);
+          yPosition += 6;
+        }
+        if (summary.confidence_average) {
+          pdf.text(`Confidence Average: ${summary.confidence_average}%`, margin, yPosition);
+          yPosition += 6;
+        }
+        if (summary.average_engagement_rate) {
+          pdf.text(`Average Engagement Rate: ${summary.average_engagement_rate}%`, margin, yPosition);
+          yPosition += 6;
+        }
+      }
+      yPosition += 15;
+
+      // Trending Keywords
+      const trendingKeywords = report?.results?.trending_keywords;
+      if (trendingKeywords && trendingKeywords.length > 0) {
+        addNewPageIfNeeded(60);
+        pdf.setFontSize(14);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('Trending Keywords', margin, yPosition);
+        yPosition += 10;
+
+        pdf.setFontSize(11);
+        pdf.setFont('helvetica', 'normal');
+        
+        trendingKeywords.slice(0, 10).forEach((keyword, index) => {
+          addNewPageIfNeeded(8);
+          pdf.text(`${index + 1}. ${keyword.keyword} - ${keyword.count} mentions (${keyword.sentiment})`, margin, yPosition);
+          yPosition += 6;
+        });
+        yPosition += 15;
+      }
+
+      // Key Insights
+      const insights = report?.results?.insights;
+      if (insights && insights.length > 0) {
+        addNewPageIfNeeded(40);
+        pdf.setFontSize(14);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('Key Insights', margin, yPosition);
+        yPosition += 10;
+
+        pdf.setFontSize(11);
+        pdf.setFont('helvetica', 'normal');
+        insights.forEach((insight, index) => {
+          addNewPageIfNeeded(20);
+          // Split long text into multiple lines
+          const maxWidth = pageWidth - 2 * margin;
+          const lines = pdf.splitTextToSize(`${index + 1}. ${insight}`, maxWidth);
+          pdf.text(lines, margin, yPosition);
+          yPosition += lines.length * 6;
+        });
+        yPosition += 15;
+      }
+
+      // Recommendations
+      const recommendations = report?.results?.recommendations;
+      if (recommendations && recommendations.length > 0) {
+        addNewPageIfNeeded(40);
+        pdf.setFontSize(14);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('Recommendations', margin, yPosition);
+        yPosition += 10;
+
+        pdf.setFontSize(11);
+        pdf.setFont('helvetica', 'normal');
+        recommendations.forEach((recommendation, index) => {
+          addNewPageIfNeeded(20);
+          // Split long text into multiple lines
+          const maxWidth = pageWidth - 2 * margin;
+          const lines = pdf.splitTextToSize(`${index + 1}. ${recommendation}`, maxWidth);
+          pdf.text(lines, margin, yPosition);
+          yPosition += lines.length * 6;
+        });
+      }
+
+      // Save the PDF
+      const filename = `${report?.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_report.pdf`;
+      pdf.save(filename);
+      
+      setSnackbar({ open: false, message: '', severity: 'success' });
+      showSnackbar('PDF report downloaded successfully!', 'success');
+      
+    } catch (error) {
+      console.error('PDF Generation Error:', error);
+      setSnackbar({ open: false, message: '', severity: 'success' });
+      showSnackbar(`Failed to generate PDF: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    }
   };
 
   if (loading) {
@@ -466,58 +582,9 @@ const ReportView: React.FC = () => {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Container maxWidth="lg" sx={{ py: 4 }} ref={reportContentRef}>
       {/* Header */}
-      <Box mb={4}>
-        <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
-          {organizationId && projectId ? (
-            <>
-              <Link 
-                color="inherit" 
-                onClick={(e) => {
-                  e.preventDefault();
-                  navigate('/organizations');
-                }}
-                sx={{ cursor: 'pointer' }}
-              >
-                Organizations
-              </Link>
-              <Link 
-                color="inherit" 
-                onClick={(e) => {
-                  e.preventDefault();
-                  navigate(`/organizations/${organizationId}/projects`);
-                }}
-                sx={{ cursor: 'pointer' }}
-              >
-                Projects
-              </Link>
-              <Link 
-                color="inherit" 
-                onClick={(e) => { 
-                  e.preventDefault(); 
-                  navigate(`/organizations/${organizationId}/projects/${projectId}/report`); 
-                }}
-                sx={{ cursor: 'pointer' }}
-              >
-                Report Marketplace
-              </Link>
-              <Typography color="text.primary">{report.title}</Typography>
-            </>
-          ) : (
-            <>
-              <Link 
-                color="inherit" 
-                href="#" 
-                onClick={(e) => { e.preventDefault(); navigate('/report'); }}
-              >
-                Report Marketplace
-              </Link>
-              <Typography color="text.primary">{report.title}</Typography>
-            </>
-          )}
-        </Breadcrumbs>
-        
+      <Box mb={4}>        
         <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
           <Box>
             <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>
@@ -555,9 +622,9 @@ const ReportView: React.FC = () => {
             <Button 
               variant="contained" 
               startIcon={<Download />}
-              onClick={handleDownloadCSV}
+              onClick={handleDownloadPDF}
             >
-              Download CSV
+              Download PDF
             </Button>
           </Box>
         </Box>

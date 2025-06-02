@@ -390,7 +390,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
     
     // Special handling for generated reports
     if (itemPath.includes('/reports/generated')) {
-      return location.pathname.includes('/reports/generated');
+      return location.pathname.includes('/reports/generated') || location.pathname.includes('/report/generated/');
     }
     
     // Special handling for report marketplace

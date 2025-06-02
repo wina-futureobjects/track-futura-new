@@ -18,8 +18,6 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  Breadcrumbs,
-  Link,
   Fade,
   Grow
 } from '@mui/material';
@@ -35,7 +33,10 @@ import {
   Error as ErrorIcon,
   AutoAwesome,
   DataUsage,
-  Insights
+  Insights,
+  BarChart,
+  Timeline,
+  Analytics
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -313,9 +314,9 @@ const Report: React.FC = () => {
       
       // Navigate to the generated report with proper context
       if (organizationId && projectId) {
-        navigate(`/organizations/${organizationId}/projects/${projectId}/report/${newReport.id}`);
+        navigate(`/organizations/${organizationId}/projects/${projectId}/report/generated/${newReport.id}`);
       } else {
-        navigate(`/report/${newReport.id}`);
+        navigate(`/report/generated/${newReport.id}`);
       }
     } catch (error) {
       console.error('Error generating report:', error);
@@ -327,9 +328,9 @@ const Report: React.FC = () => {
 
   const handleViewReport = (reportId: number) => {
     if (organizationId && projectId) {
-      navigate(`/organizations/${organizationId}/projects/${projectId}/report/${reportId}`);
+      navigate(`/organizations/${organizationId}/projects/${projectId}/report/generated/${reportId}`);
     } else {
-      navigate(`/report/${reportId}`);
+      navigate(`/report/generated/${reportId}`);
     }
   };
 
@@ -346,43 +347,7 @@ const Report: React.FC = () => {
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Header */}
-      <Box mb={4}>
-        <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
-          {organizationId && projectId ? (
-            <>
-              <Link 
-                color="inherit" 
-                href="/"
-                onClick={(e) => {
-                  e.preventDefault();
-                  navigate('/organizations');
-                }}
-                sx={{ cursor: 'pointer' }}
-              >
-                Organizations
-              </Link>
-              <Link 
-                color="inherit" 
-                onClick={(e) => {
-                  e.preventDefault();
-                  navigate(`/organizations/${organizationId}/projects`);
-                }}
-                sx={{ cursor: 'pointer' }}
-              >
-                Projects
-              </Link>
-              <Typography color="text.primary">Report Marketplace</Typography>
-            </>
-          ) : (
-            <>
-              <Link color="inherit" href="/">
-                Dashboard
-              </Link>
-              <Typography color="text.primary">Report Marketplace</Typography>
-            </>
-          )}
-        </Breadcrumbs>
-        
+      <Box mb={4}>        
         <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>
           Report Marketplace
         </Typography>

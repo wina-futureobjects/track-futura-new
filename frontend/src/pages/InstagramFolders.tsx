@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Container,
   Typography,
@@ -76,6 +76,14 @@ const InstagramFolders = () => {
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   
+  // Add loading states for create and update operations
+  const [isCreating, setIsCreating] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  
+  // Add refs to prevent race conditions and multiple submissions
+  const isCreatingRef = useRef(false);
+  const isUpdatingRef = useRef(false);
+  
   // Extract project ID from URL path or query parameters
   const getProjectId = () => {
     // First try to extract from URL path: /organizations/{orgId}/projects/{projectId}/...
@@ -152,6 +160,15 @@ const InstagramFolders = () => {
     fetchFolders();
   }, [projectId]); // Add projectId as dependency
 
+  // Cleanup effect to reset states on unmount
+  useEffect(() => {
+    return () => {
+      // Reset all refs on unmount
+      isCreatingRef.current = false;
+      isUpdatingRef.current = false;
+    };
+  }, []);
+
   const handleOpenFolder = (folderId: number) => {
     // Extract organization and project IDs from URL
     const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
@@ -168,26 +185,47 @@ const InstagramFolders = () => {
   };
 
   const handleNewFolder = () => {
+    // Reset all states and refs
     setFolderName('');
     setFolderDescription('');
     setFolderCategory('posts');
+    setIsCreating(false);
+    isCreatingRef.current = false;
+    setError(null);
     setOpenNewFolderDialog(true);
   };
 
   const handleEditFolder = (folder: Folder) => {
+    // Reset all states and refs
     setSelectedFolder(folder);
     setFolderName(folder.name);
     setFolderDescription(folder.description || '');
     setFolderCategory(folder.category);
+    setIsUpdating(false);
+    isUpdatingRef.current = false;
+    setError(null);
     setOpenEditFolderDialog(true);
   };
 
   const handleCreateFolder = async () => {
-    if (!folderName.trim()) {
+    // Double check - use both state and ref to prevent race conditions
+    if (!folderName.trim() || isCreating || isCreatingRef.current) {
+      console.log('Create folder blocked:', { 
+        folderName: folderName.trim(), 
+        isCreating, 
+        isCreatingRef: isCreatingRef.current 
+      });
       return;
     }
 
     try {
+      // Set both state and ref immediately
+      setIsCreating(true);
+      isCreatingRef.current = true;
+      setError(null);
+      
+      console.log('Starting folder creation...');
+      
       const requestData = {
         name: folderName,
         description: folderDescription || null,
@@ -222,43 +260,99 @@ const InstagramFolders = () => {
       console.log('=== END FRONTEND FOLDER CREATION DEBUG ===');
 
       // Refresh folders list
-      fetchFolders();
+      await fetchFolders();
       setOpenNewFolderDialog(false);
+      
+      // Reset form
+      setFolderName('');
+      setFolderDescription('');
+      setFolderCategory('posts');
+      
+      console.log('Folder creation completed successfully');
     } catch (error) {
       console.error('Error creating folder:', error);
       setError('Failed to create folder. Please try again.');
+    } finally {
+      // Clear both state and ref
+      setIsCreating(false);
+      isCreatingRef.current = false;
+      console.log('Create folder operation finished');
     }
   };
 
   const handleUpdateFolder = async () => {
-    if (!selectedFolder || !folderName.trim()) {
+    // Double check - use both state and ref to prevent race conditions
+    if (!selectedFolder || !folderName.trim() || isUpdating || isUpdatingRef.current) {
+      console.log('Update folder blocked:', { 
+        selectedFolder: !!selectedFolder, 
+        folderName: folderName.trim(), 
+        isUpdating, 
+        isUpdatingRef: isUpdatingRef.current 
+      });
       return;
     }
 
     try {
-      const response = await apiFetch(`/api/instagram-data/folders/${selectedFolder.id}/`, {
+      // Set both state and ref immediately
+      setIsUpdating(true);
+      isUpdatingRef.current = true;
+      setError(null);
+      
+      console.log('Starting folder update...');
+      
+      const requestData = {
+        name: folderName,
+        description: folderDescription || null,
+        category: folderCategory,
+        project: projectId ? parseInt(projectId, 10) : null,
+      };
+      
+      console.log('=== FRONTEND FOLDER UPDATE DEBUG ===');
+      console.log('Folder ID:', selectedFolder.id);
+      console.log('Request data being sent:', requestData);
+      
+      // Include project parameter in URL for consistency with backend expectations
+      const updateUrl = projectId 
+        ? `/api/instagram-data/folders/${selectedFolder.id}/?project=${projectId}`
+        : `/api/instagram-data/folders/${selectedFolder.id}/`;
+      
+      console.log('API endpoint:', updateUrl);
+      
+      const response = await apiFetch(updateUrl, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name: folderName,
-          description: folderDescription || null,
-          category: folderCategory,
-          project: projectId ? parseInt(projectId, 10) : null,
-        }),
+        body: JSON.stringify(requestData),
       });
 
+      console.log('Update response status:', response.status);
+      console.log('Update response ok:', response.ok);
+
       if (!response.ok) {
+        const errorData = await response.text();
+        console.log('Update error response:', errorData);
         throw new Error('Failed to update folder');
       }
 
+      const responseData = await response.json();
+      console.log('Update success response data:', responseData);
+      console.log('=== END FRONTEND FOLDER UPDATE DEBUG ===');
+
       // Refresh folders list
-      fetchFolders();
+      await fetchFolders();
       setOpenEditFolderDialog(false);
+      setSelectedFolder(null);
+      
+      console.log('Folder update completed successfully');
     } catch (error) {
       console.error('Error updating folder:', error);
       setError('Failed to update folder. Please try again.');
+    } finally {
+      // Clear both state and ref
+      setIsUpdating(false);
+      isUpdatingRef.current = false;
+      console.log('Update folder operation finished');
     }
   };
 
@@ -548,7 +642,18 @@ const InstagramFolders = () => {
       </Box>
 
       {/* New Folder Dialog */}
-      <Dialog open={openNewFolderDialog} onClose={() => setOpenNewFolderDialog(false)}>
+      <Dialog 
+        open={openNewFolderDialog} 
+        onClose={() => {
+          if (!isCreating && !isCreatingRef.current) {
+            setOpenNewFolderDialog(false);
+            // Reset form
+            setFolderName('');
+            setFolderDescription('');
+            setFolderCategory('posts');
+          }
+        }}
+      >
         <DialogTitle>Create New Folder</DialogTitle>
         <DialogContent sx={{ minWidth: 400 }}>
           <TextField
@@ -562,6 +667,7 @@ const InstagramFolders = () => {
             required
             variant="outlined"
             sx={{ mb: 2, mt: 1 }}
+            disabled={isCreating}
           />
           
           <FormControl fullWidth sx={{ mb: 2 }}>
@@ -570,6 +676,7 @@ const InstagramFolders = () => {
               value={folderCategory}
               label="Category"
               onChange={(e) => setFolderCategory(e.target.value as 'posts' | 'reels' | 'comments')}
+              disabled={isCreating}
             >
               <MenuItem value="posts">
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -602,18 +709,42 @@ const InstagramFolders = () => {
             value={folderDescription}
             onChange={(e) => setFolderDescription(e.target.value)}
             variant="outlined"
+            disabled={isCreating}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenNewFolderDialog(false)}>Cancel</Button>
-          <Button onClick={handleCreateFolder} variant="contained" color="primary">
-            Create
+          <Button 
+            onClick={() => {
+              if (!isCreating && !isCreatingRef.current) {
+                setOpenNewFolderDialog(false);
+                // Reset form
+                setFolderName('');
+                setFolderDescription('');
+                setFolderCategory('posts');
+              }
+            }}
+            disabled={isCreating}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleCreateFolder();
+            }}
+            variant="contained" 
+            color="primary"
+            disabled={!folderName.trim() || isCreating || isCreatingRef.current}
+            startIcon={isCreating ? <CircularProgress size={20} /> : undefined}
+          >
+            {isCreating ? 'Creating...' : 'Create'}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Edit Folder Dialog */}
-      <Dialog open={openEditFolderDialog} onClose={() => setOpenEditFolderDialog(false)}>
+      <Dialog open={openEditFolderDialog} onClose={() => !isUpdating && !isUpdatingRef.current && setOpenEditFolderDialog(false)}>
         <DialogTitle>Edit Folder</DialogTitle>
         <DialogContent sx={{ minWidth: 400 }}>
           <TextField
@@ -627,6 +758,7 @@ const InstagramFolders = () => {
             required
             variant="outlined"
             sx={{ mb: 2, mt: 1 }}
+            disabled={isUpdating}
           />
           
           <FormControl fullWidth sx={{ mb: 2 }}>
@@ -635,6 +767,7 @@ const InstagramFolders = () => {
               value={folderCategory}
               label="Category"
               onChange={(e) => setFolderCategory(e.target.value as 'posts' | 'reels' | 'comments')}
+              disabled={isUpdating}
             >
               <MenuItem value="posts">
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -667,15 +800,48 @@ const InstagramFolders = () => {
             value={folderDescription}
             onChange={(e) => setFolderDescription(e.target.value)}
             variant="outlined"
+            disabled={isUpdating}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenEditFolderDialog(false)}>Cancel</Button>
-          <Button onClick={handleUpdateFolder} variant="contained" color="primary">
-            Update
+          <Button 
+            onClick={() => {
+              if (!isUpdating && !isUpdatingRef.current) {
+                setOpenEditFolderDialog(false);
+                setSelectedFolder(null);
+              }
+            }}
+            disabled={isUpdating}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleUpdateFolder();
+            }}
+            variant="contained" 
+            color="primary"
+            disabled={!folderName.trim() || isUpdating || isUpdatingRef.current}
+            startIcon={isUpdating ? <CircularProgress size={20} /> : undefined}
+          >
+            {isUpdating ? 'Updating...' : 'Update'}
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Error Snackbar */}
+      <Snackbar
+        open={!!error}
+        autoHideDuration={6000}
+        onClose={() => setError(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setError(null)} severity="error" sx={{ width: '100%' }}>
+          {error}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 };

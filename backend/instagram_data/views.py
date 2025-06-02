@@ -1,4 +1,5 @@
 from django.shortcuts import render, get_object_or_404
+from django.http import HttpResponse, Http404
 import csv
 import json
 import io
@@ -7,7 +8,6 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action, permission_classes
 from rest_framework.permissions import AllowAny
-from django.http import HttpResponse
 from .models import InstagramPost, Folder, InstagramComment, CommentScrapingJob
 from .serializers import (
     InstagramPostSerializer, 
@@ -73,6 +73,32 @@ class FolderViewSet(viewsets.ModelViewSet):
         print(f"=== END FOLDER QUERYSET DEBUG ===")
             
         return queryset
+    
+    def get_object(self):
+        """
+        Override get_object to allow direct lookup by ID for detail operations (update, delete, retrieve)
+        This bypasses the project filtering in get_queryset for individual object operations
+        """
+        # For detail operations (like update, delete, retrieve), we should allow direct lookup by ID
+        # The project filtering is mainly for list operations to prevent data leakage
+        lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
+        folder_id = self.kwargs.get(lookup_url_kwarg)
+        
+        if folder_id:
+            try:
+                folder = Folder.objects.get(id=folder_id)
+                print(f"=== FOLDER GET_OBJECT DEBUG ===")
+                print(f"Found folder by ID: {folder.id}, Name: {folder.name}, Project: {folder.project_id}")
+                print(f"=== END FOLDER GET_OBJECT DEBUG ===")
+                return folder
+            except Folder.DoesNotExist:
+                print(f"=== FOLDER GET_OBJECT DEBUG ===")
+                print(f"Folder with ID {folder_id} not found")
+                print(f"=== END FOLDER GET_OBJECT DEBUG ===")
+                raise Http404(f"Folder with id {folder_id} does not exist")
+        
+        # Fallback to default behavior if no ID is provided
+        return super().get_object()
     
     def create(self, request, *args, **kwargs):
         """
