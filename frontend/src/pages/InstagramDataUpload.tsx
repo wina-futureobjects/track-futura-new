@@ -146,7 +146,7 @@ function a11yProps(index: number) {
 }
 
 const InstagramDataUpload = () => {
-  const { folderId } = useParams();
+  const { folderId, organizationId, projectId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -187,96 +187,126 @@ const InstagramDataUpload = () => {
     try {
       setIsLoading(true);
       
-      if (!folderId) {
-        setPosts([]);
-        setComments([]);
-        setFilteredPosts([]);
-        setFilteredComments([]);
-        setTotalCount(0);
-        return;
-      }
-      
-      // Always try the posts endpoint first (same as fetchFolderStats)
-      const searchParam = searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : '';
-      const contentTypeParam = contentType && contentType !== 'all' ? `&content_type=${contentType}` : '';
-      const folderParam = `folder_id=${folderId}`;
-      
-      const postsApiUrl = `/api/instagram-data/posts/?${folderParam}&page=${pageNumber + 1}&page_size=${pageSize}${searchParam}${contentTypeParam}`;
-      console.log('🚀 Attempting to fetch posts from:', postsApiUrl);
-      
-      try {
-        const response = await apiFetch(postsApiUrl);
-        console.log('📥 Posts API response status:', response.status, 'OK:', response.ok);
-        
-        if (response.ok) {
-          const data = await response.json();
-          console.log('📊 Posts endpoint response data:', data);
-          console.log('📊 Posts endpoint response structure:', {
-            hasResults: 'results' in data,
-            hasCount: 'count' in data,
-            resultsLength: data.results?.length || 0,
-            totalCount: data.count || 0,
-            dataType: typeof data,
-            dataKeys: Object.keys(data || {})
-          });
-          
-          if (data && typeof data === 'object' && 'results' in data) {
-            const results = data.results || [];
-            console.log('✅ Setting posts data with', results.length, 'items');
-            console.log('📋 First few posts:', results.slice(0, 2));
-            
-            setPosts(results);
-            setFilteredPosts(results);
-            setComments([]);
-            setFilteredComments([]);
-            setTotalCount(data.count || results.length);
-            return; // Success, exit function
-          } else {
-            console.error('❌ Posts endpoint returned data without results structure:', data);
-          }
-        } else {
-          console.error('❌ Posts endpoint HTTP error:', response.status, response.statusText);
-        }
-      } catch (postsError) {
-        console.log('❌ Posts endpoint failed with error:', postsError);
-      }
-      
-      // Fallback: try the comments/folder contents endpoint if posts endpoint fails
-      if (currentFolder?.category === 'comments') {
-        const response = await apiFetch(`/api/instagram-data/folders/${folderId}/contents/?page=${pageNumber + 1}&page_size=${pageSize}${searchParam}`);
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch folder contents');
-        }
-        const data = await response.json();
-        
-        console.log('Comments folder contents response:', data);
-        
-        if (data && typeof data === 'object') {
-          const results = data.results || [];
-          console.log('Setting comments data:', results);
-          setComments(results);
-          setFilteredComments(results);
-          setPosts([]);
-          setFilteredPosts([]);
-          setTotalCount(data.count || results.length);
-        }
-      } else {
-        // If posts endpoint failed and it's not a comments folder, set empty state
-        console.error('Posts endpoint failed and folder is not comments type');
-        setPosts([]);
-        setComments([]);
-        setFilteredPosts([]);
-        setFilteredComments([]);
-        setTotalCount(0);
-      }
-    } catch (error) {
-      console.error('Error fetching posts:', error);
+      // Clear existing data immediately to show loading state
       setPosts([]);
       setComments([]);
       setFilteredPosts([]);
       setFilteredComments([]);
       setTotalCount(0);
+      
+      if (!folderId) {
+        console.log('No folder ID provided, skipping data fetch');
+        return;
+      }
+      
+      console.log(`📡 Fetching data for folder ${folderId}, page ${pageNumber + 1}, search: "${searchTerm}", content type: "${contentType}"`);
+      console.log(`📁 Current folder category: ${currentFolder?.category}`);
+      
+      const searchParam = searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : '';
+      const projectParam = projectId ? `&project=${projectId}` : '';
+      
+      // Check folder category first and call appropriate endpoint
+      if (currentFolder?.category === 'comments') {
+        console.log('🔄 Comments folder detected - using comments endpoint directly');
+        
+        // For comments folders, use the folder contents endpoint or direct comments API
+        const commentsApiUrl = `/api/instagram-data/folders/${folderId}/contents/?page=${pageNumber + 1}&page_size=${pageSize}${searchParam}${projectParam}`;
+        console.log('🔄 Fetching comments from:', commentsApiUrl);
+        
+        const response = await apiFetch(commentsApiUrl);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ Comments endpoint error:', response.status, errorText);
+          throw new Error(`Failed to fetch comments: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('📝 Comments endpoint response:', data);
+        console.log('📝 Comments response structure:', {
+          hasResults: 'results' in data,
+          hasCount: 'count' in data,
+          resultsLength: data.results?.length || 0,
+          totalCount: data.count || 0,
+          category: data.category
+        });
+        
+        if (data && typeof data === 'object') {
+          const results = data.results || [];
+          console.log('✅ Setting comments data with', results.length, 'items');
+          console.log('📋 First few comments:', results.slice(0, 2));
+          
+          setComments(results);
+          setFilteredComments(results);
+          setPosts([]);
+          setFilteredPosts([]);
+          setTotalCount(data.count || results.length);
+          
+          console.log(`✅ Successfully loaded ${results.length} comments, total count: ${data.count || results.length}`);
+        } else {
+          console.error('❌ Comments endpoint returned unexpected data structure:', data);
+          throw new Error('Comments endpoint returned unexpected data format');
+        }
+        
+      } else {
+        // For posts/reels folders, use the posts endpoint
+        console.log('📊 Posts/reels folder detected - using posts endpoint');
+        
+        const contentTypeParam = contentType && contentType !== 'all' ? `&content_type=${contentType}` : '';
+        const folderParam = `folder_id=${folderId}`;
+        
+        const postsApiUrl = `/api/instagram-data/posts/?${folderParam}&page=${pageNumber + 1}&page_size=${pageSize}${searchParam}${contentTypeParam}${projectParam}`;
+        console.log('🚀 Fetching posts from:', postsApiUrl);
+        
+        const response = await apiFetch(postsApiUrl);
+        console.log('📥 Posts API response status:', response.status, 'OK:', response.ok);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ Posts endpoint error:', response.status, errorText);
+          throw new Error(`Failed to fetch posts: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('📊 Posts endpoint response data:', data);
+        console.log('📊 Posts endpoint response structure:', {
+          hasResults: 'results' in data,
+          hasCount: 'count' in data,
+          resultsLength: data.results?.length || 0,
+          totalCount: data.count || 0,
+          dataType: typeof data,
+          dataKeys: Object.keys(data || {})
+        });
+        
+        if (data && typeof data === 'object' && 'results' in data) {
+          const results = data.results || [];
+          console.log('✅ Setting posts data with', results.length, 'items');
+          console.log('📋 First few posts:', results.slice(0, 2));
+          
+          setPosts(results);
+          setFilteredPosts(results);
+          setComments([]);
+          setFilteredComments([]);
+          setTotalCount(data.count || results.length);
+          
+          console.log(`✅ Successfully loaded ${results.length} posts, total count: ${data.count || results.length}`);
+        } else {
+          console.error('❌ Posts endpoint returned data without results structure:', data);
+          throw new Error('Posts endpoint returned unexpected data format');
+        }
+      }
+      
+    } catch (error) {
+      console.error('❌ Error fetching data:', error);
+      // Keep the empty state but show an error to the user
+      setPosts([]);
+      setComments([]);
+      setFilteredPosts([]);
+      setFilteredComments([]);
+      setTotalCount(0);
+      
+      // Set error state for user feedback
+      setUploadError(error instanceof Error ? error.message : 'Failed to load data');
     } finally {
       setIsLoading(false);
     }
@@ -287,9 +317,7 @@ const InstagramDataUpload = () => {
     if (folderId) {
       try {
         setFolderLoading(true);
-        // Get project ID from URL params
-        const queryParams = new URLSearchParams(location.search);
-        const projectId = queryParams.get('project');
+        // Get project ID from URL path params instead of query params
         if (!projectId) {
           console.error('Project ID is required but not found in URL params');
           setUploadError('Project ID is missing. Please navigate from the projects page.');
@@ -321,48 +349,85 @@ const InstagramDataUpload = () => {
     
     try {
       const folderParam = `folder_id=${folderId}`;
-      const statsApiUrl = `/api/instagram-data/posts/?${folderParam}&page_size=1000`;
-      console.log('📈 Fetching folder stats from:', statsApiUrl);
+      const projectParam = projectId ? `&project=${projectId}` : '';
       
-      // Get stats for all posts in the folder (no pagination)
-      const response = await apiFetch(statsApiUrl);
-      console.log('📈 Stats API response status:', response.status, 'OK:', response.ok);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch folder statistics');
-      }
-      
-      const data = await response.json();
-      console.log('📈 Stats API response data:', data);
-      console.log('📈 Stats API response structure:', {
-        hasResults: 'results' in data,
-        hasCount: 'count' in data,
-        resultsLength: data.results?.length || 0,
-        totalCount: data.count || 0,
-        dataType: typeof data
-      });
-      
-      if (data && typeof data === 'object' && 'results' in data) {
-        const allPosts = data.results || [];
-        const uniqueUsers = [...new Set(allPosts.map((post: InstagramPost) => post.user_posted))].length;
-        const totalLikes = allPosts.reduce((acc: number, post: InstagramPost) => acc + post.likes, 0);
-        const avgLikes = allPosts.length > 0 ? Math.round(totalLikes / allPosts.length) : 0;
-        const verifiedAccounts = allPosts.filter((post: InstagramPost) => post.is_verified).length;
+      // Use different endpoint based on folder category
+      if (currentFolder?.category === 'comments') {
+        console.log('📈 Fetching comments folder stats...');
+        const statsApiUrl = `/api/instagram-data/comments/?${folderParam}&page_size=1000${projectParam}`;
+        console.log('📈 Fetching comments stats from:', statsApiUrl);
         
-        console.log('📈 Calculated stats:', {
-          totalPosts: data.count || 0,
-          uniqueUsers,
-          avgLikes,
-          verifiedAccounts,
-          actualPostsLength: allPosts.length
-        });
+        const response = await apiFetch(statsApiUrl);
+        console.log('📈 Comments stats API response status:', response.status, 'OK:', response.ok);
         
-        setFolderStats({
-          totalPosts: data.count || 0,
-          uniqueUsers,
-          avgLikes,
-          verifiedAccounts
-        });
+        if (!response.ok) {
+          throw new Error('Failed to fetch comments folder statistics');
+        }
+        
+        const data = await response.json();
+        console.log('📈 Comments stats API response data:', data);
+        
+        if (data && typeof data === 'object' && 'results' in data) {
+          const allComments = data.results || [];
+          const uniqueUsers = [...new Set(allComments.map((comment: InstagramComment) => comment.comment_user))].length;
+          const totalLikes = allComments.reduce((acc: number, comment: InstagramComment) => acc + comment.likes_number, 0);
+          const avgLikes = allComments.length > 0 ? Math.round(totalLikes / allComments.length) : 0;
+          // For comments, we don't have verified accounts info, so we'll set it to 0
+          const verifiedAccounts = 0;
+          
+          console.log('📈 Calculated comments stats:', {
+            totalComments: data.count || 0,
+            uniqueUsers,
+            avgLikes,
+            verifiedAccounts,
+            actualCommentsLength: allComments.length
+          });
+          
+          setFolderStats({
+            totalPosts: data.count || 0, // This represents total comments for comments folders
+            uniqueUsers,
+            avgLikes,
+            verifiedAccounts
+          });
+        }
+      } else {
+        // For posts/reels folders, use the posts endpoint
+        console.log('📈 Fetching posts folder stats...');
+        const statsApiUrl = `/api/instagram-data/posts/?${folderParam}&page_size=1000${projectParam}`;
+        console.log('📈 Fetching posts stats from:', statsApiUrl);
+        
+        const response = await apiFetch(statsApiUrl);
+        console.log('📈 Posts stats API response status:', response.status, 'OK:', response.ok);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch posts folder statistics');
+        }
+        
+        const data = await response.json();
+        console.log('📈 Posts stats API response data:', data);
+        
+        if (data && typeof data === 'object' && 'results' in data) {
+          const allPosts = data.results || [];
+          const uniqueUsers = [...new Set(allPosts.map((post: InstagramPost) => post.user_posted))].length;
+          const totalLikes = allPosts.reduce((acc: number, post: InstagramPost) => acc + post.likes, 0);
+          const avgLikes = allPosts.length > 0 ? Math.round(totalLikes / allPosts.length) : 0;
+          const verifiedAccounts = allPosts.filter((post: InstagramPost) => post.is_verified).length;
+          
+          console.log('📈 Calculated posts stats:', {
+            totalPosts: data.count || 0,
+            uniqueUsers,
+            avgLikes,
+            verifiedAccounts,
+            actualPostsLength: allPosts.length
+          });
+          
+          setFolderStats({
+            totalPosts: data.count || 0,
+            uniqueUsers,
+            avgLikes,
+            verifiedAccounts
+          });
+        }
       }
     } catch (error) {
       console.error('Error fetching folder statistics:', error);
@@ -372,11 +437,7 @@ const InstagramDataUpload = () => {
   // Check server status
   const checkServerStatus = async () => {
     try {
-      // Get project ID from URL params for the server status check
-      const queryParams = new URLSearchParams(location.search);
-      const projectId = queryParams.get('project');
-      
-      // Use a simple endpoint to check if server is running
+      // Use project ID from URL path params for the server status check
       // Include project parameter if available to avoid 404 from security filtering
       const endpoint = projectId ? `/api/instagram-data/folders/?project=${projectId}` : '/api/instagram-data/folders/';
       const response = await apiFetch(endpoint, { 
@@ -396,19 +457,29 @@ const InstagramDataUpload = () => {
     checkServerStatus();
   }, []);
 
-  // Initial data load
+  // Initial folder details load
   useEffect(() => {
-    fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter);
     if (folderId) {
       fetchFolderDetails();
-      fetchFolderStats();
     }
   }, [folderId]); // Only re-fetch when folder ID changes
   
+  // Fetch data after folder details are loaded
+  useEffect(() => {
+    if (folderId && currentFolder) {
+      console.log('📁 Folder details loaded, now fetching data...');
+      fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter);
+      fetchFolderStats();
+    }
+  }, [folderId, currentFolder]); // Re-fetch when folder ID or folder details change
+  
   // This effect handles pagination, search, and content type filter changes
   useEffect(() => {
-    fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter);
-  }, [page, rowsPerPage, searchTerm, contentTypeFilter]);
+    // Only fetch if we have both folderId and currentFolder loaded
+    if (folderId && currentFolder) {
+      fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter);
+    }
+  }, [page, rowsPerPage, searchTerm, contentTypeFilter, currentFolder]);
 
   // Handle file change
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -517,10 +588,13 @@ const InstagramDataUpload = () => {
       
       // Enhanced debugging and validation
       console.log('🔧 Upload Debug Info:');
+      console.log('🔧 Organization ID:', organizationId);
+      console.log('🔧 Project ID:', projectId);
       console.log('🔧 Folder ID:', folderId);
       console.log('🔧 Current folder object:', currentFolder);
       console.log('🔧 Folder category:', currentFolder?.category);
       console.log('🔧 File being uploaded:', uploadFile?.name);
+      console.log('🔧 File size:', uploadFile?.size);
       
       if (currentFolder?.category === 'comments') {
         uploadEndpoint = '/api/instagram-data/comments/upload_csv/';
@@ -546,8 +620,20 @@ const InstagramDataUpload = () => {
           },
         });
 
+        console.log('🔧 Upload response status:', response.status);
+        console.log('🔧 Upload response headers:', Object.fromEntries(response.headers.entries()));
+
         if (!response.ok) {
-          const errorData = await response.json();
+          const errorText = await response.text();
+          console.log('🔧 Upload error response text:', errorText);
+          
+          let errorData;
+          try {
+            errorData = JSON.parse(errorText);
+          } catch {
+            errorData = { error: errorText };
+          }
+          
           // Check for specific error messages
           let errorMessage = errorData.error || 'Upload failed';
           
@@ -566,6 +652,8 @@ const InstagramDataUpload = () => {
         }
 
         const data = await response.json();
+        console.log('🔧 Upload success response:', data);
+        
         let successMessage = `${data.message}`;
         
         if (data.detected_content_type) {
@@ -574,10 +662,28 @@ const InstagramDataUpload = () => {
         
         setUploadSuccess(successMessage);
         
-        // Refresh the post list and folder details
-        await fetchFolderDetails(); // Refresh folder details first
-        fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter);
-        fetchFolderStats();
+        // Reset pagination to first page to see new data
+        setPage(0);
+        
+        // Clear any existing search/filters to show all new data
+        setSearchTerm('');
+        setContentTypeFilter('all');
+        
+        // Add a small delay to ensure backend has finished processing
+        setTimeout(async () => {
+          // Clear any previous error states
+          setUploadError(null);
+          
+          // Refresh the data in the proper order
+          await fetchFolderDetails(); // Refresh folder details first
+          await fetchPosts(0, rowsPerPage, '', 'all'); // Reset to page 0 with no filters
+          fetchFolderStats(); // Update statistics
+          
+          // Clear success message after 5 seconds
+          setTimeout(() => {
+            setUploadSuccess(null);
+          }, 5000);
+        }, 500); // 500ms delay to ensure backend processing is complete
         
         // Reset file input
         setUploadFile(null);
@@ -589,6 +695,12 @@ const InstagramDataUpload = () => {
         }
       } catch (networkError) {
         console.error('Network error:', networkError);
+        console.log('🔧 Network error details:', {
+          name: networkError instanceof Error ? networkError.name : 'Unknown',
+          message: networkError instanceof Error ? networkError.message : String(networkError),
+          stack: networkError instanceof Error ? networkError.stack : undefined
+        });
+        
         // Show more helpful error message
         if (networkError instanceof TypeError && networkError.message.includes('Failed to fetch')) {
           throw new Error('Failed to connect to the server. Please check if the backend server is running and try again.');
@@ -612,9 +724,11 @@ const InstagramDataUpload = () => {
       const folderParam = folderId ? `folder_id=${folderId}` : '';
       // Add content type parameter
       const contentTypeParam = contentType ? `&content_type=${contentType}` : '';
+      // Add project parameter if available for consistency
+      const projectParam = projectId ? `&project=${projectId}` : '';
       
       const response = await apiFetch(
-        `/api/instagram-data/posts/download_csv/?${folderParam}${contentTypeParam}`,
+        `/api/instagram-data/posts/download_csv/?${folderParam}${contentTypeParam}${projectParam}`,
         {
           method: 'GET',
           headers: {
@@ -686,21 +800,26 @@ const InstagramDataUpload = () => {
 
   // Redirect to folders view
   const handleGoToFolders = () => {
-    // Extract organization and project IDs from URL
-    const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
-    
-    if (match) {
-      const [, orgId, projId] = match;
-      navigate(`/organizations/${orgId}/projects/${projId}/instagram-folders`);
+    // Check if we're on the new organized URL structure (with org and project IDs)
+    if (organizationId && projectId) {
+      navigate(`/organizations/${organizationId}/projects/${projectId}/instagram-folders`);
     } else {
-      // Get project ID from URL query parameter
-      const queryParams = new URLSearchParams(location.search);
-      const projectId = queryParams.get('project');
+      // Fallback to check if we're on the legacy URL structure with path params
+      const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)\//);
       
-      if (projectId) {
-        navigate(`/instagram-folders?project=${projectId}`);
+      if (match) {
+        const [, orgId, projId] = match;
+        navigate(`/organizations/${orgId}/projects/${projId}/instagram-folders`);
       } else {
-        navigate('/instagram-folders');
+        // Legacy fallback - try query parameters
+        const queryParams = new URLSearchParams(location.search);
+        const projectIdFromQuery = queryParams.get('project');
+        
+        if (projectIdFromQuery) {
+          navigate(`/instagram-folders?project=${projectIdFromQuery}`);
+        } else {
+          navigate('/instagram-folders');
+        }
       }
     }
   };
@@ -784,11 +903,21 @@ const InstagramDataUpload = () => {
               variant="outlined"
               startIcon={<RefreshIcon />}
               onClick={() => {
-                fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter);
+                // Clear any error states
+                setUploadError(null);
+                setUploadSuccess(null);
+                
+                // Reset page to 0 to ensure we see all data
+                setPage(0);
+                
+                // Refresh all data
+                fetchPosts(0, rowsPerPage, searchTerm, contentTypeFilter);
                 fetchFolderStats();
+                fetchFolderDetails();
               }}
+              disabled={isLoading}
             >
-              Refresh
+              {isLoading ? 'Refreshing...' : 'Refresh'}
             </Button>
             <Button
               variant="outlined"
@@ -1347,11 +1476,21 @@ const InstagramDataUpload = () => {
                       variant="outlined"
                       startIcon={<RefreshIcon />}
                       onClick={() => {
-                        fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter);
+                        // Clear any error states
+                        setUploadError(null);
+                        setUploadSuccess(null);
+                        
+                        // Reset page to 0 to ensure we see all data
+                        setPage(0);
+                        
+                        // Refresh all data
+                        fetchPosts(0, rowsPerPage, searchTerm, contentTypeFilter);
                         fetchFolderStats();
+                        fetchFolderDetails();
                       }}
+                      disabled={isLoading}
                     >
-                      Refresh Data
+                      {isLoading ? 'Refreshing...' : 'Refresh'}
                     </Button>
                   </Stack>
                 </CardContent>

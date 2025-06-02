@@ -30,6 +30,7 @@ import {
   InputLabel,
   SelectChangeEvent,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
@@ -49,6 +50,7 @@ interface Organization {
 
 const OrganizationsList = () => {
   const navigate = useNavigate();
+  const theme = useTheme();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [openNewDialog, setOpenNewDialog] = useState(false);
@@ -342,7 +344,7 @@ const OrganizationsList = () => {
                       sx={{ cursor: 'pointer' }}
                       onClick={() => handleOpenOrganization(org.id)}
                     >
-                      <TableCell sx={{ color: '#1a73e8', fontWeight: 500 }}>{org.name}</TableCell>
+                      <TableCell sx={{ color: theme.palette.primary.main, fontWeight: 500 }}>{org.name}</TableCell>
                       <TableCell>{org.owner_name}</TableCell>
                       <TableCell>{org.members_count}</TableCell>
                       <TableCell>-</TableCell>

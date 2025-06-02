@@ -2,6 +2,17 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
+/* Define color theme variables */
+:root {
+  --color-primary: #D291E2;    /* Purple */
+  --color-secondary: #6EE5D9;  /* Teal */
+  --color-tertiary: #62EF83;   /* Green */
+  --color-accent: #A6FDED;     /* Light cyan */
+  --color-background: #FFFFFF; /* White */
+  --color-foreground: #000000; /* Black */
+  --color-muted: #666666;      /* Gray */
+}
+
 /* Global compact styling overrides */
 * {
   box-sizing: border-box;
@@ -40,7 +51,7 @@
 
 .MuiTableCell-root {
   padding: 8px 12px !important;
-  border-bottom: 1px solid rgba(224, 224, 224, 0.8) !important;
+  border-bottom: 1px solid var(--color-accent) !important;
 }
 
 /* More compact form elements */
@@ -94,22 +105,22 @@ main {
   }
 }
 
-/* Compact scrollbar styling */
+/* Compact scrollbar styling using theme colors */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--color-accent);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: var(--color-secondary);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #a1a1a1;
+  background: var(--color-primary);
 }

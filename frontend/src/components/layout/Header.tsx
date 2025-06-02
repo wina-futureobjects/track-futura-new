@@ -39,6 +39,7 @@ import {
   Dataset as DatabaseIcon,
   Hub as HubIcon,
   BusinessOutlined as BusinessOutlinedIcon,
+  Settings as SettingsIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { logout, getUserRole, getCurrentUser } from '../../utils/auth';
@@ -75,9 +76,111 @@ const getPageTitle = (pathname: string): string => {
   // Handle empty paths
   if (parts.length === 0) return 'Dashboard';
   
+  // Check for specific patterns first
+  
+  // Handle Instagram data pages: /organizations/3/projects/14/instagram-data/20
+  if (parts.includes('instagram-data')) {
+    return 'Instagram Data';
+  }
+  
+  // Handle Facebook data pages: /organizations/3/projects/14/facebook-data/20
+  if (parts.includes('facebook-data')) {
+    return 'Facebook Data';
+  }
+  
+  // Handle LinkedIn data pages: /organizations/3/projects/14/linkedin-data/20
+  if (parts.includes('linkedin-data')) {
+    return 'LinkedIn Data';
+  }
+  
+  // Handle TikTok data pages: /organizations/3/projects/14/tiktok-data/20
+  if (parts.includes('tiktok-data')) {
+    return 'TikTok Data';
+  }
+  
+  // Handle folder pages
+  if (parts.includes('instagram-folders')) {
+    return 'Instagram Folders';
+  }
+  if (parts.includes('facebook-folders')) {
+    return 'Facebook Folders';
+  }
+  if (parts.includes('linkedin-folders')) {
+    return 'LinkedIn Folders';
+  }
+  if (parts.includes('tiktok-folders')) {
+    return 'TikTok Folders';
+  }
+  
+  // Handle report pages
+  if (parts.includes('report-folders') || parts.includes('reports')) {
+    return 'Reports';
+  }
+  
+  // Handle track accounts pages
+  if (parts.includes('track-accounts') || parts.includes('source-tracking')) {
+    return 'Source Tracking';
+  }
+  
+  // Handle analysis pages
+  if (parts.includes('analysis')) {
+    return 'AI Analysis';
+  }
+  
+  // Handle settings pages
+  if (parts.includes('settings')) {
+    return 'Settings';
+  }
+  
+  // Handle brightdata pages
+  if (parts.includes('brightdata-settings')) {
+    return 'Brightdata Settings';
+  }
+  if (parts.includes('brightdata-scraper')) {
+    return 'Brightdata Scraper';
+  }
+  
+  // Handle admin pages
+  if (parts.includes('super')) {
+    return 'Super Admin Dashboard';
+  }
+  if (parts.includes('tenant')) {
+    return 'Tenant Admin Dashboard';
+  }
+  
+  // Handle organization and project pages
+  if (parts.includes('organizations') && parts.includes('projects')) {
+    // Check if we're at a specific project page: /organizations/1/projects/2
+    const orgIndex = parts.indexOf('organizations');
+    const projIndex = parts.indexOf('projects');
+    if (orgIndex >= 0 && projIndex === orgIndex + 2 && parts.length === projIndex + 2) {
+      return 'Dashboard'; // Root project page shows as Dashboard
+    }
+    if (parts.length > projIndex + 2) {
+      // We're in a sub-page of the project, continue to check other patterns
+      // This will be handled by the specific checks above
+    }
+  }
+  
+  // Handle legacy dashboard pages
+  if (parts.includes('dashboard')) {
+    return 'Dashboard';
+  }
+  
+  // If we reach here, get the last meaningful part and format it
   const lastPart = parts[parts.length - 1];
   
-  // Map of route paths to display names
+  // Safety check for undefined or empty lastPart
+  if (!lastPart) return 'Dashboard';
+  
+  // Skip numeric IDs (folder IDs, project IDs, etc.)
+  let meaningfulPart = lastPart;
+  if (/^\d+$/.test(lastPart) && parts.length > 1) {
+    // If last part is just a number, use the second to last part
+    meaningfulPart = parts[parts.length - 2];
+  }
+  
+  // Map of route paths to display names for fallback
   const routeNames: Record<string, string> = {
     'dashboard': 'Dashboard',
     'instagram-folders': 'Instagram Folders',
@@ -88,9 +191,12 @@ const getPageTitle = (pathname: string): string => {
     'linkedin-data': 'LinkedIn Data',
     'tiktok-folders': 'TikTok Folders',
     'tiktok-data': 'TikTok Data',
-    'track-accounts': 'Track Accounts',
+    'track-accounts': 'Source Tracking',
+    'source-tracking': 'Source Tracking',
+    'analysis': 'AI Analysis',
     'settings': 'Settings',
     'report-folders': 'Reports',
+    'reports': 'Reports',
     'brightdata-settings': 'Brightdata Settings',
     'brightdata-scraper': 'Brightdata Scraper',
     'super': 'Super Admin Dashboard',
@@ -99,11 +205,8 @@ const getPageTitle = (pathname: string): string => {
     'organizations': 'Organizations',
   };
   
-  // Safety check for undefined or empty lastPart
-  if (!lastPart) return 'Dashboard';
-  
   // If we have a mapping, use it; otherwise, format the string
-  return routeNames[lastPart] || lastPart.charAt(0).toUpperCase() + lastPart.slice(1).replace(/-/g, ' ');
+  return routeNames[meaningfulPart] || meaningfulPart.charAt(0).toUpperCase() + meaningfulPart.slice(1).replace(/-/g, ' ');
 };
 
 // Extract organization and project IDs/names from path
@@ -341,7 +444,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
           justifyContent: 'center',
           fontWeight: 600,
           fontSize: '16px',
-          color: '#2c3e50',
+          color: theme => theme.palette.text.primary,
           textDecoration: 'none',
           cursor: 'pointer',
           height: '60px',
@@ -372,7 +475,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
       {organizationId && (
         <Typography 
           sx={{ 
-            color: '#9e9e9e', 
+            color: theme => theme.palette.text.secondary, 
             fontSize: '16px',
             fontWeight: 300,
             display: 'flex',
@@ -397,7 +500,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#2c3e50',
+            color: theme => theme.palette.text.primary,
             textDecoration: 'none',
             cursor: 'pointer',
             height: '60px',
@@ -408,8 +511,8 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
             border: 'none',
             background: 'none',
             '&:hover': {
-              color: theme.palette.primary.main,
-              backgroundColor: 'rgba(225, 37, 27, 0.04)',
+              color: theme => theme.palette.primary.main,
+              backgroundColor: theme => `rgba(210, 145, 226, 0.04)`,
             }
           }}
         >
@@ -428,7 +531,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
       {isProjectsListPath && (
         <Typography 
           sx={{ 
-            color: '#9e9e9e', 
+            color: theme => theme.palette.text.secondary, 
             fontSize: '16px',
             fontWeight: 300,
             display: 'flex',
@@ -447,7 +550,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
           sx={{ 
             fontWeight: 500,
             fontSize: '15px',
-            color: '#2c3e50',
+            color: theme => theme.palette.text.primary,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -464,7 +567,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
       {isProjectPath && projectId && (
         <Typography 
           sx={{ 
-            color: '#9e9e9e', 
+            color: theme => theme.palette.text.secondary, 
             fontSize: '16px',
             fontWeight: 300,
             display: 'flex',
@@ -489,7 +592,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#2c3e50',
+            color: theme => theme.palette.text.primary,
             textDecoration: 'none',
             cursor: 'pointer',
             height: '60px',
@@ -500,8 +603,8 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
             border: 'none',
             background: 'none',
             '&:hover': {
-              color: theme.palette.primary.main,
-              backgroundColor: 'rgba(225, 37, 27, 0.04)',
+              color: theme => theme.palette.primary.main,
+              backgroundColor: theme => `rgba(210, 145, 226, 0.04)`,
             }
           }}
         >
@@ -516,11 +619,11 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
         </Box>
       )}
       
-      {/* Separator */}
-      {isProjectPath && showDashboardLabel && (
+      {/* Separator for current page - Show when we have a project and will show current page */}
+      {projectId && (
         <Typography 
           sx={{ 
-            color: '#9e9e9e', 
+            color: theme => theme.palette.text.secondary, 
             fontSize: '16px',
             fontWeight: 300,
             display: 'flex',
@@ -533,13 +636,13 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
         </Typography>
       )}
       
-      {/* Current page (only in project and not at root project URL) */}
-      {isProjectPath && showDashboardLabel && (
+      {/* Current page - Show for all project contexts */}
+      {projectId && (
         <Typography
           sx={{ 
             fontWeight: 500,
             fontSize: '15px',
-            color: '#2c3e50',
+            color: theme => theme.palette.text.primary,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -547,104 +650,11 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
             lineHeight: 1,
           }}
         >
-          <DashboardOutlinedIcon sx={{ mr: 0.5, fontSize: 18 }} />
-          Dashboard
-        </Typography>
-      )}
-      
-      {/* Separator */}
-      {projectId && !isProjectPath && !isProjectsListPath && (
-        <Typography 
-          sx={{ 
-            color: '#9e9e9e', 
-            fontSize: '16px',
-            fontWeight: 300,
-            display: 'flex',
-            alignItems: 'center',
-            height: '60px',
-            lineHeight: 1,
-          }}
-        >
-          |
-        </Typography>
-      )}
-      
-      {/* Legacy project (if not using the new URL pattern) */}
-      {projectId && !isProjectPath && !isProjectsListPath && (
-        <Box
-          component="button"
-          onClick={handleProjectDropdownOpen}
-          aria-describedby={projectDropdownId}
-          sx={{ 
-            fontWeight: 500,
-            fontSize: '15px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#2c3e50',
-            textDecoration: 'none',
-            height: '60px',
-            padding: '0 8px',
-            borderRadius: '6px',
-            transition: 'all 0.2s ease',
-            lineHeight: 1,
-            border: 'none',
-            background: 'none',
-            cursor: 'pointer',
-            '&:hover': {
-              color: theme.palette.primary.main,
-              backgroundColor: 'rgba(225, 37, 27, 0.04)',
-            }
-          }}
-        >
-          <FolderOutlinedIcon sx={{ mr: 0.5, fontSize: 18 }} />
-          {projectName}
-          <KeyboardArrowDown sx={{ 
-            ml: 0.5, 
-            fontSize: 18,
-            transition: 'transform 0.2s ease',
-            transform: projectDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)'
-          }} />
-        </Box>
-      )}
-      
-      {/* Separator */}
-      {(isDashboardPath || (projectId && !isProjectPath && !isProjectsListPath)) && currentPage !== 'Dashboard' && (
-        <Typography 
-          sx={{ 
-            color: '#9e9e9e', 
-            fontSize: '16px',
-            fontWeight: 300,
-            display: 'flex',
-            alignItems: 'center',
-            height: '60px',
-            lineHeight: 1,
-          }}
-        >
-          |
-        </Typography>
-      )}
-      
-      {/* Current page (if not at dashboard root) */}
-      {(isDashboardPath || (projectId && !isProjectPath && !isProjectsListPath)) && currentPage !== 'Dashboard' && (
-        <Typography
-          sx={{ 
-            fontWeight: 500,
-            fontSize: '15px',
-            color: '#2c3e50',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '60px',
-            lineHeight: 1,
-          }}
-        >
-          <DashboardOutlinedIcon sx={{ mr: 0.5, fontSize: 18 }} />
           {currentPage}
         </Typography>
       )}
     </Box>
-  ), [theme, navigate, organizationId, organizationName, handleOrgDropdownOpen, orgDropdownId, orgDropdownOpen, isProjectsListPath, isProjectPath, projectId, projectName, handleProjectDropdownOpen, projectDropdownId, projectDropdownOpen, showDashboardLabel, isDashboardPath, currentPage]);
+  ), [theme, navigate, organizationId, organizationName, handleOrgDropdownOpen, orgDropdownId, orgDropdownOpen, isProjectsListPath, isProjectPath, projectId, projectName, handleProjectDropdownOpen, projectDropdownId, projectDropdownOpen, showDashboardLabel, isDashboardPath, currentPage, location.pathname]);
 
   // Handle menu operations
   const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
@@ -784,14 +794,14 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
         </Typography>
       </Box>
       
-      <Divider sx={{ my: 1, borderColor: '#f0f0f0' }} />
+      <Divider sx={{ my: 1, borderColor: theme => theme.palette.grey[200] }} />
       
       <MenuItem 
         onClick={() => { handleMenuClose(); navigate('/settings'); }}
         sx={{ 
           fontSize: '14px',
           py: 1,
-          '&:hover': { backgroundColor: '#f8f9fa' }
+          '&:hover': { backgroundColor: theme => `rgba(166, 253, 237, 0.1)` }
         }}
       >
         Account
@@ -802,7 +812,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
         sx={{ 
           fontSize: '14px',
           py: 1,
-          '&:hover': { backgroundColor: '#f8f9fa' }
+          '&:hover': { backgroundColor: theme => `rgba(166, 253, 237, 0.1)` }
         }}
       >
         Billing
@@ -816,7 +826,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
         sx={{ 
           fontSize: '14px',
           py: 1,
-          '&:hover': { backgroundColor: '#f8f9fa' }
+          '&:hover': { backgroundColor: theme => `rgba(166, 253, 237, 0.1)` }
         }}
       >
         Organization settings
@@ -827,7 +837,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
         sx={{ 
           fontSize: '14px',
           py: 1,
-          '&:hover': { backgroundColor: '#f8f9fa' }
+          '&:hover': { backgroundColor: theme => `rgba(166, 253, 237, 0.1)` }
         }}
       >
         Product releases
@@ -836,21 +846,21 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
         </Box>
       </MenuItem>
       
-      <MenuItem sx={{ fontSize: '14px', py: 1, '&:hover': { backgroundColor: '#f8f9fa' } }}>
+      <MenuItem sx={{ fontSize: '14px', py: 1, '&:hover': { backgroundColor: theme => `rgba(166, 253, 237, 0.1)` } }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
           <span>Theme: Light</span>
           <LightIcon fontSize="small" />
         </Box>
       </MenuItem>
       
-      <Divider sx={{ my: 1, borderColor: '#f0f0f0' }} />
+      <Divider sx={{ my: 1, borderColor: theme => theme.palette.grey[200] }} />
       
       <MenuItem 
         onClick={handleLogout}
         sx={{ 
           fontSize: '14px',
           py: 1,
-          '&:hover': { backgroundColor: '#f8f9fa' }
+          '&:hover': { backgroundColor: theme => `rgba(166, 253, 237, 0.1)` }
         }}
       >
         Log out
@@ -864,9 +874,9 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
         position="fixed" 
         sx={{ 
           backgroundColor: '#ffffff',
-          color: '#2c3e50',
+          color: theme => theme.palette.text.primary,
           boxShadow: 'none',
-          borderBottom: '1px solid #e8eaed',
+          borderBottom: theme => `1px solid ${theme.palette.grey[300]}`,
           borderRadius: 0,
           zIndex: (theme) => theme.zIndex.drawer + 1,
           top: '28px',
@@ -893,8 +903,8 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
             sx={{ 
               flexShrink: 0,
               '&:hover': {
-                backgroundColor: 'rgba(225, 37, 27, 0.08)',
-                color: '#E1251B',
+                backgroundColor: theme => `rgba(210, 145, 226, 0.08)`,
+                color: theme => theme.palette.primary.main,
               }
             }}
             onClick={onToggle}
@@ -916,10 +926,10 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
                 clickable
                 onClick={handleNavigateToAdmin}
                 sx={{ 
-                  backgroundColor: '#E1251B',
-                  color: '#FFFFFF',
+                  backgroundColor: theme => theme.palette.primary.main,
+                  color: theme => theme.palette.primary.contrastText,
                   '&:hover': {
-                    backgroundColor: '#B31D15',
+                    backgroundColor: theme => theme.palette.primary.dark,
                   }
                 }}
               />
@@ -930,14 +940,14 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
               sx={{ 
                 textTransform: 'none', 
                 fontWeight: 500,
-                color: '#2c3e50',
+                color: theme => theme.palette.text.primary,
                 fontSize: '14px',
                 px: 2,
                 py: 1,
                 borderRadius: '8px',
                 '&:hover': {
-                  backgroundColor: 'rgba(225, 37, 27, 0.04)',
-                  color: '#E1251B',
+                  backgroundColor: theme => `rgba(210, 145, 226, 0.04)`,
+                  color: theme => theme.palette.primary.main,
                 }
               }}
               onClick={() => {}}
@@ -950,14 +960,14 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
               sx={{ 
                 textTransform: 'none', 
                 fontWeight: 500,
-                color: '#2c3e50',
+                color: theme => theme.palette.text.primary,
                 fontSize: '14px',
                 px: 2,
                 py: 1,
                 borderRadius: '8px',
                 '&:hover': {
-                  backgroundColor: 'rgba(225, 37, 27, 0.04)',
-                  color: '#E1251B',
+                  backgroundColor: theme => `rgba(210, 145, 226, 0.04)`,
+                  color: theme => theme.palette.primary.main,
                 }
               }}
               onClick={() => navigate('/settings')}
@@ -973,7 +983,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
                 p: 1,
                 borderRadius: '8px',
                 '&:hover': { 
-                  backgroundColor: 'rgba(225, 37, 27, 0.04)',
+                  backgroundColor: theme => `rgba(210, 145, 226, 0.04)`,
                 }
               }}
               onClick={handleProfileMenuOpen}
@@ -983,8 +993,8 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
                   width: 32, 
                   height: 32,
                   fontSize: '14px',
-                  bgcolor: '#E1251B',
-                  color: '#FFFFFF'
+                  bgcolor: theme => theme.palette.primary.main,
+                  color: theme => theme.palette.primary.contrastText,
                 }}
               >
                 {userName ? userName.substring(0, 2).toUpperCase() : 'U'}
@@ -1014,7 +1024,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
           '& .MuiPaper-root': {
             borderRadius: 0,
             boxShadow: 'none',
-            border: '1px solid #e0e0e0',
+            border: theme => `1px solid ${theme.palette.grey[300]}`,
             minWidth: '240px',
           }
         }}
@@ -1025,36 +1035,71 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
               <CircularProgress size={24} />
             </Box>
           ) : (
-            organizations.map((org) => (
-              <ListItemButton 
-                key={org.id} 
-                onClick={() => handleOrganizationSelect(org.id)}
-                selected={organizationId === org.id.toString()}
-                sx={{
-                  mx: 1,
-                  borderRadius: 0,
-                  '&:hover': { backgroundColor: '#f8f9fa' },
-                  '&.Mui-selected': { 
-                    backgroundColor: 'rgba(225, 37, 27, 0.08)',
-                    '&:hover': { backgroundColor: 'rgba(225, 37, 27, 0.12)' }
-                  }
-                }}
-              >
-                <ListItemText 
-                  primary={org.name} 
-                  secondary={org.description || ''}
-                  primaryTypographyProps={{ 
-                    noWrap: true,
-                    fontSize: '14px',
-                    fontWeight: 500
+            <>
+              {organizations.map((org) => (
+                <ListItemButton 
+                  key={org.id} 
+                  onClick={() => handleOrganizationSelect(org.id)}
+                  selected={organizationId === org.id.toString()}
+                  sx={{
+                    mx: 1,
+                    borderRadius: 0,
+                    '&:hover': { backgroundColor: theme => `rgba(166, 253, 237, 0.1)` },
+                    '&.Mui-selected': { 
+                      backgroundColor: theme => `rgba(98, 239, 131, 0.08)`,
+                      '&:hover': { backgroundColor: theme => `rgba(98, 239, 131, 0.12)` }
+                    }
                   }}
-                  secondaryTypographyProps={{ 
-                    noWrap: true,
-                    fontSize: '12px'
-                  }}
-                />
-              </ListItemButton>
-            ))
+                >
+                  <ListItemText 
+                    primary={org.name} 
+                    secondary={org.description || ''}
+                    primaryTypographyProps={{ 
+                      noWrap: true,
+                      fontSize: '14px',
+                      fontWeight: 500
+                    }}
+                    secondaryTypographyProps={{ 
+                      noWrap: true,
+                      fontSize: '12px'
+                    }}
+                  />
+                </ListItemButton>
+              ))}
+              {organizations.length > 0 && (
+                <>
+                  <Divider sx={{ my: 1 }} />
+                  <ListItemButton 
+                    onClick={() => {
+                      if (organizationId) {
+                        navigate(`/organizations/${organizationId}/projects`);
+                      } else {
+                        navigate('/organizations');
+                      }
+                      handleOrgDropdownClose();
+                    }}
+                    sx={{
+                      mx: 1,
+                      borderRadius: 0,
+                      '&:hover': { backgroundColor: theme => `rgba(166, 253, 237, 0.1)` }
+                    }}
+                  >
+                    <ListItemText 
+                      primary="View All Projects"
+                      primaryTypographyProps={{ 
+                        fontSize: '14px',
+                        fontWeight: 500
+                      }}
+                      sx={{
+                        '& .MuiListItemText-primary': {
+                          color: theme => theme.palette.primary.main
+                        }
+                      }}
+                    />
+                  </ListItemButton>
+                </>
+              )}
+            </>
           )}
         </List>
       </Popover>
@@ -1089,36 +1134,71 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
               <CircularProgress size={24} />
             </Box>
           ) : (
-            projects.map((project) => (
-              <ListItemButton 
-                key={project.id} 
-                onClick={() => handleProjectSelect(project.id)}
-                selected={projectId === project.id.toString()}
-                sx={{
-                  mx: 1,
-                  borderRadius: 0,
-                  '&:hover': { backgroundColor: '#f8f9fa' },
-                  '&.Mui-selected': { 
-                    backgroundColor: 'rgba(225, 37, 27, 0.08)',
-                    '&:hover': { backgroundColor: 'rgba(225, 37, 27, 0.12)' }
-                  }
-                }}
-              >
-                <ListItemText 
-                  primary={project.name} 
-                  secondary={project.description || ''}
-                  primaryTypographyProps={{ 
-                    noWrap: true,
-                    fontSize: '14px',
-                    fontWeight: 500
+            <>
+              {projects.map((project) => (
+                <ListItemButton 
+                  key={project.id} 
+                  onClick={() => handleProjectSelect(project.id)}
+                  selected={projectId === project.id.toString()}
+                  sx={{
+                    mx: 1,
+                    borderRadius: 0,
+                    '&:hover': { backgroundColor: '#f8f9fa' },
+                    '&.Mui-selected': { 
+                      backgroundColor: 'rgba(225, 37, 27, 0.08)',
+                      '&:hover': { backgroundColor: 'rgba(225, 37, 27, 0.12)' }
+                    }
                   }}
-                  secondaryTypographyProps={{ 
-                    noWrap: true,
-                    fontSize: '12px'
-                  }}
-                />
-              </ListItemButton>
-            ))
+                >
+                  <ListItemText 
+                    primary={project.name} 
+                    secondary={project.description || ''}
+                    primaryTypographyProps={{ 
+                      noWrap: true,
+                      fontSize: '14px',
+                      fontWeight: 500
+                    }}
+                    secondaryTypographyProps={{ 
+                      noWrap: true,
+                      fontSize: '12px'
+                    }}
+                  />
+                </ListItemButton>
+              ))}
+              {projects.length > 0 && (
+                <>
+                  <Divider sx={{ my: 1 }} />
+                  <ListItemButton 
+                    onClick={() => {
+                      if (organizationId) {
+                        navigate(`/organizations/${organizationId}/projects`);
+                      } else {
+                        navigate('/organizations');
+                      }
+                      handleProjectDropdownClose();
+                    }}
+                    sx={{
+                      mx: 1,
+                      borderRadius: 0,
+                      '&:hover': { backgroundColor: '#f8f9fa' }
+                    }}
+                  >
+                    <ListItemText 
+                      primary="View All Projects"
+                      primaryTypographyProps={{ 
+                        fontSize: '14px',
+                        fontWeight: 500
+                      }}
+                      sx={{
+                        '& .MuiListItemText-primary': {
+                          color: theme => theme.palette.primary.main
+                        }
+                      }}
+                    />
+                  </ListItemButton>
+                </>
+              )}
+            </>
           )}
         </List>
       </Popover>

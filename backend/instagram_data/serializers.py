@@ -108,7 +108,9 @@ class FolderSerializer(serializers.ModelSerializer):
         return instance
     
     def get_post_count(self, obj):
-        return obj.posts.filter(content_type='post').count()
+        # Fix: exclude reels instead of filtering for non-existent 'post' content_type
+        # Posts are content_type='Image' or 'Carousel', reels are content_type='reel'
+        return obj.posts.exclude(content_type='reel').count()
     
     def get_reel_count(self, obj):
         return obj.posts.filter(content_type='reel').count()

@@ -1025,9 +1025,9 @@ class InstagramCommentViewSet(viewsets.ModelViewSet):
         """
         Upload CSV file and parse Instagram comment data
         """
-        print("🔧 Instagram Comments Upload - Method called!")
-        print(f"🔧 Request data: {dict(request.data)}")
-        print(f"🔧 Request files: {list(request.FILES.keys())}")
+        print("Instagram Comments Upload - Method called!")
+        print(f"Request data: {dict(request.data)}")
+        print(f"Request files: {list(request.FILES.keys())}")
         
         try:
             csv_file = request.FILES.get('file')
@@ -1035,22 +1035,22 @@ class InstagramCommentViewSet(viewsets.ModelViewSet):
                 return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
             
             folder_id = request.data.get('folder_id')
-            print(f"🔧 Folder ID from request: {folder_id}")
+            print(f"Folder ID from request: {folder_id}")
             
             folder = None
             if folder_id:
                 try:
                     folder = Folder.objects.get(id=folder_id)
-                    print(f"🔧 Found folder: {folder.name} (ID: {folder.id}, Category: {folder.category})")
+                    print(f"Found folder: {folder.name} (ID: {folder.id}, Category: {folder.category})")
                     # Verify this is a comments folder
                     if folder.category != 'comments':
-                        print(f"🔧 ERROR: Folder category is '{folder.category}', not 'comments'")
+                        print(f"ERROR: Folder category is '{folder.category}', not 'comments'")
                         return Response(
                             {'error': 'Selected folder is not configured for comments'},
                             status=status.HTTP_400_BAD_REQUEST
                         )
                 except Folder.DoesNotExist:
-                    print(f"🔧 ERROR: Folder with ID {folder_id} does not exist")
+                    print(f"ERROR: Folder with ID {folder_id} does not exist")
                     return Response(
                         {'error': f'Folder with id {folder_id} does not exist'},
                         status=status.HTTP_400_BAD_REQUEST
@@ -1346,7 +1346,7 @@ class InstagramCommentViewSet(viewsets.ModelViewSet):
                         # Create a new record
                         new_comment = InstagramComment.objects.create(**comment_data)
                         rows_added += 1
-                        print(f"🔧 CREATED NEW COMMENT IN InstagramComment TABLE: ID={new_comment.id}, comment_id={new_comment.comment_id}")
+                        print(f"CREATED NEW COMMENT IN InstagramComment TABLE: ID={new_comment.id}, comment_id={new_comment.comment_id}")
                         # Safe logging without Unicode characters that might cause console issues
                         safe_comment_id_for_log = str(comment_id).encode('ascii', errors='replace').decode('ascii')
                         print(f"Created new comment: {safe_comment_id_for_log}")

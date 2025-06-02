@@ -17,8 +17,6 @@ import {
   IconButton,
   CircularProgress,
   Divider,
-  Breadcrumbs,
-  Link,
   ToggleButtonGroup,
   ToggleButton,
   TableContainer,
@@ -33,6 +31,11 @@ import {
   Select,
   MenuItem,
   Chip,
+  Snackbar,
+  Alert,
+  Menu,
+  ListItemIcon,
+  ListItemText,
 } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
@@ -41,7 +44,6 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import GridViewIcon from '@mui/icons-material/GridView';
 import ViewListIcon from '@mui/icons-material/ViewList';
-import HomeIcon from '@mui/icons-material/Home';
 import PostAddIcon from '@mui/icons-material/PostAdd';
 import CommentIcon from '@mui/icons-material/Comment';
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
@@ -478,23 +480,6 @@ const InstagramFolders = () => {
   return (
     <Container maxWidth="xl">
       <Box sx={{ my: 4 }}>
-        {/* Breadcrumbs */}
-        <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
-          <Link 
-            underline="hover" 
-            sx={{ display: 'flex', alignItems: 'center' }}
-            color="inherit" 
-            href="/"
-          >
-            <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            Home
-          </Link>
-          <Typography color="text.primary" sx={{ display: 'flex', alignItems: 'center' }}>
-            <FolderIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            Instagram Data
-          </Typography>
-        </Breadcrumbs>
-
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Typography variant="h4" component="h1" gutterBottom>
             Instagram Data Folders

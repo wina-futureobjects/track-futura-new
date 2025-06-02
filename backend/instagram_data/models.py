@@ -30,9 +30,11 @@ class Folder(models.Model):
     def get_content_count(self):
         """Get the count of content items in this folder based on category"""
         if self.category == 'posts':
-            return self.posts.count()
+            # Posts should exclude reels (content_type='reel')
+            return self.posts.exclude(content_type='reel').count()
         elif self.category == 'reels':
-            return self.posts.filter(product_type='clips').count()
+            # Reels have content_type='reel'
+            return self.posts.filter(content_type='reel').count()
         elif self.category == 'comments':
             return self.comments.count()
         return 0

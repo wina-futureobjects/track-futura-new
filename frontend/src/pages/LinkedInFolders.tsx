@@ -30,15 +30,12 @@ import {
   TableCell,
   ToggleButtonGroup,
   ToggleButton,
-  Link,
-  Breadcrumbs,
 } from '@mui/material';
 import {
   Add as AddIcon,
   Folder as FolderIcon,
   Delete as DeleteIcon,
   Edit as EditIcon,
-  Home as HomeIcon,
   ViewList as ViewListIcon,
   GridView as GridViewIcon,
 } from '@mui/icons-material';
@@ -443,23 +440,6 @@ const LinkedInFolders = () => {
   return (
     <Container maxWidth="xl">
       <Box sx={{ my: 4 }}>
-        {/* Breadcrumbs */}
-        <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
-          <Link 
-            underline="hover" 
-            sx={{ display: 'flex', alignItems: 'center' }}
-            color="inherit" 
-            href="/"
-          >
-            <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            Home
-          </Link>
-          <Typography color="text.primary" sx={{ display: 'flex', alignItems: 'center' }}>
-            <FolderIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            LinkedIn Data
-          </Typography>
-        </Breadcrumbs>
-
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Typography variant="h4" component="h1" gutterBottom>
             LinkedIn Data Folders

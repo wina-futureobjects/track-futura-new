@@ -395,7 +395,7 @@ const ProjectsList = () => {
                       sx={{ cursor: 'pointer' }}
                       onClick={() => handleOpenProject(project.id)}
                     >
-                      <TableCell sx={{ color: '#1a73e8', fontWeight: 500 }}>{project.name}</TableCell>
+                      <TableCell sx={{ color: theme => theme.palette.primary.main, fontWeight: 500 }}>{project.name}</TableCell>
                       <TableCell>
                         {project.id.toString().padStart(8, '0').substring(0, 8)}
                       </TableCell>

@@ -11,6 +11,13 @@ export const getApiBaseUrl = (): string => {
   if (import.meta.env.PROD) {
     // In production (Upsun/Platform.sh), use the api subdomain as configured in .upsun/config.yaml
     const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+    
+    // Handle different cloud environments
+    if (hostname.includes('platformsh.site') || hostname.includes('upsun.app')) {
+      // Use same domain for Platform.sh/Upsun deployments
+      return `https://${hostname}`;
+    }
+    
     return `https://api.${hostname}`;
   }
   
@@ -37,6 +44,7 @@ export const createApiUrl = (endpoint: string): string => {
 
 /**
  * Wrapper for the fetch API that automatically adds the API base URL and auth token
+ * Now with enhanced error handling and cloud environment compatibility
  */
 export const apiFetch = (endpoint: string, options?: RequestInit): Promise<Response> => {
   const url = createApiUrl(endpoint);
@@ -55,11 +63,33 @@ export const apiFetch = (endpoint: string, options?: RequestInit): Promise<Respo
   const headers = {
     ...(options?.headers || {}),
     ...(token ? { 'Authorization': `Token ${token}` } : {}),
-    ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {})
+    ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
+    // Add headers for cross-origin compatibility
+    'Accept': 'application/json',
+    // Only add Content-Type if it's not FormData (for file uploads)
+    ...(!options?.body || !(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {})
   };
   
-  return fetch(url, {
+  const fetchOptions = {
     ...options,
-    headers
+    headers,
+    // Enable credentials for cross-origin requests
+    credentials: 'include' as RequestCredentials,
+    // Set mode to handle CORS more permissively  
+    mode: 'cors' as RequestMode
+  };
+  
+  // Enhanced error handling with retry logic for cloud environments
+  return fetch(url, fetchOptions).catch(error => {
+    console.error('API fetch error:', error);
+    // If it's a network error, try without credentials as fallback
+    if (error.name === 'TypeError' || error.message.includes('NetworkError')) {
+      console.log('Retrying without credentials...');
+      return fetch(url, {
+        ...fetchOptions,
+        credentials: 'omit'
+      });
+    }
+    throw error;
   });
 }; 

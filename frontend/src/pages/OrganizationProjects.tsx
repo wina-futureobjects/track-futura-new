@@ -44,6 +44,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import GridViewIcon from '@mui/icons-material/GridView';
 import { apiFetch } from '../utils/api';
+import { useTheme } from '@mui/material/styles';
 
 interface Project {
   id: number;
@@ -82,6 +83,94 @@ interface Member {
   date_joined: string;
 }
 
+// Helper function to convert legacy routes to new organization/project structure
+const convertLegacyRoute = (
+  legacyRoute: string, 
+  organizationId: string, 
+  projectId: string
+): string => {
+  const baseOrgProjectPath = `/organizations/${organizationId}/projects/${projectId}`;
+  
+  // Remove query parameters for route mapping
+  const [path] = legacyRoute.split('?');
+  
+  // Route conversion mappings
+  const routeMappings: Record<string, string> = {
+    '/dashboard': baseOrgProjectPath,
+    '/track-accounts': `${baseOrgProjectPath}/source-tracking`,
+    '/track-accounts/accounts': `${baseOrgProjectPath}/source-tracking/sources`,
+    '/track-accounts/upload': `${baseOrgProjectPath}/source-tracking/upload`,
+    '/track-accounts/create': `${baseOrgProjectPath}/source-tracking/create`,
+    '/analysis': `${baseOrgProjectPath}/analysis`,
+    '/instagram-folders': `${baseOrgProjectPath}/instagram-folders`,
+    '/facebook-folders': `${baseOrgProjectPath}/facebook-folders`,
+    '/linkedin-folders': `${baseOrgProjectPath}/linkedin-folders`,
+    '/tiktok-folders': `${baseOrgProjectPath}/tiktok-folders`,
+    '/report-folders': `${baseOrgProjectPath}/report-folders`,
+    '/reports/generated': `${baseOrgProjectPath}/reports/generated`,
+    '/report': `${baseOrgProjectPath}/report`,
+    '/comments-scraper': `${baseOrgProjectPath}/comments-scraper`,
+    '/facebook-comment-scraper': `${baseOrgProjectPath}/facebook-comment-scraper`,
+    '/brightdata-settings': `${baseOrgProjectPath}/brightdata-settings`,
+    '/brightdata-scraper': `${baseOrgProjectPath}/brightdata-scraper`,
+    '/automated-batch-scraper': `${baseOrgProjectPath}/automated-batch-scraper`,
+    '/settings': `${baseOrgProjectPath}/settings`,
+  };
+
+  // Check for direct mapping
+  if (routeMappings[path]) {
+    return routeMappings[path];
+  }
+
+  // Handle dynamic routes with parameters
+  if (path.startsWith('/track-accounts/edit/')) {
+    const accountId = path.split('/track-accounts/edit/')[1];
+    return `${baseOrgProjectPath}/source-tracking/edit/${accountId}`;
+  }
+
+  if (path.startsWith('/instagram-data/')) {
+    const folderId = path.split('/instagram-data/')[1];
+    return `${baseOrgProjectPath}/instagram-data/${folderId}`;
+  }
+
+  if (path.startsWith('/facebook-data/')) {
+    const folderId = path.split('/facebook-data/')[1];
+    return `${baseOrgProjectPath}/facebook-data/${folderId}`;
+  }
+
+  if (path.startsWith('/linkedin-data/')) {
+    const folderId = path.split('/linkedin-data/')[1];
+    return `${baseOrgProjectPath}/linkedin-data/${folderId}`;
+  }
+
+  if (path.startsWith('/tiktok-data/')) {
+    const folderId = path.split('/tiktok-data/')[1];
+    return `${baseOrgProjectPath}/tiktok-data/${folderId}`;
+  }
+
+  if (path.startsWith('/report-folders/')) {
+    const segments = path.split('/');
+    if (segments.length === 3) {
+      // /report-folders/:reportId
+      const reportId = segments[2];
+      return `${baseOrgProjectPath}/report-folders/${reportId}`;
+    }
+    if (segments.length >= 4) {
+      // /report-folders/:reportId/... 
+      const remainingPath = segments.slice(2).join('/');
+      return `${baseOrgProjectPath}/report-folders/${remainingPath}`;
+    }
+  }
+
+  if (path.startsWith('/report/')) {
+    const reportId = path.split('/report/')[1];
+    return `${baseOrgProjectPath}/report/${reportId}`;
+  }
+
+  // Default fallback to project dashboard
+  return baseOrgProjectPath;
+};
+
 const OrganizationProjects = () => {
   const navigate = useNavigate();
   const { organizationId } = useParams<{ organizationId: string }>();
@@ -101,6 +190,7 @@ const OrganizationProjects = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('last viewed');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid');
+  const theme = useTheme();
 
   useEffect(() => {
     if (organizationId) {
@@ -177,7 +267,19 @@ const OrganizationProjects = () => {
   };
 
   const handleOpenProject = (projectId: number) => {
-    navigate(`/organizations/${organizationId}/projects/${projectId}`);
+    const intendedDestination = sessionStorage.getItem('intendedDestination');
+    
+    if (intendedDestination && organizationId) {
+      // Clear the stored destination
+      sessionStorage.removeItem('intendedDestination');
+      
+      // Convert legacy route to new organization/project structure
+      const convertedRoute = convertLegacyRoute(intendedDestination, organizationId, projectId.toString());
+      navigate(convertedRoute, { replace: true });
+    } else {
+      // Normal navigation to project dashboard
+      navigate(`/organizations/${organizationId}/projects/${projectId}`);
+    }
   };
 
   const handleNewProject = () => {
@@ -410,7 +512,7 @@ const OrganizationProjects = () => {
                       component="div" 
                       sx={{ 
                         fontWeight: 500,
-                        color: '#1a73e8',
+                        color: theme => theme.palette.primary.main,
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         display: '-webkit-box',
@@ -494,7 +596,7 @@ const OrganizationProjects = () => {
                 sx={{ cursor: 'pointer' }}
               >
                 <TableCell 
-                  sx={{ color: '#1a73e8', fontWeight: 500 }}
+                  sx={{ color: theme => theme.palette.primary.main, fontWeight: 500 }}
                   onClick={() => handleOpenProject(project.id)}
                 >
                   {project.name}
@@ -568,11 +670,11 @@ const OrganizationProjects = () => {
               py: 1.5,
             },
             '& .Mui-selected': {
-              color: '#1a73e8',
+              color: theme => theme.palette.primary.main,
               fontWeight: 600,
             },
             '& .MuiTabs-indicator': {
-              backgroundColor: '#1a73e8',
+              backgroundColor: theme => theme.palette.primary.main,
               height: 3,
             },
           }}
@@ -683,7 +785,7 @@ const OrganizationProjects = () => {
                       '& .MuiSelect-select': {
                         fontWeight: 500,
                         py: 0,
-                        color: '#1a73e8'
+                        color: theme => theme.palette.primary.main
                       }
                     }}
                   >
@@ -999,8 +1101,8 @@ const OrganizationProjects = () => {
                   startIcon={<SettingsIcon />}
                   sx={{
                     borderRadius: 8,
-                    borderColor: '#1a73e8',
-                    color: '#1a73e8',
+                    borderColor: theme.palette.primary.main,
+                    color: theme.palette.primary.main,
                     textTransform: 'none',
                     fontWeight: 500,
                     px: 3,

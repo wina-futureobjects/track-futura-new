@@ -35,7 +35,7 @@ import {
   Delete as DeleteIcon,
   Assignment as AssignmentIcon
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 // Mock data for generated reports - this would come from localStorage or API in a real app
 const mockGeneratedReports = [
@@ -110,6 +110,7 @@ const GeneratedReports: React.FC = () => {
   const [templateFilter, setTemplateFilter] = useState('all');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
   const navigate = useNavigate();
+  const { organizationId, projectId } = useParams();
 
   // Load reports from localStorage or use mock data
   const loadReports = useCallback(async () => {
@@ -177,7 +178,11 @@ const GeneratedReports: React.FC = () => {
   };
 
   const handleViewReport = (reportId: number) => {
-    navigate(`/report/${reportId}`);
+    if (organizationId && projectId) {
+      navigate(`/organizations/${organizationId}/projects/${projectId}/report/${reportId}`);
+    } else {
+      navigate(`/report/${reportId}`);
+    }
   };
 
   const handleDeleteReport = async (reportId: number) => {
@@ -225,17 +230,55 @@ const GeneratedReports: React.FC = () => {
       {/* Header */}
       <Box mb={4}>
         <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
-          <Link color="inherit" href="/">
-            Dashboard
-          </Link>
-          <Link 
-            color="inherit" 
-            href="#" 
-            onClick={(e) => { e.preventDefault(); navigate('/report'); }}
-          >
-            Report Marketplace
-          </Link>
-          <Typography color="text.primary">Generated Reports</Typography>
+          {organizationId && projectId ? (
+            <>
+              <Link 
+                color="inherit" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate('/organizations');
+                }}
+                sx={{ cursor: 'pointer' }}
+              >
+                Organizations
+              </Link>
+              <Link 
+                color="inherit" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate(`/organizations/${organizationId}/projects`);
+                }}
+                sx={{ cursor: 'pointer' }}
+              >
+                Projects
+              </Link>
+              <Link 
+                color="inherit" 
+                onClick={(e) => { 
+                  e.preventDefault(); 
+                  navigate(`/organizations/${organizationId}/projects/${projectId}/report`); 
+                }}
+                sx={{ cursor: 'pointer' }}
+              >
+                Report Marketplace
+              </Link>
+              <Typography color="text.primary">Generated Reports</Typography>
+            </>
+          ) : (
+            <>
+              <Link color="inherit" href="/">
+                Dashboard
+              </Link>
+              <Link 
+                color="inherit" 
+                href="#" 
+                onClick={(e) => { e.preventDefault(); navigate('/report'); }}
+              >
+                Report Marketplace
+              </Link>
+              <Typography color="text.primary">Generated Reports</Typography>
+            </>
+          )}
         </Breadcrumbs>
         
         <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>
@@ -318,7 +361,13 @@ const GeneratedReports: React.FC = () => {
           {!searchTerm && statusFilter === 'all' && templateFilter === 'all' && (
             <Button 
               variant="contained" 
-              onClick={() => navigate('/report')}
+              onClick={() => {
+                if (organizationId && projectId) {
+                  navigate(`/organizations/${organizationId}/projects/${projectId}/report`);
+                } else {
+                  navigate('/report');
+                }
+              }}
             >
               Go to Marketplace
             </Button>

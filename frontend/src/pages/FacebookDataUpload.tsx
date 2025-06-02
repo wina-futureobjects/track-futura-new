@@ -23,7 +23,6 @@ import {
   IconButton,
   TextField,
   Stack,
-  Breadcrumbs,
   Tooltip,
   Snackbar,
   FormControl,
@@ -39,7 +38,6 @@ import DownloadIcon from '@mui/icons-material/Download';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
 import FilterListIcon from '@mui/icons-material/FilterList';
-import HomeIcon from '@mui/icons-material/Home';
 import FolderIcon from '@mui/icons-material/Folder';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -494,20 +492,6 @@ const FacebookDataUpload = () => {
         <Alert severity="info" style={{ marginBottom: '1rem' }}>
           Only the 'url' field is required in the CSV file. The 'user_posted' field is optional and can be derived from 'page_name' or 'user_username_raw' fields if available.
         </Alert>
-        
-        <Box sx={{ mb: 2 }}>
-          <Breadcrumbs aria-label="breadcrumb" style={{ marginBottom: '1rem' }}>
-            <Link 
-              style={{cursor: 'pointer', textDecoration: 'underline'}} 
-              onClick={handleGoToFolders}
-            >
-              Folders
-            </Link>
-            {currentFolder && (
-              <Typography color="textPrimary">{currentFolder.name}</Typography>
-            )}
-          </Breadcrumbs>
-        </Box>
         
         <Paper sx={{ p: 3, mb: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>

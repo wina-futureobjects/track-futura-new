@@ -58,10 +58,10 @@ const StyledDrawer = styled(Drawer, {
     width: open ? drawerWidth : miniDrawerWidth,
     boxSizing: 'border-box',
     border: 'none',
-    background: '#ffffff',
+    background: theme.palette.background.paper,
     boxShadow: 'none',
     overflowX: 'hidden',
-    borderRight: '1px solid #e8eaed',
+    borderRight: `1px solid ${theme.palette.grey[300]}`,
     zIndex: theme.zIndex.drawer,
     marginTop: '84px',
     height: 'calc(100vh - 84px)',
@@ -96,10 +96,10 @@ const StyledListItemButton = styled(ListItemButton, {
   borderRadius: 10,
   padding: theme.spacing(0.8, 1.2),
   position: 'relative',
-  backgroundColor: active ? 'rgba(225, 37, 27, 0.08)' : 'transparent',
-  border: active ? '1px solid rgba(225, 37, 27, 0.12)' : '1px solid transparent',
+  backgroundColor: active ? `rgba(210, 145, 226, 0.08)` : 'transparent',
+  border: active ? `1px solid rgba(210, 145, 226, 0.12)` : '1px solid transparent',
   '&:hover': {
-    backgroundColor: active ? 'rgba(225, 37, 27, 0.12)' : 'rgba(225, 37, 27, 0.04)',
+    backgroundColor: active ? `rgba(210, 145, 226, 0.12)` : `rgba(210, 145, 226, 0.04)`,
     transform: 'translateX(2px)',
   },
   '&:before': {
@@ -140,7 +140,7 @@ const StyledListItemText = styled(ListItemText, {
 })<{ active?: boolean }>(({ theme, active }) => ({
   margin: 0,
   '& .MuiListItemText-primary': {
-    fontSize: '0.82rem',
+    fontSize: '0.9rem',
     fontWeight: active ? 600 : 500,
     color: active ? theme.palette.primary.main : theme.palette.text.primary,
     lineHeight: 1.4,
@@ -264,7 +264,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
     
     if (match) {
       const [, orgId, projId] = match;
-      return `/organizations/${orgId}/projects/${projId}/track-accounts/accounts`;
+      return `/organizations/${orgId}/projects/${projId}/source-tracking/sources`;
     }
     
     return '/track-accounts/accounts';
@@ -335,7 +335,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
     }
     
     // Special handling for Dashboard
-    if (itemPath.includes('/projects/') && !itemPath.includes('/track-accounts') && 
+    if (itemPath.includes('/projects/') && !itemPath.includes('/source-tracking') && 
         !itemPath.includes('/instagram') && !itemPath.includes('/facebook') && 
         !itemPath.includes('/linkedin') && !itemPath.includes('/tiktok') && 
         !itemPath.includes('/report-folders') && !itemPath.includes('/brightdata') &&
@@ -357,9 +357,14 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
       return location.pathname.includes('tiktok');
     }
     
-    // Check if this is a track-accounts path in either old format or new format with organization/project
+    // Check if this is a source-tracking path in either old format or new format with organization/project
+    if (itemPath.includes('/source-tracking/sources')) {
+      return location.pathname.includes('/source-tracking');
+    }
+    
+    // Legacy support for old track-accounts paths
     if (itemPath.includes('/track-accounts/accounts')) {
-      return location.pathname.includes('/track-accounts');
+      return location.pathname.includes('/track-accounts') || location.pathname.includes('/source-tracking');
     }
     
     if (itemPath.includes('brightdata-scraper')) {
@@ -538,7 +543,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
     
     return (
       <MenuSection key={title}>
-        {open && <Typography className="section-title">{title}</Typography>}
+        {/* {open && <Typography className="section-title">{title}</Typography>} */}
         <List sx={{ py: 0 }}>
           {items.map(item => renderMenuItem(item))}
         </List>

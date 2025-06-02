@@ -17,8 +17,6 @@ import {
   IconButton,
   CircularProgress,
   Divider,
-  Breadcrumbs,
-  Link,
   ToggleButtonGroup,
   ToggleButton,
   TableContainer,
@@ -44,7 +42,6 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import GridViewIcon from '@mui/icons-material/GridView';
 import ViewListIcon from '@mui/icons-material/ViewList';
-import HomeIcon from '@mui/icons-material/Home';
 import { apiFetch } from '../utils/api';
 
 interface Folder {
@@ -452,23 +449,6 @@ const FacebookFolders = () => {
   return (
     <Container maxWidth="xl">
       <Box sx={{ my: 4 }}>
-        {/* Breadcrumbs */}
-        <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
-          <Link 
-            underline="hover" 
-            sx={{ display: 'flex', alignItems: 'center' }}
-            color="inherit" 
-            href="/"
-          >
-            <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            Home
-          </Link>
-          <Typography color="text.primary" sx={{ display: 'flex', alignItems: 'center' }}>
-            <FolderIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            Facebook Data
-          </Typography>
-        </Breadcrumbs>
-
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Typography variant="h4" component="h1" gutterBottom>
             Facebook Data Folders

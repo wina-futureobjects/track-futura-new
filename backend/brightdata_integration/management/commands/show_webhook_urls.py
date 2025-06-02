@@ -85,7 +85,7 @@ class Command(BaseCommand):
         self.stdout.write("✅ No manual configuration needed!")
         self.stdout.write("✅ Domain will be auto-detected from Upsun environment")
         self.stdout.write("✅ HTTPS will be used automatically")
-        self.stdout.write("🔧 Only set BRIGHTDATA_WEBHOOK_TOKEN for security")
+        self.stdout.write("Only set BRIGHTDATA_WEBHOOK_TOKEN for security")
         
         self.stdout.write(
             self.style.WARNING('\n=== Security Reminder ===')

@@ -37,7 +37,7 @@ import {
   DataUsage,
   Insights
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 // Mock data for demo
 const mockTemplates = [
@@ -196,6 +196,7 @@ const Report: React.FC = () => {
   const [reportTitle, setReportTitle] = useState('');
   const [generating, setGenerating] = useState(false);
   const navigate = useNavigate();
+  const { organizationId, projectId } = useParams();
 
   // Mock API functions for demo
   const fetchTemplates = useCallback(async () => {
@@ -310,8 +311,12 @@ const Report: React.FC = () => {
       setGenerateDialog({ open: false, template: null });
       showSnackbar(`Report "${reportTitle}" generated successfully!`, 'success');
       
-      // Navigate to the generated report
-      navigate(`/report/${newReport.id}`);
+      // Navigate to the generated report with proper context
+      if (organizationId && projectId) {
+        navigate(`/organizations/${organizationId}/projects/${projectId}/report/${newReport.id}`);
+      } else {
+        navigate(`/report/${newReport.id}`);
+      }
     } catch (error) {
       console.error('Error generating report:', error);
       showSnackbar('Failed to generate report', 'error');
@@ -321,7 +326,11 @@ const Report: React.FC = () => {
   };
 
   const handleViewReport = (reportId: number) => {
-    navigate(`/report/${reportId}`);
+    if (organizationId && projectId) {
+      navigate(`/organizations/${organizationId}/projects/${projectId}/report/${reportId}`);
+    } else {
+      navigate(`/report/${reportId}`);
+    }
   };
 
   if (loading) {
@@ -339,10 +348,39 @@ const Report: React.FC = () => {
       {/* Header */}
       <Box mb={4}>
         <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
-          <Link color="inherit" href="/">
-            Dashboard
-          </Link>
-          <Typography color="text.primary">Report Marketplace</Typography>
+          {organizationId && projectId ? (
+            <>
+              <Link 
+                color="inherit" 
+                href="/"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate('/organizations');
+                }}
+                sx={{ cursor: 'pointer' }}
+              >
+                Organizations
+              </Link>
+              <Link 
+                color="inherit" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate(`/organizations/${organizationId}/projects`);
+                }}
+                sx={{ cursor: 'pointer' }}
+              >
+                Projects
+              </Link>
+              <Typography color="text.primary">Report Marketplace</Typography>
+            </>
+          ) : (
+            <>
+              <Link color="inherit" href="/">
+                Dashboard
+              </Link>
+              <Typography color="text.primary">Report Marketplace</Typography>
+            </>
+          )}
         </Breadcrumbs>
         
         <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>

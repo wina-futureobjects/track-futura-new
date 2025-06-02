@@ -55,65 +55,81 @@ const Grid = (props: any) => <MuiGrid {...props} />;
 const FollowUpSuggestions: React.FC<{ onSuggestionClick: (question: string) => void; messageContent: string }> = ({ onSuggestionClick, messageContent }) => {
   // Generate contextual suggestions based on the message content
   const getContextualSuggestions = () => {
-    if (messageContent.toLowerCase().includes('engagement') || messageContent.toLowerCase().includes('instagram')) {
+    // Check which analysis was performed and suggest the other 3
+    if (messageContent.toLowerCase().includes('engagement trends over time')) {
       return [
         {
-          icon: <FilterListIcon sx={{ fontSize: 20, color: '#2563eb' }} />,
+          icon: <CompareIcon sx={{ fontSize: 20, color: 'primary.main' }} />,
+          text: "Compare engagement with competitor",
+        },
+        {
+          icon: <BarChartIcon sx={{ fontSize: 20, color: 'primary.main' }} />,
           text: "Show engagement breakdown by content type",
         },
         {
-          icon: <ShowChartIcon sx={{ fontSize: 20, color: '#2563eb' }} />,
-          text: "Compare engagement with competitors",
-        },
-        {
-          icon: <TimelineIcon sx={{ fontSize: 20, color: '#2563eb' }} />,
-          text: "Analyze engagement trends over time",
+          icon: <MonetizationOnIcon sx={{ fontSize: 20, color: 'primary.main' }} />,
+          text: "Analyze content performance by platform",
         }
       ];
-    } else if (messageContent.toLowerCase().includes('roi') || messageContent.toLowerCase().includes('conversion')) {
+    } else if (messageContent.toLowerCase().includes('competitor') || messageContent.toLowerCase().includes('compare engagement with competitor')) {
       return [
         {
-          icon: <MonetizationOnIcon sx={{ fontSize: 20, color: '#2563eb' }} />,
-          text: "Show revenue attribution by channel",
+          icon: <TrendingUpIcon sx={{ fontSize: 20, color: 'primary.main' }} />,
+          text: "Analyze Engagement Trends Over Time",
         },
         {
-          icon: <TrendingUpIcon sx={{ fontSize: 20, color: '#2563eb' }} />,
-          text: "Analyze conversion funnel performance", 
+          icon: <BarChartIcon sx={{ fontSize: 20, color: 'primary.main' }} />,
+          text: "Show engagement breakdown by content type",
         },
         {
-          icon: <CompareIcon sx={{ fontSize: 20, color: '#2563eb' }} />,
-          text: "Compare ROI across campaigns",
+          icon: <MonetizationOnIcon sx={{ fontSize: 20, color: 'primary.main' }} />,
+          text: "Analyze content performance by platform",
         }
       ];
-    } else if (messageContent.toLowerCase().includes('platform') || messageContent.toLowerCase().includes('compare')) {
+    } else if (messageContent.toLowerCase().includes('content type') || messageContent.toLowerCase().includes('engagement breakdown')) {
       return [
         {
-          icon: <BarChartIcon sx={{ fontSize: 20, color: '#2563eb' }} />,
-          text: "Create detailed platform comparison chart",
+          icon: <TrendingUpIcon sx={{ fontSize: 20, color: 'primary.main' }} />,
+          text: "Analyze Engagement Trends Over Time",
         },
         {
-          icon: <ShowChartIcon sx={{ fontSize: 20, color: '#2563eb' }} />,
-          text: "Show growth rate by platform",
+          icon: <CompareIcon sx={{ fontSize: 20, color: 'primary.main' }} />,
+          text: "Compare engagement with competitor",
         },
         {
-          icon: <FilterListIcon sx={{ fontSize: 20, color: '#2563eb' }} />,
-          text: "Filter by audience demographics",
+          icon: <MonetizationOnIcon sx={{ fontSize: 20, color: 'primary.main' }} />,
+          text: "Analyze content performance by platform",
+        }
+      ];
+    } else if (messageContent.toLowerCase().includes('content performance by platform') || messageContent.toLowerCase().includes('platform')) {
+      return [
+        {
+          icon: <TrendingUpIcon sx={{ fontSize: 20, color: 'primary.main' }} />,
+          text: "Analyze Engagement Trends Over Time",
+        },
+        {
+          icon: <CompareIcon sx={{ fontSize: 20, color: 'primary.main' }} />,
+          text: "Compare engagement with competitor",
+        },
+        {
+          icon: <BarChartIcon sx={{ fontSize: 20, color: 'primary.main' }} />,
+          text: "Show engagement breakdown by content type",
         }
       ];
     } else {
-      // Default suggestions
+      // Default suggestions for other queries
       return [
         {
-          icon: <FilterListIcon sx={{ fontSize: 20, color: '#2563eb' }} />,
-          text: "Show breakdown by device type",
+          icon: <TrendingUpIcon sx={{ fontSize: 20, color: 'primary.main' }} />,
+          text: "Analyze Engagement Trends Over Time",
         },
         {
-          icon: <ShowChartIcon sx={{ fontSize: 20, color: '#2563eb' }} />,
-          text: "Compare with previous period",
+          icon: <CompareIcon sx={{ fontSize: 20, color: 'primary.main' }} />,
+          text: "Compare engagement with competitor",
         },
         {
-          icon: <TimelineIcon sx={{ fontSize: 20, color: '#2563eb' }} />,
-          text: "What's driving this trend?",
+          icon: <BarChartIcon sx={{ fontSize: 20, color: 'primary.main' }} />,
+          text: "Show engagement breakdown by content type",
         }
       ];
     }
@@ -146,9 +162,9 @@ const FollowUpSuggestions: React.FC<{ onSuggestionClick: (question: string) => v
               fontWeight: 500,
               boxShadow: '0 1px 3px rgba(0,0,0,0.1)', // Added subtle shadow
               '&:hover': {
-                borderColor: '#2563eb',
+                borderColor: 'primary.main',
                 bgcolor: '#eff6ff',
-                color: '#2563eb',
+                color: 'primary.main',
                 transform: 'translateY(-1px)', // Subtle lift effect
                 boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
               },
@@ -226,6 +242,8 @@ const Analysis: React.FC = () => {
   const createNewThread = async () => {
     try {
       const newThread = await chatService.createThread();
+      // Set a default title for new threads
+      newThread.title = 'New Chat';
       setThreads(prev => [newThread, ...(Array.isArray(prev) ? prev : [])]);
       setCurrentThread(newThread);
       setMessages([]);
@@ -316,18 +334,14 @@ const Analysis: React.FC = () => {
                 Here's the chart you requested.
               </Typography>
             )}
-            {beforeChart.split('\n').map((line, lineIndex) => (
-              <React.Fragment key={`before-${lineIndex}`}>{line && <>{line}<br /></>}</React.Fragment>
-            ))}
+            {renderFormattedText(beforeChart)}
             <ChatChart
               type={chartData.type}
               data={chartData.data}
               title={chartData.title}
               description={getChartDescription()}
             />
-            {afterChart.split('\n').map((line, lineIndex) => (
-              <React.Fragment key={`after-${lineIndex}`}>{line && <>{line}<br /></>}</React.Fragment>
-            ))}
+            {renderFormattedText(afterChart)}
           </>
         );
       } catch (error) {
@@ -351,65 +365,87 @@ const Analysis: React.FC = () => {
       
       return (
         <>
-          {beforeTable.split('\n').map((line, lineIndex) => (
-            <React.Fragment key={`before-${lineIndex}`}>
-              {line.startsWith('##') ? (
-                <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>
-                  {line.replace(/^##\s+/, '')}
-                </Typography>
-              ) : (
-                line
-              )}
-              {line && <br />}
-            </React.Fragment>
-          ))}
+          {renderFormattedText(beforeTable)}
           {renderTable(tableText)}
-          {afterTable.split('\n').map((line, lineIndex) => (
-            <React.Fragment key={`after-${lineIndex}`}>
-              {line}
-              {lineIndex < afterTable.split('\n').length - 1 && <br />}
-            </React.Fragment>
-          ))}
+          {renderFormattedText(afterTable)}
         </>
       );
     }
     
-    // If no chart or table, format text normally with improved heading handling
+    // If no chart or table, format text normally with improved formatting
+    return renderFormattedText(text);
+  };
+
+  // Helper function to render formatted text with markdown support
+  const renderFormattedText = (text: string) => {
     return text.split('\n').map((line, lineIndex) => (
       <React.Fragment key={lineIndex}>
-        {line.startsWith('##') ? (
-          <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>
-            {line.replace(/^##\s+/, '')}
+        {line.trim().startsWith('##') ? (
+          <Typography variant="h6" sx={{ mt: 2, mb: 1, fontWeight: 600 }}>
+            {line.trim().replace(/^##\s*/, '')}
+          </Typography>
+        ) : line.startsWith('**') && line.endsWith('**') ? (
+          // Handle lines that are entirely bold (like section headers)
+          <Typography component="div" sx={{ fontWeight: 700, mt: 1.5, mb: 0.5 }}>
+            {line.replace(/^\*\*(.*)\*\*$/, '$1')}
           </Typography>
         ) : (
-          line || ' ' // Replace empty lines with a space
+          // Handle inline formatting within lines
+          <Typography component="div" sx={{ mb: 0.5 }}>
+            {renderInlineFormatting(line)}
+          </Typography>
         )}
-        {lineIndex < text.split('\n').length - 1 && <br />}
       </React.Fragment>
     ));
   };
 
-  // Updated suggested questions with icons
+  // Helper function to handle inline formatting like **bold**
+  const renderInlineFormatting = (text: string) => {
+    if (!text.trim()) return <br />;
+    
+    // Split by **bold** patterns while preserving the delimiters
+    const parts = text.split(/(\*\*[^*]+\*\*)/g);
+    
+    return parts.map((part, index) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        // This is bold text
+        return (
+          <Typography 
+            key={index} 
+            component="span" 
+            sx={{ fontWeight: 700 }}
+          >
+            {part.slice(2, -2)}
+          </Typography>
+        );
+      } else {
+        // Regular text
+        return part;
+      }
+    });
+  };
+
+  // Updated suggested questions with social media focus
   const suggestedQuestions = [
     {
-      icon: <BarChartIcon sx={{ fontSize: 24, color: '#2563eb' }} />,
-      text: "What insights can I get from my social media data?",
-      description: "Analyze your social media performance metrics"
+      icon: <TrendingUpIcon sx={{ fontSize: 24, color: 'primary.main' }} />,
+      text: "Analyze Engagement Trends Over Time",
+      description: "Track how your social media engagement evolves across platforms"
     },
     {
-      icon: <TrendingUpIcon sx={{ fontSize: 24, color: '#2563eb' }} />,
-      text: "How to identify trends in my Instagram performance?",
-      description: "Track engagement and growth patterns"
+      icon: <CompareIcon sx={{ fontSize: 24, color: 'primary.main' }} />,
+      text: "Compare engagement with competitor",
+      description: "Benchmark your performance against competitors"
     },
     {
-      icon: <CompareIcon sx={{ fontSize: 24, color: '#2563eb' }} />,
-      text: "Compare engagement rates between platforms",
-      description: "Cross-platform performance analysis"
+      icon: <BarChartIcon sx={{ fontSize: 24, color: 'primary.main' }} />,
+      text: "Show engagement breakdown by content type",
+      description: "Analyze which content types drive the most engagement"
     },
     {
-      icon: <MonetizationOnIcon sx={{ fontSize: 24, color: '#2563eb' }} />,
-      text: "What metrics should I focus on for ROI?",
-      description: "Key metrics for business impact"
+      icon: <MonetizationOnIcon sx={{ fontSize: 24, color: 'primary.main' }} />,
+      text: "Analyze content performance by platform",
+      description: "Compare how content performs across different social platforms"
     }
   ];
 
@@ -469,8 +505,204 @@ const Analysis: React.FC = () => {
     
     let aiResponse = '';
     
-    // Handle follow-up questions with new chart generation
-    if (userInput.toLowerCase().includes('breakdown by device') || userInput.toLowerCase().includes('device type')) {
+    // Handle the main 4 social media analysis types
+    if (userInput.toLowerCase().includes('analyze engagement trends over time') || userInput.toLowerCase().includes('engagement trends')) {
+      aiResponse = `
+## Engagement Trends Over Time Analysis
+
+Tracking your social media engagement patterns across the last 6 months:
+
+\`\`\`chart
+{
+  "type": "line",
+  "title": "Social Media Engagement Trends (Last 6 Months)",
+  "data": {
+    "labels": ["January", "February", "March", "April", "May", "June"],
+    "datasets": [
+      {
+        "label": "Instagram Engagement Rate (%)",
+        "data": [3.2, 3.8, 4.1, 4.6, 5.2, 5.8],
+        "borderColor": "#e91e63",
+        "backgroundColor": "rgba(233, 30, 99, 0.1)",
+        "tension": 0.4
+      },
+      {
+        "label": "Facebook Engagement Rate (%)",
+        "data": [2.1, 2.3, 2.7, 2.9, 3.1, 3.4],
+        "borderColor": "#1976d2",
+        "backgroundColor": "rgba(25, 118, 210, 0.1)",
+        "tension": 0.4
+      },
+      {
+        "label": "LinkedIn Engagement Rate (%)",
+        "data": [1.8, 2.1, 2.4, 2.8, 3.2, 3.6],
+        "borderColor": "#0d47a1",
+        "backgroundColor": "rgba(13, 71, 161, 0.1)",
+        "tension": 0.4
+      }
+    ]
+  }
+}
+\`\`\`
+
+**Key Insights:**
+- Instagram shows strongest growth: +81% engagement increase
+- All platforms trending upward consistently
+- LinkedIn showing accelerated growth in Q2
+- Peak engagement occurred in June across all platforms
+      `;
+    } else if (userInput.toLowerCase().includes('compare engagement with competitor') || userInput.toLowerCase().includes('competitor')) {
+      aiResponse = `
+## Competitor Engagement Comparison
+
+Benchmarking your engagement rates against top competitor:
+
+\`\`\`chart
+{
+  "type": "bar",
+  "title": "Your Brand vs Competitor - Engagement Rates by Platform",
+  "data": {
+    "labels": ["Instagram", "Facebook", "LinkedIn", "TikTok"],
+    "datasets": [
+      {
+        "label": "Your Brand (%)",
+        "data": [5.8, 3.4, 3.6, 7.2],
+        "backgroundColor": "rgba(37, 99, 235, 0.8)",
+        "borderColor": "#2563eb",
+        "borderWidth": 1
+      },
+      {
+        "label": "Main Competitor (%)",
+        "data": [4.9, 4.1, 2.8, 6.8],
+        "backgroundColor": "rgba(220, 38, 38, 0.8)",
+        "borderColor": "#dc2626",
+        "borderWidth": 1
+      }
+    ]
+  }
+}
+\`\`\`
+
+**Performance Analysis:**
+- **Instagram**: You're ahead by +18% (5.8% vs 4.9%)
+- **Facebook**: Competitor leads by +21% (4.1% vs 3.4%)
+- **LinkedIn**: You dominate with +29% advantage (3.6% vs 2.8%)
+- **TikTok**: Close competition, you lead by +6% (7.2% vs 6.8%)
+
+**Recommendation**: Focus on improving Facebook strategy while maintaining LinkedIn leadership.
+      `;
+    } else if (userInput.toLowerCase().includes('engagement breakdown by content type') || userInput.toLowerCase().includes('content type')) {
+      aiResponse = `
+## Engagement Breakdown by Content Type
+
+Analyzing how different content formats perform across your social media:
+
+\`\`\`chart
+{
+  "type": "bar",
+  "title": "Average Engagement Rate by Content Type",
+  "data": {
+    "labels": ["Reels/Videos", "Carousel Posts", "Single Images", "Stories", "Live Videos", "User-Generated Content"],
+    "datasets": [
+      {
+        "label": "Engagement Rate (%)",
+        "data": [8.2, 6.1, 4.3, 3.8, 9.1, 7.4],
+        "backgroundColor": [
+          "rgba(236, 72, 153, 0.8)",
+          "rgba(37, 99, 235, 0.8)",
+          "rgba(16, 185, 129, 0.8)",
+          "rgba(245, 158, 11, 0.8)",
+          "rgba(139, 92, 246, 0.8)",
+          "rgba(34, 197, 94, 0.8)"
+        ],
+        "borderColor": [
+          "#ec4899",
+          "#2563eb",
+          "#10b981",
+          "#f59e0b",
+          "#8b5cf6",
+          "#22c55e"
+        ],
+        "borderWidth": 1
+      }
+    ]
+  }
+}
+\`\`\`
+
+**Top Performers:**
+1. **Live Videos**: 9.1% engagement - highest performing content
+2. **Reels/Videos**: 8.2% engagement - consistent high performer  
+3. **User-Generated Content**: 7.4% engagement - authentic connection
+4. **Carousel Posts**: 6.1% engagement - good for storytelling
+
+**Strategy Recommendation**: Increase live video frequency and encourage more user-generated content campaigns.
+      `;
+    } else if (userInput.toLowerCase().includes('analyze content performance by platform') || userInput.toLowerCase().includes('content performance by platform')) {
+      aiResponse = `
+## Content Performance Analysis by Platform
+
+Comparing how your content performs across different social media platforms:
+
+\`\`\`chart
+{
+  "type": "radar",
+  "title": "Content Performance Metrics by Platform",
+  "data": {
+    "labels": ["Reach", "Engagement", "Shares", "Saves", "Comments", "Click-through Rate"],
+    "datasets": [
+      {
+        "label": "Instagram",
+        "data": [85, 92, 78, 88, 82, 75],
+        "borderColor": "#e91e63",
+        "backgroundColor": "rgba(233, 30, 99, 0.2)",
+        "pointBackgroundColor": "#e91e63"
+      },
+      {
+        "label": "Facebook", 
+        "data": [78, 65, 85, 45, 88, 82],
+        "borderColor": "#1976d2",
+        "backgroundColor": "rgba(25, 118, 210, 0.2)",
+        "pointBackgroundColor": "#1976d2"
+      },
+      {
+        "label": "LinkedIn",
+        "data": [65, 75, 92, 68, 78, 95],
+        "borderColor": "#0d47a1",
+        "backgroundColor": "rgba(13, 71, 161, 0.2)",
+        "pointBackgroundColor": "#0d47a1"
+      },
+      {
+        "label": "TikTok",
+        "data": [95, 88, 72, 85, 75, 68],
+        "borderColor": "#000000",
+        "backgroundColor": "rgba(0, 0, 0, 0.2)",
+        "pointBackgroundColor": "#000000"
+      }
+    ]
+  },
+  "options": {
+    "scales": {
+      "r": {
+        "beginAtZero": true,
+        "max": 100
+      }
+    }
+  }
+}
+\`\`\`
+
+**Platform Strengths:**
+- **Instagram**: Excellent for engagement (92/100) and saves (88/100)
+- **Facebook**: Best for shares (85/100) and comments (88/100)  
+- **LinkedIn**: Superior click-through rates (95/100) and professional shares (92/100)
+- **TikTok**: Highest reach (95/100) and strong engagement (88/100)
+
+**Optimization Strategy**: Leverage each platform's strengths while improving weaker metrics.
+      `;
+    } 
+    // Keep existing follow-up responses
+    else if (userInput.toLowerCase().includes('breakdown by device') || userInput.toLowerCase().includes('device type')) {
       aiResponse = `
 ## Device Type Breakdown
 
@@ -532,293 +764,16 @@ Comparing current performance with the previous 12 weeks:
 
 Your current period shows 28% improvement over the previous period!
       `;
-    } else if (userInput.toLowerCase().includes('revenue attribution') || userInput.toLowerCase().includes('channel')) {
-      aiResponse = `
-## Revenue Attribution by Channel
-
-Here's how each marketing channel contributes to your revenue:
-
-\`\`\`chart
-{
-  "type": "bar",
-  "title": "Revenue Attribution by Marketing Channel",
-  "data": {
-    "labels": ["Organic Search", "Paid Social", "Email", "Direct", "Referral"],
-    "datasets": [
-      {
-        "label": "Revenue ($)",
-        "data": [45000, 32000, 28000, 38000, 15000],
-        "backgroundColor": [
-          "rgba(16, 185, 129, 0.8)",
-          "rgba(37, 99, 235, 0.8)",
-          "rgba(245, 158, 11, 0.8)",
-          "rgba(139, 92, 246, 0.8)",
-          "rgba(236, 72, 153, 0.8)"
-        ]
-      }
-    ]
-  }
-}
-\`\`\`
-
-Organic search is your top revenue driver at $45K (28.5% of total revenue).
-      `;
-    } else if (userInput.toLowerCase().includes('engagement breakdown') || userInput.toLowerCase().includes('content type')) {
-      aiResponse = `
-## Engagement Breakdown by Content Type
-
-Analyzing how different content types perform on Instagram:
-
-\`\`\`chart
-{
-  "type": "bar",
-  "title": "Instagram Engagement by Content Type",
-  "data": {
-    "labels": ["Reels", "Carousel Posts", "Single Image", "Stories", "IGTV"],
-    "datasets": [
-      {
-        "label": "Average Engagement Rate (%)",
-        "data": [8.2, 6.1, 4.3, 3.8, 2.9],
-        "backgroundColor": [
-          "rgba(236, 72, 153, 0.8)",
-          "rgba(37, 99, 235, 0.8)",
-          "rgba(16, 185, 129, 0.8)",
-          "rgba(245, 158, 11, 0.8)",
-          "rgba(139, 92, 246, 0.8)"
-        ]
-      }
-    ]
-  }
-}
-\`\`\`
-
-Reels are your star performers with 8.2% engagement rate - nearly double that of single images!
-      `;
-    } else if (userInput.toLowerCase().includes('platform comparison') || userInput.toLowerCase().includes('detailed platform')) {
-      aiResponse = `
-## Detailed Platform Comparison
-
-Comprehensive analysis across all your social media platforms:
-
-\`\`\`chart
-{
-  "type": "line",
-  "title": "Platform Performance Over Time",
-  "data": {
-    "labels": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
-    "datasets": [
-      {
-        "label": "Instagram Followers",
-        "data": [12000, 13200, 14100, 15800, 16900, 18200],
-        "borderColor": "#e91e63",
-        "backgroundColor": "rgba(233, 30, 99, 0.1)"
-      },
-      {
-        "label": "Facebook Followers",
-        "data": [8500, 8800, 9100, 9600, 10200, 10800],
-        "borderColor": "#1976d2",
-        "backgroundColor": "rgba(25, 118, 210, 0.1)"
-      },
-      {
-        "label": "LinkedIn Followers",
-        "data": [3200, 3400, 3800, 4100, 4600, 5200],
-        "borderColor": "#0d47a1",
-        "backgroundColor": "rgba(13, 71, 161, 0.1)"
-      }
-    ]
-  }
-}
-\`\`\`
-
-Instagram shows the strongest growth trajectory with 52% increase over 6 months.
-      `;
-    } else if (userInput.toLowerCase().includes('insights') || userInput.toLowerCase().includes('data')) {
-      aiResponse = `
-## Social Media Data Insights
-
-Here are key insights available from your social media data:
-
-1. Engagement Metrics
-   - Likes, comments, shares trends
-   - Peak engagement times
-   - Most engaging content types
-
-2. Audience Analysis
-   - Follower growth rate
-   - Demographic breakdown
-   - Active followers vs total followers
-
-3. Content Performance
-   - Top performing posts
-   - Content type effectiveness
-   - Hashtag performance
-
-Here's a visualization of your engagement trends:
-
-\`\`\`chart
-{
-  "type": "line",
-  "title": "Engagement Trends Over Time",
-  "data": {
-    "labels": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
-    "datasets": [
-      {
-        "label": "Likes",
-        "data": [1200, 1900, 1500, 2100, 1800, 2400],
-        "borderColor": "#2563eb",
-        "backgroundColor": "rgba(37, 99, 235, 0.1)"
-      },
-      {
-        "label": "Comments",
-        "data": [300, 450, 380, 520, 480, 600],
-        "borderColor": "#7c3aed",
-        "backgroundColor": "rgba(124, 58, 237, 0.1)"
-      }
-    ]
-  }
-}
-\`\`\`
-
-Would you like me to analyze any specific aspect in detail?
-      `;
-    } else if (userInput.toLowerCase().includes('trends') || userInput.toLowerCase().includes('instagram')) {
-      aiResponse = `
-## Instagram Performance Trends
-
-Based on your recent Instagram data:
-
-1. Growth Metrics
-   - 15% increase in follower count
-   - 23% higher engagement rate
-   - 45% more profile visits
-
-2. Content Trends
-   - Reels outperforming static posts
-   - Educational content getting more saves
-   - Behind-the-scenes posts driving engagement
-
-3. Audience Behavior
-   - Peak activity: 6-8pm weekdays
-   - Strong response to story polls
-   - High engagement with carousel posts
-
-Here's a breakdown of your content performance:
-
-\`\`\`chart
-{
-  "type": "bar",
-  "title": "Content Type Performance",
-  "data": {
-    "labels": ["Reels", "Posts", "Stories", "Carousels"],
-    "datasets": [
-      {
-        "label": "Engagement Rate",
-        "data": [4.8, 3.2, 2.9, 4.1],
-        "backgroundColor": [
-          "rgba(37, 99, 235, 0.8)",
-          "rgba(124, 58, 237, 0.8)",
-          "rgba(236, 72, 153, 0.8)",
-          "rgba(14, 165, 233, 0.8)"
-        ]
-      }
-    ]
-  }
-}
-\`\`\`
-
-Would you like to focus on any of these areas?
-      `;
-    } else if (userInput.toLowerCase().includes('compare') || userInput.includes('engagement')) {
-      aiResponse = `
-## Cross-Platform Engagement Analysis
-
-Here's how your engagement rates compare:
-
-1. Instagram
-   - 4.2% average engagement rate
-   - Highest on Reels and Carousels
-   - Strong comment-to-like ratio
-
-2. Facebook
-   - 2.8% average engagement rate
-   - Best performance on video content
-   - High share rate on infographics
-
-3. LinkedIn
-   - 3.5% average engagement rate
-   - Strong performance on industry insights
-   - High-quality professional discussions
-
-Here's a comparison of your platform performance:
-
-\`\`\`chart
-{
-  "type": "bar",
-  "title": "Platform Engagement Comparison",
-  "data": {
-    "labels": ["Instagram", "Facebook", "LinkedIn"],
-    "datasets": [
-      {
-        "label": "Engagement Rate",
-        "data": [4.2, 2.8, 3.5],
-        "backgroundColor": [
-          "rgba(37, 99, 235, 0.8)",
-          "rgba(124, 58, 237, 0.8)",
-          "rgba(14, 165, 233, 0.8)"
-        ]
-      }
-    ]
-  }
-}
-\`\`\`
-
-Would you like a detailed breakdown of any platform?
-      `;
-    } else if (userInput.toLowerCase().includes('roi') || userInput.includes('metrics')) {
-      aiResponse = `
-## Key ROI Metrics to Track
-
-For measuring social media ROI, focus on these metrics:
-
-1. Conversion Rate: Track how many followers become customers
-2. Customer Acquisition Cost (CAC): Cost to gain a new customer 
-3. Lifetime Value (LTV): Average revenue from a customer over time
-4. Engagement-to-Conversion Ratio: How engagement translates to sales
-
-Here's a visualization of your ROI metrics:
-
-\`\`\`chart
-{
-  "type": "line",
-  "title": "ROI Metrics Over Time",
-  "data": {
-    "labels": ["Q1", "Q2", "Q3", "Q4"],
-    "datasets": [
-      {
-        "label": "Conversion Rate",
-        "data": [2.1, 2.8, 3.2, 3.5],
-        "borderColor": "#2563eb",
-        "backgroundColor": "rgba(37, 99, 235, 0.1)"
-      },
-      {
-        "label": "CAC",
-        "data": [45, 42, 38, 35],
-        "borderColor": "#7c3aed",
-        "backgroundColor": "rgba(124, 58, 237, 0.1)"
-      }
-    ]
-  }
-}
-\`\`\`
-
-Would you like me to help set up a custom ROI tracking dashboard for your specific business goals?
-      `;
     } else {
       aiResponse = `Thank you for your question about "${userInput.substring(0, 30)}...". 
 
-This is a demo of the AI analysis assistant. In a production environment, I would connect to your data sources to provide personalized insights about your social media performance, audience engagement, and content strategy.
+This is a demo of the AI analysis assistant. In a production environment, I would connect to your social media data sources to provide personalized insights about your engagement, audience behavior, and content strategy.
 
-Feel free to ask about Instagram, Facebook, or metrics performance to see sample responses.`;
+Try asking about:
+- **Engagement trends** to see how your social media performance evolves
+- **Competitor analysis** to benchmark against competition  
+- **Content type breakdown** to optimize your content strategy
+- **Platform performance** to compare across social channels`;
     }
     
     return aiResponse;
@@ -847,7 +802,7 @@ Feel free to ask about Instagram, Facebook, or metrics performance to see sample
             variant="contained"
             onClick={createNewThread}
             sx={{
-              bgcolor: '#2563eb',
+              bgcolor: 'primary.main',
               color: 'white',
               borderRadius: 1.5,
               textTransform: 'none',
@@ -855,10 +810,10 @@ Feel free to ask about Instagram, Facebook, or metrics performance to see sample
               boxShadow: 'none',
               width: '100%',
               mb: 2,
-              '&:hover': { bgcolor: '#1d4ed8' }
+              '&:hover': { bgcolor: 'primary.dark' }
             }}
           >
-            + New thread
+            + New Chat
           </Button>
         </Box>
         <Box sx={{ flex: 1, p: 3, overflowY: 'auto', minHeight: 0 }}>
@@ -883,7 +838,7 @@ Feel free to ask about Instagram, Facebook, or metrics performance to see sample
                 }}
               >
                 <Typography noWrap sx={{ fontSize: '0.875rem' }}>
-                  {thread.title || thread.last_message?.content.split('\n')[0].substring(0, 35) + '...' || 'New Thread'}
+                  {thread.title || (thread.last_message?.content ? thread.last_message.content.split('\n')[0].substring(0, 35) + '...' : null) || 'New Chat'}
                 </Typography>
               </Button>
             ))}
@@ -985,7 +940,7 @@ Feel free to ask about Instagram, Facebook, or metrics performance to see sample
                           sx={{
                             width: 36, // Increased from 32px
                             height: 36, // Increased from 32px
-                            bgcolor: '#2563eb',
+                            bgcolor: 'primary.main',
                             color: 'white'
                           }}
                         >
@@ -1038,7 +993,7 @@ Feel free to ask about Instagram, Facebook, or metrics performance to see sample
                 ))}
                 {isLoading && (
                   <Box sx={{ display: 'flex', gap: 2, maxWidth: '80%' }}>
-                    <Avatar sx={{ width: 36, height: 36, bgcolor: '#f1f5f9', color: '#2563eb' }}> {/* Increased avatar size */}
+                    <Avatar sx={{ width: 36, height: 36, bgcolor: '#f1f5f9', color: 'primary.main' }}> {/* Increased avatar size */}
                       <SmartToyIcon />
                     </Avatar>
                     <Paper
@@ -1053,7 +1008,7 @@ Feel free to ask about Instagram, Facebook, or metrics performance to see sample
                         gap: 1
                       }}
                     >
-                      <CircularProgress size={18} sx={{ color: '#2563eb' }} /> {/* Increased from 16 */}
+                      <CircularProgress size={18} sx={{ color: 'primary.main' }} /> {/* Increased from 16 */}
                       <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.95rem' }}> {/* Increased font size */}
                         Analyzing...
                       </Typography>
@@ -1087,10 +1042,10 @@ Feel free to ask about Instagram, Facebook, or metrics performance to see sample
                   onClick={handleSendMessage}
                   disabled={input.trim() === '' || isLoading || !currentThread}
                   sx={{
-                    bgcolor: '#2563eb',
+                    bgcolor: 'primary.main',
                     color: 'white',
                     ml: 1,
-                    '&:hover': { bgcolor: '#1d4ed8' },
+                    '&:hover': { bgcolor: 'primary.dark' },
                     '&.Mui-disabled': { bgcolor: '#94a3b8', color: 'white' },
                     width: 42,
                     height: 42
@@ -1107,4 +1062,4 @@ Feel free to ask about Instagram, Facebook, or metrics performance to see sample
   );
 };
 
-export default Analysis; 
+export default Analysis;

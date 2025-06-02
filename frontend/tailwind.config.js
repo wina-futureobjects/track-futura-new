@@ -4,27 +4,27 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: "#E1251B",    // Red color as requested
-        secondary: "#FFFFFF",  // White color as requested
-        tertiary: "#0A1F8F",   // Blue color as requested
+        primary: "#D291E2",    // Purple color (main primary)
+        secondary: "#6EE5D9",  // Teal color (main secondary)  
+        tertiary: "#62EF83",   // Green color (main tertiary)
+        accent: "#A6FDED",     // Light cyan (additional color)
         
         // Add derived colors based on the main colors
-        "primary-foreground": "#FFFFFF",
+        "primary-foreground": "#000000",
         "secondary-foreground": "#000000",
-        "tertiary-foreground": "#FFFFFF",
+        "tertiary-foreground": "#000000",
+        "accent-foreground": "#000000",
 
-        // Add other utility colors
-        background: "#F8F9FA",
-        foreground: "#2C3E50",
-        destructive: "#E74C3C",
-        "destructive-foreground": "#FFFFFF",
-        muted: "#F1F5F9",
-        "muted-foreground": "#64748B",
-        accent: "#F1F5F9",
-        "accent-foreground": "#0F172A",
-        success: "#2ECC71",
-        info: "#3498DB",
-        warning: "#F39C12",
+        // Add other utility colors using the theme colors
+        background: "#FFFFFF",
+        foreground: "#000000",
+        destructive: "#62EF83",  // Use green for destructive actions
+        "destructive-foreground": "#000000",
+        muted: "#A6FDED",        // Use light cyan for muted
+        "muted-foreground": "#000000",
+        success: "#62EF83",      // Use green for success
+        info: "#6EE5D9",         // Use teal for info
+        warning: "#62EF83",      // Use green for warning
       },
       // Add compact spacing scale
       spacing: {

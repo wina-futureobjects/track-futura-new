@@ -238,7 +238,7 @@ interface Report {
 }
 
 const ReportView: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id, organizationId, projectId } = useParams<{ id: string; organizationId?: string; projectId?: string }>();
   const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
@@ -470,14 +470,52 @@ const ReportView: React.FC = () => {
       {/* Header */}
       <Box mb={4}>
         <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
-          <Link 
-            color="inherit" 
-            href="#" 
-            onClick={(e) => { e.preventDefault(); navigate('/report'); }}
-          >
-            Report Marketplace
-          </Link>
-          <Typography color="text.primary">{report.title}</Typography>
+          {organizationId && projectId ? (
+            <>
+              <Link 
+                color="inherit" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate('/organizations');
+                }}
+                sx={{ cursor: 'pointer' }}
+              >
+                Organizations
+              </Link>
+              <Link 
+                color="inherit" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate(`/organizations/${organizationId}/projects`);
+                }}
+                sx={{ cursor: 'pointer' }}
+              >
+                Projects
+              </Link>
+              <Link 
+                color="inherit" 
+                onClick={(e) => { 
+                  e.preventDefault(); 
+                  navigate(`/organizations/${organizationId}/projects/${projectId}/report`); 
+                }}
+                sx={{ cursor: 'pointer' }}
+              >
+                Report Marketplace
+              </Link>
+              <Typography color="text.primary">{report.title}</Typography>
+            </>
+          ) : (
+            <>
+              <Link 
+                color="inherit" 
+                href="#" 
+                onClick={(e) => { e.preventDefault(); navigate('/report'); }}
+              >
+                Report Marketplace
+              </Link>
+              <Typography color="text.primary">{report.title}</Typography>
+            </>
+          )}
         </Breadcrumbs>
         
         <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
@@ -504,7 +542,13 @@ const ReportView: React.FC = () => {
             <Button 
               variant="outlined" 
               startIcon={<ArrowBack />}
-              onClick={() => navigate('/report')}
+              onClick={() => {
+                if (organizationId && projectId) {
+                  navigate(`/organizations/${organizationId}/projects/${projectId}/report`);
+                } else {
+                  navigate('/report');
+                }
+              }}
             >
               Back to Marketplace
             </Button>

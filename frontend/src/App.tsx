@@ -61,43 +61,38 @@ import theme from './theme/index';
 import { AuthProvider } from './components/auth/AuthContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import AdminRoute from './components/auth/AdminRoute';
+import RouteGuard from './components/auth/RouteGuard';
+import ProjectSelectionHandler from './components/ProjectSelectionHandler';
 
 // Additional pages
 import FolderSelectionReportGenerator from './FolderSelectionReportGenerator';
 import InstagramFolderSelector from './FolderSelectionReportGenerator';
+import InvalidRoutePage from './pages/InvalidRoutePage';
 
 // Auth utility
 import { isAuthenticated } from './utils/auth';
 
-// Redirect component for dynamic route redirects
-const TrackAccountsRedirect = () => {
-  const { organizationId, projectId } = useParams();
-  return <Navigate to={`/organizations/${organizationId}/projects/${projectId}/source-tracking`} replace />;
+// Legacy route redirect component
+const LegacyRouteRedirect: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
+  return (
+    <RouteGuard requireOrgProject={true}>
+      <Layout>
+        {children}
+      </Layout>
+    </RouteGuard>
+  );
 };
 
-const TrackAccountsAccountsRedirect = () => {
-  const { organizationId, projectId } = useParams();
-  return <Navigate to={`/organizations/${organizationId}/projects/${projectId}/source-tracking/sources`} replace />;
-};
-
-const TrackSourcesRedirect = () => {
-  const { organizationId, projectId } = useParams();
-  return <Navigate to={`/organizations/${organizationId}/projects/${projectId}/source-tracking`} replace />;
-};
-
-const TrackSourcesCreateRedirect = () => {
-  const { organizationId, projectId } = useParams();
-  return <Navigate to={`/organizations/${organizationId}/projects/${projectId}/source-tracking/create`} replace />;
-};
-
-const TrackSourcesUploadRedirect = () => {
-  const { organizationId, projectId } = useParams();
-  return <Navigate to={`/organizations/${organizationId}/projects/${projectId}/source-tracking/upload`} replace />;
-};
-
-const TrackSourcesEditRedirect = () => {
-  const { organizationId, projectId, accountId } = useParams();
-  return <Navigate to={`/organizations/${organizationId}/projects/${projectId}/source-tracking/edit/${accountId}`} replace />;
+// Project dashboard with selection handler
+const ProjectDashboardWithHandler: React.FC = () => {
+  return (
+    <ProtectedRoute>
+      <Layout>
+        <ProjectSelectionHandler />
+        <Dashboard3 />
+      </Layout>
+    </ProtectedRoute>
+  );
 };
 
 function App() {
@@ -148,198 +143,72 @@ function App() {
                 </ProtectedRoute>
               } />
               
-              {/* New project view route within organization context */}
-              <Route path="/organizations/:organizationId/projects/:projectId" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Dashboard3 />
-                  </Layout>
-                </ProtectedRoute>
-              } />
+              {/* MAIN PROJECT DASHBOARD - with organization context */}
+              <Route path="/organizations/:organizationId/projects/:projectId" element={<ProjectDashboardWithHandler />} />
               
-              {/* Projects routes - no sidebar, now redirects to organization projects */}
-              <Route path="/projects" element={
-                <ProtectedRoute>
-                  <Navigate to="/organizations" replace />
-                </ProtectedRoute>
-              } />
+              {/* =========================== */}
+              {/* LEGACY ROUTE REDIRECTS */}
+              {/* =========================== */}
               
-              {/* Project Dashboard and all other routes - with sidebar */}
-              <Route path="/dashboard/:projectId" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Dashboard3 />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-
-              {/* Main dashboard for backward compatibility */}
-              <Route path="/dashboard" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Dashboard3 />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-
-              {/* Instagram routes */}
-              <Route path="/instagram-data" element={
-                <ProtectedRoute>
-                  <Navigate to="/instagram-folders" replace />
-                </ProtectedRoute>
-              } />
-              <Route path="/instagram-folders" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <InstagramFolders />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              <Route path="/instagram-data/:folderId" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <InstagramDataUpload />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-
+              {/* Legacy dashboard routes - redirect to org selection */}
+              <Route path="/dashboard" element={<LegacyRouteRedirect><Dashboard3 /></LegacyRouteRedirect>} />
+              <Route path="/dashboard/:projectId" element={<LegacyRouteRedirect><Dashboard3 /></LegacyRouteRedirect>} />
               
-              <Route path="/facebook-data" element={
-                <ProtectedRoute>
-                  <Navigate to="/facebook-folders" replace />
-                </ProtectedRoute>
-              } />
-              <Route path="/facebook-folders" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <FacebookFolders />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              <Route path="/facebook-data/:folderId" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <FacebookDataUpload />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-
-              {/* Comments Scraper - Cross-platform */}
-              <Route path="/comments-scraper" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <CommentsScraper />
-                  </Layout>
-                </ProtectedRoute>
-              } />
+              {/* Legacy track accounts routes - redirect to org selection */}
+              <Route path="/track-accounts" element={<LegacyRouteRedirect><TrackAccountsList /></LegacyRouteRedirect>} />
+              <Route path="/track-accounts/accounts" element={<LegacyRouteRedirect><TrackAccountsList /></LegacyRouteRedirect>} />
+              <Route path="/track-accounts/upload" element={<LegacyRouteRedirect><TrackAccountUpload /></LegacyRouteRedirect>} />
+              <Route path="/track-accounts/create" element={<LegacyRouteRedirect><TrackAccountCreate /></LegacyRouteRedirect>} />
+              <Route path="/track-accounts/edit/:accountId" element={<LegacyRouteRedirect><TrackAccountEdit /></LegacyRouteRedirect>} />
               
-              {/* Comments Scraper with organization and project IDs */}
-              <Route path="/organizations/:organizationId/projects/:projectId/comments-scraper" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <CommentsScraper />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-
-              {/* Facebook Comment Scraper */}
-              <Route path="/facebook-comment-scraper" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <FacebookCommentScraper />
-                  </Layout>
-                </ProtectedRoute>
-              } />
+              {/* Legacy social media folder routes - redirect to org selection */}
+              <Route path="/instagram-folders" element={<LegacyRouteRedirect><InstagramFolders /></LegacyRouteRedirect>} />
+              <Route path="/instagram-data/:folderId" element={<LegacyRouteRedirect><InstagramDataUpload /></LegacyRouteRedirect>} />
+              <Route path="/facebook-folders" element={<LegacyRouteRedirect><FacebookFolders /></LegacyRouteRedirect>} />
+              <Route path="/facebook-data/:folderId" element={<LegacyRouteRedirect><FacebookDataUpload /></LegacyRouteRedirect>} />
+              <Route path="/linkedin-folders" element={<LegacyRouteRedirect><LinkedInFolders /></LegacyRouteRedirect>} />
+              <Route path="/linkedin-data/:folderId" element={<LegacyRouteRedirect><LinkedInDataUpload /></LegacyRouteRedirect>} />
+              <Route path="/tiktok-folders" element={<LegacyRouteRedirect><TikTokFolders /></LegacyRouteRedirect>} />
+              <Route path="/tiktok-data/:folderId" element={<LegacyRouteRedirect><TikTokDataUpload /></LegacyRouteRedirect>} />
               
-              {/* Facebook Comment Scraper with organization and project IDs */}
-              <Route path="/organizations/:organizationId/projects/:projectId/facebook-comment-scraper" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <FacebookCommentScraper />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-
-              {/* LinkedIn routes */}
-              <Route path="/linkedin-data" element={
-                <ProtectedRoute>
-                  <Navigate to="/linkedin-folders" replace />
-                </ProtectedRoute>
-              } />
-              <Route path="/linkedin-folders" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <LinkedInFolders />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              <Route path="/linkedin-data/:folderId" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <LinkedInDataUpload />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-
-              {/* TikTok routes */}
-              <Route path="/tiktok-data" element={
-                <ProtectedRoute>
-                  <Navigate to="/tiktok-folders" replace />
-                </ProtectedRoute>
-              } />
-              <Route path="/tiktok-folders" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <TikTokFolders />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              <Route path="/tiktok-data/:folderId" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <TikTokDataUpload />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-
+              {/* Legacy analysis routes */}
+              <Route path="/analysis" element={<LegacyRouteRedirect><Analysis /></LegacyRouteRedirect>} />
+              <Route path="/social-analysis" element={<Navigate to="/analysis" replace />} />
+              <Route path="/web-presence" element={<Navigate to="/analysis" replace />} />
+              <Route path="/sentiment" element={<Navigate to="/analysis" replace />} />
+              <Route path="/wordcloud" element={<Navigate to="/analysis" replace />} />
+              <Route path="/nps-reports" element={<Navigate to="/analysis" replace />} />
               
-              <Route path="/track-accounts" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <TrackAccountsList />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              <Route path="/track-accounts/accounts" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <TrackAccountsList />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              <Route path="/track-accounts/upload" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <TrackAccountUpload />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              <Route path="/track-accounts/create" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <TrackAccountCreate />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              <Route path="/track-accounts/edit/:accountId" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <TrackAccountEdit />
-                  </Layout>
-                </ProtectedRoute>
-              } />
+              {/* Legacy report routes */}
+              <Route path="/report" element={<LegacyRouteRedirect><Report /></LegacyRouteRedirect>} />
+              <Route path="/report/:id" element={<LegacyRouteRedirect><ReportView /></LegacyRouteRedirect>} />
+              <Route path="/reports/generated" element={<LegacyRouteRedirect><GeneratedReports /></LegacyRouteRedirect>} />
+              <Route path="/report-folders" element={<LegacyRouteRedirect><ReportFolders /></LegacyRouteRedirect>} />
+              <Route path="/report-folders/:reportId" element={<LegacyRouteRedirect><ReportDetail /></LegacyRouteRedirect>} />
+              <Route path="/report-folders/:reportId/instagram-data" element={<LegacyRouteRedirect><InstagramFolderSelector /></LegacyRouteRedirect>} />
+              <Route path="/report-folders/create/multi-platform" element={<LegacyRouteRedirect><MultiPlatformReportGeneration /></LegacyRouteRedirect>} />
+              <Route path="/report-folders/:reportId/edit-multi-platform" element={<LegacyRouteRedirect><MultiPlatformReportGeneration /></LegacyRouteRedirect>} />
               
-              {/* New routes with organization and project IDs */}
+              {/* Legacy scraper routes */}
+              <Route path="/comments-scraper" element={<LegacyRouteRedirect><CommentsScraper /></LegacyRouteRedirect>} />
+              <Route path="/facebook-comment-scraper" element={<LegacyRouteRedirect><FacebookCommentScraper /></LegacyRouteRedirect>} />
+              <Route path="/brightdata-settings" element={<LegacyRouteRedirect><BrightdataSettings /></LegacyRouteRedirect>} />
+              <Route path="/brightdata-scraper" element={<LegacyRouteRedirect><AutomatedBatchScraper /></LegacyRouteRedirect>} />
+              <Route path="/automated-batch-scraper" element={<LegacyRouteRedirect><AutomatedBatchScraper /></LegacyRouteRedirect>} />
+              
+              {/* Legacy redirects */}
+              <Route path="/projects" element={<Navigate to="/organizations" replace />} />
+              <Route path="/instagram-data" element={<Navigate to="/instagram-folders" replace />} />
+              <Route path="/facebook-data" element={<Navigate to="/facebook-folders" replace />} />
+              <Route path="/linkedin-data" element={<Navigate to="/linkedin-folders" replace />} />
+              <Route path="/tiktok-data" element={<Navigate to="/tiktok-folders" replace />} />
+              <Route path="/reports" element={<Navigate to="/report-folders" replace />} />
+              
+              {/* =========================== */}
+              {/* PROPER ORGANIZATION/PROJECT ROUTES */}
+              {/* =========================== */}
+              
+              {/* Source Tracking (Track Accounts) */}
               <Route path="/organizations/:organizationId/projects/:projectId/source-tracking" element={
                 <ProtectedRoute>
                   <Layout>
@@ -376,52 +245,7 @@ function App() {
                 </ProtectedRoute>
               } />
               
-              {/* Legacy track-accounts routes for backward compatibility */}
-              <Route path="/organizations/:organizationId/projects/:projectId/track-accounts" element={<TrackAccountsRedirect />} />
-              <Route path="/organizations/:organizationId/projects/:projectId/track-accounts/accounts" element={<TrackAccountsAccountsRedirect />} />
-              
-              {/* Legacy track-sources routes for backward compatibility */}
-              <Route path="/organizations/:organizationId/projects/:projectId/track-sources" element={<TrackSourcesRedirect />} />
-              <Route path="/organizations/:organizationId/projects/:projectId/track-sources/create" element={<TrackSourcesCreateRedirect />} />
-              <Route path="/organizations/:organizationId/projects/:projectId/track-sources/upload" element={<TrackSourcesUploadRedirect />} />
-              <Route path="/organizations/:organizationId/projects/:projectId/track-sources/edit/:accountId" element={<TrackSourcesEditRedirect />} />
-              
-              <Route path="/social-analysis" element={
-                <ProtectedRoute>
-                  <Navigate to="/analysis" replace />
-                </ProtectedRoute>
-              } />
-              <Route path="/web-presence" element={
-                <ProtectedRoute>
-                  <Navigate to="/analysis" replace />
-                </ProtectedRoute>
-              } />
-              <Route path="/sentiment" element={
-                <ProtectedRoute>
-                  <Navigate to="/analysis" replace />
-                </ProtectedRoute>
-              } />
-              <Route path="/wordcloud" element={
-                <ProtectedRoute>
-                  <Navigate to="/analysis" replace />
-                </ProtectedRoute>
-              } />
-              <Route path="/nps-reports" element={
-                <ProtectedRoute>
-                  <Navigate to="/analysis" replace />
-                </ProtectedRoute>
-              } />
-              
-              {/* New unified Analysis route */}
-              <Route path="/analysis" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Analysis />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              {/* Analysis route with organization and project IDs */}
+              {/* Analysis routes */}
               <Route path="/organizations/:organizationId/projects/:projectId/analysis" element={
                 <ProtectedRoute>
                   <Layout>
@@ -430,139 +254,7 @@ function App() {
                 </ProtectedRoute>
               } />
               
-              <Route path="/settings" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Settings />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              {/* New Report Marketplace Routes */}
-              <Route path="/report" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Report />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/report/:id" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <ReportView />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              {/* Report Marketplace with organization and project IDs */}
-              <Route path="/organizations/:organizationId/projects/:projectId/report" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Report />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/organizations/:organizationId/projects/:projectId/report/:id" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <ReportView />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-
-              {/* Generated Reports Routes */}
-              <Route path="/reports/generated" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <GeneratedReports />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/organizations/:organizationId/projects/:projectId/reports/generated" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <GeneratedReports />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-
-              {/* Report Folder Routes */}
-              <Route path="/reports" element={
-                <ProtectedRoute>
-                  <Navigate to="/report-folders" replace />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/report-folders" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <ReportFolders />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/report-folders/:reportId" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <ReportDetail />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              <Route path="/report-folders/:reportId/instagram-data" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <InstagramFolderSelector />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              <Route path="/instagram-folder-selector/:reportId" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <InstagramFolderSelector />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
-              {/* Multi-Platform Report Generation Routes */}
-              <Route path="/report-folders/create/multi-platform" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <MultiPlatformReportGeneration />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              <Route path="/report-folders/:reportId/edit-multi-platform" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <MultiPlatformReportGeneration />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              <Route path="/brightdata-settings" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <BrightdataSettings />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              <Route path="/brightdata-scraper" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <AutomatedBatchScraper />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              <Route path="/automated-batch-scraper" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <AutomatedBatchScraper />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-
-              {/* Social Media Data with organization and project IDs */}
+              {/* Social Media Data Routes */}
               {/* Instagram routes */}
               <Route path="/organizations/:organizationId/projects/:projectId/instagram-folders" element={
                 <ProtectedRoute>
@@ -627,7 +319,50 @@ function App() {
                 </ProtectedRoute>
               } />
               
-              {/* Report Folder Routes with organization and project IDs */}
+              {/* Comments Scraper routes */}
+              <Route path="/organizations/:organizationId/projects/:projectId/comments-scraper" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <CommentsScraper />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/organizations/:organizationId/projects/:projectId/facebook-comment-scraper" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <FacebookCommentScraper />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+
+              {/* Report Marketplace routes */}
+              <Route path="/organizations/:organizationId/projects/:projectId/report" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Report />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/organizations/:organizationId/projects/:projectId/report/:id" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <ReportView />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+
+              {/* Generated Reports routes */}
+              <Route path="/organizations/:organizationId/projects/:projectId/reports/generated" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <GeneratedReports />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+              
+              {/* Report Folder routes */}
               <Route path="/organizations/:organizationId/projects/:projectId/report-folders" element={
                 <ProtectedRoute>
                   <Layout>
@@ -652,7 +387,7 @@ function App() {
                 </ProtectedRoute>
               } />
               
-              {/* Multi-Platform Report Generation Routes with organization and project IDs */}
+              {/* Multi-Platform Report Generation routes */}
               <Route path="/organizations/:organizationId/projects/:projectId/report-folders/create/multi-platform" element={
                 <ProtectedRoute>
                   <Layout>
@@ -669,7 +404,7 @@ function App() {
                 </ProtectedRoute>
               } />
               
-              {/* Brightdata routes with organization and project IDs */}
+              {/* Brightdata routes */}
               <Route path="/organizations/:organizationId/projects/:projectId/brightdata-settings" element={
                 <ProtectedRoute>
                   <Layout>
@@ -693,6 +428,21 @@ function App() {
                   </Layout>
                 </ProtectedRoute>
               } />
+              
+              {/* Settings route - available at project level */}
+              <Route path="/organizations/:organizationId/projects/:projectId/settings" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Settings />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+              
+              {/* Global settings route (legacy) */}
+              <Route path="/settings" element={<LegacyRouteRedirect><Settings /></LegacyRouteRedirect>} />
+              
+              {/* Catch-all route for invalid paths - redirect to organizations */}
+              <Route path="*" element={<Navigate to="/organizations" replace />} />
             </Routes>
           </Router>
         </ThemeProvider>

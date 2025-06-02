@@ -29,6 +29,7 @@ import {
   Stack,
   Avatar,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import {
   Search as SearchIcon,
   Add as AddIcon,
@@ -69,6 +70,7 @@ interface FilterStats {
 const TrackSourcesList = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const theme = useTheme();
   
   // Extract project ID from URL path or query parameters
   const getProjectId = () => {
@@ -482,10 +484,10 @@ const TrackSourcesList = () => {
             <Button
               variant="contained"
               startIcon={<PersonAddIcon />}
-              onClick={() => navigate(getNavigationPath('/track-sources/create'))}
+              onClick={() => navigate(getNavigationPath('/source-tracking/create'))}
               sx={{ 
-                bgcolor: '#3b82f6',
-                '&:hover': { bgcolor: '#2563eb' },
+                bgcolor: theme.palette.primary.main,
+                '&:hover': { bgcolor: theme.palette.primary.dark },
                 borderRadius: 2,
                 px: 3
               }}
@@ -499,7 +501,7 @@ const TrackSourcesList = () => {
             <Card sx={{ bgcolor: '#f8fafc', border: '1px solid #e2e8f0' }}>
               <CardContent sx={{ p: 2 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Avatar sx={{ bgcolor: '#3b82f6', mr: 2 }}>
+                  <Avatar sx={{ bgcolor: theme.palette.primary.main, mr: 2 }}>
                     <FolderIcon />
                   </Avatar>
                   <Box>
@@ -552,8 +554,8 @@ const TrackSourcesList = () => {
                 <Button
                   variant="contained"
                   startIcon={<AddIcon />}
-                  onClick={() => navigate(getNavigationPath('/track-sources/create'))}
-                  sx={{ bgcolor: '#3b82f6', '&:hover': { bgcolor: '#2563eb' } }}
+                  onClick={() => navigate(getNavigationPath('/source-tracking/create'))}
+                  sx={{ bgcolor: theme.palette.primary.main, '&:hover': { bgcolor: theme.palette.primary.dark } }}
                 >
                   Add Source
                 </Button>
@@ -680,14 +682,8 @@ const TrackSourcesList = () => {
                             <Button
                               size="small"
                               startIcon={<EditIcon />}
-                              onClick={() => navigate(getNavigationPath(`/track-sources/edit/${source.id}`))}
-                              sx={{ 
-                                color: '#64748b',
-                                '&:hover': { 
-                                  bgcolor: '#f1f5f9',
-                                  color: '#334155'
-                                }
-                              }}
+                              onClick={() => navigate(getNavigationPath(`/source-tracking/edit/${source.id}`))}
+                              sx={{ color: theme.palette.primary.main }}
                             >
                               Edit
                             </Button>

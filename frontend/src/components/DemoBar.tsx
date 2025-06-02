@@ -3,8 +3,8 @@ import { Box, Typography, Button } from '@mui/material';
 import { styled } from '@mui/material/styles';
 
 const DemoBarContainer = styled(Box)(({ theme }) => ({
-  backgroundColor: '#1976d2',
-  color: '#333333',
+  backgroundColor: theme.palette.secondary.main,
+  color: theme.palette.text.primary,
   padding: theme.spacing(0.4, 1.5),
   display: 'flex',
   alignItems: 'center',
@@ -15,9 +15,8 @@ const DemoBarContainer = styled(Box)(({ theme }) => ({
   left: 0,
   right: 0,
   zIndex: theme.zIndex.drawer + 2,
-  borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
+  borderBottom: `1px solid ${theme.palette.primary.main}`,
   minHeight: '28px',
-  background: '#A6FDED',
   [theme.breakpoints.down('md')]: {
     gap: theme.spacing(1),
     padding: theme.spacing(0.3, 1.2),
@@ -33,7 +32,7 @@ const DemoBarContainer = styled(Box)(({ theme }) => ({
 const DemoText = styled(Typography)(({ theme }) => ({
   fontSize: '12px',
   fontWeight: 500,
-  color: '#333333',
+  color: theme.palette.text.primary,
   textAlign: 'center',
   [theme.breakpoints.down('md')]: {
     fontSize: '11px',
@@ -46,9 +45,9 @@ const DemoText = styled(Typography)(({ theme }) => ({
 }));
 
 const ScheduleButton = styled(Button)(({ theme }) => ({
-  backgroundColor: 'rgba(0, 0, 0, 0.08)',
-  color: '#333333',
-  border: '1px solid rgba(0, 0, 0, 0.2)',
+  backgroundColor: theme.palette.primary.main,
+  color: theme.palette.text.primary,
+  border: `1px solid ${theme.palette.primary.dark}`,
   borderRadius: '4px',
   padding: theme.spacing(0.25, 1),
   fontSize: '12px',
@@ -59,10 +58,10 @@ const ScheduleButton = styled(Button)(({ theme }) => ({
   transition: 'all 0.2s ease-in-out',
   backdropFilter: 'blur(10px)',
   '&:hover': {
-    backgroundColor: 'rgba(0, 0, 0, 0.12)',
-    border: '1px solid rgba(0, 0, 0, 0.3)',
+    backgroundColor: theme.palette.primary.dark,
+    border: `1px solid ${theme.palette.primary.dark}`,
     transform: 'translateY(-1px)',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+    boxShadow: `0 4px 12px rgba(98, 239, 131, 0.3)`,
   },
   '&:active': {
     transform: 'translateY(0)',
@@ -91,7 +90,7 @@ const DemoBar: React.FC = () => {
       </DemoText>
       <ScheduleButton
         onClick={handleScheduleCall}
-        variant="outlined"
+        variant="contained"
       >
         Schedule a call
       </ScheduleButton>

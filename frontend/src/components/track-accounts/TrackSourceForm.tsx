@@ -25,6 +25,7 @@ import LinkIcon from '@mui/icons-material/Link';
 import InfoIcon from '@mui/icons-material/Info';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
+import AddIcon from '@mui/icons-material/Add';
 import { apiFetch } from '../../utils/api';
 
 // Types
@@ -413,6 +414,31 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
                 onChange={handleChange}
                 placeholder="Enter details about other social media accounts"
               />
+
+              {/* Add Other Sources Button */}
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  startIcon={<AddIcon />}
+                  onClick={() => {
+                    // TODO: Implement functionality to add other sources
+                    console.log('Add Other Sources clicked - functionality to be implemented');
+                  }}
+                  sx={{
+                    borderStyle: 'dashed',
+                    borderWidth: 2,
+                    py: 1.5,
+                    px: 3,
+                    '&:hover': {
+                      borderStyle: 'dashed',
+                      borderWidth: 2,
+                    }
+                  }}
+                >
+                  Add Other Sources
+                </Button>
+              </Box>
             </Stack>
           </Box>
           
