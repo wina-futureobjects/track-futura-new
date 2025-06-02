@@ -69,8 +69,22 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
             if not csv_file.name.endswith('.csv'):
                 return Response({'error': 'File must be a CSV'}, status=status.HTTP_400_BAD_REQUEST)
             
-            # Get project ID directly from request data
+            # Get project ID and validate it
             project_id = request.data.get('project')
+            if not project_id:
+                return Response({'error': 'Project ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            try:
+                project_id = int(project_id)
+            except (ValueError, TypeError):
+                return Response({'error': 'Invalid project ID'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Verify project exists
+            from users.models import Project
+            try:
+                project = Project.objects.get(id=project_id)
+            except Project.DoesNotExist:
+                return Response({'error': f'Project with ID {project_id} does not exist'}, status=status.HTTP_400_BAD_REQUEST)
             
             # Read the CSV file
             decoded_file = csv_file.read().decode('utf-8')
@@ -87,7 +101,7 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
                 if not row.get('Name'):
                     continue
                 
-                # Prepare the data dictionary
+                # Prepare the data dictionary with project_id instead of project
                 data = {
                     'name': row.get('Name', '').strip(),
                     'facebook_link': row.get('FACEBOOK_LINK', '').strip() or None,
@@ -95,7 +109,7 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
                     'linkedin_link': row.get('LINKEDIN_LINK', '').strip() or None,
                     'tiktok_link': row.get('TIKTOK_LINK', '').strip() or None,
                     'other_social_media': row.get('OTHER_SOCIAL_MEDIA', '').strip() or None,
-                    'project': project_id
+                    'project_id': project_id  # Use project_id instead of project
                 }
                 
                 # Check if source with this name already exists in the project
@@ -107,7 +121,7 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
                 if existing_source:
                     # Update existing source
                     for key, value in data.items():
-                        if key != 'project':  # Don't change project
+                        if key != 'project_id':  # Don't change project_id
                             setattr(existing_source, key, value)
                     existing_source.save()
                     updated_objects.append(existing_source)

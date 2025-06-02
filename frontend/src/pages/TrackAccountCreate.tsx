@@ -6,7 +6,7 @@ import {
   Box,
   Paper
 } from '@mui/material';
-import TrackSourceForm from '../components/track-accounts/TrackSourceForm';
+import BulkSourceCreate from '../components/track-accounts/BulkSourceCreate';
 
 const TrackAccountCreate = () => {
   const navigate = useNavigate();
@@ -16,16 +16,18 @@ const TrackAccountCreate = () => {
   }>();
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" gutterBottom>
-          Create Track Source
-        </Typography>
-      </Box>
-      
-      <TrackSourceForm 
+    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <BulkSourceCreate 
         organizationId={organizationId} 
         projectId={projectId}
+        onSuccess={() => {
+          // Navigate back to the sources list after successful creation
+          if (organizationId && projectId) {
+            navigate(`/organizations/${organizationId}/projects/${projectId}/source-tracking/sources`);
+          } else {
+            navigate('/');
+          }
+        }}
       />
     </Container>
   );

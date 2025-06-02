@@ -42,6 +42,7 @@ import {
   Clear as ClearIcon,
   Folder as FolderIcon,
   TrendingUp as TrendingUpIcon,
+  Download as DownloadIcon,
 } from '@mui/icons-material';
 import { apiFetch } from '../utils/api';
 
@@ -305,6 +306,35 @@ const TrackSourcesList = () => {
     });
   };
 
+  // Handle CSV download
+  const handleCsvDownload = async () => {
+    if (!projectId) return;
+
+    try {
+      const response = await apiFetch(`/track-accounts/sources/download_csv/?project=${projectId}`);
+      
+      if (!response.ok) {
+        throw new Error('Download failed');
+      }
+
+      // Create a blob from the response
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'track_sources.csv';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      showSnackbar('CSV downloaded successfully', 'success');
+    } catch (error) {
+      console.error('Download error:', error);
+      showSnackbar('Failed to download CSV', 'error');
+    }
+  };
+
   // Navigation helper
   const getNavigationPath = (path: string) => {
     const pathMatch = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
@@ -481,19 +511,38 @@ const TrackSourcesList = () => {
                 Manage and track social media sources for monitoring
               </Typography>
             </Box>
-            <Button
-              variant="contained"
-              startIcon={<PersonAddIcon />}
-              onClick={() => navigate(getNavigationPath('/source-tracking/create'))}
-              sx={{ 
-                bgcolor: theme.palette.primary.main,
-                '&:hover': { bgcolor: theme.palette.primary.dark },
-                borderRadius: 2,
-                px: 3
-              }}
-            >
-              Add Source
-            </Button>
+            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+              {/* CSV Download */}
+              <Button
+                variant="outlined"
+                startIcon={<DownloadIcon />}
+                onClick={handleCsvDownload}
+                size="small"
+                sx={{ 
+                  borderColor: theme.palette.secondary.main,
+                  color: theme.palette.secondary.main,
+                  '&:hover': { 
+                    borderColor: theme.palette.secondary.dark,
+                    bgcolor: theme.palette.secondary.main + '0A'
+                  }
+                }}
+              >
+                Export CSV
+              </Button>
+              
+              {/* Add Source */}
+              <Button
+                variant="contained"
+                startIcon={<PersonAddIcon />}
+                onClick={() => navigate(getNavigationPath('/source-tracking/create'))}
+                sx={{ 
+                  bgcolor: theme.palette.primary.main,
+                  '&:hover': { bgcolor: theme.palette.primary.dark }
+                }}
+              >
+                Add Source
+              </Button>
+            </Box>
           </Box>
           
           {/* Stats Cards */}
