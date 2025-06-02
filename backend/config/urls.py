@@ -18,8 +18,28 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import RedirectView
+from django.http import JsonResponse, HttpResponse
+
+def api_status(request):
+    """Simple API status endpoint for root path"""
+    return JsonResponse({
+        'status': 'Track-Futura API is running',
+        'version': '1.0',
+        'endpoints': {
+            'users': '/api/users/',
+            'reports': '/api/reports/',
+            'analytics': '/api/analytics/',
+            'admin': '/admin/',
+        }
+    })
+
+def favicon_view(request):
+    """Return empty response for favicon to prevent 404s"""
+    return HttpResponse(status=204)  # No Content
 
 urlpatterns = [
+    path("", api_status, name="api_status"),  # Handle root path
+    path("favicon.ico", favicon_view, name="favicon"),  # Handle favicon
     path("admin/", admin.site.urls),
     path("api/users/", include("users.urls")),
     path("api/reports/", include("reports.urls")),

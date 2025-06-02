@@ -194,6 +194,17 @@ def get_csrf_trusted_origins():
         app_name = os.getenv('PLATFORM_APPLICATION_NAME')
         project_id = os.getenv('PLATFORM_PROJECT')
         environment = os.getenv('PLATFORM_ENVIRONMENT', 'main')
+        
+        # Add the specific Upsun URL pattern from the error
+        upsun_url = "https://api.upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site"
+        if upsun_url not in origins:
+            origins.append(upsun_url)
+            
+        # Also add the frontend URL
+        frontend_url = "https://upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site"  
+        if frontend_url not in origins:
+            origins.append(frontend_url)
+        
         if app_name and project_id:
             fallback_url = f"https://{app_name}-{project_id}.{environment}.platformsh.site"
             if fallback_url not in origins:
@@ -270,6 +281,10 @@ BRIGHTDATA_WEBHOOK_TOKEN = os.getenv('BRIGHTDATA_WEBHOOK_TOKEN', 'your-default-w
 if (os.getenv('PLATFORM_APPLICATION_NAME') is not None):
     DEBUG = False
 
+    # Disable DataDog tracing if auto-injected by Upsun
+    os.environ['DD_TRACE_ENABLED'] = 'false'
+    os.environ['DD_PROFILING_ENABLED'] = 'false'
+
     # Static files for production - match Upsun mount path
     STATIC_ROOT = '/app/staticfiles'
 
@@ -296,6 +311,16 @@ if (os.getenv('PLATFORM_APPLICATION_NAME') is not None):
                         hostname = urlparse(route_url).hostname
                         if hostname and hostname not in allowed_hosts:
                             allowed_hosts.append(hostname)
+                            
+                # Add specific Upsun hostnames from the error
+                upsun_hosts = [
+                    'api.upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site',
+                    'upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site'
+                ]
+                for host in upsun_hosts:
+                    if host not in allowed_hosts:
+                        allowed_hosts.append(host)
+                        
                 if not allowed_hosts:  # If no hosts found, allow all
                     allowed_hosts = ['*']
             except (json.JSONDecodeError, AttributeError, ImportError):
