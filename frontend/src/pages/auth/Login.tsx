@@ -52,26 +52,16 @@ const useAuth = () => {
       if (!response.ok) {
         let errorData;
         try {
-          const responseText = await response.text();
-          if (responseText.trim()) {
-            errorData = JSON.parse(responseText);
-          } else {
-            throw new Error(`HTTP ${response.status}: Empty response from server`);
-          }
+          errorData = await response.json();
         } catch (parseError) {
           throw new Error(`HTTP ${response.status}: Unable to parse server error response`);
         }
-        throw new Error(errorData.detail || 'Login failed');
+        throw new Error(errorData.detail || errorData.non_field_errors?.[0] || 'Login failed');
       }
 
       let data;
       try {
-        const responseText = await response.text();
-        if (responseText.trim()) {
-          data = JSON.parse(responseText);
-        } else {
-          throw new Error('Empty response from server');
-        }
+        data = await response.json();
       } catch (parseError) {
         throw new Error('Unable to parse server response');
       }
@@ -89,12 +79,7 @@ const useAuth = () => {
       if (userProfileResp.ok) {
         let userProfileData;
         try {
-          const profileResponseText = await userProfileResp.text();
-          if (profileResponseText.trim()) {
-            userProfileData = JSON.parse(profileResponseText);
-          } else {
-            userProfileData = { user: {} };
-          }
+          userProfileData = await userProfileResp.json();
         } catch (parseError) {
           userProfileData = { user: {} };
         }

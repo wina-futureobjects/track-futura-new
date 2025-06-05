@@ -10,3 +10,6 @@ and software architecture.
 please make sure the development of the code is at professional level, this is for the use of big tech company like Apple.
 
 when UI development is involve, Make sure the UI is clean and modern, feel free to use top Ui library and interactive UI like framer motion
+
+
+this application is going to be deployed in upsun, your changes or new generated code should always be compatible and no issue when deploying to the server
