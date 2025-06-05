@@ -1,9 +1,8 @@
+import { CssBaseline, ThemeProvider, createTheme } from '@mui/material'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
-import { ThemeProvider, createTheme } from '@mui/material'
-import { CssBaseline } from '@mui/material'
 
 // Declare API_BASE_URL on Window interface to fix TypeScript error
 declare global {
@@ -13,8 +12,8 @@ declare global {
 }
 
 // Set the API base URL based on environment
-window.API_BASE_URL = import.meta.env.PROD 
-  ? `https://api.${window.location.hostname}` // Use api subdomain in production (Upsun/Platform.sh)
+window.API_BASE_URL = import.meta.env.PROD
+  ? `https://${window.location.hostname}` // Use same domain in production
   : '';
 
 const theme = createTheme({

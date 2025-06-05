@@ -73,16 +73,16 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",  # CORS first - most important for API calls
     "django.middleware.security.SecurityMiddleware",
     # "whitenoise.middleware.WhiteNoiseMiddleware",  # Temporarily disable whitenoise
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "users.middleware.CustomCsrfMiddleware",  # Use custom CSRF middleware that disables CSRF
     # "django.middleware.csrf.CsrfViewMiddleware",  # Completely disable CSRF middleware
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # "django.middleware.clickjacking.XFrameOptionsMiddleware",  # Disable X-Frame protection
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -235,11 +235,36 @@ REST_FRAMEWORK = {
     'UNAUTHENTICATED_TOKEN': None,
 }
 
-# CORS settings - Allow everything
+# CORS settings - Permissive configuration for deployment
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_HEADERS = True
-CORS_ALLOW_ALL_METHODS = True
+CORS_ALLOWED_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'access-control-allow-origin',
+    'access-control-allow-credentials',
+    'access-control-allow-headers',
+    'access-control-allow-methods',
+]
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+CORS_PREFLIGHT_MAX_AGE = 86400
+CORS_EXPOSE_HEADERS = []
+CORS_ALLOW_PRIVATE_NETWORK = True
 
 # Completely disable CSRF
 CSRF_COOKIE_SECURE = False
@@ -255,14 +280,26 @@ CSRF_TRUSTED_ORIGINS = [
     'https://localhost:8000',
 ]
 
-# Add Upsun/Platform.sh domains to trusted origins
+# Add dynamic origins for Upsun
+DYNAMIC_CORS_ORIGINS = []
 if os.getenv('PLATFORM_APPLICATION_NAME'):
-    app_name = os.getenv('PLATFORM_APPLICATION_NAME')
-    project_id = os.getenv('PLATFORM_PROJECT')
+    # Add all possible Upsun/Platform.sh patterns
+    app_name = os.getenv('PLATFORM_APPLICATION_NAME', 'app')
+    project_id = os.getenv('PLATFORM_PROJECT', '')
     environment = os.getenv('PLATFORM_ENVIRONMENT', 'main')
-    if app_name and project_id:
-        upsun_domain = f"https://{app_name}-{project_id}.{environment}.platformsh.site"
-        CSRF_TRUSTED_ORIGINS.append(upsun_domain)
+
+    if project_id:
+        # All possible domain patterns
+        base_patterns = [
+            f"https://{app_name}-{project_id}.{environment}.platformsh.site",
+            f"https://api.{app_name}-{project_id}.{environment}.platformsh.site",
+            f"https://{app_name}-{project_id}.{environment}.upsun.app",
+            f"https://api.{app_name}-{project_id}.{environment}.upsun.app",
+            f"https://{project_id}.{environment}.platformsh.site",
+            f"https://{project_id}.{environment}.upsun.app",
+        ]
+        DYNAMIC_CORS_ORIGINS.extend(base_patterns)
+        CSRF_TRUSTED_ORIGINS.extend(base_patterns)
 
     # Also get from Platform routes if available
     platform_routes = os.getenv('PLATFORM_ROUTES')
@@ -272,9 +309,21 @@ if os.getenv('PLATFORM_APPLICATION_NAME'):
             routes = json.loads(platform_routes)
             for route_url in routes.keys():
                 if route_url.startswith(('http://', 'https://')):
-                    CSRF_TRUSTED_ORIGINS.append(route_url.rstrip('/'))
+                    clean_url = route_url.rstrip('/')
+                    DYNAMIC_CORS_ORIGINS.append(clean_url)
+                    CSRF_TRUSTED_ORIGINS.append(clean_url)
         except (json.JSONDecodeError, AttributeError):
             pass
+
+# Override CORS origins to include dynamic ones
+CORS_ALLOWED_ORIGINS = DYNAMIC_CORS_ORIGINS + [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://localhost:8000',
+    'https://localhost:3000',
+    'https://localhost:5173',
+    'https://localhost:8000',
+]
 
 # Completely disable CSRF validation
 CSRF_COOKIE_NAME = 'csrftoken'
@@ -287,7 +336,7 @@ CSRF_COOKIE_PATH = '/'
 CSRF_COOKIE_AGE = 31449600  # 1 year
 CSRF_TOKEN_VALID = True
 
-# Disable CSRF completely for development
+# Disable CSRF for deployment
 USE_CSRF = False
 
 # Session security settings - make permissive
@@ -297,7 +346,7 @@ SESSION_COOKIE_SAMESITE = None
 SESSION_SAVE_EVERY_REQUEST = True
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 
-# Disable all security headers
+# Disable ALL security headers completely
 SECURE_SSL_REDIRECT = False
 SECURE_PROXY_SSL_HEADER = None
 SECURE_HSTS_SECONDS = 0
@@ -308,7 +357,18 @@ SECURE_BROWSER_XSS_FILTER = False
 SECURE_REFERRER_POLICY = None
 
 # Completely disable X-Frame-Options
-X_FRAME_OPTIONS = 'ALLOWALL'
+X_FRAME_OPTIONS = None
+
+# Additional deployment settings
+USE_HTTPS = False
+SECURE_REDIRECT_EXEMPT = []  # Empty list - no regex patterns needed
+
+# Force all requests to be treated as secure if needed
+if os.getenv('PLATFORM_APPLICATION_NAME'):
+    # On Upsun, we might be behind a proxy, but don't enforce security
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    # But still don't redirect or enforce
+    SECURE_SSL_REDIRECT = False
 
 # BrightData Integration Settings - Auto-detect domain for Upsun deployment
 def get_brightdata_base_url():
@@ -365,7 +425,7 @@ if (os.getenv('PLATFORM_APPLICATION_NAME') is not None):
     if (os.getenv('PLATFORM_PROJECT_ENTROPY') is not None):
         SECRET_KEY = os.getenv('PLATFORM_PROJECT_ENTROPY')
 
-    # Allow all hosts - completely permissive
+    # Allow all hosts for deployment
     ALLOWED_HOSTS = ['*']
 
     # Production database configuration.

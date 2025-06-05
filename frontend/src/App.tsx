@@ -90,6 +90,7 @@ const ProjectDashboardWithHandler: React.FC = () => {
 };
 
 function App() {
+
   return (
     <AuthProvider>
       <LocalizationProvider dateAdapter={AdapterDayjs}>

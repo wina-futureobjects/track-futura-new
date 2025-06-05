@@ -1,20 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import {
+    ArrowRight,
+    BarChart3,
+    Eye,
+    EyeOff,
+    Shield,
+    Zap
+} from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import futureObjectLogo from '../../assets/images/logos/future-object.png';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { apiFetch } from '../../utils/api';
 import { setAuthToken, setCurrentUser, UserRole } from '../../utils/auth';
-import { 
-  Eye, 
-  EyeOff, 
-  Shield, 
-  TrendingUp, 
-  BarChart3,
-  Zap,
-  ArrowRight
-} from 'lucide-react';
-import futureObjectLogo from '../../assets/images/logos/future-object.png';
 
 // Define local types and auth implementation
 interface LoginCredentials {
@@ -41,8 +40,7 @@ interface LoginResult {
 // Local auth implementation
 const useAuth = () => {
   const login = async (credentials: LoginCredentials): Promise<LoginResult> => {
-    try {
-      console.log('Starting login request...');
+        try {
       const response = await apiFetch('/api/users/login/', {
         method: 'POST',
         headers: {
@@ -50,51 +48,44 @@ const useAuth = () => {
         },
         body: JSON.stringify(credentials),
       });
-      
-      console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers);
-      
+
       if (!response.ok) {
         let errorData;
         try {
           const responseText = await response.text();
-          console.log('Error response text:', responseText);
           if (responseText.trim()) {
             errorData = JSON.parse(responseText);
           } else {
             throw new Error(`HTTP ${response.status}: Empty response from server`);
           }
         } catch (parseError) {
-          console.error('Failed to parse error response:', parseError);
           throw new Error(`HTTP ${response.status}: Unable to parse server error response`);
         }
         throw new Error(errorData.detail || 'Login failed');
       }
-      
+
       let data;
       try {
         const responseText = await response.text();
-        console.log('Success response text:', responseText);
         if (responseText.trim()) {
           data = JSON.parse(responseText);
         } else {
           throw new Error('Empty response from server');
         }
       } catch (parseError) {
-        console.error('Failed to parse success response:', parseError);
         throw new Error('Unable to parse server response');
       }
-      
+
       // Save token using the auth utility
       setAuthToken(data.token);
-      
+
       // Get user role and details
       const userProfileResp = await apiFetch('/api/users/profile/', {
         headers: {
           'Authorization': `Token ${data.token}`
         }
       });
-      
+
       if (userProfileResp.ok) {
         let userProfileData;
         try {
@@ -102,14 +93,12 @@ const useAuth = () => {
           if (profileResponseText.trim()) {
             userProfileData = JSON.parse(profileResponseText);
           } else {
-            console.warn('Empty profile response, using basic user data');
             userProfileData = { user: {} };
           }
         } catch (parseError) {
-          console.warn('Failed to parse profile response, using basic user data:', parseError);
           userProfileData = { user: {} };
         }
-        
+
         // Store complete user data including role
         const userData: User = {
           id: data.user_id,
@@ -119,10 +108,10 @@ const useAuth = () => {
           last_name: data.last_name || '',
           global_role: userProfileData.user.global_role
         };
-        
+
         // Save user data using auth utility
         setCurrentUser(userData);
-        
+
         return { user: userData };
       } else {
         // If profile fetch fails, still store basic user info
@@ -133,16 +122,15 @@ const useAuth = () => {
           first_name: data.first_name || '',
           last_name: data.last_name || ''
         };
-        
+
         setCurrentUser(userData);
         return { user: userData };
       }
     } catch (error) {
-      console.error('Login error:', error);
       throw error;
     }
   };
-  
+
   return { login };
 };
 
@@ -158,6 +146,7 @@ const Login: React.FC = () => {
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [rememberMe, setRememberMe] = useState<boolean>(false);
   const [isVisible, setIsVisible] = useState<boolean>(false);
+
 
   useEffect(() => {
     // Add custom CSS for animations
@@ -329,7 +318,7 @@ const Login: React.FC = () => {
       const result = await login(credentials);
       // Check if user has admin role and redirect accordingly
       const userRole = result.user.global_role?.role;
-      
+
       if (userRole === 'super_admin') {
         navigate('/admin/super');
       } else if (userRole === 'tenant_admin') {
@@ -339,7 +328,7 @@ const Login: React.FC = () => {
           if (response.ok) {
             const data = await response.json();
             const organizations = Array.isArray(data) ? data : (data.results || []);
-            
+
             if (organizations.length > 0) {
               // Redirect to the first organization's projects page
               navigate(`/organizations/${organizations[0].id}/projects`);
@@ -369,7 +358,7 @@ const Login: React.FC = () => {
     <div className="min-h-screen relative overflow-hidden">
       {/* Enhanced Background */}
       <div className="absolute inset-0 bg-white" />
-      
+
       {/* Grid pattern overlay */}
       <div className="absolute inset-0 opacity-[0.02]" style={{
         backgroundImage: `radial-gradient(circle at 1px 1px, rgb(0 0 0) 1px, transparent 0)`,
@@ -380,15 +369,15 @@ const Login: React.FC = () => {
       <div className="relative z-10 min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="w-full max-w-6xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-20 items-center">
-            
+
             {/* Left side - Branding and features */}
             <div className={`hidden lg:block space-y-12 ${isVisible ? 'slide-in-left' : 'opacity-0'}`}>
               {/* Logo and title */}
               <div className="space-y-0">
                 <div className="flex items-center gap-">
-                  <img 
-                    src={futureObjectLogo} 
-                    alt="Future Objects" 
+                  <img
+                    src={futureObjectLogo}
+                    alt="Future Objects"
                     className="h-24 w-auto"
                   />
                 </div>
@@ -402,7 +391,7 @@ const Login: React.FC = () => {
                     </span>
                   </h2>
                   <p className="text-xl text-gray-600 leading-relaxed max-w-lg">
-                    Comprehensive data collection and insights across all major social platforms. 
+                    Comprehensive data collection and insights across all major social platforms.
                     Monitor, analyze, and optimize your social media performance with cutting-edge AI.
                   </p>
                 </div>
@@ -430,7 +419,7 @@ const Login: React.FC = () => {
                     gradient: "from-[#D291E2] to-[#C673DD]"
                   }
                 ].map((feature, index) => (
-                  <div 
+                  <div
                     key={index}
                     className="flex items-start gap-4 group hover:translate-x-2 transition-transform duration-300 opacity-0"
                     style={{ animation: `fadeInLeft 0.8s ease-out ${0.4 + index * 0.15}s forwards` }}
@@ -459,13 +448,13 @@ const Login: React.FC = () => {
             {/* Right side - Login form (Centered) */}
             <div className="w-full flex items-center justify-center">
               <div className={`w-full max-w-md mx-auto ${isVisible ? 'fade-in-center' : 'opacity-0'}`}>
-                
+
                 {/* Mobile header */}
                 <div className="lg:hidden text-center mb-12 opacity-0" style={{ animation: 'fadeInUp 0.8s ease-out 0.2s forwards' }}>
                   <div className="flex items-center justify-center gap-3 mb-6">
-                    <img 
-                      src={futureObjectLogo} 
-                      alt="Future Objects" 
+                    <img
+                      src={futureObjectLogo}
+                      alt="Future Objects"
                       className="h-12 w-auto"
                     />
                   </div>
@@ -477,7 +466,7 @@ const Login: React.FC = () => {
                 <div className="relative group">
                   {/* Glow effect */}
                   <div className="absolute -inset-1 bg-gradient-to-r from-emerald-200 via-cyan-200 to-violet-200 rounded-3xl blur-xl opacity-50 group-hover:opacity-70 transition-opacity duration-500" />
-                  
+
                   <div className="relative backdrop-blur-sm bg-white/90 rounded-3xl border border-gray-200 shadow-2xl overflow-hidden">
                     {/* Header */}
                     <div className="p-10 text-center border-b border-gray-100">
@@ -590,4 +579,4 @@ const Login: React.FC = () => {
   );
 };
 
-export default Login; 
+export default Login;

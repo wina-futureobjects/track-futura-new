@@ -20,6 +20,9 @@ from django.urls import path, include
 from django.views.generic import RedirectView
 from django.http import JsonResponse, HttpResponse
 from django.db import connection
+from django.conf import settings
+from django.conf.urls.static import static
+
 
 def api_status(request):
     """Simple API status endpoint for root path"""
@@ -40,7 +43,7 @@ def health_check(request):
         # Test database connection
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
-        
+
         return JsonResponse({
             'status': 'healthy',
             'database': 'connected',
@@ -55,6 +58,8 @@ def health_check(request):
 def favicon_view(request):
     """Return empty response for favicon to prevent 404s"""
     return HttpResponse(status=204)  # No Content
+
+
 
 urlpatterns = [
     path("", api_status, name="api_status"),  # Handle root path
@@ -74,4 +79,8 @@ urlpatterns = [
     path("api/brightdata/", include("brightdata_integration.urls")),
     path("api/chat/", include("chat.urls")),
     path("api/", RedirectView.as_view(url="/api/users/", permanent=False)),
+
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
