@@ -1,16 +1,21 @@
 @import "tailwindcss";
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
 /* Define color theme variables */
 :root {
-  --color-primary: #D291E2;    /* Purple */
-  --color-secondary: #6EE5D9;  /* Teal */
-  --color-tertiary: #62EF83;   /* Green */
-  --color-accent: #A6FDED;     /* Light cyan */
-  --color-background: #FFFFFF; /* White */
-  --color-foreground: #000000; /* Black */
-  --color-muted: #666666;      /* Gray */
+  --color-primary: #D291E2;
+  /* Purple */
+  --color-secondary: #6EE5D9;
+  /* Teal */
+  --color-tertiary: #62EF83;
+  /* Green */
+  --color-accent: #A6FDED;
+  /* Light cyan */
+  --color-background: #FFFFFF;
+  /* White */
+  --color-foreground: #000000;
+  /* Black */
+  --color-muted: #666666;
+  /* Gray */
 }
 
 /* Global compact styling overrides */
@@ -97,9 +102,12 @@ main {
 }
 
 @keyframes blink {
-  from, to {
+
+  from,
+  to {
     opacity: 1;
   }
+
   50% {
     opacity: 0;
   }

@@ -51,12 +51,12 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    
+
     # Third-party apps
     "rest_framework",
     "rest_framework.authtoken",
     "corsheaders",
-    
+
     # Local apps
     "users",
     "reports",
@@ -180,6 +180,11 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'simple',
         },
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(BASE_DIR, 'logs', 'webhooks.log'),
+            'formatter': 'verbose',
+        },
     },
     'loggers': {
         'django': {
@@ -189,6 +194,16 @@ LOGGING = {
         'users.middleware': {
             'handlers': ['console'],
             'level': 'DEBUG' if DEBUG else 'WARNING',
+            'propagate': False,
+        },
+        'webhook_security': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'webhook_monitor': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
             'propagate': False,
         },
     },
@@ -248,7 +263,7 @@ if os.getenv('PLATFORM_APPLICATION_NAME'):
     if app_name and project_id:
         upsun_domain = f"https://{app_name}-{project_id}.{environment}.platformsh.site"
         CSRF_TRUSTED_ORIGINS.append(upsun_domain)
-    
+
     # Also get from Platform routes if available
     platform_routes = os.getenv('PLATFORM_ROUTES')
     if platform_routes:
@@ -301,7 +316,7 @@ def get_brightdata_base_url():
     manual_url = os.getenv('BRIGHTDATA_BASE_URL')
     if manual_url:
         return manual_url
-    
+
     # Auto-detect for Upsun/Platform.sh deployment
     if os.getenv('PLATFORM_APPLICATION_NAME'):
         # Get the default route from Platform.sh environment
@@ -320,14 +335,14 @@ def get_brightdata_base_url():
                         return route_url.rstrip('/')
             except (json.JSONDecodeError, AttributeError):
                 pass
-        
+
         # Fallback: construct from app name and default Upsun domain
         app_name = os.getenv('PLATFORM_APPLICATION_NAME')
         project_id = os.getenv('PLATFORM_PROJECT')
         environment = os.getenv('PLATFORM_ENVIRONMENT', 'main')
         if app_name and project_id:
             return f"https://{app_name}-{project_id}.{environment}.platformsh.site"
-    
+
     # Development fallback
     return 'http://localhost:8000'
 
@@ -352,7 +367,7 @@ if (os.getenv('PLATFORM_APPLICATION_NAME') is not None):
 
     # Allow all hosts - completely permissive
     ALLOWED_HOSTS = ['*']
-    
+
     # Production database configuration.
     if (os.getenv('PLATFORM_ENVIRONMENT') is not None):
         DATABASES = {
@@ -369,3 +384,115 @@ if (os.getenv('PLATFORM_APPLICATION_NAME') is not None):
                 'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
             }
         }
+
+# Add webhook configuration
+WEBHOOK_RATE_LIMIT = os.environ.get('WEBHOOK_RATE_LIMIT', 100)  # requests per minute
+WEBHOOK_MAX_TIMESTAMP_AGE = os.environ.get('WEBHOOK_MAX_TIMESTAMP_AGE', 300)  # 5 minutes
+WEBHOOK_MAX_EVENTS = os.environ.get('WEBHOOK_MAX_EVENTS', 1000)
+WEBHOOK_METRICS_RETENTION = os.environ.get('WEBHOOK_METRICS_RETENTION', 3600)  # 1 hour
+WEBHOOK_ERROR_THRESHOLD = os.environ.get('WEBHOOK_ERROR_THRESHOLD', 0.1)  # 10%
+WEBHOOK_RESPONSE_TIME_THRESHOLD = os.environ.get('WEBHOOK_RESPONSE_TIME_THRESHOLD', 5.0)  # 5 seconds
+WEBHOOK_ENABLE_CERT_PINNING = os.environ.get('WEBHOOK_ENABLE_CERT_PINNING', 'False').lower() == 'true'
+
+# Webhook IP whitelist (comma-separated)
+WEBHOOK_ALLOWED_IPS = [ip.strip() for ip in os.environ.get('WEBHOOK_ALLOWED_IPS', '').split(',') if ip.strip()]
+
+# Auto-detect Upsun/Production URLs
+def get_webhook_base_url():
+    """Auto-detect the correct base URL for webhooks based on environment"""
+
+    # Check for explicit override
+    if 'BRIGHTDATA_BASE_URL' in os.environ:
+        return os.environ['BRIGHTDATA_BASE_URL']
+
+    # Upsun environment detection
+    if 'PLATFORM_ROUTES' in os.environ:
+        try:
+            import json
+            routes = json.loads(os.environ['PLATFORM_ROUTES'])
+            # Find the primary route
+            for route_url, route_config in routes.items():
+                if route_config.get('primary', False):
+                    return route_url.rstrip('/')
+            # Fallback to first HTTPS route
+            for route_url in routes.keys():
+                if route_url.startswith('https://'):
+                    return route_url.rstrip('/')
+        except (json.JSONDecodeError, KeyError):
+            pass
+
+    # Platform.sh environment detection
+    if 'PLATFORM_APPLICATION_NAME' in os.environ:
+        app_name = os.environ.get('PLATFORM_APPLICATION_NAME', 'app')
+        branch = os.environ.get('PLATFORM_BRANCH', 'main')
+        project_id = os.environ.get('PLATFORM_PROJECT', '')
+        if project_id:
+            return f"https://{branch}-{project_id}.platformsh.site"
+
+    # Ngrok detection for development
+    if 'NGROK_URL' in os.environ:
+        return os.environ['NGROK_URL']
+
+    # Railway detection
+    if 'RAILWAY_STATIC_URL' in os.environ:
+        return f"https://{os.environ['RAILWAY_STATIC_URL']}"
+
+    # Heroku detection
+    if 'HEROKU_APP_NAME' in os.environ:
+        return f"https://{os.environ['HEROKU_APP_NAME']}.herokuapp.com"
+
+    # Local development fallback
+    return 'http://localhost:8000'
+
+BRIGHTDATA_BASE_URL = get_webhook_base_url()
+
+# Ngrok support for local development
+NGROK_ENABLED = os.environ.get('NGROK_ENABLED', 'False').lower() == 'true'
+NGROK_AUTH_TOKEN = os.environ.get('NGROK_AUTH_TOKEN', '')
+NGROK_SUBDOMAIN = os.environ.get('NGROK_SUBDOMAIN', '')
+NGROK_REGION = os.environ.get('NGROK_REGION', 'us')  # us, eu, ap, au, sa, jp, in
+
+# Cache configuration for webhook monitoring
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'default-cache',
+        'TIMEOUT': 300,  # 5 minutes default
+        'OPTIONS': {
+            'MAX_ENTRIES': 1000,
+            'CULL_FREQUENCY': 3,
+        }
+    },
+    'webhook_cache': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'webhook-cache',
+        'TIMEOUT': 3600,  # 1 hour default
+        'OPTIONS': {
+            'MAX_ENTRIES': 10000,
+            'CULL_FREQUENCY': 3,
+        }
+    }
+}
+
+# Development-specific webhook settings
+if DEBUG:
+    # More permissive settings for development
+    WEBHOOK_RATE_LIMIT = 1000
+    WEBHOOK_MAX_TIMESTAMP_AGE = 600  # 10 minutes
+    WEBHOOK_ALLOWED_IPS = []  # Allow all IPs in development
+
+    # Enable ngrok auto-detection
+    if NGROK_ENABLED and not BRIGHTDATA_BASE_URL.startswith('https://'):
+        try:
+            import requests
+            response = requests.get('http://localhost:4040/api/tunnels', timeout=2)
+            if response.status_code == 200:
+                tunnels = response.json().get('tunnels', [])
+                for tunnel in tunnels:
+                    if tunnel.get('proto') == 'https':
+                        BRIGHTDATA_BASE_URL = tunnel['public_url']
+                        break
+        except:
+            pass  # Ngrok not running or not accessible
+
+print(f"Webhook Base URL: {BRIGHTDATA_BASE_URL}")  # For debugging

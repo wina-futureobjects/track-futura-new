@@ -1,40 +1,38 @@
-import React, { useState, useCallback } from 'react';
-import { styled, useTheme } from '@mui/material/styles';
 import {
+  Analytics as AnalyticsIcon,
+  Assessment as AssessmentIcon,
+  Assignment as AssignmentIcon,
+  AutoAwesome as AutoAwesomeIcon,
+  InsertChart as ChartIcon,
+  Description as DescriptionIcon,
+  ExpandMore as ExpandMoreIcon,
+  Facebook as FacebookIcon,
+  Input as InputIcon,
+  Instagram as InstagramIcon,
+  Logout as LogoutIcon,
+  Settings as SettingsIcon,
+  SettingsSuggest as SettingsSuggestIcon,
+  Storage as StorageIcon
+} from '@mui/icons-material';
+import CommentIcon from '@mui/icons-material/Comment';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
+import MusicVideoIcon from '@mui/icons-material/MusicVideo';
+import {
+  Box,
+  Collapse,
+  Divider,
   Drawer,
   List,
   ListItem,
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Divider,
-  Box,
-  Typography,
   Tooltip,
-  useMediaQuery,
-  Collapse
+  useMediaQuery
 } from '@mui/material';
-import {
-  Dashboard as DashboardIcon,
-  Settings as SettingsIcon,
-  Logout as LogoutIcon,
-  Description as DescriptionIcon,
-  Assessment as AssessmentIcon,
-  Instagram as InstagramIcon,
-  Analytics as AnalyticsIcon,
-  Facebook as FacebookIcon,
-  ExpandMore as ExpandMoreIcon,
-  InsertChart as ChartIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  SettingsSuggest as SettingsSuggestIcon,
-  Assignment as AssignmentIcon,
-  Input as InputIcon,
-  Storage as StorageIcon
-} from '@mui/icons-material';
-import LinkedInIcon from '@mui/icons-material/LinkedIn';
-import MusicVideoIcon from '@mui/icons-material/MusicVideo';
-import CommentIcon from '@mui/icons-material/Comment';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { styled, useTheme } from '@mui/material/styles';
+import React, { useCallback, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 // Inline minimal implementation of useAuth to avoid path resolution issues
 const useAuth = () => {
@@ -42,7 +40,7 @@ const useAuth = () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
   };
-  
+
   return { logout };
 };
 
@@ -181,44 +179,44 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const { logout } = useAuth();
-  
+
   // State to track expanded menu categories
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({
     'data-storage': true,
     'data-scrapers': true,
     'reports': true
   });
-  
+
   // Function to get correct path for Dashboard based on URL
   function getDashboardPath() {
     // Extract organization and project IDs from URL
     const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
-    
+
     if (match) {
       const [, orgId, projId] = match;
       return `/organizations/${orgId}/projects/${projId}`;
     }
-    
+
     return '/dashboard';
   }
 
   // Menu items with categories
   const menuItems: MenuItem[] = [
-    { 
-      text: 'Dashboard', 
-      path: getDashboardPath(), 
+    {
+      text: 'Dashboard',
+      path: getDashboardPath(),
       icon: <AnalyticsIcon />,
       category: 'main'
     },
-    { 
-      text: 'Input Collection', 
-      path: getTrackAccountsPath(), 
+    {
+      text: 'Input Collection',
+      path: getTrackAccountsPath(),
       icon: <InputIcon />,
       category: 'main'
     },
-    { 
-      text: 'Data Storage', 
-      path: '#data-storage', 
+    {
+      text: 'Data Storage',
+      path: '#data-storage',
       icon: <StorageIcon />,
       category: 'data',
       subItems: [
@@ -228,26 +226,27 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
         { text: 'TikTok Data', path: getSocialMediaPath('tiktok-folders'), icon: <MusicVideoIcon /> },
       ]
     },
-    // { 
-    //   text: 'Data Scrapers', 
-    //   path: '#data-scrapers', 
-    //   icon: <AutoAwesomeIcon />,
-    //   category: 'data',
-    //   subItems: [
-    //     { text: 'Posts & Reels Scraper', path: getSocialMediaPath('automated-batch-scraper'), icon: <AutoAwesomeIcon /> },
-    //     { text: 'Comments Scraper', path: getSocialMediaPath('comments-scraper'), icon: <CommentIcon /> },
-    //     { text: 'Brightdata Settings', path: getSocialMediaPath('brightdata-settings'), icon: <SettingsSuggestIcon /> },
-    //   ]
-    // },
-    { 
-      text: 'AI Analysis', 
+    {
+      text: 'Data Scrapers',
+      path: '#data-scrapers',
+      icon: <AutoAwesomeIcon />,
+      category: 'data',
+      subItems: [
+        { text: 'Posts & Reels Scraper', path: getSocialMediaPath('automated-batch-scraper'), icon: <AutoAwesomeIcon /> },
+        { text: 'Comments Scraper', path: getSocialMediaPath('comments-scraper'), icon: <CommentIcon /> },
+        { text: 'Brightdata Settings', path: getSocialMediaPath('brightdata-settings'), icon: <SettingsSuggestIcon /> },
+        { text: 'Webhook Monitor', path: getSocialMediaPath('webhook-monitor'), icon: <AnalyticsIcon /> },
+      ]
+    },
+    {
+      text: 'AI Analysis',
       path: getSocialMediaPath('analysis'),
       icon: <ChartIcon />,
       category: 'analytics'
     },
-    { 
-      text: 'Reports', 
-      path: '#reports', 
+    {
+      text: 'Reports',
+      path: '#reports',
       icon: <DescriptionIcon />,
       category: 'analytics',
       subItems: [
@@ -261,12 +260,12 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
   function getTrackAccountsPath() {
     // Extract organization and project IDs from URL
     const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
-    
+
     if (match) {
       const [, orgId, projId] = match;
       return `/organizations/${orgId}/projects/${projId}/source-tracking/sources`;
     }
-    
+
     return '/track-accounts/accounts';
   }
 
@@ -274,12 +273,12 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
   function getSocialMediaPath(endpoint: string) {
     // Extract organization and project IDs from URL
     const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
-    
+
     if (match) {
       const [, orgId, projId] = match;
       return `/organizations/${orgId}/projects/${projId}/${endpoint}`;
     }
-    
+
     return `/${endpoint}`;
   }
 
@@ -287,12 +286,12 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
   function getReportMarketplacePath() {
     // Extract organization and project IDs from URL
     const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
-    
+
     if (match) {
       const [, orgId, projId] = match;
       return `/organizations/${orgId}/projects/${projId}/report`;
     }
-    
+
     return '/report';
   }
 
@@ -300,12 +299,12 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
   function getGeneratedReportsPath() {
     // Extract organization and project IDs from URL
     const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
-    
+
     if (match) {
       const [, orgId, projId] = match;
       return `/organizations/${orgId}/projects/${projId}/reports/generated`;
     }
-    
+
     return '/reports/generated';
   }
 
@@ -313,12 +312,12 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
   function getReportFoldersPath() {
     // Extract organization and project IDs from URL
     const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
-    
+
     if (match) {
       const [, orgId, projId] = match;
       return `/organizations/${orgId}/projects/${projId}/report-folders`;
     }
-    
+
     return '/report-folders';
   }
 
@@ -328,21 +327,21 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
     if (itemPath === '/') {
       return location.pathname === '/';
     }
-    
+
     // Skip category headers with hash paths
     if (itemPath.startsWith('#')) {
       return false;
     }
-    
+
     // Special handling for Dashboard
-    if (itemPath.includes('/projects/') && !itemPath.includes('/source-tracking') && 
-        !itemPath.includes('/instagram') && !itemPath.includes('/facebook') && 
-        !itemPath.includes('/linkedin') && !itemPath.includes('/tiktok') && 
+    if (itemPath.includes('/projects/') && !itemPath.includes('/source-tracking') &&
+        !itemPath.includes('/instagram') && !itemPath.includes('/facebook') &&
+        !itemPath.includes('/linkedin') && !itemPath.includes('/tiktok') &&
         !itemPath.includes('/report-folders') && !itemPath.includes('/brightdata') &&
         !itemPath.includes('/analysis')) {
       return location.pathname === itemPath;
     }
-    
+
     // Special handling for social media data sections
     if (itemPath.includes('instagram-folders')) {
       return location.pathname.includes('instagram');
@@ -356,48 +355,52 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
     if (itemPath.includes('tiktok-folders')) {
       return location.pathname.includes('tiktok');
     }
-    
+
     // Check if this is a source-tracking path in either old format or new format with organization/project
     if (itemPath.includes('/source-tracking/sources')) {
       return location.pathname.includes('/source-tracking');
     }
-    
+
     // Legacy support for old track-accounts paths
     if (itemPath.includes('/track-accounts/accounts')) {
       return location.pathname.includes('/track-accounts') || location.pathname.includes('/source-tracking');
     }
-    
+
     if (itemPath.includes('brightdata-scraper')) {
       return location.pathname.includes('brightdata-scraper');
     }
     if (itemPath.includes('brightdata-settings')) {
       return location.pathname.includes('brightdata-settings');
     }
-    
+
     if (itemPath.includes('facebook-comment-scraper')) {
       return location.pathname.includes('facebook-comment-scraper');
     }
-    
+
+    if (itemPath.includes('webhook-monitor')) {
+      return location.pathname.includes('webhook-monitor');
+    }
+
     // Special handling for analysis page
     if (itemPath.includes('analysis')) {
       return location.pathname.includes('analysis');
     }
-    
+
     // Special handling for report folders
     if (itemPath.includes('report-folders')) {
       return location.pathname.includes('report-folders');
     }
-    
+
     // Special handling for generated reports
     if (itemPath.includes('/reports/generated')) {
       return location.pathname.includes('/reports/generated') || location.pathname.includes('/report/generated/');
     }
-    
+
     // Special handling for report marketplace
     if (itemPath.includes('/report') && !itemPath.includes('report-folders') && !itemPath.includes('/reports/generated')) {
       return location.pathname.includes('/report') && !location.pathname.includes('report-folders') && !location.pathname.includes('/reports/generated');
     }
-    
+
     // For other paths, check if the current path starts with the menu item path
     return location.pathname.startsWith(itemPath);
   }, [location.pathname]);
@@ -421,24 +424,24 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
     if (path.startsWith('#')) {
       return;
     }
-    
+
     // Special handling for Dashboard when using organization/project structure
     if (path.match(/\/organizations\/\d+\/projects\/\d+$/) && location.pathname === path) {
       return; // Already on dashboard, do nothing
     }
-    
+
     // Prevent navigation if already on the exact same path
     if (location.pathname === path) {
       return;
     }
-    
+
     // More specific subpath checking - only prevent navigation for direct subpaths
     // Don't prevent navigation between different report sections
     if (path !== '/' && path !== getDashboardPath()) {
       // Allow navigation between different report paths even if they share a common base
       const isReportPath = path.includes('/report');
       const isCurrentReportPath = location.pathname.includes('/report');
-      
+
       if (isReportPath && isCurrentReportPath) {
         // Allow navigation between different report paths
         // Only prevent if it's the exact same path (already handled above)
@@ -447,7 +450,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
         return;
       }
     }
-    
+
     navigate(path);
     if (isMobile) {
       onClose();
@@ -468,13 +471,13 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
 
   const renderMenuItem = (item: MenuItem, isSubItem = false) => {
     const itemActive = isActive(item.path);
-    
+
     // For category headers with sub-items
     if (item.subItems) {
       const menuId = item.path.replace('#', '');
       const isExpanded = expandedMenus[menuId];
       const isAnySubItemActive = isAnyCategoryItemActive(item.subItems);
-      
+
       return (
         <React.Fragment key={item.text}>
           <ListItem disablePadding sx={{ display: 'block' }}>
@@ -489,7 +492,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
               </Tooltip>
               {open && (
                 <>
-                  <StyledListItemText 
+                  <StyledListItemText
                     active={isAnySubItemActive}
                     primary={item.text}
                   />
@@ -500,7 +503,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
               )}
             </StyledListItemButton>
           </ListItem>
-          
+
           {open && (
             <Collapse in={isExpanded} timeout="auto" unmountOnExit>
               <List component="div" disablePadding sx={{ pl: 1 }}>
@@ -511,7 +514,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
         </React.Fragment>
       );
     }
-    
+
     // For regular menu items
     return (
       <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
@@ -528,7 +531,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
             </StyledListItemIcon>
           </Tooltip>
           {open && (
-            <StyledListItemText 
+            <StyledListItemText
               active={itemActive}
               primary={item.text}
             />
@@ -540,7 +543,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
 
   const renderMenuSection = (title: string, items: MenuItem[]) => {
     if (items.length === 0) return null;
-    
+
     return (
       <MenuSection key={title}>
         {/* {open && <Typography className="section-title">{title}</Typography>} */}
@@ -563,9 +566,9 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
         {renderMenuSection('Data Management', menuCategories.data)}
         {renderMenuSection('Analytics', menuCategories.analytics)}
       </Box>
-      
+
       <Divider sx={{ mx: 2 }} />
-      
+
       {/* Settings and Logout */}
       <MenuSection>
         <List sx={{ py: 1 }}>
@@ -580,7 +583,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
                 </StyledListItemIcon>
               </Tooltip>
               {open && (
-                <StyledListItemText 
+                <StyledListItemText
                   active={isActive('/settings')}
                   primary="Settings"
                 />
@@ -602,7 +605,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
                 </StyledListItemIcon>
               </Tooltip>
               {open && (
-                <StyledListItemText 
+                <StyledListItemText
                   primary="Logout"
                   sx={{
                     '& .MuiListItemText-primary': {
@@ -619,4 +622,4 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
   );
 };
 
-export default Sidebar; 
+export default Sidebar;

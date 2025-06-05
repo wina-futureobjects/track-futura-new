@@ -19,6 +19,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import RedirectView
 from django.http import JsonResponse, HttpResponse
+from django.db import connection
 
 def api_status(request):
     """Simple API status endpoint for root path"""
@@ -33,12 +34,31 @@ def api_status(request):
         }
     })
 
+def health_check(request):
+    """Health check endpoint for Docker container monitoring"""
+    try:
+        # Test database connection
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+        
+        return JsonResponse({
+            'status': 'healthy',
+            'database': 'connected',
+            'timestamp': request.META.get('HTTP_X_FORWARDED_FOR', request.META.get('REMOTE_ADDR'))
+        })
+    except Exception as e:
+        return JsonResponse({
+            'status': 'unhealthy',
+            'error': str(e)
+        }, status=503)
+
 def favicon_view(request):
     """Return empty response for favicon to prevent 404s"""
     return HttpResponse(status=204)  # No Content
 
 urlpatterns = [
     path("", api_status, name="api_status"),  # Handle root path
+    path("api/health/", health_check, name="health_check"),  # Health check endpoint
     path("favicon.ico", favicon_view, name="favicon"),  # Handle favicon
     path("admin/", admin.site.urls),
     path("api/users/", include("users.urls")),
