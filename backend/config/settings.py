@@ -161,46 +161,18 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Logging configuration - console only for deployment compatibility
+# Completely disable custom logging to prevent file handler errors
+# Use Django defaults only for deployment compatibility
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-            'style': '{',
-        },
-        'simple': {
-            'format': '{levelname} {message}',
-            'style': '{',
-        },
-    },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
-            'formatter': 'simple',
         },
     },
-    'loggers': {
-        'django': {
-            'handlers': ['console'],
-            'level': 'INFO' if DEBUG else 'WARNING',
-        },
-        'users.middleware': {
-            'handlers': ['console'],
-            'level': 'DEBUG' if DEBUG else 'WARNING',
-            'propagate': False,
-        },
-        'webhook_security': {
-            'handlers': ['console'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'webhook_monitor': {
-            'handlers': ['console'],
-            'level': 'INFO',
-            'propagate': False,
-        },
+    'root': {
+        'handlers': ['console'],
     },
 }
 
