@@ -16,10 +16,20 @@ export const getApiBaseUrl = (): string => {
     console.log('🔍 Production API Detection:', { hostname, protocol });
 
     // 🚨 SPECIFIC FIX FOR UPSUN DEPLOYMENT 🚨
-    // If we're on the Upsun domain, use the exact API URL
+    // Based on Upsun config: frontend is on {default}, backend is on api.{default}
     if (hostname.includes('upsun-deployment') || hostname.includes('.platformsh.site')) {
-      const apiUrl = `${protocol}//${hostname}`;
-      console.log('✅ Using Upsun API URL:', apiUrl);
+      // If we're on the frontend domain, we need to call the API subdomain
+      let apiHostname = hostname;
+
+      // If we're NOT already on the api subdomain, add it
+      if (!hostname.startsWith('api.')) {
+        apiHostname = `api.${hostname}`;
+      }
+
+      const apiUrl = `${protocol}//${apiHostname}`;
+      console.log('✅ Using Upsun API URL (with api subdomain):', apiUrl);
+      console.log('📍 Frontend hostname:', hostname);
+      console.log('📍 Backend hostname:', apiHostname);
       return apiUrl;
     }
 

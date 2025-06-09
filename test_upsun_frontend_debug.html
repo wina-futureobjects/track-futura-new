@@ -119,7 +119,15 @@
 
         let apiUrl;
         if (hostname.includes('upsun-deployment') || hostname.includes('.platformsh.site')) {
-          apiUrl = `${protocol}//${hostname}`;
+          // For Upsun: frontend is on {default}, backend is on api.{default}
+          let apiHostname = hostname;
+
+          // If we're NOT already on the api subdomain, add it
+          if (!hostname.startsWith('api.')) {
+            apiHostname = `api.${hostname}`;
+          }
+
+          apiUrl = `${protocol}//${apiHostname}`;
         } else {
           apiUrl = `${protocol}//${hostname}`;
         }
@@ -127,11 +135,16 @@
         const loginEndpoint = `${apiUrl}/api/users/login/`;
 
         const testResult = {
-          hostname,
+          currentHostname: hostname,
           protocol,
+          apiHostname: apiUrl.replace(protocol + '//', ''),
           detectedApiUrl: apiUrl,
           loginEndpoint,
-          isUpsun: hostname.includes('upsun-deployment') || hostname.includes('.platformsh.site')
+          isUpsun: hostname.includes('upsun-deployment') || hostname.includes('.platformsh.site'),
+          hostnameStartsWithApi: hostname.startsWith('api.'),
+          explanation: hostname.includes('upsun-deployment') ?
+            'Upsun detected: Frontend on {default}, Backend on api.{default}' :
+            'Standard deployment: Same domain'
         };
 
         result.textContent = JSON.stringify(testResult, null, 2);
@@ -149,7 +162,18 @@
       try {
         const hostname = window.location.hostname;
         const protocol = window.location.protocol;
-        const apiUrl = `${protocol}//${hostname}`;
+
+        // Use same logic as API URL detection
+        let apiUrl;
+        if (hostname.includes('upsun-deployment') || hostname.includes('.platformsh.site')) {
+          let apiHostname = hostname;
+          if (!hostname.startsWith('api.')) {
+            apiHostname = `api.${hostname}`;
+          }
+          apiUrl = `${protocol}//${apiHostname}`;
+        } else {
+          apiUrl = `${protocol}//${hostname}`;
+        }
 
         const response = await fetch(`${apiUrl}/api/users/login/`, {
           method: 'OPTIONS',
@@ -161,6 +185,7 @@
         });
 
         const corsHeaders = {
+          testUrl: `${apiUrl}/api/users/login/`,
           status: response.status,
           statusText: response.statusText,
           'Access-Control-Allow-Origin': response.headers.get('Access-Control-Allow-Origin'),
@@ -186,7 +211,19 @@
       try {
         const hostname = window.location.hostname;
         const protocol = window.location.protocol;
-        const apiUrl = `${protocol}//${hostname}`;
+
+        // Use same logic as API URL detection
+        let apiUrl;
+        if (hostname.includes('upsun-deployment') || hostname.includes('.platformsh.site')) {
+          let apiHostname = hostname;
+          if (!hostname.startsWith('api.')) {
+            apiHostname = `api.${hostname}`;
+          }
+          apiUrl = `${protocol}//${apiHostname}`;
+        } else {
+          apiUrl = `${protocol}//${hostname}`;
+        }
+
         const loginUrl = `${apiUrl}/api/users/login/`;
 
         console.log('🚀 Testing login with URL:', loginUrl);
@@ -216,6 +253,8 @@
 
         const testResult = {
           url: loginUrl,
+          frontendDomain: window.location.origin,
+          backendDomain: apiUrl,
           status: response.status,
           statusText: response.statusText,
           headers: Object.fromEntries(response.headers.entries()),
