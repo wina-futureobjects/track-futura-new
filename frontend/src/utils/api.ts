@@ -96,7 +96,7 @@ export const createApiUrl = (endpoint: string): string => {
 
 /**
  * Wrapper for the fetch API that automatically adds the API base URL and auth token
- * Now with enhanced error handling and cloud environment compatibility
+ * Now with enhanced error handling, cloud environment compatibility, and smart fallback
  */
 export const apiFetch = (endpoint: string, options?: RequestInit): Promise<Response> => {
   const url = createApiUrl(endpoint);
@@ -126,19 +126,76 @@ export const apiFetch = (endpoint: string, options?: RequestInit): Promise<Respo
 
   console.log('📤 Fetch Options:', { url, headers, method: options?.method });
 
-  // Enhanced error handling with logging
+  // Smart fallback function
+  const tryFallbackUrl = async (originalError: any): Promise<Response> => {
+    const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+    const protocol = typeof window !== 'undefined' ? window.location.protocol : 'https:';
+
+    // Only try fallback for Upsun deployments and if we're not already on API subdomain
+    if ((hostname.includes('upsun-deployment') || hostname.includes('.platformsh.site')) && !hostname.startsWith('api.')) {
+      const fallbackHostname = `api.${hostname}`;
+      const fallbackBaseUrl = `${protocol}//${fallbackHostname}`;
+      const formattedEndpoint = endpoint.startsWith('/api/') ? endpoint : `/api/${endpoint.replace(/^\//, '')}`;
+      const fallbackUrl = `${fallbackBaseUrl}${formattedEndpoint}`;
+
+      console.log('🔄 Trying fallback URL with API subdomain:', fallbackUrl);
+
+      try {
+        const fallbackResponse = await fetch(fallbackUrl, fetchOptions);
+        console.log('📥 Fallback response received:', {
+          status: fallbackResponse.status,
+          statusText: fallbackResponse.statusText,
+          contentType: fallbackResponse.headers.get('content-type'),
+          url: fallbackResponse.url
+        });
+
+        // If the fallback worked (got JSON), update the global API base URL for future requests
+        if (fallbackResponse.ok && fallbackResponse.headers.get('content-type')?.includes('application/json')) {
+          console.log('✅ Fallback successful! Setting global API base URL:', fallbackBaseUrl);
+          (window as any).API_BASE_URL = fallbackBaseUrl;
+        }
+
+        return fallbackResponse;
+      } catch (fallbackError) {
+        console.error('❌ Fallback also failed:', fallbackError);
+        throw originalError; // Throw the original error if fallback fails
+      }
+    }
+
+    throw originalError;
+  };
+
+  // Enhanced error handling with smart fallback
   return fetch(url, fetchOptions)
-    .then(response => {
+    .then(async (response) => {
       console.log('📥 Response received:', {
         status: response.status,
         statusText: response.statusText,
         contentType: response.headers.get('content-type'),
         url: response.url
       });
+
+      // Check if we got HTML when expecting JSON (indicates wrong API endpoint)
+      const contentType = response.headers.get('content-type');
+      if (response.ok && contentType?.includes('text/html')) {
+        console.warn('⚠️ Received HTML when expecting JSON - attempting fallback URL');
+
+        // Clone the response to read it without consuming the stream
+        const responseClone = response.clone();
+        const text = await responseClone.text();
+
+        if (text.trim().toLowerCase().startsWith('<!doctype') || text.trim().toLowerCase().startsWith('<html')) {
+          console.error('🚨 Confirmed HTML response - trying fallback');
+          return await tryFallbackUrl(new Error('Received HTML instead of JSON'));
+        }
+      }
+
       return response;
     })
-    .catch(error => {
+    .catch(async (error) => {
       console.error('❌ Fetch Error:', { url, error: error.message, stack: error.stack });
-      throw error;
+
+      // Try fallback URL if the primary request failed
+      return await tryFallbackUrl(error);
     });
 };

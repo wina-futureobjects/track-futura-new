@@ -87,7 +87,15 @@ const useAuth = () => {
       } catch (parseError) {
         console.error('❌ Failed to parse success response as JSON:', parseError);
         console.error('📄 Raw response that failed to parse:', responseText);
-        throw new Error(`Unable to parse server response. Status: ${response.status}. Response: ${responseText.substring(0, 200)}`);
+
+        // Check if this looks like an HTML response (indicating wrong API endpoint)
+        if (responseText.trim().toLowerCase().startsWith('<!doctype') || responseText.trim().toLowerCase().startsWith('<html')) {
+          console.error('🚨 Received HTML instead of JSON - likely API endpoint misconfiguration');
+          throw new Error('Connection error: Unable to reach the login service. Please try again later.');
+        }
+
+        // For other parse errors, provide a user-friendly message
+        throw new Error('Server communication error. Please check your connection and try again.');
       }
 
       // Validate that we have the expected data structure
