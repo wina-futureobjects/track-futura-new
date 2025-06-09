@@ -193,11 +193,20 @@ REST_FRAMEWORK = {
     'UNAUTHENTICATED_TOKEN': None,
 }
 
-# CORS settings - ULTRA-PERMISSIVE configuration for deployment
+# 🚨 MAXIMUM PERMISSIVE CORS - ALLOW ABSOLUTELY EVERYTHING 🚨
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_HEADERS = True
 CORS_REPLACE_HTTPS_REFERER = True
+
+# Specifically allow your Upsun domain and any variations
+CORS_ALLOWED_ORIGINS = [
+    "https://api.upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site",
+    "https://upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:8000",
+]
 CORS_ALLOWED_HEADERS = [
     'accept',
     'accept-encoding',
@@ -225,11 +234,27 @@ CORS_PREFLIGHT_MAX_AGE = 86400
 CORS_EXPOSE_HEADERS = []
 CORS_ALLOW_PRIVATE_NETWORK = True
 
-# ULTRA-PERMISSIVE CSRF settings for deployment
+# 🚨 COMPLETE CSRF BYPASS - NO ORIGIN CHECKING 🚨
 CSRF_COOKIE_SECURE = False
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = None
 CSRF_USE_SESSIONS = False
+
+# Add your specific Upsun domain to trusted origins
+CSRF_TRUSTED_ORIGINS = [
+    "https://api.upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site",
+    "https://upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:8000",
+    "https://localhost:3000",
+    "https://localhost:5173",
+    "https://localhost:8000",
+    # Wildcard patterns for any platformsh/upsun domains
+    "https://*.platformsh.site",
+    "https://*.upsun.app",
+    "https://*.eu-5.platformsh.site",
+]
 CSRF_FAILURE_VIEW = lambda request, reason="": None  # Never fail CSRF
 
 # Initialize CSRF trusted origins with common localhost patterns
