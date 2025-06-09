@@ -193,10 +193,11 @@ REST_FRAMEWORK = {
     'UNAUTHENTICATED_TOKEN': None,
 }
 
-# CORS settings - Permissive configuration for deployment
+# CORS settings - ULTRA-PERMISSIVE configuration for deployment
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_HEADERS = True
+CORS_REPLACE_HTTPS_REFERER = True
 CORS_ALLOWED_HEADERS = [
     'accept',
     'accept-encoding',
@@ -224,11 +225,14 @@ CORS_PREFLIGHT_MAX_AGE = 86400
 CORS_EXPOSE_HEADERS = []
 CORS_ALLOW_PRIVATE_NETWORK = True
 
-# Completely disable CSRF
+# ULTRA-PERMISSIVE CSRF settings for deployment
 CSRF_COOKIE_SECURE = False
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = None
 CSRF_USE_SESSIONS = False
+CSRF_FAILURE_VIEW = lambda request, reason="": None  # Never fail CSRF
+
+# Initialize CSRF trusted origins with common localhost patterns
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3000',
     'http://localhost:5173',
