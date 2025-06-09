@@ -64,13 +64,13 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    "corsheaders.middleware.CorsMiddleware",  # CORS first - most important for API calls
+    "users.middleware.CustomCsrfMiddleware",  # 🚨 CSRF BYPASS FIRST - OVERRIDES EVERYTHING
+    "corsheaders.middleware.CorsMiddleware",  # CORS second
     "django.middleware.security.SecurityMiddleware",
     # "whitenoise.middleware.WhiteNoiseMiddleware",  # Temporarily disable whitenoise
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
-    "users.middleware.CustomCsrfMiddleware",  # Use custom CSRF middleware that disables CSRF
-    # "django.middleware.csrf.CsrfViewMiddleware",  # Completely disable CSRF middleware
+    # "django.middleware.csrf.CsrfViewMiddleware",  # NEVER ENABLE - COMPLETELY DISABLED
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     # "django.middleware.clickjacking.XFrameOptionsMiddleware",  # Disable X-Frame protection
@@ -240,8 +240,9 @@ CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = None
 CSRF_USE_SESSIONS = False
 
-# Add your specific Upsun domain to trusted origins
+# 🚨 COMPLETE CSRF DISABLE - NO VALIDATION AT ALL 🚨
 CSRF_TRUSTED_ORIGINS = [
+    "*",  # Trust absolutely everything
     "https://api.upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site",
     "https://upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site",
     "http://localhost:3000",
@@ -250,22 +251,15 @@ CSRF_TRUSTED_ORIGINS = [
     "https://localhost:3000",
     "https://localhost:5173",
     "https://localhost:8000",
-    # Wildcard patterns for any platformsh/upsun domains
+    # Wildcard patterns
     "https://*.platformsh.site",
     "https://*.upsun.app",
     "https://*.eu-5.platformsh.site",
 ]
-CSRF_FAILURE_VIEW = lambda request, reason="": None  # Never fail CSRF
 
-# Initialize CSRF trusted origins with common localhost patterns
-CSRF_TRUSTED_ORIGINS = [
-    'http://localhost:3000',
-    'http://localhost:5173',
-    'http://localhost:8000',
-    'https://localhost:3000',
-    'https://localhost:5173',
-    'https://localhost:8000',
-]
+# Completely disable CSRF validation at Django core level
+CSRF_FAILURE_VIEW = lambda request, reason="": None  # Never fail CSRF
+USE_CSRF = False  # Disable CSRF completely
 
 # Add dynamic origins for Upsun
 DYNAMIC_CORS_ORIGINS = []
@@ -312,19 +306,7 @@ CORS_ALLOWED_ORIGINS = DYNAMIC_CORS_ORIGINS + [
     'https://localhost:8000',
 ]
 
-# Completely disable CSRF validation
-CSRF_COOKIE_NAME = 'csrftoken'
-CSRF_HEADER_NAME = 'HTTP_X_CSRFTOKEN'
-CSRF_FAILURE_VIEW = 'django.views.csrf.csrf_failure'
-
-# Additional CSRF bypass settings
-CSRF_COOKIE_DOMAIN = None
-CSRF_COOKIE_PATH = '/'
-CSRF_COOKIE_AGE = 31449600  # 1 year
-CSRF_TOKEN_VALID = True
-
-# Disable CSRF for deployment
-USE_CSRF = False
+# ✅ CSRF COMPLETELY DISABLED - NO MORE DUPLICATE SETTINGS
 
 # Session security settings - make permissive
 SESSION_COOKIE_SECURE = False
