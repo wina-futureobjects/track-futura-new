@@ -42,20 +42,14 @@ applications:
         DJANGO_SETTINGS_MODULE: "config.settings"
         DEBUG: "True"
         DJANGO_SECURE_SSL_REDIRECT: "False"
-        # Disable DataDog tracing completely
+        # Completely disable DataDog tracing and monitoring
         DD_TRACE_ENABLED: "false"
         DD_PROFILING_ENABLED: "false"
         DD_APM_ENABLED: "false"
         DD_LOGS_ENABLED: "false"
         DD_TRACE_STARTUP_LOGS: "false"
-        _DD_TRACE_ENABLED: "false"
-        # Force disable all DataDog features
-        DD_SERVICE: ""
-        DD_ENV: ""
-        DD_VERSION: ""
-        DD_API_KEY: ""
-        # Additional DataDog disable flags
-        DATADOG_TRACE_ENABLED: "false"
+        DD_RUNTIME_METRICS_ENABLED: "false"
+        DD_INSTRUMENTATION_TELEMETRY_ENABLED: "false"
         PYTHONPATH: "/app"
     mounts:
       "/staticfiles":

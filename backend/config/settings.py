@@ -17,15 +17,6 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-# Disable DataDog tracing immediately if in production
-if os.getenv('PLATFORM_APPLICATION_NAME'):
-    os.environ['DD_TRACE_ENABLED'] = 'false'
-    os.environ['DD_PROFILING_ENABLED'] = 'false'
-    os.environ['DD_APM_ENABLED'] = 'false'
-    os.environ['DD_LOGS_ENABLED'] = 'false'
-    os.environ['DD_TRACE_STARTUP_LOGS'] = 'false'
-    os.environ['_DD_TRACE_ENABLED'] = 'false'
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -380,10 +371,6 @@ BRIGHTDATA_WEBHOOK_TOKEN = os.getenv('BRIGHTDATA_WEBHOOK_TOKEN', 'your-default-w
 if (os.getenv('PLATFORM_APPLICATION_NAME') is not None):
     # Keep DEBUG True for now to avoid issues
     DEBUG = True
-
-    # Disable DataDog tracing if auto-injected by Upsun
-    os.environ['DD_TRACE_ENABLED'] = 'false'
-    os.environ['DD_PROFILING_ENABLED'] = 'false'
 
     # Static files for production - match Upsun mount path
     STATIC_ROOT = '/app/staticfiles'
