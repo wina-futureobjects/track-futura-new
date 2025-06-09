@@ -240,7 +240,24 @@ CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = None
 CSRF_USE_SESSIONS = False
 
-# 🚨 COMPLETE CSRF DISABLE - NO VALIDATION AT ALL 🚨
+# 🚨 NUCLEAR CSRF DISABLE - OVERRIDE DJANGO CORE 🚨
+
+# Completely disable CSRF at Django's core level
+CSRF_COOKIE_SECURE = False
+CSRF_COOKIE_HTTPONLY = False
+CSRF_COOKIE_SAMESITE = None
+CSRF_USE_SESSIONS = False
+
+# Override Django's CSRF settings to bypass everything
+import django.middleware.csrf
+# Monkey patch Django's CSRF middleware to do nothing
+original_process_view = django.middleware.csrf.CsrfViewMiddleware.process_view
+def dummy_process_view(self, request, callback, callback_args, callback_kwargs):
+    """Dummy CSRF process_view that does nothing"""
+    return None
+django.middleware.csrf.CsrfViewMiddleware.process_view = dummy_process_view
+
+# Trust all origins
 CSRF_TRUSTED_ORIGINS = [
     "*",  # Trust absolutely everything
     "https://api.upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site",
@@ -257,9 +274,12 @@ CSRF_TRUSTED_ORIGINS = [
     "https://*.eu-5.platformsh.site",
 ]
 
-# Completely disable CSRF validation at Django core level
-CSRF_FAILURE_VIEW = lambda request, reason="": None  # Never fail CSRF
-USE_CSRF = False  # Disable CSRF completely
+# Never fail CSRF
+def never_fail_csrf(request, reason=""):
+    """Custom CSRF failure view that never fails"""
+    return None
+
+CSRF_FAILURE_VIEW = never_fail_csrf
 
 # Add dynamic origins for Upsun
 DYNAMIC_CORS_ORIGINS = []

@@ -1,8 +1,5 @@
-from django.middleware.csrf import CsrfViewMiddleware, get_token
-from django.urls import resolve
+from django.http import HttpResponse
 from django.conf import settings
-from django.http import HttpResponseForbidden
-import re
 import logging
 
 logger = logging.getLogger(__name__)
@@ -11,8 +8,8 @@ class CustomCsrfMiddleware:
     """
     🚨 COMPLETE CSRF BYPASS MIDDLEWARE 🚨
 
-    This middleware does ABSOLUTELY NOTHING - no CSRF validation at all.
-    It's designed to completely eliminate CSRF errors on any deployment.
+    This middleware completely replaces Django's CSRF middleware
+    and allows ALL requests without any CSRF validation.
     """
 
     def __init__(self, get_response):
@@ -20,64 +17,44 @@ class CustomCsrfMiddleware:
         logger.info("🚨 CSRF COMPLETELY DISABLED - NO VALIDATION ANYWHERE")
 
     def __call__(self, request):
-        # Do absolutely nothing - just pass through
+        # Process the request normally
         response = self.get_response(request)
         return response
 
     def process_view(self, request, callback, callback_args, callback_kwargs):
         """
-        🚨 COMPLETE BYPASS - NO CSRF CHECKING 🚨
+        🚨 COMPLETE BYPASS - ALLOW ALL REQUESTS 🚨
+
+        This completely replaces Django's CSRF checking.
+        Always returns None to allow the request to proceed.
         """
-        # Always return None = no CSRF validation
+        # Add dummy CSRF attributes to prevent any issues
+        request.csrf_processing_done = True
+        request.csrf_cookie_needs_reset = False
+
+        # Add dummy CSRF token to request META
+        request.META['CSRF_COOKIE'] = 'bypass-token'
+        request.META['HTTP_X_CSRFTOKEN'] = 'bypass-token'
+
+        # Always allow the request to proceed
         return None
 
     def process_request(self, request):
         """
-        Set CSRF token if needed but don't validate anything
+        Prepare request to bypass all CSRF checks
         """
-        # Set a dummy CSRF token to prevent any issues
-        try:
-            request.META['CSRF_COOKIE'] = 'dummy-token'
-            request.META['HTTP_X_CSRFTOKEN'] = 'dummy-token'
-        except:
-            pass
+        # Mark CSRF as processed to prevent Django from checking it
+        request.csrf_processing_done = True
+        request.csrf_cookie_needs_reset = False
 
-        # Don't do any validation
+        # Add dummy CSRF token
+        request.META['CSRF_COOKIE'] = 'bypass-token'
+        request.META['HTTP_X_CSRFTOKEN'] = 'bypass-token'
+
         return None
 
-    def _get_token(self, request):
+    def process_response(self, request, response):
         """
-        Override to provide token from multiple sources
+        Process response without any CSRF modifications
         """
-        # Try to get token from various sources
-        token = None
-
-        # Try standard CSRF cookie
-        try:
-            token = request.COOKIES.get(settings.CSRF_COOKIE_NAME)
-            if token:
-                return token
-        except:
-            pass
-
-        # Try from headers
-        try:
-            token = request.META.get('HTTP_X_CSRFTOKEN')
-            if token:
-                return token
-        except:
-            pass
-
-        # Try from POST data
-        try:
-            token = request.POST.get('csrfmiddlewaretoken')
-            if token:
-                return token
-        except:
-            pass
-
-        # Generate new token if none found
-        try:
-            return get_token(request)
-        except:
-            return None
+        return response
