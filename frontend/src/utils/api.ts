@@ -7,23 +7,38 @@ export const getApiBaseUrl = (): string => {
     return (window as any).API_BASE_URL;
   }
 
-    // Fall back to environment-specific logic
+  // Fall back to environment-specific logic
   if (import.meta.env.PROD) {
-    // In production, use the same domain
+    // In production, get the current hostname
     const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+    const protocol = typeof window !== 'undefined' ? window.location.protocol : 'https:';
 
-    // Use same domain for all environments
-    return `https://${hostname}`;
+    console.log('🔍 Production API Detection:', { hostname, protocol });
+
+    // 🚨 SPECIFIC FIX FOR UPSUN DEPLOYMENT 🚨
+    // If we're on the Upsun domain, use the exact API URL
+    if (hostname.includes('upsun-deployment') || hostname.includes('.platformsh.site')) {
+      const apiUrl = `${protocol}//${hostname}`;
+      console.log('✅ Using Upsun API URL:', apiUrl);
+      return apiUrl;
+    }
+
+    // For other production environments, use same domain
+    const apiUrl = `${protocol}//${hostname}`;
+    console.log('✅ Using production API URL:', apiUrl);
+    return apiUrl;
   }
 
   // In development, try to use the direct backend URL if proxy is not working
   // Check if we're running on localhost:5173 (Vite dev server)
   if (typeof window !== 'undefined' && window.location.port === '5173') {
     // Use direct backend URL to bypass potential proxy issues
+    console.log('✅ Using development direct API URL: http://localhost:8000');
     return 'http://localhost:8000';
   }
 
   // Default: use relative URLs which will be handled by the Vite proxy
+  console.log('✅ Using relative API URLs (proxy)');
   return '';
 };
 
@@ -34,7 +49,10 @@ export const createApiUrl = (endpoint: string): string => {
   const baseUrl = getApiBaseUrl();
   // Ensure endpoint starts with /api/
   const formattedEndpoint = endpoint.startsWith('/api/') ? endpoint : `/api/${endpoint.replace(/^\//, '')}`;
-  return `${baseUrl}${formattedEndpoint}`;
+  const fullUrl = `${baseUrl}${formattedEndpoint}`;
+
+  console.log('🔗 API URL Created:', { endpoint, baseUrl, fullUrl });
+  return fullUrl;
 };
 
 /**
@@ -43,11 +61,10 @@ export const createApiUrl = (endpoint: string): string => {
  */
 export const apiFetch = (endpoint: string, options?: RequestInit): Promise<Response> => {
   const url = createApiUrl(endpoint);
+  console.log('📡 API Fetch:', { endpoint, url, method: options?.method || 'GET' });
 
-    // Get auth token from localStorage if available
+  // Get auth token from localStorage if available
   const token = localStorage.getItem('authToken');
-
-  // Skip CSRF tokens completely for testing
 
   // Prepare headers with minimal requirements for testing
   const headers = {
@@ -59,7 +76,7 @@ export const apiFetch = (endpoint: string, options?: RequestInit): Promise<Respo
     ...(!options?.body || !(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {})
   };
 
-    const fetchOptions = {
+  const fetchOptions = {
     ...options,
     headers,
     // Try without credentials first for maximum compatibility
@@ -68,8 +85,21 @@ export const apiFetch = (endpoint: string, options?: RequestInit): Promise<Respo
     mode: 'cors' as RequestMode
   };
 
-  // Error handling
-  return fetch(url, fetchOptions).catch(error => {
-    throw error;
-  });
+  console.log('📤 Fetch Options:', { url, headers, method: options?.method });
+
+  // Enhanced error handling with logging
+  return fetch(url, fetchOptions)
+    .then(response => {
+      console.log('📥 Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        contentType: response.headers.get('content-type'),
+        url: response.url
+      });
+      return response;
+    })
+    .catch(error => {
+      console.error('❌ Fetch Error:', { url, error: error.message, stack: error.stack });
+      throw error;
+    });
 };

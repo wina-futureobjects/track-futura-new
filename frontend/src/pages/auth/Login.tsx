@@ -40,7 +40,9 @@ interface LoginResult {
 // Local auth implementation
 const useAuth = () => {
   const login = async (credentials: LoginCredentials): Promise<LoginResult> => {
-        try {
+    try {
+      console.log('🚀 Starting login process with credentials:', { username: credentials.username });
+
       const response = await apiFetch('/api/users/login/', {
         method: 'POST',
         headers: {
@@ -49,27 +51,57 @@ const useAuth = () => {
         body: JSON.stringify(credentials),
       });
 
+      console.log('📥 Login response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        url: response.url
+      });
+
       if (!response.ok) {
+        console.warn('⚠️ Login response not OK:', response.status, response.statusText);
+
+        // Try to get the response text first
+        const responseText = await response.text();
+        console.log('📄 Error response text:', responseText);
+
         let errorData;
         try {
-          errorData = await response.json();
+          errorData = JSON.parse(responseText);
+          console.log('✅ Error response parsed as JSON:', errorData);
         } catch (parseError) {
-          throw new Error(`HTTP ${response.status}: Unable to parse server error response`);
+          console.error('❌ Failed to parse error response as JSON:', parseError);
+          throw new Error(`HTTP ${response.status}: Unable to parse server error response. Response: ${responseText.substring(0, 200)}`);
         }
         throw new Error(errorData.detail || errorData.non_field_errors?.[0] || 'Login failed');
       }
 
+      // Try to get the response text first to see what we're dealing with
+      const responseText = await response.text();
+      console.log('📄 Success response text:', responseText);
+
       let data;
       try {
-        data = await response.json();
+        data = JSON.parse(responseText);
+        console.log('✅ Success response parsed as JSON:', data);
       } catch (parseError) {
-        throw new Error('Unable to parse server response');
+        console.error('❌ Failed to parse success response as JSON:', parseError);
+        console.error('📄 Raw response that failed to parse:', responseText);
+        throw new Error(`Unable to parse server response. Status: ${response.status}. Response: ${responseText.substring(0, 200)}`);
       }
 
+      // Validate that we have the expected data structure
+      if (!data.token) {
+        console.error('❌ Login response missing token:', data);
+        throw new Error('Login response missing authentication token');
+      }
+
+      console.log('✅ Login successful, saving token');
       // Save token using the auth utility
       setAuthToken(data.token);
 
       // Get user role and details
+      console.log('🔍 Fetching user profile...');
       const userProfileResp = await apiFetch('/api/users/profile/', {
         headers: {
           'Authorization': `Token ${data.token}`
@@ -79,8 +111,11 @@ const useAuth = () => {
       if (userProfileResp.ok) {
         let userProfileData;
         try {
-          userProfileData = await userProfileResp.json();
+          const profileText = await userProfileResp.text();
+          userProfileData = JSON.parse(profileText);
+          console.log('✅ Profile data retrieved:', userProfileData);
         } catch (parseError) {
+          console.warn('⚠️ Failed to parse profile response, using default:', parseError);
           userProfileData = { user: {} };
         }
 
@@ -97,8 +132,10 @@ const useAuth = () => {
         // Save user data using auth utility
         setCurrentUser(userData);
 
+        console.log('🎉 Login process completed successfully');
         return { user: userData };
       } else {
+        console.warn('⚠️ Profile fetch failed, using basic user info');
         // If profile fetch fails, still store basic user info
         const userData: User = {
           id: data.user_id,
@@ -112,6 +149,7 @@ const useAuth = () => {
         return { user: userData };
       }
     } catch (error) {
+      console.error('💥 Login process failed:', error);
       throw error;
     }
   };
