@@ -4,231 +4,227 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Upsun Frontend API Debug</title>
+  <title>Track Futura - Upsun Frontend Debug</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      max-width: 800px;
+      font-family: monospace;
+      max-width: 1200px;
       margin: 0 auto;
       padding: 20px;
+      background: #1a1a1a;
+      color: #00ff00;
     }
 
     .test-section {
-      border: 1px solid #ddd;
+      border: 1px solid #333;
       margin: 10px 0;
       padding: 15px;
-      border-radius: 5px;
+      background: #2a2a2a;
     }
 
     .success {
-      background: #d4edda;
-      border-color: #c3e6cb;
+      color: #00ff00;
     }
 
     .error {
-      background: #f8d7da;
-      border-color: #f5c6cb;
+      color: #ff4444;
     }
 
-    .info {
-      background: #d1ecf1;
-      border-color: #bee5eb;
-    }
-
-    button {
-      padding: 10px 20px;
-      margin: 5px;
-      background: #007bff;
-      color: white;
-      border: none;
-      border-radius: 3px;
-      cursor: pointer;
+    .warning {
+      color: #ffaa00;
     }
 
     pre {
-      background: #f8f9fa;
+      background: #1a1a1a;
       padding: 10px;
-      border-radius: 3px;
+      border: 1px solid #333;
       overflow-x: auto;
     }
 
+    button {
+      background: #007acc;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      margin: 5px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    button:hover {
+      background: #0066aa;
+    }
+
     input {
+      background: #333;
+      color: white;
+      border: 1px solid #555;
       padding: 8px;
       margin: 5px;
-      width: 200px;
+      border-radius: 4px;
     }
   </style>
 </head>
 
 <body>
-  <h1>🔧 Upsun Frontend API Debug Tool</h1>
+  <h1>🚀 Track Futura - Upsun Frontend Debug Tool</h1>
 
-  <div class="test-section info">
-    <h3>Environment Information</h3>
-    <pre id="env-info"></pre>
+  <div class="test-section">
+    <h2>📍 Environment Detection</h2>
+    <div id="environment-info"></div>
   </div>
 
   <div class="test-section">
-    <h3>API URL Test</h3>
-    <button onclick="testApiUrl()">Test API URL Detection</button>
-    <pre id="api-url-result"></pre>
+    <h2>🔗 API URL Detection</h2>
+    <div id="api-url-info"></div>
   </div>
 
   <div class="test-section">
-    <h3>CORS Test</h3>
-    <button onclick="testCors()">Test CORS Headers</button>
-    <pre id="cors-result"></pre>
+    <h2>🧪 Login API Test</h2>
+    <input type="text" id="username" placeholder="Username" value="tenantadmin">
+    <input type="password" id="password" placeholder="Password" value="">
+    <button onclick="testLogin()">Test Login</button>
+    <div id="login-result"></div>
   </div>
 
   <div class="test-section">
-    <h3>Login API Test</h3>
-    <input type="text" id="username" placeholder="Username" value="admin">
-    <input type="password" id="password" placeholder="Password" value="admin123">
-    <button onclick="testLogin()">Test Login API</button>
-    <pre id="login-result"></pre>
-  </div>
-
-  <div class="test-section">
-    <h3>Raw Response Test</h3>
-    <button onclick="testRawResponse()">Get Raw Login Response</button>
-    <pre id="raw-result"></pre>
+    <h2>📊 Test Results</h2>
+    <div id="test-results"></div>
   </div>
 
   <script>
-    // Display environment information
-    function displayEnvInfo() {
+    // Simulate Vite environment variables
+    const importMeta = {
+      env: {
+        PROD: true,  // This is what should be true in production
+        DEV: false,
+        MODE: 'production'
+      }
+    };
+
+    // Mock getApiBaseUrl function based on your latest code
+    function getApiBaseUrl() {
+      // Check if there's a global API base URL
+      if (typeof window !== 'undefined' && window.API_BASE_URL !== undefined) {
+        console.log('🌐 Using global API_BASE_URL:', window.API_BASE_URL);
+        return window.API_BASE_URL;
+      }
+
+      // Get environment info
+      const hostname = window.location.hostname;
+      const protocol = window.location.protocol;
+      const isProd = importMeta.env.PROD;
+      const isDev = importMeta.env.DEV;
+      const mode = importMeta.env.MODE;
+
+      console.log('🔍 DETAILED Environment Detection:', {
+        hostname,
+        protocol,
+        isProd,
+        isDev,
+        mode,
+        'import.meta.env': importMeta.env,
+        'window.location': window.location
+      });
+
+      // Production logic
+      if (isProd) {
+        console.log('✅ Production mode detected');
+
+        console.log('🔍 Hostname checks:', {
+          hostname,
+          'includes upsun-deployment': hostname.includes('upsun-deployment'),
+          'includes .platformsh.site': hostname.includes('.platformsh.site'),
+          'starts with api.': hostname.startsWith('api.')
+        });
+
+        // Upsun deployment check
+        if (hostname.includes('upsun-deployment') || hostname.includes('.platformsh.site')) {
+          console.log('🎯 Upsun domain detected!');
+
+          let apiHostname = hostname;
+          if (!hostname.startsWith('api.')) {
+            apiHostname = `api.${hostname}`;
+            console.log('📍 Adding api subdomain:', { original: hostname, modified: apiHostname });
+          } else {
+            console.log('📍 Already on api subdomain:', hostname);
+          }
+
+          const apiUrl = `${protocol}//${apiHostname}`;
+          console.log('✅ Using Upsun API URL (with api subdomain):', apiUrl);
+          return apiUrl;
+        }
+
+        // Other production environments
+        console.log('🌐 Non-Upsun production environment detected');
+        const apiUrl = `${protocol}//${hostname}`;
+        console.log('✅ Using production API URL:', apiUrl);
+        return apiUrl;
+      }
+
+      console.log('🛠️ Development mode detected');
+      return 'http://localhost:8000';
+    }
+
+    function createApiUrl(endpoint) {
+      const baseUrl = getApiBaseUrl();
+      const formattedEndpoint = endpoint.startsWith('/api/') ? endpoint : `/api/${endpoint.replace(/^\//, '')}`;
+      const fullUrl = `${baseUrl}${formattedEndpoint}`;
+      console.log('🔗 API URL Created:', { endpoint, baseUrl, fullUrl });
+      return fullUrl;
+    }
+
+    // Display environment info
+    function displayEnvironmentInfo() {
       const info = {
         hostname: window.location.hostname,
         protocol: window.location.protocol,
         port: window.location.port,
-        pathname: window.location.pathname,
         origin: window.location.origin,
-        userAgent: navigator.userAgent.substring(0, 100) + '...'
+        href: window.location.href,
+        isProd: importMeta.env.PROD,
+        isDev: importMeta.env.DEV,
+        mode: importMeta.env.MODE
       };
-      document.getElementById('env-info').textContent = JSON.stringify(info, null, 2);
+
+      document.getElementById('environment-info').innerHTML = `
+        <pre>${JSON.stringify(info, null, 2)}</pre>
+      `;
     }
 
-    // Test API URL detection
-    function testApiUrl() {
-      const result = document.getElementById('api-url-result');
+    // Display API URL info
+    function displayApiUrlInfo() {
+      console.clear();
+      const baseUrl = getApiBaseUrl();
+      const loginUrl = createApiUrl('/users/login/');
 
-      try {
-        // Simulate the frontend API URL detection logic
-        const hostname = window.location.hostname;
-        const protocol = window.location.protocol;
+      const info = {
+        baseUrl,
+        loginUrl,
+        'Expected for Upsun': `https://api.${window.location.hostname}/api/users/login/`
+      };
 
-        let apiUrl;
-        if (hostname.includes('upsun-deployment') || hostname.includes('.platformsh.site')) {
-          // For Upsun: frontend is on {default}, backend is on api.{default}
-          let apiHostname = hostname;
-
-          // If we're NOT already on the api subdomain, add it
-          if (!hostname.startsWith('api.')) {
-            apiHostname = `api.${hostname}`;
-          }
-
-          apiUrl = `${protocol}//${apiHostname}`;
-        } else {
-          apiUrl = `${protocol}//${hostname}`;
-        }
-
-        const loginEndpoint = `${apiUrl}/api/users/login/`;
-
-        const testResult = {
-          currentHostname: hostname,
-          protocol,
-          apiHostname: apiUrl.replace(protocol + '//', ''),
-          detectedApiUrl: apiUrl,
-          loginEndpoint,
-          isUpsun: hostname.includes('upsun-deployment') || hostname.includes('.platformsh.site'),
-          hostnameStartsWithApi: hostname.startsWith('api.'),
-          explanation: hostname.includes('upsun-deployment') ?
-            'Upsun detected: Frontend on {default}, Backend on api.{default}' :
-            'Standard deployment: Same domain'
-        };
-
-        result.textContent = JSON.stringify(testResult, null, 2);
-        result.parentElement.className = 'test-section success';
-      } catch (error) {
-        result.textContent = `Error: ${error.message}`;
-        result.parentElement.className = 'test-section error';
-      }
+      document.getElementById('api-url-info').innerHTML = `
+        <pre>${JSON.stringify(info, null, 2)}</pre>
+      `;
     }
 
-    // Test CORS
-    async function testCors() {
-      const result = document.getElementById('cors-result');
-
-      try {
-        const hostname = window.location.hostname;
-        const protocol = window.location.protocol;
-
-        // Use same logic as API URL detection
-        let apiUrl;
-        if (hostname.includes('upsun-deployment') || hostname.includes('.platformsh.site')) {
-          let apiHostname = hostname;
-          if (!hostname.startsWith('api.')) {
-            apiHostname = `api.${hostname}`;
-          }
-          apiUrl = `${protocol}//${apiHostname}`;
-        } else {
-          apiUrl = `${protocol}//${hostname}`;
-        }
-
-        const response = await fetch(`${apiUrl}/api/users/login/`, {
-          method: 'OPTIONS',
-          headers: {
-            'Origin': window.location.origin,
-            'Access-Control-Request-Method': 'POST',
-            'Access-Control-Request-Headers': 'Content-Type'
-          }
-        });
-
-        const corsHeaders = {
-          testUrl: `${apiUrl}/api/users/login/`,
-          status: response.status,
-          statusText: response.statusText,
-          'Access-Control-Allow-Origin': response.headers.get('Access-Control-Allow-Origin'),
-          'Access-Control-Allow-Methods': response.headers.get('Access-Control-Allow-Methods'),
-          'Access-Control-Allow-Headers': response.headers.get('Access-Control-Allow-Headers'),
-          'Access-Control-Allow-Credentials': response.headers.get('Access-Control-Allow-Credentials')
-        };
-
-        result.textContent = JSON.stringify(corsHeaders, null, 2);
-        result.parentElement.className = response.status === 200 ? 'test-section success' : 'test-section error';
-      } catch (error) {
-        result.textContent = `CORS Error: ${error.message}`;
-        result.parentElement.className = 'test-section error';
-      }
-    }
-
-    // Test login API
+    // Test login function
     async function testLogin() {
-      const result = document.getElementById('login-result');
       const username = document.getElementById('username').value;
       const password = document.getElementById('password').value;
+      const resultDiv = document.getElementById('login-result');
+
+      if (!password) {
+        resultDiv.innerHTML = '<div class="error">Please enter a password</div>';
+        return;
+      }
 
       try {
-        const hostname = window.location.hostname;
-        const protocol = window.location.protocol;
+        const url = createApiUrl('/users/login/');
+        console.log('🚀 Testing login with URL:', url);
 
-        // Use same logic as API URL detection
-        let apiUrl;
-        if (hostname.includes('upsun-deployment') || hostname.includes('.platformsh.site')) {
-          let apiHostname = hostname;
-          if (!hostname.startsWith('api.')) {
-            apiHostname = `api.${hostname}`;
-          }
-          apiUrl = `${protocol}//${apiHostname}`;
-        } else {
-          apiUrl = `${protocol}//${hostname}`;
-        }
-
-        const loginUrl = `${apiUrl}/api/users/login/`;
-
-        console.log('🚀 Testing login with URL:', loginUrl);
-
-        const response = await fetch(loginUrl, {
+        const response = await fetch(url, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -239,81 +235,50 @@
           credentials: 'omit'
         });
 
-        console.log('📥 Response received:', response);
-
-        const responseText = await response.text();
-        console.log('📄 Response text:', responseText);
-
-        let parsedData;
-        try {
-          parsedData = JSON.parse(responseText);
-        } catch (parseError) {
-          parsedData = { parseError: parseError.message, rawText: responseText };
-        }
-
-        const testResult = {
-          url: loginUrl,
-          frontendDomain: window.location.origin,
-          backendDomain: apiUrl,
+        console.log('📥 Response:', {
           status: response.status,
           statusText: response.statusText,
-          headers: Object.fromEntries(response.headers.entries()),
           contentType: response.headers.get('content-type'),
-          responseText: responseText.substring(0, 500) + (responseText.length > 500 ? '...' : ''),
-          parsedData: parsedData
-        };
-
-        result.textContent = JSON.stringify(testResult, null, 2);
-        result.parentElement.className = response.status === 200 ? 'test-section success' : 'test-section error';
-      } catch (error) {
-        result.textContent = `Login Test Error: ${error.message}\nStack: ${error.stack}`;
-        result.parentElement.className = 'test-section error';
-      }
-    }
-
-    // Test raw response
-    async function testRawResponse() {
-      const result = document.getElementById('raw-result');
-
-      try {
-        const hostname = window.location.hostname;
-        const protocol = window.location.protocol;
-        const apiUrl = `${protocol}//${hostname}`;
-        const loginUrl = `${apiUrl}/api/users/login/`;
-
-        // Just try to fetch the endpoint without any data
-        const response = await fetch(loginUrl, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json'
-          },
-          mode: 'cors',
-          credentials: 'omit'
+          url: response.url
         });
 
-        const responseText = await response.text();
+        const text = await response.text();
+        console.log('📄 Response text:', text);
 
-        const rawResult = {
-          url: loginUrl,
-          method: 'GET',
-          status: response.status,
-          statusText: response.statusText,
-          contentType: response.headers.get('content-type'),
-          contentLength: response.headers.get('content-length'),
-          responseText: responseText
-        };
+        let result = `
+          <h3>Response Details:</h3>
+          <pre>Status: ${response.status}
+Content-Type: ${response.headers.get('content-type')}
+URL: ${response.url}
 
-        result.textContent = JSON.stringify(rawResult, null, 2);
-        result.parentElement.className = 'test-section info';
+Response Body:
+${text}</pre>
+        `;
+
+        if (response.status === 200) {
+          try {
+            const json = JSON.parse(text);
+            result += `<div class="success">✅ Success! Got JSON response</div>`;
+          } catch (e) {
+            result += `<div class="error">❌ Got 200 but response is not JSON (likely HTML from frontend)</div>`;
+          }
+        } else {
+          result += `<div class="error">❌ HTTP Error: ${response.status}</div>`;
+        }
+
+        resultDiv.innerHTML = result;
+
       } catch (error) {
-        result.textContent = `Raw Response Error: ${error.message}`;
-        result.parentElement.className = 'test-section error';
+        console.error('❌ Login test failed:', error);
+        resultDiv.innerHTML = `<div class="error">❌ Network Error: ${error.message}</div>`;
       }
     }
 
     // Initialize
-    displayEnvInfo();
-    testApiUrl();
+    window.onload = function () {
+      displayEnvironmentInfo();
+      displayApiUrlInfo();
+    };
   </script>
 </body>
 
