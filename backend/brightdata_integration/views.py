@@ -1058,64 +1058,24 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
 @require_http_methods(["POST"])
 def brightdata_webhook(request):
     """
-    Enhanced webhook endpoint with enterprise-grade security and monitoring
+    Simplified webhook endpoint for reliable data processing
     """
-    from .webhook_security import webhook_security
-    from .webhook_monitor import webhook_monitor
     import time
 
     start_time = time.time()
-    client_ip = webhook_security.get_client_ip(request)
-    user_agent = request.headers.get('User-Agent', '')
+    client_ip = request.META.get('REMOTE_ADDR', 'unknown')
 
     try:
-        # Comprehensive security validation
-        is_valid, validation_result = webhook_security.comprehensive_webhook_validation(request)
-
-        if not is_valid:
-            error_message = f"Security validation failed: {', '.join(validation_result['errors'])}"
-            logger.warning(f"Webhook security validation failed from {client_ip}: {error_message}")
-
-            # Record security event
-            webhook_monitor.record_webhook_event(
-                event_type='webhook_data',
-                status='security_error',
-                response_time=time.time() - start_time,
-                payload_size=len(request.body) if request.body else 0,
-                client_ip=client_ip,
-                user_agent=user_agent,
-                error_message=error_message,
-                metadata={'validation_result': validation_result}
-            )
-
-            return JsonResponse({
-                'error': 'Security validation failed',
-                'details': validation_result['errors'],
-                'security_score': validation_result['security_score']
-            }, status=401)
-
         # Parse the incoming data
         if request.content_type == 'application/json':
             data = json.loads(request.body)
         else:
-            error_message = f"Unsupported content type: {request.content_type}"
-            logger.error(error_message)
-
-            webhook_monitor.record_webhook_event(
-                event_type='webhook_data',
-                status='error',
-                response_time=time.time() - start_time,
-                payload_size=len(request.body) if request.body else 0,
-                client_ip=client_ip,
-                user_agent=user_agent,
-                error_message=error_message
-            )
-
+            logger.error(f"Unsupported content type: {request.content_type}")
             return JsonResponse({'error': 'Unsupported content type'}, status=400)
 
         # Extract metadata from headers or data
         snapshot_id = request.headers.get('X-Snapshot-Id') or data.get('snapshot_id')
-        platform = request.headers.get('X-Platform') or data.get('platform', 'unknown')
+        platform = request.headers.get('X-Platform') or data.get('platform', 'instagram')
 
         logger.info(f"Received webhook data for snapshot_id: {snapshot_id}, platform: {platform}")
 
@@ -1124,6 +1084,7 @@ def brightdata_webhook(request):
         if snapshot_id:
             try:
                 scraper_request = ScraperRequest.objects.get(request_id=snapshot_id)
+                logger.info(f"Found scraper request for snapshot_id: {snapshot_id}")
             except ScraperRequest.DoesNotExist:
                 logger.warning(f"No scraper request found for snapshot_id: {snapshot_id}")
 
@@ -1135,30 +1096,17 @@ def brightdata_webhook(request):
             if scraper_request:
                 scraper_request.status = 'completed'
                 scraper_request.save()
+                logger.info(f"Updated scraper request status to completed")
 
-            # Record successful event
-            webhook_monitor.record_webhook_event(
-                event_type='webhook_data',
-                status='success',
-                response_time=time.time() - start_time,
-                payload_size=len(request.body) if request.body else 0,
-                client_ip=client_ip,
-                user_agent=user_agent,
-                metadata={
-                    'snapshot_id': snapshot_id,
-                    'platform': platform,
-                    'data_items': len(data) if isinstance(data, list) else 1,
-                    'validation_warnings': validation_result.get('warnings', [])
-                }
-            )
+            processing_time = round(time.time() - start_time, 3)
+            logger.info(f"Webhook processed successfully: {snapshot_id} in {processing_time}s")
 
-            logger.info(f"Webhook processed successfully: {snapshot_id}")
             return JsonResponse({
                 'status': 'success',
                 'message': 'Data processed successfully',
                 'snapshot_id': snapshot_id,
-                'processing_time': round(time.time() - start_time, 3),
-                'security_score': validation_result['security_score']
+                'processing_time': processing_time,
+                'items_processed': len(data) if isinstance(data, list) else 1
             })
         else:
             # Update scraper request status to failed
@@ -1167,54 +1115,25 @@ def brightdata_webhook(request):
                 scraper_request.error_message = 'Failed to process webhook data'
                 scraper_request.save()
 
-            error_message = 'Failed to process webhook data'
-            webhook_monitor.record_webhook_event(
-                event_type='webhook_data',
-                status='processing_error',
-                response_time=time.time() - start_time,
-                payload_size=len(request.body) if request.body else 0,
-                client_ip=client_ip,
-                user_agent=user_agent,
-                error_message=error_message,
-                metadata={'snapshot_id': snapshot_id, 'platform': platform}
-            )
-
+            logger.error(f"Failed to process webhook data for snapshot_id: {snapshot_id}")
             return JsonResponse({
                 'status': 'error',
-                'message': error_message,
+                'message': 'Failed to process webhook data',
                 'processing_time': round(time.time() - start_time, 3)
             }, status=500)
 
     except json.JSONDecodeError as e:
-        error_message = f"Invalid JSON in webhook request: {str(e)}"
-        logger.error(error_message)
-
-        webhook_monitor.record_webhook_event(
-            event_type='webhook_data',
-            status='json_error',
-            response_time=time.time() - start_time,
-            payload_size=len(request.body) if request.body else 0,
-            client_ip=client_ip,
-            user_agent=user_agent,
-            error_message=error_message
-        )
-
+        logger.error(f"Invalid JSON in webhook request: {str(e)}")
         return JsonResponse({'error': 'Invalid JSON', 'details': str(e)}, status=400)
+
     except Exception as e:
-        error_message = f"Error processing webhook: {str(e)}"
-        logger.error(error_message)
-
-        webhook_monitor.record_webhook_event(
-            event_type='webhook_data',
-            status='error',
-            response_time=time.time() - start_time,
-            payload_size=len(request.body) if request.body else 0,
-            client_ip=client_ip,
-            user_agent=user_agent,
-            error_message=error_message
-        )
-
-        return JsonResponse({'error': 'Internal server error', 'details': str(e)}, status=500)
+        logger.error(f"Error processing webhook: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return JsonResponse({
+            'error': 'Internal server error',
+            'details': str(e),
+            'processing_time': round(time.time() - start_time, 3)
+        }, status=500)
 
 @csrf_exempt
 @require_http_methods(["POST"])

@@ -71,7 +71,8 @@ urlpatterns = [
     path("api/analytics/", include("analytics.urls")),
     path("api/data-collector/", include("data_collector.urls")),
     path("api/query-builder/", include("query_builder.urls")),
-    path("api/instagram-data/", include("instagram_data.urls")),
+    path("api/instagram_data/", include("instagram_data.urls")),
+    path("api/instagram-data/", include("instagram_data.urls")),  # Support both formats
     path("api/facebook-data/", include("facebook_data.urls")),
     path("api/track-accounts/", include("track_accounts.urls")),
     path("api/linkedin-data/", include("linkedin_data.urls")),
