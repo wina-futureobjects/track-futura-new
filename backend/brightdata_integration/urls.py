@@ -4,9 +4,9 @@ from . import views
 
 router = DefaultRouter()
 router.register(r'configs', views.BrightdataConfigViewSet)
-router.register(r'config', views.BrightdataConfigViewSet)  # Support both formats
+router.register(r'config', views.BrightdataConfigViewSet, basename='brightdataconfig-alt')  # Support both formats
 router.register(r'requests', views.ScraperRequestViewSet)
-router.register(r'scraper-requests', views.ScraperRequestViewSet)  # Support both formats
+router.register(r'scraper-requests', views.ScraperRequestViewSet, basename='scraperrequest-alt')  # Support both formats
 router.register(r'batch-jobs', views.BatchScraperJobViewSet)
 
 urlpatterns = [
