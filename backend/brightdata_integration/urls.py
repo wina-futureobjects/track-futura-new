@@ -8,6 +8,7 @@ router.register(r'config', views.BrightdataConfigViewSet, basename='brightdataco
 router.register(r'requests', views.ScraperRequestViewSet)
 router.register(r'scraper-requests', views.ScraperRequestViewSet, basename='scraperrequest-alt')  # Support both formats
 router.register(r'batch-jobs', views.BatchScraperJobViewSet)
+router.register(r'notifications', views.BrightdataNotificationViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),

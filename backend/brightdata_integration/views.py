@@ -12,10 +12,10 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from .models import BrightdataConfig, ScraperRequest, BatchScraperJob
+from .models import BrightdataConfig, ScraperRequest, BatchScraperJob, BrightdataNotification
 from .serializers import (
     BrightdataConfigSerializer, ScraperRequestSerializer, ScraperRequestCreateSerializer,
-    BatchScraperJobSerializer, BatchScraperJobCreateSerializer
+    BatchScraperJobSerializer, BatchScraperJobCreateSerializer, BrightdataNotificationSerializer
 )
 from .services import AutomatedBatchScraper, create_and_execute_batch_job
 import traceback
@@ -362,6 +362,10 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
             }
             params = {
                 "dataset_id": config.dataset_id,
+                "endpoint": "/webhook",
+                "notify": "/notify",
+                "format": "json",
+                "uncompressed_webhook": "true",
                 "include_errors": "true",
                 "type": "discover_new",
                 "discover_by": "url",
@@ -1141,13 +1145,9 @@ def brightdata_notify(request):
     """
     Notification endpoint to receive status updates from BrightData
     """
-    try:
-        # Verify authentication
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not _verify_webhook_auth(auth_header):
-            logger.warning(f"Unauthorized notify request from {request.META.get('REMOTE_ADDR')}")
-            return JsonResponse({'error': 'Unauthorized'}, status=401)
+    from .models import BrightdataNotification
 
+    try:
         # Parse notification data
         if request.content_type == 'application/json':
             data = json.loads(request.body)
@@ -1155,48 +1155,55 @@ def brightdata_notify(request):
             # Handle form-encoded data
             data = dict(request.POST.items())
 
-        snapshot_id = data.get('snapshot_id')
-        status_update = data.get('status')
+        snapshot_id = data.get('snapshot_id') or data.get('request_id')
+        status_update = data.get('status', 'unknown')
         message = data.get('message', '')
 
         logger.info(f"Received notification: snapshot_id={snapshot_id}, status={status_update}, message={message}")
 
-        # Find and update the corresponding scraper request
+        # Find the corresponding scraper request
+        scraper_request = None
         if snapshot_id:
             try:
                 scraper_request = ScraperRequest.objects.get(request_id=snapshot_id)
-
-                # Update status based on notification
-                if status_update in ['completed', 'finished']:
-                    scraper_request.status = 'completed'
-                elif status_update in ['failed', 'error']:
-                    scraper_request.status = 'failed'
-                    scraper_request.error_message = message
-                elif status_update in ['running', 'processing']:
-                    scraper_request.status = 'processing'
-
-                # Store notification metadata
-                if not scraper_request.response_metadata:
-                    scraper_request.response_metadata = {}
-
-                scraper_request.response_metadata['notifications'] = scraper_request.response_metadata.get('notifications', [])
-                scraper_request.response_metadata['notifications'].append({
-                    'timestamp': request.headers.get('Date') or 'unknown',
-                    'status': status_update,
-                    'message': message,
-                    'data': data
-                })
-
-                scraper_request.save()
-
-                logger.info(f"Updated scraper request {scraper_request.id} status to {scraper_request.status}")
-
+                logger.info(f"Found scraper request {scraper_request.id} for snapshot_id: {snapshot_id}")
             except ScraperRequest.DoesNotExist:
                 logger.warning(f"No scraper request found for snapshot_id: {snapshot_id}")
 
+        # Create notification record
+        notification = BrightdataNotification.objects.create(
+            snapshot_id=snapshot_id or 'unknown',
+            status=status_update,
+            message=message,
+            scraper_request=scraper_request,
+            raw_data=data,
+            request_ip=request.META.get('REMOTE_ADDR'),
+            request_headers=dict(request.headers),
+            processed_at=timezone.now()
+        )
+
+        # Update scraper request status if found
+        if scraper_request:
+            # Update status based on notification
+            if status_update in ['completed', 'finished']:
+                scraper_request.status = 'completed'
+                scraper_request.completed_at = timezone.now()
+            elif status_update in ['failed', 'error']:
+                scraper_request.status = 'failed'
+                scraper_request.error_message = message
+            elif status_update in ['running', 'processing']:
+                scraper_request.status = 'processing'
+                if not scraper_request.started_at:
+                    scraper_request.started_at = timezone.now()
+
+            scraper_request.save()
+            logger.info(f"Updated scraper request {scraper_request.id} status to {scraper_request.status}")
+
         return JsonResponse({
             'status': 'success',
-            'message': 'Notification processed successfully'
+            'message': 'Notification processed successfully',
+            'notification_id': notification.id,
+            'scraper_request_updated': scraper_request is not None
         })
 
     except json.JSONDecodeError:
@@ -1204,6 +1211,7 @@ def brightdata_notify(request):
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
     except Exception as e:
         logger.error(f"Error processing notification: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return JsonResponse({'error': 'Internal server error'}, status=500)
 
 def _verify_webhook_auth(auth_header: str) -> bool:
@@ -1346,7 +1354,61 @@ def _map_post_fields(post_data: dict, platform: str) -> dict:
     Map BrightData post fields to our model fields based on actual BrightData JSON structure
     """
 
-    if platform.lower() == 'facebook':
+    if platform.lower() == 'instagram':
+        # Map Instagram-specific fields based on actual BrightData structure
+        mapped_data = {
+            'url': post_data.get('url', ''),
+            'post_id': post_data.get('post_id', '') or post_data.get('pk', ''),
+            'user_posted': post_data.get('user_posted', '') or post_data.get('user_name', '') or post_data.get('username', ''),
+            'description': post_data.get('description', '') or post_data.get('caption', '') or post_data.get('text', ''),
+            'hashtags': post_data.get('hashtags', []),
+            'num_comments': post_data.get('num_comments', 0) or post_data.get('comments', 0) or post_data.get('comments_count', 0),
+            'date_posted': post_data.get('date_posted', '') or post_data.get('date', '') or post_data.get('timestamp', ''),
+            'likes': post_data.get('likes', 0) or post_data.get('likes_count', 0),
+            'photos': post_data.get('photos', []),
+            'videos': post_data.get('videos', []),
+            'thumbnail': post_data.get('thumbnail', ''),
+            'views': post_data.get('views', 0),
+            'video_play_count': post_data.get('video_play_count', 0),
+            'video_view_count': post_data.get('video_view_count', 0),
+            'length': post_data.get('length', ''),
+            'video_url': post_data.get('video_url', ''),
+            'audio_url': post_data.get('audio_url', ''),
+            'shortcode': post_data.get('shortcode', ''),
+            'content_id': post_data.get('content_id', ''),
+            'instagram_pk': post_data.get('pk', '') or post_data.get('instagram_pk', ''),
+            'content_type': post_data.get('content_type', ''),
+            'platform_type': post_data.get('platform_type', ''),
+            'product_type': post_data.get('product_type', ''),
+            'user_posted_id': post_data.get('user_posted_id', '') or post_data.get('user_id', ''),
+            'followers': post_data.get('followers', 0),
+            'posts_count': post_data.get('posts_count', 0),
+            'following': post_data.get('following', 0),
+            'profile_image_link': post_data.get('profile_image_link', ''),
+            'user_profile_url': post_data.get('user_profile_url', ''),
+            'profile_url': post_data.get('profile_url', ''),
+            'is_verified': post_data.get('is_verified', False),
+            'is_paid_partnership': post_data.get('is_paid_partnership', False),
+            'partnership_details': post_data.get('partnership_details', {}),
+            'coauthor_producers': post_data.get('coauthor_producers', []),
+            'location': post_data.get('location', ''),
+            'latest_comments': post_data.get('latest_comments', []),
+            'top_comments': post_data.get('top_comments', []),
+            'engagement_score': post_data.get('engagement_score', 0.0),
+            'engagement_score_view': post_data.get('engagement_score_view', 0),
+            'tagged_users': post_data.get('tagged_users', []),
+            'audio': post_data.get('audio', {}),
+            'post_content': post_data.get('post_content', {}),
+            'videos_duration': post_data.get('videos_duration', {}),
+            'images': post_data.get('images', []),
+            'photos_number': post_data.get('photos_number', 0),
+            'alt_text': post_data.get('alt_text', ''),
+            'discovery_input': post_data.get('discovery_input', ''),
+            'has_handshake': post_data.get('has_handshake', False),
+        }
+        return mapped_data
+
+    elif platform.lower() == 'facebook':
         # Map Facebook-specific fields based on actual BrightData structure
         mapped_data = {
             'url': post_data.get('url', ''),
@@ -1595,6 +1657,55 @@ def scrape_comments(request):
         logger.error(f"Error in scrape_comments: {str(e)}")
         return Response({'error': f'Internal server error: {str(e)}'},
                       status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class BrightdataNotificationViewSet(viewsets.ReadOnlyModelViewSet):
+    """API endpoint for viewing BrightData notifications"""
+    queryset = BrightdataNotification.objects.all()
+    serializer_class = BrightdataNotificationSerializer
+    permission_classes = [AllowAny]  # For testing, use proper permissions in production
+
+    def get_queryset(self):
+        """Filter notifications by scraper request or status if specified"""
+        queryset = BrightdataNotification.objects.all()
+
+        # Filter by scraper request ID
+        scraper_request_id = self.request.query_params.get('scraper_request')
+        if scraper_request_id:
+            queryset = queryset.filter(scraper_request_id=scraper_request_id)
+
+        # Filter by status
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+
+        # Filter by snapshot ID
+        snapshot_id = self.request.query_params.get('snapshot_id')
+        if snapshot_id:
+            queryset = queryset.filter(snapshot_id=snapshot_id)
+
+        return queryset.order_by('-created_at')
+
+    @action(detail=False, methods=['GET'])
+    def recent(self, request):
+        """Get recent notifications (last 50)"""
+        notifications = self.get_queryset()[:50]
+        serializer = self.get_serializer(notifications, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['GET'])
+    def by_status(self, request):
+        """Get notifications grouped by status"""
+        from django.db.models import Count
+
+        status_counts = BrightdataNotification.objects.values('status').annotate(
+            count=Count('id')
+        ).order_by('-count')
+
+        return Response({
+            'status_counts': list(status_counts),
+            'total_notifications': BrightdataNotification.objects.count()
+        })
 
 @api_view(['GET'])
 @permission_classes([AllowAny])

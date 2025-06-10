@@ -1,10 +1,10 @@
 from rest_framework import serializers
-from .models import BrightdataConfig, ScraperRequest, BatchScraperJob
+from .models import BrightdataConfig, ScraperRequest, BatchScraperJob, BrightdataNotification
 
 class BrightdataConfigSerializer(serializers.ModelSerializer):
     """Serializer for Brightdata API configuration"""
     platform_display = serializers.CharField(source='get_platform_display', read_only=True)
-    
+
     class Meta:
         model = BrightdataConfig
         fields = ['id', 'name', 'platform', 'platform_display', 'api_token', 'dataset_id', 'is_active', 'description', 'created_at', 'updated_at']
@@ -17,7 +17,7 @@ class BatchScraperJobSerializer(serializers.ModelSerializer):
     platforms_display = serializers.CharField(source='get_platforms_display', read_only=True)
     content_types_display = serializers.CharField(source='get_content_types_display', read_only=True)
     project_name = serializers.CharField(source='project.name', read_only=True)
-    
+
     class Meta:
         model = BatchScraperJob
         fields = [
@@ -44,12 +44,12 @@ class ScraperRequestSerializer(serializers.ModelSerializer):
     """Serializer for Brightdata scraper requests"""
     platform_display = serializers.CharField(source='get_platform_display', read_only=True)
     batch_job_name = serializers.CharField(source='batch_job.name', read_only=True)
-    
+
     class Meta:
         model = ScraperRequest
         fields = [
-            'id', 'config', 'batch_job', 'batch_job_name', 'request_id', 'platform', 'platform_display', 
-            'content_type', 'target_url', 'source_name', 'num_of_posts', 'posts_to_not_include', 
+            'id', 'config', 'batch_job', 'batch_job_name', 'request_id', 'platform', 'platform_display',
+            'content_type', 'target_url', 'source_name', 'num_of_posts', 'posts_to_not_include',
             'start_date', 'end_date', 'status', 'request_payload', 'response_metadata', 'error_message',
             # Legacy field for backward compatibility
             'account_name',
@@ -65,7 +65,7 @@ class ScraperRequestCreateSerializer(serializers.ModelSerializer):
             'platform', 'content_type', 'target_url', 'source_name', 'num_of_posts',
             'posts_to_not_include', 'start_date', 'end_date', 'folder_id'
         ]
-    
+
     def create(self, validated_data):
         # Get the platform-specific active config
         platform = validated_data.get('platform')
@@ -73,11 +73,25 @@ class ScraperRequestCreateSerializer(serializers.ModelSerializer):
             config = BrightdataConfig.objects.filter(platform=platform, is_active=True).first()
             if not config:
                 raise serializers.ValidationError(f"No active Brightdata configuration found for {platform}")
-            
+
             # Add the config to the validated data
             validated_data['config'] = config
-            
+
             # Create the scraper request
             return super().create(validated_data)
         except Exception as e:
-            raise serializers.ValidationError(f"Error creating scraper request: {str(e)}") 
+            raise serializers.ValidationError(f"Error creating scraper request: {str(e)}")
+
+
+class BrightdataNotificationSerializer(serializers.ModelSerializer):
+    """Serializer for BrightData notifications"""
+    scraper_request_id = serializers.IntegerField(source='scraper_request.id', read_only=True)
+    scraper_request_url = serializers.CharField(source='scraper_request.target_url', read_only=True)
+
+    class Meta:
+        model = BrightdataNotification
+        fields = [
+            'id', 'snapshot_id', 'status', 'message', 'scraper_request_id', 'scraper_request_url',
+            'raw_data', 'request_ip', 'request_headers', 'created_at', 'processed_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'processed_at']
