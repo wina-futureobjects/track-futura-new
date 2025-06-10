@@ -1,6 +1,28 @@
 import axios, { AxiosResponse } from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+// Determine API base URL with fallback logic for different deployment environments
+const getApiBaseUrl = (): string => {
+  // First check for explicit environment variable
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+
+  // For production deployments, try to detect the API URL from current location
+  if (typeof window !== 'undefined') {
+    const currentHost = window.location.host;
+    const currentProtocol = window.location.protocol;
+
+    // If we're on a deployment platform (like Upsun), construct API URL
+    if (currentHost.includes('.upsun.app') || currentHost.includes('.platformsh.site')) {
+      return `${currentProtocol}//api.${currentHost}`;
+    }
+  }
+
+  // Default fallback for development
+  return 'http://localhost:8000';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 export interface WebhookMetrics {
   total_requests: number;
@@ -92,26 +114,92 @@ export interface WebhookConfig {
 class WebhookService {
   private baseUrl = `${API_BASE_URL}/api/brightdata`;
 
+  constructor() {
+    console.log('WebhookService initialized with API_BASE_URL:', API_BASE_URL);
+    console.log('Full webhook base URL:', this.baseUrl);
+  }
+
+  /**
+   * Test the API connection and webhook endpoints
+   */
+  async testConnection(): Promise<{ success: boolean; details: any }> {
+    try {
+      console.log('Testing webhook API connection...');
+
+      // Test basic API health first
+      const healthUrl = `${API_BASE_URL}/api/health/`;
+      console.log('Testing health endpoint:', healthUrl);
+
+      try {
+        const healthResponse = await axios.get(healthUrl);
+        console.log('Health check successful:', healthResponse.data);
+      } catch (healthError) {
+        console.warn('Health check failed:', healthError);
+      }
+
+      // Test webhook metrics endpoint
+      const metricsUrl = `${this.baseUrl}/webhook/metrics/`;
+      console.log('Testing webhook metrics endpoint:', metricsUrl);
+
+      const response = await axios.get(metricsUrl);
+
+      return {
+        success: true,
+        details: {
+          apiBaseUrl: API_BASE_URL,
+          webhookBaseUrl: this.baseUrl,
+          metricsEndpoint: metricsUrl,
+          response: response.data
+        }
+      };
+    } catch (error) {
+      console.error('Connection test failed:', error);
+
+      return {
+        success: false,
+        details: {
+          apiBaseUrl: API_BASE_URL,
+          webhookBaseUrl: this.baseUrl,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          status: axios.isAxiosError(error) ? error.response?.status : 'No status',
+          responseData: axios.isAxiosError(error) ? error.response?.data : null
+        }
+      };
+    }
+  }
+
   async getMetrics(): Promise<WebhookMetrics> {
     try {
-      const response: AxiosResponse<{ metrics: WebhookMetrics }> = await axios.get(
-        `${this.baseUrl}/webhook/metrics/`
-      );
+      const url = `${this.baseUrl}/webhook/metrics/`;
+      console.log('Fetching webhook metrics from:', url);
+
+      const response: AxiosResponse<{ metrics: WebhookMetrics }> = await axios.get(url);
       return response.data.metrics;
     } catch (error) {
       console.error('Failed to fetch webhook metrics:', error);
+      console.error('Request URL was:', `${this.baseUrl}/webhook/metrics/`);
+
+      // If this is the first failure, run a connection test
+      if (axios.isAxiosError(error) && (error.response?.status === 404 || !error.response)) {
+        console.log('Running connection test due to metrics failure...');
+        const testResult = await this.testConnection();
+        console.log('Connection test result:', testResult);
+      }
+
       throw this.handleError(error);
     }
   }
 
   async getHealth(): Promise<WebhookHealth> {
     try {
-      const response: AxiosResponse<{ health: WebhookHealth }> = await axios.get(
-        `${this.baseUrl}/webhook/health/`
-      );
+      const url = `${this.baseUrl}/webhook/health/`;
+      console.log('Fetching webhook health from:', url);
+
+      const response: AxiosResponse<{ health: WebhookHealth }> = await axios.get(url);
       return response.data.health;
     } catch (error) {
       console.error('Failed to fetch webhook health:', error);
+      console.error('Request URL was:', `${this.baseUrl}/webhook/health/`);
       throw this.handleError(error);
     }
   }

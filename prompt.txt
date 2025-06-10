@@ -7,7 +7,7 @@ first you should understand the project by reading the related code,
 please do search online if necesssary to find out the best UI design principle
 and software architecture.
 
-please make sure the development of the code is at professional level, this is for the use of big tech company like Apple.
+please make sure the development of the code is at professional level, this is for the use of big tech company like Apple, you should have clear code architecture with best error handling.
 
 when UI development is involve, Make sure the UI is clean and modern, feel free to use top Ui library and interactive UI like framer motion
 
