@@ -1077,9 +1077,12 @@ def brightdata_webhook(request):
             logger.error(f"Unsupported content type: {request.content_type}")
             return JsonResponse({'error': 'Unsupported content type'}, status=400)
 
-        # Extract metadata from headers or data
-        snapshot_id = request.headers.get('X-Snapshot-Id') or data.get('snapshot_id')
-        platform = request.headers.get('X-Platform') or data.get('platform', 'instagram')
+        # Extract metadata from headers or query params
+        snapshot_id = (request.headers.get('X-Snapshot-Id') or
+                      request.headers.get('X-Brightdata-Snapshot-Id') or
+                      request.GET.get('snapshot_id'))
+        platform = (request.headers.get('X-Platform') or
+                   request.GET.get('platform', 'instagram'))
 
         logger.info(f"Received webhook data for snapshot_id: {snapshot_id}, platform: {platform}")
 
@@ -1155,9 +1158,16 @@ def brightdata_notify(request):
             # Handle form-encoded data
             data = dict(request.POST.items())
 
-        snapshot_id = data.get('snapshot_id') or data.get('request_id')
-        status_update = data.get('status', 'unknown')
-        message = data.get('message', '')
+        # Handle both dict and list data structures
+        if isinstance(data, dict):
+            snapshot_id = data.get('snapshot_id') or data.get('request_id')
+            status_update = data.get('status', 'unknown')
+            message = data.get('message', '')
+        else:
+            # If data is not a dict (e.g., list), try to get from query params
+            snapshot_id = request.GET.get('snapshot_id') or request.GET.get('request_id')
+            status_update = request.GET.get('status', 'unknown')
+            message = request.GET.get('message', '')
 
         logger.info(f"Received notification: snapshot_id={snapshot_id}, status={status_update}, message={message}")
 

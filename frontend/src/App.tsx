@@ -60,6 +60,9 @@ import theme from './theme/index';
 // Webhook monitoring
 import WebhookMonitorDashboard from './components/webhook/WebhookMonitorDashboard';
 
+// BrightData notifications
+import BrightDataNotifications from './pages/BrightDataNotifications';
+
 // Additional pages
 import InstagramFolderSelector from './FolderSelectionReportGenerator';
 
@@ -451,11 +454,29 @@ function App() {
                 </ProtectedRoute>
               } />
 
+              {/* BrightData Notifications Monitor - project level route */}
+              <Route path="/organizations/:organizationId/projects/:projectId/brightdata-notifications" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <BrightDataNotifications />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+
               {/* Webhook Monitor - standalone for development/admin use */}
               <Route path="/webhook-monitor" element={
                 <ProtectedRoute>
                   <Layout>
                     <WebhookMonitorDashboard />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+
+              {/* BrightData Notifications - standalone for development/admin use */}
+              <Route path="/brightdata-notifications" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <BrightDataNotifications />
                   </Layout>
                 </ProtectedRoute>
               } />

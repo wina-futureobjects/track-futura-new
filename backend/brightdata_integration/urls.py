@@ -17,7 +17,8 @@ urlpatterns = [
     path('comments/scrape/', views.scrape_comments, name='scrape_comments'),
 
     # Webhook monitoring endpoints
-    path('webhook/metrics/', views.webhook_metrics, name='webhook_metrics'),
+    path('webhook-metrics/', views.webhook_metrics, name='webhook_metrics'),
+    path('webhook/metrics/', views.webhook_metrics, name='webhook_metrics_alt'),
     path('webhook/health/', views.webhook_health, name='webhook_health'),
     path('webhook/events/', views.webhook_events, name='webhook_events'),
     path('webhook/alerts/', views.webhook_alerts, name='webhook_alerts'),
