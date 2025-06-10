@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API Connection Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+
+    .test-result {
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 5px;
+    }
+
+    .success {
+      background-color: #d4edda;
+      color: #155724;
+    }
+
+    .error {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+
+    .info {
+      background-color: #d1ecf1;
+      color: #0c5460;
+    }
+
+    pre {
+      background-color: #f8f9fa;
+      padding: 10px;
+      border-radius: 5px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>API Connection Test</h1>
+  <div id="results"></div>
+
+  <script>
+    const results = document.getElementById('results');
+
+    function addResult(message, type = 'info') {
+      const div = document.createElement('div');
+      div.className = `test-result ${type}`;
+      div.innerHTML = message;
+      results.appendChild(div);
+    }
+
+    function addCode(data) {
+      const pre = document.createElement('pre');
+      pre.textContent = JSON.stringify(data, null, 2);
+      results.appendChild(pre);
+    }
+
+    async function testAPI() {
+      addResult('🔍 Starting API Connection Test', 'info');
+
+      // Environment info
+      const envInfo = {
+        hostname: window.location.hostname,
+        protocol: window.location.protocol,
+        port: window.location.port,
+        pathname: window.location.pathname,
+        href: window.location.href
+      };
+
+      addResult('📍 Environment Information:', 'info');
+      addCode(envInfo);
+
+      // Test different API base URLs
+      const testUrls = [
+        `${window.location.protocol}//api.${window.location.hostname}`,
+        `${window.location.protocol}//${window.location.hostname}`,
+        'http://localhost:8000'
+      ];
+
+      for (const baseUrl of testUrls) {
+        addResult(`🧪 Testing API base URL: ${baseUrl}`, 'info');
+
+        try {
+          // Test health endpoint
+          const healthUrl = `${baseUrl}/api/health/`;
+          addResult(`📡 Trying: ${healthUrl}`, 'info');
+
+          const response = await fetch(healthUrl, {
+            method: 'GET',
+            mode: 'cors',
+            credentials: 'omit'
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            addResult(`✅ SUCCESS: ${baseUrl}`, 'success');
+            addCode({ url: healthUrl, status: response.status, data });
+            break;
+          } else {
+            addResult(`❌ HTTP Error: ${response.status} ${response.statusText}`, 'error');
+          }
+        } catch (error) {
+          addResult(`❌ Network Error: ${error.message}`, 'error');
+        }
+
+        // Test webhook endpoints
+        try {
+          const webhookUrl = `${baseUrl}/api/brightdata/webhook/metrics/`;
+          addResult(`📡 Trying webhook: ${webhookUrl}`, 'info');
+
+          const response = await fetch(webhookUrl, {
+            method: 'GET',
+            mode: 'cors',
+            credentials: 'omit'
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            addResult(`✅ WEBHOOK SUCCESS: ${baseUrl}`, 'success');
+            addCode({ url: webhookUrl, status: response.status, data });
+          } else {
+            addResult(`❌ Webhook HTTP Error: ${response.status} ${response.statusText}`, 'error');
+          }
+        } catch (error) {
+          addResult(`❌ Webhook Network Error: ${error.message}`, 'error');
+        }
+      }
+
+      addResult('🏁 Test Complete', 'info');
+    }
+
+    // Run test on page load
+    testAPI();
+  </script>
+</body>
+
+</html>

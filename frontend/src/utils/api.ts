@@ -38,7 +38,10 @@ export const getApiBaseUrl = (): string => {
 
     // 🚨 SPECIFIC FIX FOR UPSUN DEPLOYMENT 🚨
     // Based on Upsun config: frontend is on {default}, backend is on api.{default}
-    if (hostname.includes('upsun-deployment') || hostname.includes('.platformsh.site')) {
+    if (hostname.includes('upsun-deployment') ||
+        hostname.includes('.platformsh.site') ||
+        hostname.includes('.upsun.app') ||
+        hostname.includes('.upsun.io')) {
       console.log('🎯 Upsun domain detected!');
 
       // If we're on the frontend domain, we need to call the API subdomain
@@ -132,7 +135,11 @@ export const apiFetch = (endpoint: string, options?: RequestInit): Promise<Respo
     const protocol = typeof window !== 'undefined' ? window.location.protocol : 'https:';
 
     // Only try fallback for Upsun deployments and if we're not already on API subdomain
-    if ((hostname.includes('upsun-deployment') || hostname.includes('.platformsh.site')) && !hostname.startsWith('api.')) {
+    if ((hostname.includes('upsun-deployment') ||
+         hostname.includes('.platformsh.site') ||
+         hostname.includes('.upsun.app') ||
+         hostname.includes('.upsun.io')) &&
+        !hostname.startsWith('api.')) {
       const fallbackHostname = `api.${hostname}`;
       const fallbackBaseUrl = `${protocol}//${fallbackHostname}`;
       const formattedEndpoint = endpoint.startsWith('/api/') ? endpoint : `/api/${endpoint.replace(/^\//, '')}`;

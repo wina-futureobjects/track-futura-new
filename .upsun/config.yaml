@@ -82,15 +82,11 @@ applications:
       flavor: none
     hooks:
       build: |
-        # Extract the domain from PLATFORM_ROUTES and set API base URL
-        if [ -n "$PLATFORM_ROUTES" ]; then
-          DOMAIN=$(echo $PLATFORM_ROUTES | base64 --decode | jq -r 'to_entries[] | select(.value.primary == true) | .key' | sed 's:/*$::' | sed 's|https\?://||')
-          export VITE_API_BASE_URL="https://api.${DOMAIN}"
-          echo "Setting VITE_API_BASE_URL to: https://api.${DOMAIN}"
-        else
-          export VITE_API_BASE_URL="http://localhost:8000"
-          echo "Using default VITE_API_BASE_URL: http://localhost:8000"
-        fi
+        # Set API base URL for Upsun deployment
+        # The API will be available at https://api.{default}/ based on our routes configuration
+        export VITE_API_BASE_URL=""
+        echo "Setting VITE_API_BASE_URL to empty string to use dynamic detection"
+        echo "API will be detected as: https://api.\${hostname}"
         npm install
         npm run build
 

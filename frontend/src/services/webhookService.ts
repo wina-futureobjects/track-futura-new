@@ -1,31 +1,7 @@
 import axios, { AxiosResponse } from 'axios';
+import { getApiBaseUrl } from '../utils/api';
 
-// Determine API base URL with fallback logic for different deployment environments
-const getApiBaseUrl = (): string => {
-  // First check for explicit environment variable
-  if (import.meta.env.VITE_API_BASE_URL) {
-    return import.meta.env.VITE_API_BASE_URL;
-  }
-
-  // For production deployments, use the same domain as frontend
-  if (typeof window !== 'undefined') {
-    const currentHost = window.location.host;
-    const currentProtocol = window.location.protocol;
-
-    // For Upsun and other deployments, the API is typically on the same domain
-    if (currentHost.includes('.upsun.app') ||
-        currentHost.includes('.platformsh.site') ||
-        currentHost.includes('.herokuapp.com') ||
-        currentHost.includes('.railway.app') ||
-        !currentHost.includes('localhost')) {
-      return `${currentProtocol}//${currentHost}`;
-    }
-  }
-
-  // Default fallback for development
-  return 'http://localhost:8000';
-};
-
+// Use the centralized API base URL detection
 const API_BASE_URL = getApiBaseUrl();
 
 export interface WebhookMetrics {
@@ -119,8 +95,15 @@ class WebhookService {
   private baseUrl = `${API_BASE_URL}/api/brightdata`;
 
   constructor() {
-    console.log('WebhookService initialized with API_BASE_URL:', API_BASE_URL);
-    console.log('Full webhook base URL:', this.baseUrl);
+    console.log('🔧 WebhookService initialized with API_BASE_URL:', API_BASE_URL);
+    console.log('🔧 Full webhook base URL:', this.baseUrl);
+    console.log('🔧 Current environment:', {
+      hostname: typeof window !== 'undefined' ? window.location.hostname : 'undefined',
+      protocol: typeof window !== 'undefined' ? window.location.protocol : 'undefined',
+      isProd: import.meta.env.PROD,
+      mode: import.meta.env.MODE,
+      viteApiBaseUrl: import.meta.env.VITE_API_BASE_URL
+    });
   }
 
   /**
@@ -190,7 +173,17 @@ class WebhookService {
         console.log('Connection test result:', testResult);
       }
 
-      throw this.handleError(error);
+      // Return default metrics structure to prevent errors
+      return {
+        total_requests: 0,
+        successful_requests: 0,
+        failed_requests: 0,
+        success_rate: 0,
+        error_rate: 0,
+        avg_response_time: 0,
+        max_response_time: 0,
+        min_response_time: 0
+      };
     }
   }
 
@@ -204,7 +197,24 @@ class WebhookService {
     } catch (error) {
       console.error('Failed to fetch webhook health:', error);
       console.error('Request URL was:', `${this.baseUrl}/webhook/health/`);
-      throw this.handleError(error);
+
+      // Return default health structure to prevent errors
+      return {
+        status: 'critical',
+        timestamp: new Date().toISOString(),
+        metrics: {
+          total_requests: 0,
+          successful_requests: 0,
+          failed_requests: 0,
+          success_rate: 0,
+          error_rate: 0,
+          avg_response_time: 0,
+          max_response_time: 0,
+          min_response_time: 0
+        },
+        issues: ['Unable to connect to webhook service'],
+        health_score: 0
+      };
     }
   }
 
@@ -219,10 +229,12 @@ class WebhookService {
         `${this.baseUrl}/webhook/events/`,
         { params }
       );
-      return response.data.events;
+      // Ensure we always return an array
+      return Array.isArray(response.data.events) ? response.data.events : [];
     } catch (error) {
       console.error('Failed to fetch webhook events:', error);
-      throw this.handleError(error);
+      // Return empty array instead of throwing error to prevent map errors
+      return [];
     }
   }
 
@@ -232,10 +244,12 @@ class WebhookService {
         `${this.baseUrl}/webhook/alerts/`,
         { params: severity ? { severity } : {} }
       );
-      return response.data.alerts;
+      // Ensure we always return an array
+      return Array.isArray(response.data.alerts) ? response.data.alerts : [];
     } catch (error) {
       console.error('Failed to fetch webhook alerts:', error);
-      throw this.handleError(error);
+      // Return empty array instead of throwing error to prevent map errors
+      return [];
     }
   }
 
@@ -248,7 +262,16 @@ class WebhookService {
       return response.data.analytics;
     } catch (error) {
       console.error('Failed to fetch webhook analytics:', error);
-      throw this.handleError(error);
+      // Return default analytics structure to prevent errors
+      return {
+        total_events: 0,
+        success_rate: 0,
+        avg_response_time: 0,
+        hourly_breakdown: [],
+        error_types: {},
+        top_clients: [],
+        performance_trends: []
+      };
     }
   }
 
