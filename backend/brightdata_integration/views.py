@@ -1340,47 +1340,76 @@ def _process_webhook_data(data, platform: str, scraper_request=None):
                 # Map common fields (you'll need to adjust based on your model fields)
                 post_fields = _map_post_fields(post_data, platform)
 
-                # Handle folder assignment for Facebook posts
-                if folder_id and platform.lower() == 'facebook':
-                    from facebook_data.models import Folder
-                    try:
-                        folder = Folder.objects.get(id=folder_id)
-                        post_fields['folder'] = folder
-                    except Folder.DoesNotExist:
-                        logger.warning(f"Folder with ID {folder_id} not found, creating default folder")
-                        folder = Folder.objects.create(name=f"Auto-created folder {folder_id}")
-                        post_fields['folder'] = folder
+                # Handle folder assignment for all platforms
+                if folder_id:
+                    if platform.lower() == 'facebook':
+                        from facebook_data.models import Folder
+                        try:
+                            folder = Folder.objects.get(id=folder_id)
+                            post_fields['folder'] = folder
+                        except Folder.DoesNotExist:
+                            logger.warning(f"Facebook folder with ID {folder_id} not found, creating default folder")
+                            folder = Folder.objects.create(name=f"Auto-created folder {folder_id}")
+                            post_fields['folder'] = folder
+
+                    elif platform.lower() == 'instagram':
+                        from instagram_data.models import Folder
+                        try:
+                            folder = Folder.objects.get(id=folder_id)
+                            post_fields['folder'] = folder
+                        except Folder.DoesNotExist:
+                            logger.warning(f"Instagram folder with ID {folder_id} not found, creating default folder")
+                            folder = Folder.objects.create(name=f"Auto-created folder {folder_id}")
+                            post_fields['folder'] = folder
+
+                    elif platform.lower() == 'linkedin':
+                        from linkedin_data.models import Folder
+                        try:
+                            folder = Folder.objects.get(id=folder_id)
+                            post_fields['folder'] = folder
+                        except Folder.DoesNotExist:
+                            logger.warning(f"LinkedIn folder with ID {folder_id} not found, creating default folder")
+                            folder = Folder.objects.create(name=f"Auto-created folder {folder_id}")
+                            post_fields['folder'] = folder
+
+                    elif platform.lower() == 'tiktok':
+                        from tiktok_data.models import Folder
+                        try:
+                            folder = Folder.objects.get(id=folder_id)
+                            post_fields['folder'] = folder
+                        except Folder.DoesNotExist:
+                            logger.warning(f"TikTok folder with ID {folder_id} not found, creating default folder")
+                            folder = Folder.objects.create(name=f"Auto-created folder {folder_id}")
+                            post_fields['folder'] = folder
 
                 # Create or update post
                 post_id = post_data.get('post_id') or post_data.get('id')
-                if post_id and platform.lower() == 'facebook':
-                    # For Facebook, check uniqueness by post_id and folder
+                if post_id:
+                    # For all platforms, check uniqueness by post_id and folder (if folder exists)
                     folder = post_fields.get('folder')
                     if folder:
+                        # If post has a folder, check uniqueness by post_id and folder
                         post, created = PostModel.objects.get_or_create(
                             post_id=post_id,
                             folder=folder,
                             defaults=post_fields
                         )
                     else:
+                        # If no folder, check uniqueness by post_id only
                         post, created = PostModel.objects.get_or_create(
                             post_id=post_id,
                             defaults=post_fields
                         )
                     if created:
                         created_count += 1
-                elif post_id:
-                    # For other platforms
-                    post, created = PostModel.objects.get_or_create(
-                        post_id=post_id,
-                        defaults=post_fields
-                    )
-                    if created:
-                        created_count += 1
+                        logger.info(f"Created new {platform} post: {post_id} in folder: {folder.name if folder else 'No folder'}")
+                    else:
+                        logger.info(f"Updated existing {platform} post: {post_id}")
                 else:
                     # Create new post without checking for duplicates
-                    PostModel.objects.create(**post_fields)
+                    post = PostModel.objects.create(**post_fields)
                     created_count += 1
+                    logger.info(f"Created new {platform} post without ID in folder: {folder.name if post_fields.get('folder') else 'No folder'}")
 
             except Exception as e:
                 logger.error(f"Error processing individual post: {str(e)}")
@@ -1449,6 +1478,7 @@ def _map_post_fields(post_data: dict, platform: str) -> dict:
     # Generic mapping for other platforms
     common_mapping = {
         'url': post_data.get('url', ''),
+        'post_id': post_data.get('post_id') or post_data.get('id', ''),
         'content': post_data.get('text') or post_data.get('content') or post_data.get('description', ''),
         'date_posted': post_data.get('date') or post_data.get('created_time') or post_data.get('timestamp'),
         'likes': post_data.get('likes_count') or post_data.get('likes') or 0,

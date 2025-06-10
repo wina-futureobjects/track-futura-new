@@ -85,60 +85,11 @@ const WebhookMonitorDashboard: React.FC = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [testResult, setTestResult] = useState<WebhookTestResult | null>(null);
-  const [debugInfo, setDebugInfo] = useState<any>(null);
-
-  // Debug information for deployment troubleshooting
-  const getDebugInfo = () => {
-    return {
-      currentUrl: window.location.href,
-      currentHost: window.location.host,
-      currentProtocol: window.location.protocol,
-      apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'Not set',
-      isDevelopment: import.meta.env.DEV,
-      isProduction: import.meta.env.PROD,
-      mode: import.meta.env.MODE,
-      allEnvVars: import.meta.env
-    };
-  };
-
-  // Test connection on component mount
-  useEffect(() => {
-    const testConnection = async () => {
-      try {
-        const connectionTest = await webhookService.testConnection();
-        setDebugInfo({
-          ...getDebugInfo(),
-          connectionTest
-        });
-      } catch (error) {
-        setDebugInfo({
-          ...getDebugInfo(),
-          connectionError: error instanceof Error ? error.message : 'Unknown error'
-        });
-      }
-    };
-
-    testConnection();
-  }, []);
 
   // Fetch webhook data using the service
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-
-      // First test the connection if we haven't loaded data yet
-      if (!metrics && !health) {
-        console.log('Testing webhook connection before fetching data...');
-        const connectionTest = await webhookService.testConnection();
-        console.log('Connection test result:', connectionTest);
-
-        if (!connectionTest.success) {
-          console.error('Connection test failed:', connectionTest.details);
-          setSnackbarMessage(`Failed to connect to webhook API: ${connectionTest.details.error}`);
-          setSnackbarOpen(true);
-          return;
-        }
-      }
 
       const [metricsData, healthData, eventsData, alertsData, analyticsData] = await Promise.all([
         webhookService.getMetrics(),
@@ -156,7 +107,6 @@ const WebhookMonitorDashboard: React.FC = () => {
     } catch (error) {
       console.error('Failed to fetch webhook data:', error);
 
-      // Provide more detailed error information
       let errorMessage = 'Failed to fetch webhook data';
       if (error instanceof Error) {
         errorMessage += `: ${error.message}`;
@@ -167,7 +117,7 @@ const WebhookMonitorDashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedTimeRange, metrics, health]);
+  }, [selectedTimeRange]);
 
   // Auto-refresh data every 30 seconds
   useEffect(() => {
@@ -371,47 +321,49 @@ const WebhookMonitorDashboard: React.FC = () => {
   );
 
   const AnalyticsCharts = () => (
-    <Grid container spacing={3}>
-      <Grid item xs={12} md={6}>
-        <Card>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Hourly Request Volume
-            </Typography>
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={analytics?.hourly_breakdown || []}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="hour" />
-                <YAxis />
-                <RechartsTooltip />
-                <Area type="monotone" dataKey="total" stackId="1" stroke="#8884d8" fill="#8884d8" />
-                <Area type="monotone" dataKey="success" stackId="1" stroke="#82ca9d" fill="#82ca9d" />
-                <Area type="monotone" dataKey="errors" stackId="1" stroke="#ffc658" fill="#ffc658" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </Grid>
+    <Box>
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Hourly Request Volume
+              </Typography>
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={analytics?.hourly_breakdown || []}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="hour" />
+                  <YAxis />
+                  <RechartsTooltip />
+                  <Area type="monotone" dataKey="total" stackId="1" stroke="#8884d8" fill="#8884d8" />
+                  <Area type="monotone" dataKey="success" stackId="1" stroke="#82ca9d" fill="#82ca9d" />
+                  <Area type="monotone" dataKey="errors" stackId="1" stroke="#ffc658" fill="#ffc658" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </Grid>
 
-      <Grid item xs={12} md={6}>
-        <Card>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Response Time Trend
-            </Typography>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={analytics?.hourly_breakdown || []}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="hour" />
-                <YAxis />
-                <RechartsTooltip />
-                <Line type="monotone" dataKey="avg_response_time" stroke="#8884d8" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Response Time Trend
+              </Typography>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={analytics?.hourly_breakdown || []}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="hour" />
+                  <YAxis />
+                  <RechartsTooltip />
+                  <Line type="monotone" dataKey="avg_response_time" stroke="#8884d8" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </Grid>
       </Grid>
-    </Grid>
+    </Box>
   );
 
   if (loading) {
@@ -474,39 +426,6 @@ const WebhookMonitorDashboard: React.FC = () => {
           </IconButton>
         </Box>
       </Box>
-
-      {/* Debug Information Panel - Remove this in production */}
-      {debugInfo && (
-        <Paper sx={{ p: 2, mb: 3, bgcolor: 'grey.50', border: '1px solid #e0e0e0' }}>
-          <Typography variant="h6" gutterBottom sx={{ color: 'primary.main' }}>
-            🔧 Debug Information (Deployment Troubleshooting)
-          </Typography>
-          <Box sx={{ fontFamily: 'monospace', fontSize: '0.85rem', lineHeight: 1.6 }}>
-            <div><strong>Current URL:</strong> {debugInfo.currentUrl}</div>
-            <div><strong>Current Host:</strong> {debugInfo.currentHost}</div>
-            <div><strong>API Base URL:</strong> {debugInfo.apiBaseUrl}</div>
-            <div><strong>Environment:</strong> {debugInfo.mode} (Dev: {debugInfo.isDevelopment ? 'Yes' : 'No'})</div>
-            {debugInfo.connectionTest && (
-              <div>
-                <strong>Connection Test:</strong> {debugInfo.connectionTest.success ? '✅ Success' : '❌ Failed'}
-                {!debugInfo.connectionTest.success && debugInfo.connectionTest.details && (
-                  <div style={{ marginLeft: '20px', color: '#d32f2f', marginTop: '4px' }}>
-                    <strong>Error:</strong> {debugInfo.connectionTest.details.error}<br/>
-                    <strong>Status:</strong> {debugInfo.connectionTest.details.status}<br/>
-                    <strong>API URL:</strong> {debugInfo.connectionTest.details.apiBaseUrl}<br/>
-                    <strong>Webhook URL:</strong> {debugInfo.connectionTest.details.webhookBaseUrl}
-                  </div>
-                )}
-              </div>
-            )}
-            {debugInfo.connectionError && (
-              <div style={{ color: '#d32f2f', marginTop: '8px' }}>
-                <strong>Connection Error:</strong> {debugInfo.connectionError}
-              </div>
-            )}
-          </Box>
-        </Paper>
-      )}
 
       {/* Health Status */}
       <HealthStatusCard />

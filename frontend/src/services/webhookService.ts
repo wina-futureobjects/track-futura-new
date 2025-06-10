@@ -7,14 +7,18 @@ const getApiBaseUrl = (): string => {
     return import.meta.env.VITE_API_BASE_URL;
   }
 
-  // For production deployments, try to detect the API URL from current location
+  // For production deployments, use the same domain as frontend
   if (typeof window !== 'undefined') {
     const currentHost = window.location.host;
     const currentProtocol = window.location.protocol;
 
-    // If we're on a deployment platform (like Upsun), construct API URL
-    if (currentHost.includes('.upsun.app') || currentHost.includes('.platformsh.site')) {
-      return `${currentProtocol}//api.${currentHost}`;
+    // For Upsun and other deployments, the API is typically on the same domain
+    if (currentHost.includes('.upsun.app') ||
+        currentHost.includes('.platformsh.site') ||
+        currentHost.includes('.herokuapp.com') ||
+        currentHost.includes('.railway.app') ||
+        !currentHost.includes('localhost')) {
+      return `${currentProtocol}//${currentHost}`;
     }
   }
 

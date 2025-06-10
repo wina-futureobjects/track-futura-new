@@ -197,7 +197,7 @@ REST_FRAMEWORK = {
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_HEADERS = True
-CORS_REPLACE_HTTPS_REFERER = True
+# CORS_REPLACE_HTTPS_REFERER is deprecated and removed
 
 # Specifically allow your Upsun domain and any variations
 CORS_ALLOWED_ORIGINS = [
@@ -257,21 +257,25 @@ def dummy_process_view(self, request, callback, callback_args, callback_kwargs):
     return None
 django.middleware.csrf.CsrfViewMiddleware.process_view = dummy_process_view
 
-# Trust all origins
+# Trust all origins (Django 4.0+ requires scheme prefixes)
 CSRF_TRUSTED_ORIGINS = [
-    "*",  # Trust absolutely everything
+    # Upsun deployment URLs
     "https://api.upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site",
     "https://upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site",
+    # Local development URLs
     "http://localhost:3000",
     "http://localhost:5173",
     "http://localhost:8000",
     "https://localhost:3000",
     "https://localhost:5173",
     "https://localhost:8000",
-    # Wildcard patterns
-    "https://*.platformsh.site",
-    "https://*.upsun.app",
-    "https://*.eu-5.platformsh.site",
+    # Common localhost variants
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:8000",
+    "https://127.0.0.1:3000",
+    "https://127.0.0.1:5173",
+    "https://127.0.0.1:8000",
 ]
 
 # Never fail CSRF
