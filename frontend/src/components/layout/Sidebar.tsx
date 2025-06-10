@@ -1,34 +1,35 @@
 import {
-  Analytics as AnalyticsIcon,
-  Assessment as AssessmentIcon,
-  Assignment as AssignmentIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  InsertChart as ChartIcon,
-  Description as DescriptionIcon,
-  ExpandMore as ExpandMoreIcon,
-  Facebook as FacebookIcon,
-  Input as InputIcon,
-  Instagram as InstagramIcon,
-  Logout as LogoutIcon,
-  Settings as SettingsIcon,
-  SettingsSuggest as SettingsSuggestIcon,
-  Storage as StorageIcon
+    Analytics as AnalyticsIcon,
+    Assessment as AssessmentIcon,
+    Assignment as AssignmentIcon,
+    AutoAwesome as AutoAwesomeIcon,
+    InsertChart as ChartIcon,
+    Description as DescriptionIcon,
+    ExpandMore as ExpandMoreIcon,
+    Facebook as FacebookIcon,
+    Input as InputIcon,
+    Instagram as InstagramIcon,
+    Logout as LogoutIcon,
+    Settings as SettingsIcon,
+    SettingsSuggest as SettingsSuggestIcon,
+    Storage as StorageIcon
 } from '@mui/icons-material';
 import CommentIcon from '@mui/icons-material/Comment';
 import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import MusicVideoIcon from '@mui/icons-material/MusicVideo';
+import NotificationsIcon from '@mui/icons-material/Notifications';
 import {
-  Box,
-  Collapse,
-  Divider,
-  Drawer,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Tooltip,
-  useMediaQuery
+    Box,
+    Collapse,
+    Divider,
+    Drawer,
+    List,
+    ListItem,
+    ListItemButton,
+    ListItemIcon,
+    ListItemText,
+    Tooltip,
+    useMediaQuery
 } from '@mui/material';
 import { styled, useTheme } from '@mui/material/styles';
 import React, { useCallback, useState } from 'react';
@@ -236,6 +237,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
         { text: 'Comments Scraper', path: getSocialMediaPath('comments-scraper'), icon: <CommentIcon /> },
         { text: 'Brightdata Settings', path: getSocialMediaPath('brightdata-settings'), icon: <SettingsSuggestIcon /> },
         { text: 'Webhook Monitor', path: getSocialMediaPath('webhook-monitor'), icon: <AnalyticsIcon /> },
+        { text: 'BrightData Notifications', path: getSocialMediaPath('brightdata-notifications'), icon: <NotificationsIcon /> },
       ]
     },
     {
@@ -379,6 +381,10 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
 
     if (itemPath.includes('webhook-monitor')) {
       return location.pathname.includes('webhook-monitor');
+    }
+
+    if (itemPath.includes('brightdata-notifications')) {
+      return location.pathname.includes('brightdata-notifications');
     }
 
     // Special handling for analysis page
