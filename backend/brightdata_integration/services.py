@@ -543,7 +543,7 @@ class AutomatedBatchScraper:
             scraper_request.save()
             return False
 
-        def _make_brightdata_request(self, scraper_request: ScraperRequest, payload: List[Dict]) -> bool:
+    def _make_brightdata_request(self, scraper_request: ScraperRequest, payload: List[Dict]) -> bool:
         """
         Make the actual API request to BrightData
         """
