@@ -1142,24 +1142,31 @@ def brightdata_webhook(request):
 
         logger.info(f"Received webhook data for snapshot_id: {snapshot_id}, platform: {platform}")
 
-        # Find the corresponding scraper request
-        scraper_request = None
+        # Find ALL corresponding scraper requests (for batch jobs, multiple requests share the same snapshot_id)
+        scraper_requests = []
         if snapshot_id:
             try:
-                scraper_request = ScraperRequest.objects.get(request_id=snapshot_id)
-                logger.info(f"Found scraper request for snapshot_id: {snapshot_id}")
-            except ScraperRequest.DoesNotExist:
-                logger.warning(f"No scraper request found for snapshot_id: {snapshot_id}")
+                scraper_requests = list(ScraperRequest.objects.filter(request_id=snapshot_id))
+                if scraper_requests:
+                    logger.info(f"Found {len(scraper_requests)} scraper requests for snapshot_id: {snapshot_id}")
+                    for req in scraper_requests:
+                        logger.info(f"  - Request {req.id}: {req.target_url} -> folder_id: {req.folder_id}")
+                else:
+                    logger.warning(f"No scraper requests found for snapshot_id: {snapshot_id}")
+            except Exception as e:
+                logger.error(f"Error finding scraper requests for snapshot_id {snapshot_id}: {str(e)}")
 
         # Process the data based on platform
-        success = _process_webhook_data(data, platform, scraper_request)
+        success = _process_webhook_data_with_batch_support(data, platform, scraper_requests)
 
         if success:
-            # Update scraper request status
-            if scraper_request:
+            # Update all scraper request statuses
+            for scraper_request in scraper_requests:
                 scraper_request.status = 'completed'
                 scraper_request.save()
-                logger.info(f"Updated scraper request status to completed")
+
+            if scraper_requests:
+                logger.info(f"Updated {len(scraper_requests)} scraper request statuses to completed")
 
             processing_time = round(time.time() - start_time, 3)
             logger.info(f"Webhook processed successfully: {snapshot_id} in {processing_time}s")
@@ -1169,11 +1176,12 @@ def brightdata_webhook(request):
                 'message': 'Data processed successfully',
                 'snapshot_id': snapshot_id,
                 'processing_time': processing_time,
-                'items_processed': len(data) if isinstance(data, list) else 1
+                'items_processed': len(data) if isinstance(data, list) else 1,
+                'scraper_requests_updated': len(scraper_requests)
             })
         else:
-            # Update scraper request status to failed
-            if scraper_request:
+            # Update all scraper request statuses to failed
+            for scraper_request in scraper_requests:
                 scraper_request.status = 'failed'
                 scraper_request.error_message = 'Failed to process webhook data'
                 scraper_request.save()
@@ -1298,9 +1306,9 @@ def _verify_webhook_auth(auth_header: str) -> bool:
         logger.error(f"Error verifying webhook auth: {str(e)}")
         return False
 
-def _process_webhook_data(data, platform: str, scraper_request=None):
+def _process_webhook_data_with_batch_support(data, platform: str, scraper_requests):
     """
-    Process incoming webhook data and store it in the appropriate platform model
+    Process incoming webhook data with support for batch jobs (multiple scraper requests)
     """
     try:
         # Import platform-specific models
@@ -1360,13 +1368,51 @@ def _process_webhook_data(data, platform: str, scraper_request=None):
 
         logger.info(f"Processing {len(valid_posts)} valid posts, skipped {skipped_count} invalid entries")
 
-        folder_id = scraper_request.folder_id if scraper_request else None
+        # Create a mapping of URLs to folder_ids from scraper requests
+        url_to_folder_map = {}
+        if scraper_requests:
+            for req in scraper_requests:
+                if req.target_url and req.folder_id:
+                    # Clean the URL for matching (remove trailing slashes, etc.)
+                    clean_url = req.target_url.rstrip('/')
+                    url_to_folder_map[clean_url] = req.folder_id
+                    logger.info(f"URL mapping: {clean_url} -> folder_id: {req.folder_id}")
+
         created_count = 0
 
         for post_data in valid_posts:
             try:
-                # Map common fields (you'll need to adjust based on your model fields)
+                # Map common fields
                 post_fields = _map_post_fields(post_data, platform)
+
+                # 🔧 CRITICAL FIX: Determine folder_id based on the post's source URL
+                folder_id = None
+                post_url = post_data.get('url', '')
+
+                if post_url and url_to_folder_map:
+                    # Extract the account URL from the post URL
+                    # For Instagram: https://www.instagram.com/p/ABC123 -> https://www.instagram.com/username
+                    # For Facebook: similar logic
+
+                    if platform.lower() == 'instagram':
+                        # Extract Instagram username from post URL
+                        # Example: https://www.instagram.com/p/DKeLi2VSshg -> find matching account
+                        import re
+
+                        # Try to find which account this post belongs to by checking user_posted field
+                        user_posted = post_data.get('user_posted', '')
+                        if user_posted:
+                            # Look for a matching URL in our mapping
+                            for mapped_url, mapped_folder_id in url_to_folder_map.items():
+                                if user_posted.lower() in mapped_url.lower():
+                                    folder_id = mapped_folder_id
+                                    logger.info(f"✅ Matched post from @{user_posted} to folder_id: {folder_id}")
+                                    break
+
+                        # Fallback: if no specific match found, use the first available folder
+                        if not folder_id and url_to_folder_map:
+                            folder_id = list(url_to_folder_map.values())[0]
+                            logger.info(f"⚠️  Using fallback folder_id: {folder_id} for post from @{user_posted}")
 
                 # Handle folder assignment for all platforms
                 if folder_id:
@@ -1385,6 +1431,7 @@ def _process_webhook_data(data, platform: str, scraper_request=None):
                         try:
                             folder = Folder.objects.get(id=folder_id)
                             post_fields['folder'] = folder
+                            logger.info(f"✅ Assigned Instagram post to folder: {folder.name} (ID: {folder_id})")
                         except Folder.DoesNotExist:
                             logger.warning(f"Instagram folder with ID {folder_id} not found, creating default folder")
                             folder = Folder.objects.create(name=f"Auto-created folder {folder_id}")
@@ -1409,6 +1456,8 @@ def _process_webhook_data(data, platform: str, scraper_request=None):
                             logger.warning(f"TikTok folder with ID {folder_id} not found, creating default folder")
                             folder = Folder.objects.create(name=f"Auto-created folder {folder_id}")
                             post_fields['folder'] = folder
+                else:
+                    logger.warning(f"No folder_id determined for post: {post_data.get('url', 'No URL')}")
 
                 # Create or update post
                 post_id = post_data.get('post_id') or post_data.get('id') or post_data.get('pk')
@@ -1430,7 +1479,7 @@ def _process_webhook_data(data, platform: str, scraper_request=None):
                         )
                     if created:
                         created_count += 1
-                        logger.info(f"Created new {platform} post: {post_id} in folder: {folder.name if folder else 'No folder'}")
+                        logger.info(f"✅ Created new {platform} post: {post_id} in folder: {folder.name if folder else 'No folder'}")
                     else:
                         logger.info(f"Updated existing {platform} post: {post_id}")
                 else:
@@ -1444,12 +1493,19 @@ def _process_webhook_data(data, platform: str, scraper_request=None):
                 logger.error(f"Post data: {post_data}")
                 continue
 
-        logger.info(f"Successfully processed {created_count} valid posts for platform {platform}")
+        logger.info(f"✅ Successfully processed {created_count} valid posts for platform {platform}")
         return True
 
     except Exception as e:
         logger.error(f"Error processing webhook data: {str(e)}")
         return False
+
+def _process_webhook_data(data, platform: str, scraper_request=None):
+    """
+    Legacy function - redirects to batch support version
+    """
+    scraper_requests = [scraper_request] if scraper_request else []
+    return _process_webhook_data_with_batch_support(data, platform, scraper_requests)
 
 def _map_post_fields(post_data: dict, platform: str) -> dict:
     """

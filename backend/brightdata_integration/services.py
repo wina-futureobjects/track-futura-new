@@ -759,8 +759,9 @@ class AutomatedBatchScraper:
                 "end_date": request.end_date.strftime('%m-%d-%Y') if request.end_date else "",
             })
 
-        # Use the first request for API call configuration
-        return self._make_brightdata_request(requests[0], payload)
+        # Use the first request for API call configuration, but update ALL requests with the response
+        success = self._make_brightdata_batch_request(requests, payload)
+        return success
 
     def _trigger_instagram_batch(self, requests: List[ScraperRequest]) -> bool:
         """Trigger Instagram batch scrape with multiple sources"""
@@ -792,8 +793,9 @@ class AutomatedBatchScraper:
                     "posts_to_not_include": [],  # Could be extended to support excluded posts
                 })
 
-        # Use the first request for API call configuration
-        return self._make_brightdata_request(requests[0], payload)
+        # Use the first request for API call configuration, but update ALL requests with the response
+        success = self._make_brightdata_batch_request(requests, payload)
+        return success
 
     def _trigger_linkedin_batch(self, requests: List[ScraperRequest]) -> bool:
         """Trigger LinkedIn batch scrape with multiple sources"""
@@ -810,8 +812,9 @@ class AutomatedBatchScraper:
                 "end_date": request.end_date.strftime('%m-%d-%Y') if request.end_date else "",
             })
 
-        # Use the first request for API call configuration
-        return self._make_brightdata_request(requests[0], payload)
+        # Use the first request for API call configuration, but update ALL requests with the response
+        success = self._make_brightdata_batch_request(requests, payload)
+        return success
 
     def _trigger_tiktok_batch(self, requests: List[ScraperRequest]) -> bool:
         """Trigger TikTok batch scrape with multiple sources"""
@@ -828,8 +831,133 @@ class AutomatedBatchScraper:
                 "end_date": request.end_date.strftime('%m-%d-%Y') if request.end_date else "",
             })
 
-        # Use the first request for API call configuration
-        return self._make_brightdata_request(requests[0], payload)
+        # Use the first request for API call configuration, but update ALL requests with the response
+        success = self._make_brightdata_batch_request(requests, payload)
+        return success
+
+    def _make_brightdata_batch_request(self, requests: List[ScraperRequest], payload: List[Dict]) -> bool:
+        """
+        Make a batch API request to BrightData and update ALL requests with the same snapshot_id
+        """
+        if not requests:
+            return False
+
+        # Use the first request for configuration
+        primary_request = requests[0]
+
+        try:
+            config = primary_request.config
+
+            # Import Django settings to get base URL and webhook token
+            base_url = getattr(settings, 'BRIGHTDATA_BASE_URL', 'http://localhost:8000')
+            webhook_token = getattr(settings, 'BRIGHTDATA_WEBHOOK_TOKEN', 'your-webhook-secret-token')
+
+            url = "https://api.brightdata.com/datasets/v3/trigger"
+            headers = {
+                "Authorization": f"Bearer {config.api_token}",
+                "Content-Type": "application/json",
+            }
+
+            # Base parameters - simplified to match working independent code
+            params = {
+                "dataset_id": config.dataset_id,
+                "endpoint": f"{base_url}/api/brightdata/webhook/",
+                "format": "json",
+                "uncompressed_webhook": "true",
+                "include_errors": "true",
+            }
+
+            # Add Instagram-specific parameters
+            if primary_request.platform.startswith('instagram'):
+                params.update({
+                    "type": "discover_new",
+                    "discover_by": "url",
+                })
+
+            # ===== DETAILED DEBUG LOGGING =====
+            print("\n" + "="*80)
+            print("🐛 BRIGHTDATA BATCH API REQUEST DEBUG")
+            print("="*80)
+            print(f"Platform: {primary_request.platform}")
+            print(f"Config Name: {config.name}")
+            print(f"Config ID: {config.id}")
+            print(f"Base URL: {base_url}")
+            print(f"Webhook Token: {webhook_token}")
+            print(f"Batch Size: {len(requests)} requests, {len(payload)} sources")
+            print()
+            print("📡 REQUEST DETAILS:")
+            print(f"URL: {url}")
+            print(f"Headers: {headers}")
+            print(f"Params: {params}")
+            print(f"Payload ({len(payload)} items): {payload}")
+            print()
+
+            # Log batch details
+            self.logger.info(f"Sending batch API request for {primary_request.platform} with {len(payload)} sources")
+            if len(payload) <= 5:  # Log URLs for small batches
+                urls = [item.get('url', 'N/A') for item in payload]
+                self.logger.info(f"Batch URLs: {urls}")
+            else:
+                first_few = [item.get('url', 'N/A') for item in payload[:3]]
+                self.logger.info(f"Batch URLs (first 3): {first_few} ... and {len(payload) - 3} more")
+
+            # Update ALL requests to processing status
+            for request in requests:
+                request.request_payload = payload
+                request.status = 'processing'
+                request.save()
+
+            # Make the API request
+            response = requests.post(url, headers=headers, params=params, json=payload)
+
+            # ===== DETAILED RESPONSE LOGGING =====
+            print("\n📥 BRIGHTDATA API RESPONSE:")
+            print(f"Status Code: {response.status_code}")
+            print(f"Response Headers: {dict(response.headers)}")
+            print(f"Response Text: {response.text}")
+            print("="*80 + "\n")
+
+            if response.status_code == 200:
+                response_data = response.json()
+                snapshot_id = response_data.get('snapshot_id') or response_data.get('request_id')
+
+                # 🔧 CRITICAL FIX: Update ALL requests with the same snapshot_id
+                for request in requests:
+                    request.request_id = snapshot_id
+                    request.response_metadata = response_data
+                    request.save()
+
+                self.logger.info(f"✅ Successfully triggered batch scrape for {primary_request.platform} with {len(payload)} sources. Snapshot ID: {snapshot_id}")
+                self.logger.info(f"✅ Updated {len(requests)} scraper requests with snapshot_id: {snapshot_id}")
+                print(f"✅ SUCCESS! Snapshot ID: {snapshot_id}")
+                print(f"✅ Updated {len(requests)} scraper requests with the same snapshot_id")
+                return True
+            else:
+                error_msg = f"BrightData API error for {primary_request.platform} batch: {response.status_code} - {response.text}"
+                self.logger.error(error_msg)
+
+                # Update ALL requests with failed status
+                for request in requests:
+                    request.status = 'failed'
+                    request.error_message = error_msg
+                    request.save()
+
+                print(f"❌ FAILED! Status: {response.status_code}, Error: {response.text}")
+                return False
+
+        except Exception as e:
+            error_msg = f"Exception during BrightData batch request for {primary_request.platform}: {str(e)}"
+            self.logger.error(error_msg)
+
+            # Update ALL requests with failed status
+            for request in requests:
+                request.status = 'failed'
+                request.error_message = error_msg
+                request.save()
+
+            print(f"❌ EXCEPTION! Error: {str(e)}")
+            print("="*80 + "\n")
+            return False
 
 # Convenience function for external use
 def create_and_execute_batch_job(name: str, project_id: int, source_folder_ids: List[int],
