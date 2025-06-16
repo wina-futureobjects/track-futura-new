@@ -362,8 +362,7 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
             }
             params = {
                 "dataset_id": config.dataset_id,
-                "endpoint": "/webhook",
-                "notify": "/notify",
+                "endpoint": "https://api.upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site/api/brightdata/webhook/",
                 "format": "json",
                 "uncompressed_webhook": "true",
                 "include_errors": "true",
