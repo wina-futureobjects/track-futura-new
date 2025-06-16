@@ -830,17 +830,19 @@ class AutomatedBatchScraper:
         success = self._make_brightdata_batch_request(requests, payload)
         return success
 
-    def _make_brightdata_batch_request(self, requests: List[ScraperRequest], payload: List[Dict]) -> bool:
+    def _make_brightdata_batch_request(self, scraper_requests: List[ScraperRequest], payload: List[Dict]) -> bool:
         """
         Make a batch API request to BrightData and update ALL requests with the same snapshot_id
         """
-        if not requests:
+        if not scraper_requests:
             return False
 
         # Use the first request for configuration
-        primary_request = requests[0]
+        primary_request = scraper_requests[0]
 
         try:
+            import requests  # Import requests library explicitly to avoid naming conflict
+
             config = primary_request.config
 
             # Import Django settings to get base URL and webhook token
@@ -878,7 +880,7 @@ class AutomatedBatchScraper:
             print(f"Config ID: {config.id}")
             print(f"Base URL: {base_url}")
             print(f"Webhook Token: {webhook_token}")
-            print(f"Batch Size: {len(requests)} requests, {len(payload)} sources")
+            print(f"Batch Size: {len(scraper_requests)} requests, {len(payload)} sources")
             print()
             print("📡 REQUEST DETAILS:")
             print(f"URL: {url}")
@@ -897,7 +899,7 @@ class AutomatedBatchScraper:
                 self.logger.info(f"Batch URLs (first 3): {first_few} ... and {len(payload) - 3} more")
 
             # Update ALL requests to processing status
-            for request in requests:
+            for request in scraper_requests:
                 request.request_payload = payload
                 request.status = 'processing'
                 request.save()
@@ -917,22 +919,22 @@ class AutomatedBatchScraper:
                 snapshot_id = response_data.get('snapshot_id') or response_data.get('request_id')
 
                 # 🔧 CRITICAL FIX: Update ALL requests with the same snapshot_id
-                for request in requests:
+                for request in scraper_requests:
                     request.request_id = snapshot_id
                     request.response_metadata = response_data
                     request.save()
 
                 self.logger.info(f"✅ Successfully triggered batch scrape for {primary_request.platform} with {len(payload)} sources. Snapshot ID: {snapshot_id}")
-                self.logger.info(f"✅ Updated {len(requests)} scraper requests with snapshot_id: {snapshot_id}")
+                self.logger.info(f"✅ Updated {len(scraper_requests)} scraper requests with snapshot_id: {snapshot_id}")
                 print(f"✅ SUCCESS! Snapshot ID: {snapshot_id}")
-                print(f"✅ Updated {len(requests)} scraper requests with the same snapshot_id")
+                print(f"✅ Updated {len(scraper_requests)} scraper requests with the same snapshot_id")
                 return True
             else:
                 error_msg = f"BrightData API error for {primary_request.platform} batch: {response.status_code} - {response.text}"
                 self.logger.error(error_msg)
 
                 # Update ALL requests with failed status
-                for request in requests:
+                for request in scraper_requests:
                     request.status = 'failed'
                     request.error_message = error_msg
                     request.save()
@@ -945,7 +947,7 @@ class AutomatedBatchScraper:
             self.logger.error(error_msg)
 
             # Update ALL requests with failed status
-            for request in requests:
+            for request in scraper_requests:
                 request.status = 'failed'
                 request.error_message = error_msg
                 request.save()
