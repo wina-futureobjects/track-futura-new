@@ -430,12 +430,69 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
 
                 print("=======================================\n")
 
+                # ===== DETAILED DEBUG LOGGING FOR INDIVIDUAL REQUESTS =====
+                print("\n" + "="*80)
+                print("🐛 BRIGHTDATA API REQUEST DEBUG - INDIVIDUAL SCRAPER")
+                print("="*80)
+                print(f"Platform: {platform_config_key}")
+                print(f"Config Name: {config.name}")
+                print(f"Config ID: {config.id}")
+                print()
+                print("📡 REQUEST DETAILS:")
+                print(f"URL: {url}")
+                print(f"Headers: {headers}")
+                print(f"Params: {params}")
+                print(f"Data: {data}")
+                print()
+                print("🔍 COMPARISON WITH WORKING manualrun.py:")
+                print("Working script uses:")
+                print('  Authorization: Bearer c20a28d5-5c6c-43c3-9567-a6d7c193e727')
+                print('  dataset_id: gd_lk5ns7kz21pck8jpis')
+                print('  endpoint: https://api.upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site/api/brightdata/webhook/')
+                print()
+                print("This request uses:")
+                print(f'  Authorization: {headers["Authorization"]}')
+                print(f'  dataset_id: {params["dataset_id"]}')
+                print(f'  endpoint: {params["endpoint"]}')
+                print()
+
+                # Check for differences
+                working_token = "c20a28d5-5c6c-43c3-9567-a6d7c193e727"
+                working_dataset = "gd_lk5ns7kz21pck8jpis"
+                working_endpoint = "https://api.upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site/api/brightdata/webhook/"
+
+                if headers["Authorization"] != f"Bearer {working_token}":
+                    print("❌ API TOKEN MISMATCH!")
+                    print(f"   Expected: Bearer {working_token}")
+                    print(f"   Got:      {headers['Authorization']}")
+                else:
+                    print("✅ API Token matches")
+
+                if params["dataset_id"] != working_dataset:
+                    print("❌ DATASET ID MISMATCH!")
+                    print(f"   Expected: {working_dataset}")
+                    print(f"   Got:      {params['dataset_id']}")
+                else:
+                    print("✅ Dataset ID matches")
+
+                if params["endpoint"] != working_endpoint:
+                    print("❌ ENDPOINT MISMATCH!")
+                    print(f"   Expected: {working_endpoint}")
+                    print(f"   Got:      {params['endpoint']}")
+                else:
+                    print("✅ Endpoint matches")
+
+                print()
+                print("🚀 MAKING API REQUEST...")
+                print("="*80)
+
                 response = requests.post(url, headers=headers, params=params, json=data)
 
-                print("\n==== DEBUG: BRIGHTDATA API RESPONSE (INSTAGRAM) ====")
-                print(f"Status code: {response.status_code}")
-                print(f"Response text: {response.text}")
-                print("=======================================\n\n")
+                print("\n📥 BRIGHTDATA API RESPONSE:")
+                print(f"Status Code: {response.status_code}")
+                print(f"Response Headers: {dict(response.headers)}")
+                print(f"Response Text: {response.text}")
+                print("="*80 + "\n")
 
                 # Try to parse the response as JSON
                 try:
@@ -1576,6 +1633,15 @@ class BatchScraperJobViewSet(viewsets.ModelViewSet):
     def create_and_execute(self, request):
         """Create and execute a batch scraper job"""
         try:
+            # ===== DETAILED CONSOLE LOGGING FOR FRONTEND =====
+            print("\n" + "="*80)
+            print("🚀 BATCH JOB CREATE_AND_EXECUTE - BACKEND DEBUG")
+            print("="*80)
+            print(f"Request Data: {request.data}")
+            print(f"Request Method: {request.method}")
+            print(f"Request Path: {request.path}")
+            print("="*80)
+
             job, success = create_and_execute_batch_job(
                 name=request.data.get('name'),
                 project_id=request.data.get('project'),
@@ -1589,13 +1655,30 @@ class BatchScraperJobViewSet(viewsets.ModelViewSet):
                 output_folder_pattern=request.data.get('output_folder_pattern')
             )
 
+            print(f"✅ Job Created and Executed:")
+            print(f"   Job ID: {job.id}")
+            print(f"   Job Name: {job.name}")
+            print(f"   Success: {success}")
+            print(f"   Platforms: {job.platforms_to_scrape}")
+            print(f"   Content Types: {job.content_types_to_scrape}")
+            print("="*80 + "\n")
+
             return Response({
                 'job_id': job.id,
                 'success': success,
-                'message': f'Batch job {"completed successfully" if success else "failed"}'
+                'message': f'Batch job {"completed successfully" if success else "failed"}',
+                'debug_info': {
+                    'platforms': job.platforms_to_scrape,
+                    'content_types': job.content_types_to_scrape,
+                    'num_of_posts': job.num_of_posts,
+                    'job_name': job.name
+                }
             }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
+            print(f"❌ Exception in create_and_execute:")
+            print(f"   Error: {str(e)}")
+            print("="*80 + "\n")
             return Response({
                 'error': str(e)
             }, status=status.HTTP_400_BAD_REQUEST)

@@ -1,55 +1,55 @@
-import { useState, useEffect } from 'react';
-import {
-  Container,
-  Typography,
-  Box,
-  Button,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  IconButton,
-  Chip,
-  Snackbar,
-  Alert,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  FormControlLabel,
-  Checkbox,
-  Card,
-  CardContent,
-  Stack,
-  Tooltip,
-  Breadcrumbs,
-  LinearProgress
-} from '@mui/material';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import { Link, useParams } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import StopIcon from '@mui/icons-material/Stop';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import HomeIcon from '@mui/icons-material/Home';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
 import FacebookIcon from '@mui/icons-material/Facebook';
+import HomeIcon from '@mui/icons-material/Home';
 import InstagramIcon from '@mui/icons-material/Instagram';
 import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import MusicVideoIcon from '@mui/icons-material/MusicVideo';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import StopIcon from '@mui/icons-material/Stop';
+import {
+    Alert,
+    Box,
+    Breadcrumbs,
+    Button,
+    Card,
+    CardContent,
+    Checkbox,
+    Chip,
+    CircularProgress,
+    Container,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogContentText,
+    DialogTitle,
+    FormControl,
+    FormControlLabel,
+    IconButton,
+    InputLabel,
+    LinearProgress,
+    MenuItem,
+    Paper,
+    Select,
+    Snackbar,
+    Stack,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    TextField,
+    Tooltip,
+    Typography
+} from '@mui/material';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import dayjs, { Dayjs } from 'dayjs';
+import { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import { apiFetch } from '../utils/api';
 
 interface BatchScraperJob {
@@ -91,7 +91,7 @@ const AutomatedBatchScraper = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  
+
   // Form state
   const [formOpen, setFormOpen] = useState(false);
   const [jobName, setJobName] = useState('');
@@ -105,44 +105,44 @@ const AutomatedBatchScraper = () => {
 
   // Updated platform options with content types (excluding comments since this is for posts/reels)
   const platformOptions = [
-    { 
-      value: 'facebook_posts', 
-      label: 'Facebook Posts', 
+    {
+      value: 'facebook_posts',
+      label: 'Facebook Posts',
       icon: <FacebookIcon />,
       platform: 'facebook',
       contentType: 'posts'
     },
-    { 
-      value: 'facebook_reels', 
-      label: 'Facebook Reels', 
+    {
+      value: 'facebook_reels',
+      label: 'Facebook Reels',
       icon: <FacebookIcon />,
       platform: 'facebook',
       contentType: 'reels'
     },
-    { 
-      value: 'instagram_posts', 
-      label: 'Instagram Posts', 
+    {
+      value: 'instagram_posts',
+      label: 'Instagram Posts',
       icon: <InstagramIcon />,
       platform: 'instagram',
       contentType: 'posts'
     },
-    { 
-      value: 'instagram_reels', 
-      label: 'Instagram Reels', 
+    {
+      value: 'instagram_reels',
+      label: 'Instagram Reels',
       icon: <InstagramIcon />,
       platform: 'instagram',
       contentType: 'reels'
     },
-    { 
-      value: 'linkedin', 
-      label: 'LinkedIn Posts', 
+    {
+      value: 'linkedin',
+      label: 'LinkedIn Posts',
       icon: <LinkedInIcon />,
       platform: 'linkedin',
       contentType: 'posts'
     },
-    { 
-      value: 'tiktok', 
-      label: 'TikTok Posts', 
+    {
+      value: 'tiktok',
+      label: 'TikTok Posts',
       icon: <MusicVideoIcon />,
       platform: 'tiktok',
       contentType: 'posts'
@@ -221,10 +221,10 @@ const AutomatedBatchScraper = () => {
     }
 
     // Check if we have active configurations for selected platforms
-    const missingConfigs = selectedPlatforms.filter(platform => 
+    const missingConfigs = selectedPlatforms.filter(platform =>
       !configs.some(config => config.platform === platform && config.is_active)
     );
-    
+
     if (missingConfigs.length > 0) {
       setError(`Missing active configurations for: ${missingConfigs.join(', ')}`);
       return;
@@ -232,32 +232,32 @@ const AutomatedBatchScraper = () => {
 
     try {
       setIsSubmitting(true);
-      
+
       // Convert selectedPlatforms into the proper format
       // selectedPlatforms contains items like: ['facebook_posts', 'instagram_reels', 'facebook_reels']
       // We need to convert this to:
       // platforms_to_scrape: ['facebook', 'instagram']
       // content_types_to_scrape: { facebook: ['post', 'reel'], instagram: ['reel'] }
-      
+
       const platformsSet = new Set<string>();
       const contentTypesByPlatform: { [key: string]: string[] } = {};
-      
+
       selectedPlatforms.forEach(platformContentType => {
         const platformOption = platformOptions.find(opt => opt.value === platformContentType);
         if (platformOption) {
           const { platform, contentType } = platformOption;
           platformsSet.add(platform);
-          
+
           if (!contentTypesByPlatform[platform]) {
             contentTypesByPlatform[platform] = [];
           }
-          
+
           if (!contentTypesByPlatform[platform].includes(contentType)) {
             contentTypesByPlatform[platform].push(contentType);
           }
         }
       });
-      
+
       const payload = {
         name: jobName,
         project: projectId ? parseInt(projectId, 10) : 1,
@@ -270,8 +270,19 @@ const AutomatedBatchScraper = () => {
         auto_create_folders: autoCreateFolders,
         output_folder_pattern: outputFolderPattern,
       };
-      
+
       const url = '/api/brightdata/batch-jobs/create_and_execute/';
+
+      // ===== DETAILED CONSOLE LOGGING =====
+      console.log('🚀 AUTOMATED BATCH SCRAPER - FRONTEND DEBUG');
+      console.log('='.repeat(60));
+      console.log('📤 REQUEST PAYLOAD:');
+      console.log('URL:', url);
+      console.log('Payload:', payload);
+      console.log('Selected Platforms:', selectedPlatforms);
+      console.log('Platforms Set:', Array.from(platformsSet));
+      console.log('Content Types by Platform:', contentTypesByPlatform);
+      console.log('='.repeat(60));
       const response = await apiFetch(url, {
         method: 'POST',
         headers: {
@@ -280,10 +291,21 @@ const AutomatedBatchScraper = () => {
         body: JSON.stringify(payload),
       });
 
+      console.log('📥 RESPONSE FROM BACKEND:');
+      console.log('Status:', response.status);
+      console.log('Status Text:', response.statusText);
+      console.log('Headers:', Object.fromEntries(response.headers.entries()));
+
       if (!response.ok) {
         const errorData = await response.json();
+        console.log('❌ ERROR RESPONSE:', errorData);
+        console.log('='.repeat(60));
         throw new Error(errorData.error || 'Failed to create and execute batch job');
       }
+
+      const responseData = await response.json();
+      console.log('✅ SUCCESS RESPONSE:', responseData);
+      console.log('='.repeat(60));
 
       setSuccessMessage('Batch job created and started successfully');
       fetchJobs();
@@ -298,14 +320,30 @@ const AutomatedBatchScraper = () => {
 
   const handleExecuteJob = async (jobId: number) => {
     try {
+      console.log('🔄 EXECUTING BATCH JOB - FRONTEND DEBUG');
+      console.log('='.repeat(60));
+      console.log('Job ID:', jobId);
+      console.log('Execute URL:', `/api/brightdata/batch-jobs/${jobId}/execute/`);
+      console.log('='.repeat(60));
+
       const response = await apiFetch(`/api/brightdata/batch-jobs/${jobId}/execute/`, {
         method: 'POST',
       });
 
+      console.log('📥 EXECUTE RESPONSE:');
+      console.log('Status:', response.status);
+      console.log('Status Text:', response.statusText);
+
       if (!response.ok) {
         const errorData = await response.json();
+        console.log('❌ EXECUTE ERROR:', errorData);
+        console.log('='.repeat(60));
         throw new Error(errorData.error || 'Failed to execute job');
       }
+
+      const responseData = await response.json();
+      console.log('✅ EXECUTE SUCCESS:', responseData);
+      console.log('='.repeat(60));
 
       setSuccessMessage('Job execution started successfully');
       fetchJobs();
@@ -369,8 +407,8 @@ const AutomatedBatchScraper = () => {
               </Box>
             </Link>
             {organizationId && projectId && (
-              <Link 
-                to={`/organizations/${organizationId}/projects/${projectId}`} 
+              <Link
+                to={`/organizations/${organizationId}/projects/${projectId}`}
                 style={{ textDecoration: 'none', color: 'inherit' }}
               >
                 Project Dashboard
@@ -390,9 +428,9 @@ const AutomatedBatchScraper = () => {
           </Typography>
 
           {/* Error and Success Messages */}
-          <Snackbar 
-            open={!!error} 
-            autoHideDuration={6000} 
+          <Snackbar
+            open={!!error}
+            autoHideDuration={6000}
             onClose={() => setError(null)}
             anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
           >
@@ -401,9 +439,9 @@ const AutomatedBatchScraper = () => {
             </Alert>
           </Snackbar>
 
-          <Snackbar 
-            open={!!successMessage} 
-            autoHideDuration={6000} 
+          <Snackbar
+            open={!!successMessage}
+            autoHideDuration={6000}
             onClose={() => setSuccessMessage(null)}
             anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
           >
@@ -422,13 +460,13 @@ const AutomatedBatchScraper = () => {
                 {platformOptions.map((platform) => {
                   const config = configs.find(c => c.platform === platform.value && c.is_active);
                   return (
-                    <Box key={platform.value} sx={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      p: 2, 
-                      border: 1, 
+                    <Box key={platform.value} sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      p: 2,
+                      border: 1,
                       borderColor: config ? 'success.main' : 'warning.main',
-                      borderRadius: 1, 
+                      borderRadius: 1,
                       minWidth: '200px',
                       backgroundColor: config ? 'rgba(76, 175, 80, 0.1)' : 'rgba(255, 152, 0, 0.1)'
                     }}>
@@ -439,9 +477,9 @@ const AutomatedBatchScraper = () => {
                           Config: {platform.value}
                         </Typography>
                         <Box sx={{ mt: 0.5 }}>
-                          <Chip 
-                            size="small" 
-                            label={config ? 'Ready' : 'Not Configured'} 
+                          <Chip
+                            size="small"
+                            label={config ? 'Ready' : 'Not Configured'}
                             color={config ? 'success' : 'warning'}
                           />
                         </Box>
@@ -468,16 +506,16 @@ const AutomatedBatchScraper = () => {
                   Batch Scraper Jobs
                 </Typography>
                 <Stack direction="row" spacing={2}>
-                  <Button 
-                    variant="outlined" 
-                    startIcon={<RefreshIcon />} 
+                  <Button
+                    variant="outlined"
+                    startIcon={<RefreshIcon />}
                     onClick={fetchJobs}
                   >
                     Refresh
                   </Button>
-                  <Button 
-                    variant="contained" 
-                    startIcon={<AddIcon />} 
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
                     onClick={handleCreateJob}
                     disabled={configs.length === 0}
                   >
@@ -530,17 +568,17 @@ const AutomatedBatchScraper = () => {
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Chip 
-                                label={job.status} 
+                              <Chip
+                                label={job.status}
                                 color={getStatusColor(job.status)}
                                 size="small"
                               />
                             </TableCell>
                             <TableCell>
                               <Box sx={{ width: '100%' }}>
-                                <LinearProgress 
-                                  variant="determinate" 
-                                  value={getProgressValue(job)} 
+                                <LinearProgress
+                                  variant="determinate"
+                                  value={getProgressValue(job)}
                                   sx={{ mb: 1 }}
                                 />
                                 <Typography variant="caption">
@@ -568,8 +606,8 @@ const AutomatedBatchScraper = () => {
                               <Stack direction="row" spacing={1}>
                                 {job.status === 'pending' && (
                                   <Tooltip title="Execute Job">
-                                    <IconButton 
-                                      size="small" 
+                                    <IconButton
+                                      size="small"
                                       color="primary"
                                       onClick={() => handleExecuteJob(job.id)}
                                     >
@@ -579,8 +617,8 @@ const AutomatedBatchScraper = () => {
                                 )}
                                 {job.status === 'processing' && (
                                   <Tooltip title="Cancel Job">
-                                    <IconButton 
-                                      size="small" 
+                                    <IconButton
+                                      size="small"
                                       color="warning"
                                       onClick={() => handleCancelJob(job.id)}
                                     >
@@ -607,7 +645,7 @@ const AutomatedBatchScraper = () => {
               <DialogContentText sx={{ mb: 2 }}>
                 Create an automated batch scraping job to collect data from multiple social media accounts.
               </DialogContentText>
-              
+
               <Stack spacing={3} sx={{ mt: 2 }}>
                 <TextField
                   autoFocus
@@ -624,7 +662,7 @@ const AutomatedBatchScraper = () => {
                     multiple
                     value={selectedPlatforms}
                     onChange={(e) => setSelectedPlatforms(e.target.value as string[])}
-                    renderValue={(selected) => 
+                    renderValue={(selected) =>
                       platformOptions
                         .filter(p => (selected as string[]).includes(p.value))
                         .map(p => p.label)
@@ -701,10 +739,10 @@ const AutomatedBatchScraper = () => {
             </DialogContent>
             <DialogActions>
               <Button onClick={handleCloseForm}>Cancel</Button>
-              <Button 
-                onClick={handleSubmit} 
-                variant="contained" 
-                color="primary" 
+              <Button
+                onClick={handleSubmit}
+                variant="contained"
+                color="primary"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? <CircularProgress size={24} /> : 'Create & Execute Job'}
@@ -717,4 +755,4 @@ const AutomatedBatchScraper = () => {
   );
 };
 
-export default AutomatedBatchScraper; 
+export default AutomatedBatchScraper;

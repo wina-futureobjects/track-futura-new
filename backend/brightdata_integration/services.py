@@ -543,7 +543,7 @@ class AutomatedBatchScraper:
             scraper_request.save()
             return False
 
-    def _make_brightdata_request(self, scraper_request: ScraperRequest, payload: List[Dict]) -> bool:
+        def _make_brightdata_request(self, scraper_request: ScraperRequest, payload: List[Dict]) -> bool:
         """
         Make the actual API request to BrightData
         """
@@ -576,6 +576,64 @@ class AutomatedBatchScraper:
                     "discover_by": "url",
                 })
 
+            # ===== DETAILED DEBUG LOGGING =====
+            print("\n" + "="*80)
+            print("🐛 BRIGHTDATA API REQUEST DEBUG - AUTOMATED BATCH SCRAPER")
+            print("="*80)
+            print(f"Platform: {scraper_request.platform}")
+            print(f"Config Name: {config.name}")
+            print(f"Config ID: {config.id}")
+            print(f"Base URL: {base_url}")
+            print(f"Webhook Token: {webhook_token}")
+            print()
+            print("📡 REQUEST DETAILS:")
+            print(f"URL: {url}")
+            print(f"Headers: {headers}")
+            print(f"Params: {params}")
+            print(f"Payload ({len(payload)} items): {payload}")
+            print()
+            print("🔍 COMPARISON WITH WORKING manualrun.py:")
+            print("Working script uses:")
+            print('  Authorization: Bearer c20a28d5-5c6c-43c3-9567-a6d7c193e727')
+            print('  dataset_id: gd_lk5ns7kz21pck8jpis')
+            print('  endpoint: https://api.upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site/api/brightdata/webhook/')
+            print()
+            print("This request uses:")
+            print(f'  Authorization: {headers["Authorization"]}')
+            print(f'  dataset_id: {params["dataset_id"]}')
+            print(f'  endpoint: {params["endpoint"]}')
+            print()
+
+            # Check for differences
+            working_token = "c20a28d5-5c6c-43c3-9567-a6d7c193e727"
+            working_dataset = "gd_lk5ns7kz21pck8jpis"
+            working_endpoint = "https://api.upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site/api/brightdata/webhook/"
+
+            if headers["Authorization"] != f"Bearer {working_token}":
+                print("❌ API TOKEN MISMATCH!")
+                print(f"   Expected: Bearer {working_token}")
+                print(f"   Got:      {headers['Authorization']}")
+            else:
+                print("✅ API Token matches")
+
+            if params["dataset_id"] != working_dataset:
+                print("❌ DATASET ID MISMATCH!")
+                print(f"   Expected: {working_dataset}")
+                print(f"   Got:      {params['dataset_id']}")
+            else:
+                print("✅ Dataset ID matches")
+
+            if params["endpoint"] != working_endpoint:
+                print("❌ ENDPOINT MISMATCH!")
+                print(f"   Expected: {working_endpoint}")
+                print(f"   Got:      {params['endpoint']}")
+            else:
+                print("✅ Endpoint matches")
+
+            print()
+            print("🚀 MAKING API REQUEST...")
+            print("="*80)
+
             # Log batch details
             self.logger.info(f"Sending batch API request for {scraper_request.platform} with {len(payload)} sources")
             if len(payload) <= 5:  # Log URLs for small batches
@@ -593,6 +651,13 @@ class AutomatedBatchScraper:
             # Make the API request
             response = requests.post(url, headers=headers, params=params, json=payload)
 
+            # ===== DETAILED RESPONSE LOGGING =====
+            print("\n📥 BRIGHTDATA API RESPONSE:")
+            print(f"Status Code: {response.status_code}")
+            print(f"Response Headers: {dict(response.headers)}")
+            print(f"Response Text: {response.text}")
+            print("="*80 + "\n")
+
             if response.status_code == 200:
                 response_data = response.json()
                 scraper_request.request_id = response_data.get('snapshot_id') or response_data.get('request_id')
@@ -600,6 +665,7 @@ class AutomatedBatchScraper:
                 scraper_request.save()
 
                 self.logger.info(f"Successfully triggered batch scrape for {scraper_request.platform} with {len(payload)} sources. Request ID: {scraper_request.request_id}")
+                print(f"✅ SUCCESS! Request ID: {scraper_request.request_id}")
                 return True
             else:
                 error_msg = f"BrightData API error for {scraper_request.platform} batch: {response.status_code} - {response.text}"
@@ -607,6 +673,7 @@ class AutomatedBatchScraper:
                 scraper_request.status = 'failed'
                 scraper_request.error_message = error_msg
                 scraper_request.save()
+                print(f"❌ FAILED! Status: {response.status_code}, Error: {response.text}")
                 return False
 
         except Exception as e:
@@ -615,6 +682,8 @@ class AutomatedBatchScraper:
             scraper_request.status = 'failed'
             scraper_request.error_message = error_msg
             scraper_request.save()
+            print(f"❌ EXCEPTION! Error: {str(e)}")
+            print("="*80 + "\n")
             return False
 
     def _trigger_facebook_scrape(self, scraper_request: ScraperRequest) -> bool:
