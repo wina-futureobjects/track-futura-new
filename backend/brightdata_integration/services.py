@@ -422,7 +422,7 @@ class AutomatedBatchScraper:
 
     def _get_or_create_output_folder(self, job: BatchScraperJob, platform: str, source: TrackSource, content_type: str) -> Optional[int]:
         """
-        Get or create an output folder for the scraped data
+        Get or create a SINGLE output folder per job for ALL scraped data from all accounts
         """
         if not job.auto_create_folders:
             return None
@@ -443,14 +443,9 @@ class AutomatedBatchScraper:
                 folder_category = 'posts'  # Default fallback
                 content_type_for_name = content_type
 
-            # Generate folder name using the pattern
-            folder_name = job.output_folder_pattern.format(
-                platform=platform.title(),
-                content_type=content_type_for_name.upper(),
-                date=timezone.now().strftime('%Y-%m-%d'),
-                job_name=job.name,
-                account_name=source.name,
-            )
+            # 🔧 CRITICAL CHANGE: Create ONE folder per job, not per account
+            # Generate folder name using date and job name (NO account_name)
+            folder_name = f"{platform.title()}_{content_type_for_name.upper()}_{timezone.now().strftime('%Y-%m-%d')}_{job.name}"
 
             # Get the appropriate folder model for this platform
             FolderModel = self.PLATFORM_FOLDER_MODELS.get(platform)
@@ -471,9 +466,9 @@ class AutomatedBatchScraper:
             )
 
             if created:
-                self.logger.info(f"Created new {platform} {folder_category} folder: {folder_name}")
+                self.logger.info(f"✅ Created new SHARED {platform} {folder_category} folder: {folder_name}")
             else:
-                self.logger.info(f"Using existing {platform} folder: {folder_name}")
+                self.logger.info(f"✅ Using existing SHARED {platform} folder: {folder_name}")
 
             return folder.id
 

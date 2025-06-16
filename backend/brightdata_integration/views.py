@@ -1309,6 +1309,7 @@ def _verify_webhook_auth(auth_header: str) -> bool:
 def _process_webhook_data_with_batch_support(data, platform: str, scraper_requests):
     """
     Process incoming webhook data with support for batch jobs (multiple scraper requests)
+    All posts from the same job go into the SAME shared folder
     """
     try:
         # Import platform-specific models
@@ -1368,15 +1369,20 @@ def _process_webhook_data_with_batch_support(data, platform: str, scraper_reques
 
         logger.info(f"Processing {len(valid_posts)} valid posts, skipped {skipped_count} invalid entries")
 
-        # Create a mapping of URLs to folder_ids from scraper requests
-        url_to_folder_map = {}
+        # 🔧 SIMPLIFIED LOGIC: Use the SAME folder for ALL posts in this batch job
+        # All scraper requests in the same batch job should have the same folder_id
+        shared_folder_id = None
         if scraper_requests:
-            for req in scraper_requests:
-                if req.target_url and req.folder_id:
-                    # Clean the URL for matching (remove trailing slashes, etc.)
-                    clean_url = req.target_url.rstrip('/')
-                    url_to_folder_map[clean_url] = req.folder_id
-                    logger.info(f"URL mapping: {clean_url} -> folder_id: {req.folder_id}")
+            # Get the folder_id from the first request (all should be the same now)
+            shared_folder_id = scraper_requests[0].folder_id
+            logger.info(f"✅ Using SHARED folder_id: {shared_folder_id} for ALL posts in this batch")
+
+            # Log all folder_ids to verify they're the same
+            folder_ids = [req.folder_id for req in scraper_requests if req.folder_id]
+            if len(set(folder_ids)) > 1:
+                logger.warning(f"⚠️  Multiple folder_ids found in batch: {folder_ids}. Using first one: {shared_folder_id}")
+            else:
+                logger.info(f"✅ All {len(scraper_requests)} requests use the same folder_id: {shared_folder_id}")
 
         created_count = 0
 
@@ -1385,34 +1391,8 @@ def _process_webhook_data_with_batch_support(data, platform: str, scraper_reques
                 # Map common fields
                 post_fields = _map_post_fields(post_data, platform)
 
-                # 🔧 CRITICAL FIX: Determine folder_id based on the post's source URL
-                folder_id = None
-                post_url = post_data.get('url', '')
-
-                if post_url and url_to_folder_map:
-                    # Extract the account URL from the post URL
-                    # For Instagram: https://www.instagram.com/p/ABC123 -> https://www.instagram.com/username
-                    # For Facebook: similar logic
-
-                    if platform.lower() == 'instagram':
-                        # Extract Instagram username from post URL
-                        # Example: https://www.instagram.com/p/DKeLi2VSshg -> find matching account
-                        import re
-
-                        # Try to find which account this post belongs to by checking user_posted field
-                        user_posted = post_data.get('user_posted', '')
-                        if user_posted:
-                            # Look for a matching URL in our mapping
-                            for mapped_url, mapped_folder_id in url_to_folder_map.items():
-                                if user_posted.lower() in mapped_url.lower():
-                                    folder_id = mapped_folder_id
-                                    logger.info(f"✅ Matched post from @{user_posted} to folder_id: {folder_id}")
-                                    break
-
-                        # Fallback: if no specific match found, use the first available folder
-                        if not folder_id and url_to_folder_map:
-                            folder_id = list(url_to_folder_map.values())[0]
-                            logger.info(f"⚠️  Using fallback folder_id: {folder_id} for post from @{user_posted}")
+                # 🔧 SIMPLIFIED: ALL posts go to the SAME shared folder
+                folder_id = shared_folder_id
 
                 # Handle folder assignment for all platforms
                 if folder_id:
@@ -1431,7 +1411,7 @@ def _process_webhook_data_with_batch_support(data, platform: str, scraper_reques
                         try:
                             folder = Folder.objects.get(id=folder_id)
                             post_fields['folder'] = folder
-                            logger.info(f"✅ Assigned Instagram post to folder: {folder.name} (ID: {folder_id})")
+                            logger.info(f"✅ Assigned Instagram post to SHARED folder: {folder.name} (ID: {folder_id})")
                         except Folder.DoesNotExist:
                             logger.warning(f"Instagram folder with ID {folder_id} not found, creating default folder")
                             folder = Folder.objects.create(name=f"Auto-created folder {folder_id}")
@@ -1457,7 +1437,7 @@ def _process_webhook_data_with_batch_support(data, platform: str, scraper_reques
                             folder = Folder.objects.create(name=f"Auto-created folder {folder_id}")
                             post_fields['folder'] = folder
                 else:
-                    logger.warning(f"No folder_id determined for post: {post_data.get('url', 'No URL')}")
+                    logger.warning(f"No shared folder_id available for posts")
 
                 # Create or update post
                 post_id = post_data.get('post_id') or post_data.get('id') or post_data.get('pk')
@@ -1479,21 +1459,23 @@ def _process_webhook_data_with_batch_support(data, platform: str, scraper_reques
                         )
                     if created:
                         created_count += 1
-                        logger.info(f"✅ Created new {platform} post: {post_id} in folder: {folder.name if folder else 'No folder'}")
+                        user_posted = post_data.get('user_posted', 'Unknown')
+                        logger.info(f"✅ Created new {platform} post: {post_id} from @{user_posted} in SHARED folder: {folder.name if folder else 'No folder'}")
                     else:
                         logger.info(f"Updated existing {platform} post: {post_id}")
                 else:
                     # Create new post without checking for duplicates
                     post = PostModel.objects.create(**post_fields)
                     created_count += 1
-                    logger.info(f"Created new {platform} post without ID in folder: {folder.name if post_fields.get('folder') else 'No folder'}")
+                    user_posted = post_data.get('user_posted', 'Unknown')
+                    logger.info(f"Created new {platform} post from @{user_posted} without ID in SHARED folder: {folder.name if post_fields.get('folder') else 'No folder'}")
 
             except Exception as e:
                 logger.error(f"Error processing individual post: {str(e)}")
                 logger.error(f"Post data: {post_data}")
                 continue
 
-        logger.info(f"✅ Successfully processed {created_count} valid posts for platform {platform}")
+        logger.info(f"✅ Successfully processed {created_count} valid posts for platform {platform} into SHARED folder")
         return True
 
     except Exception as e:
