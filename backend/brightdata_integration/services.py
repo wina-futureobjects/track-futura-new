@@ -924,6 +924,34 @@ class AutomatedBatchScraper:
                     request.response_metadata = response_data
                     request.save()
 
+                # 🚀 NEW FIX: Update the webhook endpoint to include snapshot_id
+                # This ensures BrightData sends the snapshot_id as a query parameter
+                if snapshot_id:
+                    try:
+                        updated_endpoint = f"{base_url}/api/brightdata/webhook/?snapshot_id={snapshot_id}"
+
+                        # Make a second API call to update the webhook endpoint
+                        update_params = params.copy()
+                        update_params["endpoint"] = updated_endpoint
+
+                        print(f"🔄 UPDATING WEBHOOK ENDPOINT:")
+                        print(f"   Old: {params['endpoint']}")
+                        print(f"   New: {updated_endpoint}")
+
+                        # Update the webhook endpoint for this job
+                        update_response = requests.post(url, headers=headers, params=update_params, json=payload)
+
+                        if update_response.status_code == 200:
+                            print(f"✅ Successfully updated webhook endpoint with snapshot_id")
+                            self.logger.info(f"✅ Updated webhook endpoint to include snapshot_id: {snapshot_id}")
+                        else:
+                            print(f"⚠️  Failed to update webhook endpoint: {update_response.status_code}")
+                            self.logger.warning(f"Failed to update webhook endpoint: {update_response.text}")
+
+                    except Exception as e:
+                        print(f"⚠️  Error updating webhook endpoint: {str(e)}")
+                        self.logger.warning(f"Error updating webhook endpoint: {str(e)}")
+
                 self.logger.info(f"✅ Successfully triggered batch scrape for {primary_request.platform} with {len(payload)} sources. Snapshot ID: {snapshot_id}")
                 self.logger.info(f"✅ Updated {len(scraper_requests)} scraper requests with snapshot_id: {snapshot_id}")
                 print(f"✅ SUCCESS! Snapshot ID: {snapshot_id}")
