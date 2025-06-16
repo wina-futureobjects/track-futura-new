@@ -1269,10 +1269,45 @@ def _process_webhook_data(data, platform: str, scraper_request=None):
         # Extract posts from data
         posts_data = data if isinstance(data, list) else data.get('data', [])
 
+        # Filter out invalid entries (warnings, errors, entries without required fields)
+        valid_posts = []
+        skipped_count = 0
+
+        for post_data in posts_data:
+            # Skip entries with warnings or errors
+            if post_data.get('warning') or post_data.get('error') or post_data.get('warning_code'):
+                skipped_count += 1
+                logger.info(f"Skipping warning/error entry: {post_data.get('warning', post_data.get('error', 'Unknown warning'))}")
+                continue
+
+            # Skip entries without essential fields
+            if platform.lower() == 'instagram':
+                # For Instagram, we need either 'url' or 'post_id'
+                if not (post_data.get('url') or post_data.get('post_id') or post_data.get('pk')):
+                    skipped_count += 1
+                    logger.info(f"Skipping Instagram entry without URL or post_id: {post_data}")
+                    continue
+            elif platform.lower() == 'facebook':
+                # For Facebook, we need either 'url' or 'post_id'
+                if not (post_data.get('url') or post_data.get('post_id')):
+                    skipped_count += 1
+                    logger.info(f"Skipping Facebook entry without URL or post_id: {post_data}")
+                    continue
+            else:
+                # For other platforms, we need at least 'url' or 'post_id'
+                if not (post_data.get('url') or post_data.get('post_id') or post_data.get('id')):
+                    skipped_count += 1
+                    logger.info(f"Skipping {platform} entry without URL or ID: {post_data}")
+                    continue
+
+            valid_posts.append(post_data)
+
+        logger.info(f"Processing {len(valid_posts)} valid posts, skipped {skipped_count} invalid entries")
+
         folder_id = scraper_request.folder_id if scraper_request else None
         created_count = 0
 
-        for post_data in posts_data:
+        for post_data in valid_posts:
             try:
                 # Map common fields (you'll need to adjust based on your model fields)
                 post_fields = _map_post_fields(post_data, platform)
@@ -1320,7 +1355,7 @@ def _process_webhook_data(data, platform: str, scraper_request=None):
                             post_fields['folder'] = folder
 
                 # Create or update post
-                post_id = post_data.get('post_id') or post_data.get('id')
+                post_id = post_data.get('post_id') or post_data.get('id') or post_data.get('pk')
                 if post_id:
                     # For all platforms, check uniqueness by post_id and folder (if folder exists)
                     folder = post_fields.get('folder')
@@ -1350,9 +1385,10 @@ def _process_webhook_data(data, platform: str, scraper_request=None):
 
             except Exception as e:
                 logger.error(f"Error processing individual post: {str(e)}")
+                logger.error(f"Post data: {post_data}")
                 continue
 
-        logger.info(f"Successfully processed {created_count} posts for platform {platform}")
+        logger.info(f"Successfully processed {created_count} valid posts for platform {platform}")
         return True
 
     except Exception as e:
