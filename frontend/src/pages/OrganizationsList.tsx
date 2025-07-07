@@ -2,39 +2,34 @@ import AddIcon from '@mui/icons-material/Add';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import SearchIcon from '@mui/icons-material/Search';
 import {
-    Box,
-    Breadcrumbs,
-    Button,
-    CircularProgress,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    FormControl,
-    IconButton,
-    InputAdornment,
-    InputLabel,
-    MenuItem,
-    Paper,
-    Select,
-    SelectChangeEvent,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    TextField,
-    Typography
+  Box,
+  Breadcrumbs,
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControl,
+  IconButton,
+  InputAdornment,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
+  SelectChangeEvent,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { apiFetch } from '../utils/api';
-import { getAuthToken } from '../utils/auth';
-import AddIcon from '@mui/icons-material/Add';
-import SearchIcon from '@mui/icons-material/Search';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { apiFetch } from '../utils/api';
 
 interface Organization {
@@ -70,9 +65,9 @@ const OrganizationsList = () => {
       if (!response.ok) {
         throw new Error('Failed to fetch organizations');
       }
-      
+
       const data = await response.json();
-      
+
       if (Array.isArray(data)) {
         setOrganizations(data);
       } else if (data && typeof data === 'object' && 'results' in data) {
@@ -150,7 +145,7 @@ const OrganizationsList = () => {
       }
 
       const data = await response.json();
-      
+
       fetchOrganizations();
       setOpenNewDialog(false);
     } catch (error) {
@@ -214,13 +209,13 @@ const OrganizationsList = () => {
   };
 
   // Filter organizations based on search query
-  const filteredOrganizations = organizations.filter(org => 
+  const filteredOrganizations = organizations.filter(org =>
     org.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
-    <Box sx={{ 
-      width: '100%', 
+    <Box sx={{
+      width: '100%',
       padding: '16px 32px',
       bgcolor: '#f5f5f5',
       minHeight: 'calc(100vh - 56px)',
@@ -231,20 +226,20 @@ const OrganizationsList = () => {
           <Typography color="text.primary">Organizations</Typography>
         </Breadcrumbs>
       </Box>
-      
+
       {/* Header and actions */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4" component="h1" fontWeight="500">
           Organizations
         </Typography>
-        <Button 
-          variant="contained" 
+        <Button
+          variant="contained"
           startIcon={<AddIcon />}
           onClick={handleNewOrganization}
-          sx={{ 
+          sx={{
             borderRadius: 1,
-            bgcolor: '#e5e8eb', 
-            color: '#000000', 
+            bgcolor: '#e5e8eb',
+            color: '#000000',
             textTransform: 'none',
             fontWeight: 500,
             boxShadow: 'none',
@@ -259,10 +254,10 @@ const OrganizationsList = () => {
       </Box>
 
       {/* Search and filters bar */}
-      <Box 
-        display="flex" 
-        justifyContent="space-between" 
-        alignItems="center" 
+      <Box
+        display="flex"
+        justifyContent="space-between"
+        alignItems="center"
         sx={{
           mb: 1,
         }}
@@ -273,7 +268,7 @@ const OrganizationsList = () => {
           size="small"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          sx={{ 
+          sx={{
             width: '300px',
             '& .MuiOutlinedInput-root': {
               backgroundColor: 'white',
@@ -320,8 +315,8 @@ const OrganizationsList = () => {
       ) : (
         <>
           {filteredOrganizations.length > 0 ? (
-            <TableContainer component={Paper} sx={{ 
-              boxShadow: 'none', 
+            <TableContainer component={Paper} sx={{
+              boxShadow: 'none',
               borderRadius: '4px',
               border: '1px solid rgba(0,0,0,0.12)'
             }}>
@@ -338,7 +333,7 @@ const OrganizationsList = () => {
                 </TableHead>
                 <TableBody>
                   {filteredOrganizations.map((org) => (
-                    <TableRow 
+                    <TableRow
                       key={org.id}
                       hover
                       sx={{ cursor: 'pointer' }}
@@ -350,7 +345,7 @@ const OrganizationsList = () => {
                       <TableCell>-</TableCell>
                       <TableCell>{new Date(org.created_at).toLocaleDateString()}</TableCell>
                       <TableCell align="center">
-                        <IconButton 
+                        <IconButton
                           size="small"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -371,14 +366,14 @@ const OrganizationsList = () => {
               <Typography variant="body2" color="text.secondary" paragraph>
                 Create your first organization to get started.
               </Typography>
-              <Button 
-                variant="contained" 
-                startIcon={<AddIcon />} 
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
                 onClick={handleNewOrganization}
                 sx={{
                   borderRadius: 1,
-                  bgcolor: '#e5e8eb', 
-                  color: '#000000', 
+                  bgcolor: '#e5e8eb',
+                  color: '#000000',
                   textTransform: 'none',
                   fontWeight: 500,
                   boxShadow: 'none',
@@ -454,8 +449,8 @@ const OrganizationsList = () => {
           />
         </DialogContent>
         <DialogActions>
-          <Button 
-            onClick={() => selectedOrganization && handleDeleteOrganization(selectedOrganization.id)} 
+          <Button
+            onClick={() => selectedOrganization && handleDeleteOrganization(selectedOrganization.id)}
             color="error"
           >
             Delete
@@ -478,4 +473,4 @@ const OrganizationsList = () => {
   );
 };
 
-export default OrganizationsList; 
+export default OrganizationsList;

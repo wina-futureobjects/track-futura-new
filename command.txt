@@ -1,3 +1,0 @@
-
-Do not need to care about security for now, lets allow every source
-please fix everything and ensure its compatible both locally and in a remote cloud environment like Upsun
