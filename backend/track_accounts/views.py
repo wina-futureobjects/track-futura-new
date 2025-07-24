@@ -38,6 +38,35 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
                 Q(name__icontains=search)
             )
         
+        # Social media filters
+        has_facebook = self.request.query_params.get('has_facebook')
+        has_instagram = self.request.query_params.get('has_instagram')
+        has_linkedin = self.request.query_params.get('has_linkedin')
+        has_tiktok = self.request.query_params.get('has_tiktok')
+        
+        # Apply social media filters (AND logic - sources must have ALL selected platforms)
+        if has_facebook == 'true':
+            queryset = queryset.filter(facebook_link__isnull=False).exclude(facebook_link='')
+        
+        if has_instagram == 'true':
+            queryset = queryset.filter(instagram_link__isnull=False).exclude(instagram_link='')
+        
+        if has_linkedin == 'true':
+            queryset = queryset.filter(linkedin_link__isnull=False).exclude(linkedin_link='')
+        
+        if has_tiktok == 'true':
+            queryset = queryset.filter(tiktok_link__isnull=False).exclude(tiktok_link='')
+        
+        print(f"=== BACKEND FILTER DEBUG ===")
+        print(f"Project ID: {project_id}")
+        print(f"Search: {search}")
+        print(f"Has Facebook: {has_facebook}")
+        print(f"Has Instagram: {has_instagram}")
+        print(f"Has LinkedIn: {has_linkedin}")
+        print(f"Has TikTok: {has_tiktok}")
+        print(f"Final queryset count: {queryset.count()}")
+        print(f"=== END BACKEND FILTER DEBUG ===")
+        
         return queryset.order_by('name')
     
     def perform_create(self, serializer):
@@ -55,6 +84,27 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
         # Get project from request data directly
         project_id = self.request.data.get('project')
         serializer.save(project_id=project_id)
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        Custom destroy method to handle deletion with proper logging
+        """
+        try:
+            instance = self.get_object()
+            print(f"Attempting to delete TrackSource: {instance.id} - {instance.name}")
+            
+            # Perform the deletion
+            self.perform_destroy(instance)
+            
+            print(f"Successfully deleted TrackSource: {instance.id} - {instance.name}")
+            return Response(status=status.HTTP_204_NO_CONTENT)
+            
+        except Exception as e:
+            print(f"Error deleting TrackSource: {str(e)}")
+            return Response(
+                {'error': f'Failed to delete source: {str(e)}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
     @action(detail=False, methods=['POST'])
     def upload_csv(self, request):

@@ -5,14 +5,12 @@ import {
   TextField,
   Typography,
   Paper,
-  FormControlLabel,
-  Switch,
-  MenuItem,
   CircularProgress,
   Alert,
   Divider,
   Stack,
-  InputAdornment
+  InputAdornment,
+  Tooltip
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import FacebookIcon from '@mui/icons-material/Facebook';
@@ -20,13 +18,59 @@ import InstagramIcon from '@mui/icons-material/Instagram';
 import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import MusicNoteIcon from '@mui/icons-material/MusicNote'; // For TikTok
 import PersonIcon from '@mui/icons-material/Person';
-import WarningIcon from '@mui/icons-material/Warning';
-import LinkIcon from '@mui/icons-material/Link';
-import InfoIcon from '@mui/icons-material/Info';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
 import AddIcon from '@mui/icons-material/Add';
 import { apiFetch } from '../../utils/api';
+
+// Validation functions
+const validateFacebookLink = (link: string): boolean => {
+  if (!link.trim()) return true; // Empty is valid
+  const facebookRegex = /^(https?:\/\/)?(www\.)?(facebook\.com|fb\.com)\/.+/i;
+  return facebookRegex.test(link);
+};
+
+const validateInstagramLink = (link: string): boolean => {
+  if (!link.trim()) return true; // Empty is valid
+  const instagramRegex = /^(https?:\/\/)?(www\.)?(instagram\.com|instagr\.am)\/.+/i;
+  return instagramRegex.test(link);
+};
+
+const validateLinkedInLink = (link: string): boolean => {
+  if (!link.trim()) return true; // Empty is valid
+  const linkedinRegex = /^(https?:\/\/)?(www\.)?(linkedin\.com)\/(in|company)\/.+/i;
+  return linkedinRegex.test(link);
+};
+
+const validateTikTokLink = (link: string): boolean => {
+  if (!link.trim()) return true; // Empty is valid
+  const tiktokRegex = /^(https?:\/\/)?(www\.)?(tiktok\.com)\/@.+/i;
+  return tiktokRegex.test(link);
+};
+
+const getValidationMessage = (platform: string, link: string): string => {
+  if (!link.trim()) return '';
+  
+  let isValid = false;
+  switch (platform) {
+    case 'facebook':
+      isValid = validateFacebookLink(link);
+      break;
+    case 'instagram':
+      isValid = validateInstagramLink(link);
+      break;
+    case 'linkedin':
+      isValid = validateLinkedInLink(link);
+      break;
+    case 'tiktok':
+      isValid = validateTikTokLink(link);
+      break;
+    default:
+      isValid = true;
+  }
+  
+  return isValid ? '' : 'Please enter a valid social media URL.';
+};
 
 // Types
 interface TrackSourceFormProps {
@@ -82,7 +126,7 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
       const fetchSourceData = async () => {
         try {
           setLoadingSource(true);
-          const response = await apiFetch(`/api/track-accounts/sources/${sourceId}/`);
+          const response = await apiFetch(`/track-accounts/sources/${sourceId}/`);
           
           if (!response.ok) {
             throw new Error('Failed to load source data');
@@ -122,23 +166,7 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
     }
   };
 
-  // Handle switch change
-  const handleSwitchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: checked
-    }));
-  };
 
-  // Handle select change
-  const handleSelectChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value === '' ? null : value
-    }));
-  };
 
   // Validate form
   const validateForm = (): boolean => {
@@ -148,27 +176,37 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
       errors.name = 'Name is required';
     }
     
-    // Validate URLs if provided
-    const urlFields = [
-      { field: 'facebook_link', label: 'Facebook Profile URL' },
-      { field: 'instagram_link', label: 'Instagram Profile URL' },
-      { field: 'linkedin_link', label: 'LinkedIn Profile URL' },
-      { field: 'tiktok_link', label: 'TikTok Profile URL' }
-    ];
+    // Validate social media links using our custom validation functions
+    if (formData.facebook_link && !validateFacebookLink(formData.facebook_link)) {
+      errors.facebook_link = getValidationMessage('facebook', formData.facebook_link);
+    }
     
-    urlFields.forEach(({ field, label }) => {
-      const value = formData[field as keyof TrackSource] as string;
-      if (value && value.trim() !== '') {
-        try {
-          new URL(value);
-        } catch (e) {
-          errors[field] = `${label} must be a valid URL`;
-        }
-      }
-    });
+    if (formData.instagram_link && !validateInstagramLink(formData.instagram_link)) {
+      errors.instagram_link = getValidationMessage('instagram', formData.instagram_link);
+    }
+    
+    if (formData.linkedin_link && !validateLinkedInLink(formData.linkedin_link)) {
+      errors.linkedin_link = getValidationMessage('linkedin', formData.linkedin_link);
+    }
+    
+    if (formData.tiktok_link && !validateTikTokLink(formData.tiktok_link)) {
+      errors.tiktok_link = getValidationMessage('tiktok', formData.tiktok_link);
+    }
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
+  };
+
+  // Check if there are any validation errors
+  const hasValidationErrors = (): boolean => {
+    if (!formData.name.trim()) return true;
+    
+    if (formData.facebook_link && !validateFacebookLink(formData.facebook_link)) return true;
+    if (formData.instagram_link && !validateInstagramLink(formData.instagram_link)) return true;
+    if (formData.linkedin_link && !validateLinkedInLink(formData.linkedin_link)) return true;
+    if (formData.tiktok_link && !validateTikTokLink(formData.tiktok_link)) return true;
+    
+    return false;
   };
 
   // Handle form submission
@@ -185,18 +223,16 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
     
     try {
       const url = sourceId 
-        ? `/api/track-accounts/sources/${sourceId}/`
-        : '/api/track-accounts/sources/';
+        ? `/track-accounts/sources/${sourceId}/`
+        : '/track-accounts/sources/';
       
       const method = sourceId ? 'PUT' : 'POST';
       
       // Add project ID to request body if available
-      let requestData = { ...formData };
-      
-      // Ensure project ID is set if available from props
-      if (projectId) {
-        requestData.project = parseInt(projectId, 10);
-      }
+      const requestData = { 
+        ...formData,
+        project: projectId ? parseInt(projectId, 10) : formData.project
+      };
       
       const response = await apiFetch(url, {
         method,
@@ -319,6 +355,23 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
                 error={!!formErrors.name}
                 helperText={formErrors.name}
                 required
+                sx={{
+                  '& .MuiFormHelperText-root': {
+                    color: formErrors.name ? '#d32f2f !important' : 'inherit'
+                  },
+                  '& .MuiOutlinedInput-root': {
+                    '&.Mui-error': {
+                      '& fieldset': {
+                        borderColor: '#d32f2f !important'
+                      }
+                    },
+                    '&:not(.Mui-error)': {
+                      '& fieldset': {
+                        borderColor: '#d0d7de !important'
+                      }
+                    }
+                  }
+                }}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -330,13 +383,31 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
               
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                 <TextField
-                  sx={{ flex: 1, minWidth: 200 }}
+                  sx={{ 
+                    flex: 1, 
+                    minWidth: 200,
+                    '& .MuiFormHelperText-root': {
+                      color: (formData.facebook_link && !validateFacebookLink(formData.facebook_link)) ? '#d32f2f !important' : 'inherit'
+                    },
+                    '& .MuiOutlinedInput-root': {
+                      '&.Mui-error': {
+                        '& fieldset': {
+                          borderColor: '#d32f2f !important'
+                        }
+                      },
+                      '&:not(.Mui-error)': {
+                        '& fieldset': {
+                          borderColor: '#d0d7de !important'
+                        }
+                      }
+                    }
+                  }}
                   label="Facebook Link"
                   name="facebook_link"
                   value={formData.facebook_link || ''}
                   onChange={handleChange}
-                  error={!!formErrors.facebook_link}
-                  helperText={formErrors.facebook_link}
+                  error={formData.facebook_link ? !validateFacebookLink(formData.facebook_link) : false}
+                  helperText={getValidationMessage('facebook', formData.facebook_link || '')}
                   placeholder="https://facebook.com/username"
                   InputProps={{
                     startAdornment: (
@@ -348,13 +419,31 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
                 />
                 
                 <TextField
-                  sx={{ flex: 1, minWidth: 200 }}
+                  sx={{ 
+                    flex: 1, 
+                    minWidth: 200,
+                    '& .MuiFormHelperText-root': {
+                      color: (formData.instagram_link && !validateInstagramLink(formData.instagram_link)) ? '#d32f2f !important' : 'inherit'
+                    },
+                    '& .MuiOutlinedInput-root': {
+                      '&.Mui-error': {
+                        '& fieldset': {
+                          borderColor: '#d32f2f !important'
+                        }
+                      },
+                      '&:not(.Mui-error)': {
+                        '& fieldset': {
+                          borderColor: '#d0d7de !important'
+                        }
+                      }
+                    }
+                  }}
                   label="Instagram Link"
                   name="instagram_link"
                   value={formData.instagram_link || ''}
                   onChange={handleChange}
-                  error={!!formErrors.instagram_link}
-                  helperText={formErrors.instagram_link}
+                  error={formData.instagram_link ? !validateInstagramLink(formData.instagram_link) : false}
+                  helperText={getValidationMessage('instagram', formData.instagram_link || '')}
                   placeholder="https://instagram.com/username"
                   InputProps={{
                     startAdornment: (
@@ -368,13 +457,31 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
               
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                 <TextField
-                  sx={{ flex: 1, minWidth: 200 }}
+                  sx={{ 
+                    flex: 1, 
+                    minWidth: 200,
+                    '& .MuiFormHelperText-root': {
+                      color: (formData.linkedin_link && !validateLinkedInLink(formData.linkedin_link)) ? '#d32f2f !important' : 'inherit'
+                    },
+                    '& .MuiOutlinedInput-root': {
+                      '&.Mui-error': {
+                        '& fieldset': {
+                          borderColor: '#d32f2f !important'
+                        }
+                      },
+                      '&:not(.Mui-error)': {
+                        '& fieldset': {
+                          borderColor: '#d0d7de !important'
+                        }
+                      }
+                    }
+                  }}
                   label="LinkedIn Link"
                   name="linkedin_link"
                   value={formData.linkedin_link || ''}
                   onChange={handleChange}
-                  error={!!formErrors.linkedin_link}
-                  helperText={formErrors.linkedin_link}
+                  error={formData.linkedin_link ? !validateLinkedInLink(formData.linkedin_link) : false}
+                  helperText={getValidationMessage('linkedin', formData.linkedin_link || '')}
                   placeholder="https://linkedin.com/in/username"
                   InputProps={{
                     startAdornment: (
@@ -386,13 +493,31 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
                 />
                 
                 <TextField
-                  sx={{ flex: 1, minWidth: 200 }}
+                  sx={{ 
+                    flex: 1, 
+                    minWidth: 200,
+                    '& .MuiFormHelperText-root': {
+                      color: (formData.tiktok_link && !validateTikTokLink(formData.tiktok_link)) ? '#d32f2f !important' : 'inherit'
+                    },
+                    '& .MuiOutlinedInput-root': {
+                      '&.Mui-error': {
+                        '& fieldset': {
+                          borderColor: '#d32f2f !important'
+                        }
+                      },
+                      '&:not(.Mui-error)': {
+                        '& fieldset': {
+                          borderColor: '#d0d7de !important'
+                        }
+                      }
+                    }
+                  }}
                   label="TikTok Link"
                   name="tiktok_link"
                   value={formData.tiktok_link || ''}
                   onChange={handleChange}
-                  error={!!formErrors.tiktok_link}
-                  helperText={formErrors.tiktok_link}
+                  error={formData.tiktok_link ? !validateTikTokLink(formData.tiktok_link) : false}
+                  helperText={getValidationMessage('tiktok', formData.tiktok_link || '')}
                   placeholder="https://tiktok.com/@username"
                   InputProps={{
                     startAdornment: (
@@ -452,18 +577,25 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
             >
               Cancel
             </Button>
-            <Button 
-              type="submit"
-              variant="contained" 
-              color="primary"
-              startIcon={<SaveIcon />}
-              disabled={loading}
+            <Tooltip 
+              title={hasValidationErrors() ? "Check the link errors before saving" : ""}
+              open={hasValidationErrors() ? undefined : false}
             >
-              {loading ? 
-                <CircularProgress size={24} /> : 
-                (sourceId ? 'Update Source' : 'Create Source')
-              }
-            </Button>
+              <span>
+                <Button 
+                  type="submit"
+                  variant="contained" 
+                  color="primary"
+                  startIcon={<SaveIcon />}
+                  disabled={loading || hasValidationErrors()}
+                >
+                  {loading ? 
+                    <CircularProgress size={24} /> : 
+                    (sourceId ? 'Update Source' : 'Create Source')
+                  }
+                </Button>
+              </span>
+            </Tooltip>
           </Box>
         </Stack>
       </form>
