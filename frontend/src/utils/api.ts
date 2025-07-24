@@ -75,8 +75,8 @@ export const getApiBaseUrl = (): string => {
   // Check if we're running on localhost:5173 (Vite dev server)
   if (typeof window !== 'undefined' && window.location.port === '5173') {
     // Use direct backend URL to bypass potential proxy issues
-    console.log('✅ Using development direct API URL: http://localhost:8000');
-    return 'http://localhost:8000';
+    console.log('✅ Using development direct API URL: http://127.0.0.1:8000');
+    return 'http://127.0.0.1:8000';
   }
 
   // Default: use relative URLs which will be handled by the Vite proxy

@@ -32,9 +32,9 @@ class CustomCsrfMiddleware:
         request.csrf_processing_done = True
         request.csrf_cookie_needs_reset = False
 
-        # Add dummy CSRF token to request META
-        request.META['CSRF_COOKIE'] = 'bypass-token'
-        request.META['HTTP_X_CSRFTOKEN'] = 'bypass-token'
+        # Add dummy CSRF token to request META (using only allowed characters)
+        request.META['CSRF_COOKIE'] = 'bypasstoken'
+        request.META['HTTP_X_CSRFTOKEN'] = 'bypasstoken'
 
         # Always allow the request to proceed
         return None
@@ -47,9 +47,9 @@ class CustomCsrfMiddleware:
         request.csrf_processing_done = True
         request.csrf_cookie_needs_reset = False
 
-        # Add dummy CSRF token
-        request.META['CSRF_COOKIE'] = 'bypass-token'
-        request.META['HTTP_X_CSRFTOKEN'] = 'bypass-token'
+        # Add dummy CSRF token (using only allowed characters)
+        request.META['CSRF_COOKIE'] = 'bypasstoken'
+        request.META['HTTP_X_CSRFTOKEN'] = 'bypasstoken'
 
         return None
 
