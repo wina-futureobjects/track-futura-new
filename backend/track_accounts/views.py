@@ -7,6 +7,7 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
+from rest_framework.pagination import PageNumberPagination
 from django.http import HttpResponse
 from django.db.models import Q
 from .models import TrackSource, ReportFolder, ReportEntry
@@ -15,12 +16,22 @@ from .serializers import (
     ReportFolderSerializer, ReportEntrySerializer, ReportFolderDetailSerializer
 )
 
+class CustomPageNumberPagination(PageNumberPagination):
+    """
+    Custom pagination class that respects the page_size parameter
+    """
+    page_size = 25  # Default page size
+    page_size_query_param = 'page_size'
+    max_page_size = 1000
+    page_query_param = 'page'
+
 class TrackSourceViewSet(viewsets.ModelViewSet):
     """
     API endpoint for managing Track Sources (formerly Track Accounts)
     """
     serializer_class = TrackSourceSerializer
     permission_classes = [AllowAny]  # For testing, use proper permissions in production
+    pagination_class = CustomPageNumberPagination
     
     def get_queryset(self):
         """Filter sources based on query parameters"""
@@ -57,6 +68,33 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
         if has_tiktok == 'true':
             queryset = queryset.filter(tiktok_link__isnull=False).exclude(tiktok_link='')
         
+        # Date filters
+        date_range = self.request.query_params.get('date_range')
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+        
+        # Apply date filters
+        if date_range and date_range != 'all':
+            today = datetime.date.today()
+            
+            if date_range == 'today':
+                queryset = queryset.filter(created_at__date=today)
+            elif date_range == 'week':
+                week_ago = today - datetime.timedelta(days=7)
+                queryset = queryset.filter(created_at__date__gte=week_ago, created_at__date__lte=today)
+            elif date_range == 'month':
+                month_ago = today - datetime.timedelta(days=30)
+                queryset = queryset.filter(created_at__date__gte=month_ago, created_at__date__lte=today)
+            elif date_range == 'year':
+                year_ago = today - datetime.timedelta(days=365)
+                queryset = queryset.filter(created_at__date__gte=year_ago, created_at__date__lte=today)
+        
+        # Custom date range
+        if start_date:
+            queryset = queryset.filter(created_at__date__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(created_at__date__lte=end_date)
+        
         print(f"=== BACKEND FILTER DEBUG ===")
         print(f"Project ID: {project_id}")
         print(f"Search: {search}")
@@ -64,6 +102,11 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
         print(f"Has Instagram: {has_instagram}")
         print(f"Has LinkedIn: {has_linkedin}")
         print(f"Has TikTok: {has_tiktok}")
+        print(f"Date Range: {date_range}")
+        print(f"Start Date: {start_date}")
+        print(f"End Date: {end_date}")
+        print(f"Page: {self.request.query_params.get('page')}")
+        print(f"Page Size: {self.request.query_params.get('page_size')}")
         print(f"Final queryset count: {queryset.count()}")
         print(f"=== END BACKEND FILTER DEBUG ===")
         

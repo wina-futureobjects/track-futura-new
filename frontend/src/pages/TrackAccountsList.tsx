@@ -20,9 +20,6 @@ import {
   Snackbar,
   Alert,
   Tooltip,
-  FormGroup,
-  FormControlLabel,
-  Checkbox,
   Card,
   CardContent,
   Avatar,
@@ -256,6 +253,12 @@ const TrackSourcesList = () => {
   // Handle rows per page change
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newRowsPerPage = parseInt(event.target.value, 10);
+    console.log('=== ROWS PER PAGE CHANGE DEBUG ===');
+    console.log('New rows per page:', newRowsPerPage);
+    console.log('Current page:', page);
+    console.log('Current search term:', searchTerm);
+    console.log('Current social media filters:', socialMediaFilters);
+    
     setRowsPerPage(newRowsPerPage);
     setPage(0);
     fetchSources(0, newRowsPerPage, searchTerm, socialMediaFilters);
@@ -277,18 +280,7 @@ const TrackSourcesList = () => {
     }
   };
 
-  const handleSocialMediaFilterChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, checked } = event.target;
-    const updatedFilters = {
-      ...socialMediaFilters,
-      [name]: checked
-    };
-    setSocialMediaFilters(updatedFilters);
-    setPage(0);
-    fetchSources(0, rowsPerPage, searchTerm, updatedFilters);
-    // Refresh stats when filters change
-    fetchFilterStats();
-  };
+
 
   // Clear all filters
   const handleClearFilters = () => {
@@ -562,76 +554,239 @@ const TrackSourcesList = () => {
             <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#374151', minWidth: 80 }}>
               Social Media Presence :
             </Typography>
-            <FormGroup row sx={{ gap: 2, flex: 1 }}>
-              <FormControlLabel
-                control={
-                  <Checkbox 
-                    checked={socialMediaFilters.hasFacebook}
-                    onChange={handleSocialMediaFilterChange}
-                    name="hasFacebook"
-                    size="small"
-                  />
-                }
-                label={
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <FacebookIcon sx={{ fontSize: 16, color: '#4267B2' }} />
-                    <Typography variant="body2">Facebook</Typography>
-                    <Chip label={filterStats.socialMediaCounts.facebook} size="small" variant="outlined" />
-                  </Box>
-                }
-              />
-              <FormControlLabel
-                control={
-                  <Checkbox 
-                    checked={socialMediaFilters.hasInstagram}
-                    onChange={handleSocialMediaFilterChange}
-                    name="hasInstagram"
-                    size="small"
-                  />
-                }
-                label={
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <InstagramIcon sx={{ fontSize: 16, color: '#E1306C' }} />
-                    <Typography variant="body2">Instagram</Typography>
-                    <Chip label={filterStats.socialMediaCounts.instagram} size="small" variant="outlined" />
-                  </Box>
-                }
-              />
-              <FormControlLabel
-                control={
-                  <Checkbox 
-                    checked={socialMediaFilters.hasLinkedIn}
-                    onChange={handleSocialMediaFilterChange}
-                    name="hasLinkedIn"
-                    size="small"
-                  />
-                }
-                label={
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <LinkedInIcon sx={{ fontSize: 16, color: '#0077B5' }} />
-                    <Typography variant="body2">LinkedIn</Typography>
-                    <Chip label={filterStats.socialMediaCounts.linkedin} size="small" variant="outlined" />
-                  </Box>
-                }
-              />
-              <FormControlLabel
-                control={
-                  <Checkbox 
-                    checked={socialMediaFilters.hasTikTok}
-                    onChange={handleSocialMediaFilterChange}
-                    name="hasTikTok"
-                    size="small"
-                  />
-                }
-                label={
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <TikTokIcon sx={{ fontSize: 16, color: '#000' }} />
-                    <Typography variant="body2">TikTok</Typography>
-                    <Chip label={filterStats.socialMediaCounts.tiktok} size="small" variant="outlined" />
-                  </Box>
-                }
-              />
-            </FormGroup>
+            <Box sx={{ display: 'flex', gap: 1, flex: 1 }}>
+              <Button
+                variant={socialMediaFilters.hasFacebook ? "contained" : "outlined"}
+                size="small"
+                onClick={() => {
+                  const updatedFilters = {
+                    ...socialMediaFilters,
+                    hasFacebook: !socialMediaFilters.hasFacebook
+                  };
+                  setSocialMediaFilters(updatedFilters);
+                  setPage(0);
+                  fetchSources(0, rowsPerPage, searchTerm, updatedFilters);
+                  fetchFilterStats();
+                }}
+                startIcon={<FacebookIcon sx={{ fontSize: 16 }} />}
+                sx={{
+                  minWidth: 'auto',
+                  px: 2,
+                  py: 0.5,
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  ...(socialMediaFilters.hasFacebook ? {
+                    bgcolor: '#4267B2',
+                    color: 'white',
+                    border: 'none',
+                    '&:hover': { bgcolor: '#365899' }
+                  } : {
+                    border: 'none',
+                    color: '#4267B2',
+                    bgcolor: 'transparent',
+                    '&:hover': { 
+                      bgcolor: '#4267B2',
+                      color: 'white'
+                    }
+                  })
+                }}
+              >
+                Facebook
+                <Chip 
+                  label={filterStats.socialMediaCounts.facebook} 
+                  size="small" 
+                  variant="outlined"
+                  sx={{ 
+                    ml: 0.5, 
+                    height: 16, 
+                    fontSize: '0.625rem',
+                    ...(socialMediaFilters.hasFacebook ? {
+                      borderColor: 'white',
+                      color: 'white'
+                    } : {
+                      borderColor: '#4267B2',
+                      color: '#4267B2'
+                    })
+                  }} 
+                />
+              </Button>
+              
+              <Button
+                variant={socialMediaFilters.hasInstagram ? "contained" : "outlined"}
+                size="small"
+                onClick={() => {
+                  const updatedFilters = {
+                    ...socialMediaFilters,
+                    hasInstagram: !socialMediaFilters.hasInstagram
+                  };
+                  setSocialMediaFilters(updatedFilters);
+                  setPage(0);
+                  fetchSources(0, rowsPerPage, searchTerm, updatedFilters);
+                  fetchFilterStats();
+                }}
+                startIcon={<InstagramIcon sx={{ fontSize: 16 }} />}
+                sx={{
+                  minWidth: 'auto',
+                  px: 2,
+                  py: 0.5,
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  ...(socialMediaFilters.hasInstagram ? {
+                    bgcolor: '#E1306C',
+                    color: 'white',
+                    border: 'none',
+                    '&:hover': { bgcolor: '#C13584' }
+                  } : {
+                    border: 'none',
+                    color: '#E1306C',
+                    bgcolor: 'transparent',
+                    '&:hover': { 
+                      bgcolor: '#E1306C',
+                      color: 'white'
+                    }
+                  })
+                }}
+              >
+                Instagram
+                <Chip 
+                  label={filterStats.socialMediaCounts.instagram} 
+                  size="small" 
+                  variant="outlined"
+                  sx={{ 
+                    ml: 0.5, 
+                    height: 16, 
+                    fontSize: '0.625rem',
+                    ...(socialMediaFilters.hasInstagram ? {
+                      borderColor: 'white',
+                      color: 'white'
+                    } : {
+                      borderColor: '#E1306C',
+                      color: '#E1306C'
+                    })
+                  }} 
+                />
+              </Button>
+              
+              <Button
+                variant={socialMediaFilters.hasLinkedIn ? "contained" : "outlined"}
+                size="small"
+                onClick={() => {
+                  const updatedFilters = {
+                    ...socialMediaFilters,
+                    hasLinkedIn: !socialMediaFilters.hasLinkedIn
+                  };
+                  setSocialMediaFilters(updatedFilters);
+                  setPage(0);
+                  fetchSources(0, rowsPerPage, searchTerm, updatedFilters);
+                  fetchFilterStats();
+                }}
+                startIcon={<LinkedInIcon sx={{ fontSize: 16 }} />}
+                sx={{
+                  minWidth: 'auto',
+                  px: 2,
+                  py: 0.5,
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  ...(socialMediaFilters.hasLinkedIn ? {
+                    bgcolor: '#0077B5',
+                    color: 'white',
+                    border: 'none',
+                    '&:hover': { bgcolor: '#005885' }
+                  } : {
+                    border: 'none',
+                    color: '#0077B5',
+                    bgcolor: 'transparent',
+                    '&:hover': { 
+                      bgcolor: '#0077B5',
+                      color: 'white'
+                    }
+                  })
+                }}
+              >
+                LinkedIn
+                <Chip 
+                  label={filterStats.socialMediaCounts.linkedin} 
+                  size="small" 
+                  variant="outlined"
+                  sx={{ 
+                    ml: 0.5, 
+                    height: 16, 
+                    fontSize: '0.625rem',
+                    ...(socialMediaFilters.hasLinkedIn ? {
+                      borderColor: 'white',
+                      color: 'white'
+                    } : {
+                      borderColor: '#0077B5',
+                      color: '#0077B5'
+                    })
+                  }} 
+                />
+              </Button>
+              
+              <Button
+                variant={socialMediaFilters.hasTikTok ? "contained" : "outlined"}
+                size="small"
+                onClick={() => {
+                  const updatedFilters = {
+                    ...socialMediaFilters,
+                    hasTikTok: !socialMediaFilters.hasTikTok
+                  };
+                  setSocialMediaFilters(updatedFilters);
+                  setPage(0);
+                  fetchSources(0, rowsPerPage, searchTerm, updatedFilters);
+                  fetchFilterStats();
+                }}
+                startIcon={<TikTokIcon sx={{ fontSize: 16 }} />}
+                sx={{
+                  minWidth: 'auto',
+                  px: 2,
+                  py: 0.5,
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  ...(socialMediaFilters.hasTikTok ? {
+                    bgcolor: '#000',
+                    color: 'white',
+                    border: 'none',
+                    '&:hover': { bgcolor: '#333' }
+                  } : {
+                    border: 'none',
+                    color: '#000',
+                    bgcolor: 'transparent',
+                    '&:hover': { 
+                      bgcolor: '#000',
+                      color: 'white'
+                    }
+                  })
+                }}
+              >
+                TikTok
+                <Chip 
+                  label={filterStats.socialMediaCounts.tiktok} 
+                  size="small" 
+                  variant="outlined"
+                  sx={{ 
+                    ml: 0.5, 
+                    height: 16, 
+                    fontSize: '0.625rem',
+                    ...(socialMediaFilters.hasTikTok ? {
+                      borderColor: 'white',
+                      color: 'white'
+                    } : {
+                      borderColor: '#000',
+                      color: '#000'
+                    })
+                  }} 
+                />
+              </Button>
+            </Box>
           </Box>
         </Box>
 
