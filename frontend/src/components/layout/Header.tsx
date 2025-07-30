@@ -34,13 +34,11 @@ import {
   Storage as StorageIcon,
   HomeOutlined as HomeIcon,
   FolderOutlined as FolderOutlinedIcon,
-  DashboardOutlined as DashboardOutlinedIcon,
-  InsertDriveFileOutlined as FileOutlinedIcon,
-  Dataset as DatabaseIcon,
-  Hub as HubIcon,
   BusinessOutlined as BusinessOutlinedIcon,
   Settings as SettingsIcon,
   ExitToApp as ExitIcon,
+  SwapHoriz as SwapIcon,
+  Code as CodeIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { logout, getUserRole, getCurrentUser } from '../../utils/auth';
@@ -135,7 +133,7 @@ const getPageTitle = (pathname: string): string => {
   
   // Handle brightdata pages
   if (parts.includes('brightdata-settings')) {
-    return 'Brightdata Settings';
+    return 'Super Admin Dashboard';
   }
   if (parts.includes('brightdata-scraper')) {
     return 'Brightdata Scraper';
@@ -198,7 +196,7 @@ const getPageTitle = (pathname: string): string => {
     'settings': 'Settings',
     'report-folders': 'Reports',
     'reports': 'Reports',
-    'brightdata-settings': 'Brightdata Settings',
+    'brightdata-settings': 'Super Admin Dashboard',
     'brightdata-scraper': 'Brightdata Scraper',
     'super': 'Super Admin Dashboard',
     'tenant': 'Tenant Admin Dashboard',
@@ -292,6 +290,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
   const [userRole, setUserRole] = useState(getUserRole());
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
+  const [isDeveloperMode, setIsDeveloperMode] = useState(false);
   
   // Breadcrumb state
   const [organizationName, setOrganizationName] = useState('Organization');
@@ -337,6 +336,14 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
       setUserEmail(user.email || '');
     }
   }, []);
+
+  // Effect to update developer mode based on current route
+  useEffect(() => {
+    if (userRole === 'super_admin') {
+      const isOrganizationsRoute = location.pathname.includes('/organizations');
+      setIsDeveloperMode(isOrganizationsRoute);
+    }
+  }, [location.pathname, userRole]);
   
   // Separate effect for organization name to prevent unnecessary re-renders
   useEffect(() => {
@@ -426,10 +433,27 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
   const handleLogoClick = useCallback(() => {
     if (userRole === 'super_admin') {
       navigate('/admin/super');
+    } else if (userRole === 'tenant_admin') {
+      navigate('/admin/tenant');
     } else {
       navigate('/');
     }
   }, [userRole, navigate]);
+
+  // Handle developer mode toggle for super admins
+  const handleDeveloperToggle = useCallback(() => {
+    if (userRole === 'super_admin') {
+      if (isDeveloperMode) {
+        // Switch back to super admin mode
+        setIsDeveloperMode(false);
+        navigate('/admin/super');
+      } else {
+        // Switch to developer mode
+        setIsDeveloperMode(true);
+        navigate('/organizations');
+      }
+    }
+  }, [userRole, isDeveloperMode, navigate]);
   
   // Memoize breadcrumb components to prevent re-rendering
   const renderBreadcrumbs = React.useMemo(() => (
@@ -682,9 +706,9 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
 
   const handleNavigateToAdmin = () => {
     if (userRole === 'super_admin') {
-      navigate('/super');
+      navigate('/admin/super');
     } else if (userRole === 'tenant_admin') {
-      navigate('/tenant');
+      navigate('/admin/tenant');
     }
   };
 
@@ -932,19 +956,22 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
           
           {/* Right side content */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, ml: 'auto' }}>
-            {/* Admin link based on role */}
+            {/* Developer mode toggle for super admins */}
             {userRole === 'super_admin' && (
               <Chip
-                icon={<AdminIcon />}
-                label="Admin Dashboard"
+                icon={isDeveloperMode ? <CodeIcon /> : <AdminIcon />}
+                label={isDeveloperMode ? "Developer Mode" : "SuperAdmin Dashboard"}
                 color="primary"
                 clickable
-                onClick={handleNavigateToAdmin}
+                onClick={handleDeveloperToggle}
                 sx={{ 
                   backgroundColor: theme => theme.palette.primary.main,
                   color: theme => theme.palette.primary.contrastText,
                   '&:hover': {
                     backgroundColor: theme => theme.palette.primary.dark,
+                  },
+                  '& .MuiChip-icon': {
+                    color: 'inherit',
                   }
                 }}
               />

@@ -11,7 +11,6 @@ import {
     Instagram as InstagramIcon,
     Logout as LogoutIcon,
     Settings as SettingsIcon,
-    SettingsSuggest as SettingsSuggestIcon,
     Storage as StorageIcon
 } from '@mui/icons-material';
 import CommentIcon from '@mui/icons-material/Comment';
@@ -223,7 +222,6 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
       subItems: [
         { text: 'Posts & Reels Scraper', path: getSocialMediaPath('automated-batch-scraper'), icon: <AutoAwesomeIcon /> },
         { text: 'Comments Scraper', path: getSocialMediaPath('comments-scraper'), icon: <CommentIcon /> },
-        { text: 'Brightdata Settings', path: getSocialMediaPath('brightdata-settings'), icon: <SettingsSuggestIcon /> },
         { text: 'Webhook Monitor', path: getSocialMediaPath('webhook-monitor'), icon: <AnalyticsIcon /> },
         { text: 'BrightData Notifications', path: getSocialMediaPath('brightdata-notifications'), icon: <NotificationsIcon /> },
       ]
@@ -357,9 +355,6 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
 
     if (itemPath.includes('brightdata-scraper')) {
       return location.pathname.includes('brightdata-scraper');
-    }
-    if (itemPath.includes('brightdata-settings')) {
-      return location.pathname.includes('brightdata-settings');
     }
 
     if (itemPath.includes('facebook-comment-scraper')) {

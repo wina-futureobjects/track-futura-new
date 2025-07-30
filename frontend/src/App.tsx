@@ -38,6 +38,7 @@ import ReportView from './pages/ReportView';
 
 // Admin and auth imports
 import SuperAdminDashboard from './pages/admin/SuperAdminDashboard';
+import TenantAdminDashboard from './pages/admin/TenantAdminDashboard';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import OrganizationProjects from './pages/OrganizationProjects';
@@ -45,7 +46,6 @@ import OrganizationsList from './pages/OrganizationsList';
 
 // Scraper and comment imports
 import AutomatedBatchScraper from './pages/AutomatedBatchScraper';
-import BrightdataSettings from './pages/BrightdataSettings';
 import CommentsScraper from './pages/CommentsScraper';
 import FacebookCommentScraper from './pages/FacebookCommentScraper';
 
@@ -55,6 +55,7 @@ import { AuthProvider } from './components/auth/AuthContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import RouteGuard from './components/auth/RouteGuard';
 import ProjectSelectionHandler from './components/ProjectSelectionHandler';
+import RoleBasedRedirect from './components/RoleBasedRedirect';
 import theme from './theme/index';
 
 // Webhook monitoring
@@ -105,12 +106,10 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
 
-              {/* Root route - redirect to login if not authenticated */}
+              {/* Root route - redirect based on role if authenticated */}
               <Route path="/" element={
                 isAuthenticated() ? (
-                  <NoSidebarLayout>
-                    <OrganizationsList />
-                  </NoSidebarLayout>
+                  <RoleBasedRedirect />
                 ) : (
                   <Navigate to="/login" />
                 )
@@ -121,6 +120,13 @@ function App() {
                 <AdminRoute requiredRole="super_admin">
                   <NoSidebarLayout>
                     <SuperAdminDashboard />
+                  </NoSidebarLayout>
+                </AdminRoute>
+              } />
+              <Route path="/admin/tenant" element={
+                <AdminRoute requiredRole="tenant_admin">
+                  <NoSidebarLayout>
+                    <TenantAdminDashboard />
                   </NoSidebarLayout>
                 </AdminRoute>
               } />
@@ -191,7 +197,6 @@ function App() {
               {/* Legacy scraper routes */}
               <Route path="/comments-scraper" element={<LegacyRouteRedirect><CommentsScraper /></LegacyRouteRedirect>} />
               <Route path="/facebook-comment-scraper" element={<LegacyRouteRedirect><FacebookCommentScraper /></LegacyRouteRedirect>} />
-              <Route path="/brightdata-settings" element={<LegacyRouteRedirect><BrightdataSettings /></LegacyRouteRedirect>} />
               <Route path="/brightdata-scraper" element={<LegacyRouteRedirect><AutomatedBatchScraper /></LegacyRouteRedirect>} />
               <Route path="/automated-batch-scraper" element={<LegacyRouteRedirect><AutomatedBatchScraper /></LegacyRouteRedirect>} />
 
@@ -412,13 +417,7 @@ function App() {
               } />
 
               {/* Brightdata routes */}
-              <Route path="/organizations/:organizationId/projects/:projectId/brightdata-settings" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <BrightdataSettings />
-                  </Layout>
-                </ProtectedRoute>
-              } />
+
 
               <Route path="/organizations/:organizationId/projects/:projectId/brightdata-scraper" element={
                 <ProtectedRoute>

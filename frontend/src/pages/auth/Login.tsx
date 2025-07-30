@@ -353,28 +353,7 @@ const Login: React.FC = () => {
       if (userRole === 'super_admin') {
         navigate('/admin/super');
       } else if (userRole === 'tenant_admin') {
-        // Fetch the tenant admin's organizations and redirect to the first one's projects page
-        try {
-          const response = await apiFetch('/api/users/organizations/');
-          if (response.ok) {
-            const data = await response.json();
-            const organizations = Array.isArray(data) ? data : (data.results || []);
-
-            if (organizations.length > 0) {
-              // Redirect to the first organization's projects page
-              navigate(`/organizations/${organizations[0].id}/projects`);
-            } else {
-              // If no organizations, redirect to main page
-              navigate('/');
-            }
-          } else {
-            // If API call fails, redirect to main page
-            navigate('/');
-          }
-        } catch (error) {
-          console.error('Error fetching organizations:', error);
-          navigate('/');
-        }
+        navigate('/admin/tenant');
       } else {
         navigate('/');
       }
