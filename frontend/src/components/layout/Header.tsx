@@ -40,6 +40,7 @@ import {
   Hub as HubIcon,
   BusinessOutlined as BusinessOutlinedIcon,
   Settings as SettingsIcon,
+  ExitToApp as ExitIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { logout, getUserRole, getCurrentUser } from '../../utils/auth';
@@ -420,6 +421,15 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
     setProjectDropAnchorEl(event.currentTarget);
     fetchOrganizationProjects();
   }, [organizationId]);
+
+  // Handle logo click based on user role
+  const handleLogoClick = useCallback(() => {
+    if (userRole === 'super_admin') {
+      navigate('/admin/super');
+    } else {
+      navigate('/');
+    }
+  }, [userRole, navigate]);
   
   // Memoize breadcrumb components to prevent re-rendering
   const renderBreadcrumbs = React.useMemo(() => (
@@ -437,7 +447,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
       {/* Logo Link */}
       <Box
         component="button"
-        onClick={() => navigate('/')}
+        onClick={handleLogoClick}
         sx={{ 
           display: 'flex', 
           alignItems: 'center',
@@ -654,7 +664,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
         </Typography>
       )}
     </Box>
-  ), [theme, navigate, organizationId, organizationName, handleOrgDropdownOpen, orgDropdownId, orgDropdownOpen, isProjectsListPath, isProjectPath, projectId, projectName, handleProjectDropdownOpen, projectDropdownId, projectDropdownOpen, showDashboardLabel, isDashboardPath, currentPage, location.pathname]);
+  ), [theme, navigate, organizationId, organizationName, handleOrgDropdownOpen, orgDropdownId, orgDropdownOpen, isProjectsListPath, isProjectPath, projectId, projectName, handleProjectDropdownOpen, projectDropdownId, projectDropdownOpen, showDashboardLabel, isDashboardPath, currentPage, location.pathname, handleLogoClick]);
 
   // Handle menu operations
   const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
@@ -860,9 +870,14 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
         sx={{ 
           fontSize: '14px',
           py: 1,
-          '&:hover': { backgroundColor: theme => `rgba(166, 253, 237, 0.1)` }
+          color: '#d32f2f',
+          '&:hover': { 
+            backgroundColor: 'rgba(211, 47, 47, 0.1)',
+            color: '#b71c1c'
+          }
         }}
       >
+        <ExitIcon sx={{ mr: 1, fontSize: 18 }} />
         Log out
       </MenuItem>
     </Menu>
