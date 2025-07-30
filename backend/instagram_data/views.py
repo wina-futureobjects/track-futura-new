@@ -348,6 +348,63 @@ class InstagramPostViewSet(viewsets.ModelViewSet):
                 Q(post_id__icontains=search_query)
             )
         
+        # Add date range filtering
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+        
+        if start_date:
+            try:
+                start_datetime = self._parse_date(start_date)
+                if start_datetime:
+                    queryset = queryset.filter(date_posted__gte=start_datetime)
+            except Exception as e:
+                print(f"Error parsing start_date {start_date}: {e}")
+        
+        if end_date:
+            try:
+                end_datetime = self._parse_date(end_date)
+                if end_datetime:
+                    queryset = queryset.filter(date_posted__lte=end_datetime)
+            except Exception as e:
+                print(f"Error parsing end_date {end_date}: {e}")
+        
+        # Add likes range filtering
+        min_likes = self.request.query_params.get('min_likes')
+        max_likes = self.request.query_params.get('max_likes')
+        
+        if min_likes:
+            try:
+                min_likes_int = int(min_likes)
+                queryset = queryset.filter(likes__gte=min_likes_int)
+            except (ValueError, TypeError):
+                print(f"Error parsing min_likes {min_likes}")
+        
+        if max_likes:
+            try:
+                max_likes_int = int(max_likes)
+                queryset = queryset.filter(likes__lte=max_likes_int)
+            except (ValueError, TypeError):
+                print(f"Error parsing max_likes {max_likes}")
+        
+        # Add sorting
+        sort_by = self.request.query_params.get('sort_by', 'date_posted')
+        sort_order = self.request.query_params.get('sort_order', 'desc')
+        
+        # Validate sort_by field to prevent injection
+        allowed_sort_fields = {
+            'date_posted', 'likes', 'num_comments', 'user_posted', 
+            'content_type', 'is_verified', 'is_paid_partnership'
+        }
+        
+        if sort_by not in allowed_sort_fields:
+            sort_by = 'date_posted'  # Default to date_posted if invalid field
+        
+        # Apply sorting
+        if sort_order == 'desc':
+            queryset = queryset.order_by(f'-{sort_by}')
+        else:
+            queryset = queryset.order_by(sort_by)
+        
         return queryset
 
     def _safe_int_convert(self, value):
@@ -868,6 +925,50 @@ class InstagramPostViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(detail=False, methods=['GET'])
+    def stats(self, request):
+        """
+        Get statistics about posts
+        """
+        try:
+            folder_id = request.query_params.get('folder_id')
+            
+            # Base queryset
+            queryset = self.get_queryset()
+            if folder_id:
+                queryset = queryset.filter(folder_id=folder_id)
+            
+            # Calculate statistics
+            from django.db import models
+            total_posts = queryset.count()
+            unique_users = queryset.values('user_posted').distinct().count()
+            avg_likes = queryset.aggregate(avg_likes=models.Avg('likes'))['avg_likes'] or 0
+            avg_comments = queryset.aggregate(avg_comments=models.Avg('num_comments'))['avg_comments'] or 0
+            verified_accounts = queryset.filter(is_verified=True).count()
+            
+            # Calculate average views for video content
+            video_posts = queryset.filter(content_type='reel')
+            avg_views = 0
+            if video_posts.exists():
+                avg_views = video_posts.aggregate(avg_views=models.Avg('views'))['avg_views'] or 0
+            
+            stats = {
+                'totalPosts': total_posts,
+                'uniqueUsers': unique_users,
+                'avgLikes': round(avg_likes, 2),
+                'avgComments': round(avg_comments, 2),
+                'verifiedAccounts': verified_accounts,
+                'avgViews': round(avg_views, 2),
+            }
+            
+            return Response(stats, status=status.HTTP_200_OK)
+        except Exception as e:
+            print(f"Error in posts stats view: {str(e)}")
+            return Response(
+                {'error': 'An error occurred while retrieving statistics'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
     @action(detail=False, methods=['POST'])
     def move_to_folder(self, request):
         """
@@ -937,17 +1038,37 @@ class InstagramCommentViewSet(viewsets.ModelViewSet):
             
             if start_date:
                 try:
-                    start_date_obj = datetime.datetime.strptime(start_date, '%Y-%m-%d').date()
-                    queryset = queryset.filter(comment_date__gte=start_date_obj)
-                except ValueError:
-                    pass
+                    start_datetime = self._parse_date(start_date)
+                    if start_datetime:
+                        queryset = queryset.filter(comment_date__gte=start_datetime)
+                except Exception as e:
+                    print(f"Error parsing start_date {start_date}: {e}")
             
             if end_date:
                 try:
-                    end_date_obj = datetime.datetime.strptime(end_date, '%Y-%m-%d').date()
-                    queryset = queryset.filter(comment_date__lte=end_date_obj)
-                except ValueError:
-                    pass
+                    end_datetime = self._parse_date(end_date)
+                    if end_datetime:
+                        queryset = queryset.filter(comment_date__lte=end_datetime)
+                except Exception as e:
+                    print(f"Error parsing end_date {end_date}: {e}")
+            
+            # Add likes range filtering for comments
+            min_likes = self.request.query_params.get('min_likes')
+            max_likes = self.request.query_params.get('max_likes')
+            
+            if min_likes:
+                try:
+                    min_likes_int = int(min_likes)
+                    queryset = queryset.filter(likes_number__gte=min_likes_int)
+                except (ValueError, TypeError):
+                    print(f"Error parsing min_likes {min_likes}")
+            
+            if max_likes:
+                try:
+                    max_likes_int = int(max_likes)
+                    queryset = queryset.filter(likes_number__lte=max_likes_int)
+                except (ValueError, TypeError):
+                    print(f"Error parsing max_likes {max_likes}")
             
             # Add search functionality
             search_query = self.request.query_params.get('search', '')
@@ -957,6 +1078,25 @@ class InstagramCommentViewSet(viewsets.ModelViewSet):
                 search_filter |= Q(comment__icontains=search_query)
                 search_filter |= Q(post_id__icontains=search_query)
                 queryset = queryset.filter(search_filter)
+            
+            # Add sorting
+            sort_by = self.request.query_params.get('sort_by', 'comment_date')
+            sort_order = self.request.query_params.get('sort_order', 'desc')
+            
+            # Validate sort_by field to prevent injection
+            allowed_sort_fields = {
+                'comment_date', 'likes_number', 'replies_number', 'comment_user', 
+                'post_id', 'comment'
+            }
+            
+            if sort_by not in allowed_sort_fields:
+                sort_by = 'comment_date'  # Default to comment_date if invalid field
+            
+            # Apply sorting
+            if sort_order == 'desc':
+                queryset = queryset.order_by(f'-{sort_by}')
+            else:
+                queryset = queryset.order_by(sort_by)
             
             return queryset
         except Exception as e:

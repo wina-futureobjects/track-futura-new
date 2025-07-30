@@ -150,20 +150,52 @@ const ProjectDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Mock project stats
+  // Project stats - will be fetched from API
   const [stats, setStats] = useState<ProjectStats>({
-    totalPosts: 1258,
-    totalAccounts: 42,
-    totalReports: 15,
-    totalStorageUsed: '2.8 GB',
-    creditBalance: 2400,
-    maxCredits: 5000,
-    engagementRate: 3.2,
-    growthRate: 5.8
+    totalPosts: 0,
+    totalAccounts: 0,
+    totalReports: 0,
+    totalStorageUsed: '0 MB',
+    creditBalance: 0,
+    maxCredits: 0,
+    engagementRate: 0,
+    growthRate: 0
   });
+  const [statsLoading, setStatsLoading] = useState(true);
   
   // Determine which URL pattern we're using
   const isOrgProjectUrl = location.pathname.includes('/organizations/') && location.pathname.includes('/projects/');
+
+  // Function to fetch project statistics
+  const fetchProjectStats = async () => {
+    if (!projectId) return;
+    
+    try {
+      setStatsLoading(true);
+      const response = await apiFetch(`/api/users/projects/${projectId}/stats/`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch project statistics');
+      }
+      
+      const data = await response.json();
+      setStats({
+        totalPosts: data.totalPosts || 0,
+        totalAccounts: data.totalAccounts || 0,
+        totalReports: data.totalReports || 0,
+        totalStorageUsed: data.totalStorageUsed || '0 MB',
+        creditBalance: data.creditBalance || 0,
+        maxCredits: data.maxCredits || 0,
+        engagementRate: data.engagementRate || 0,
+        growthRate: data.growthRate || 0
+      });
+    } catch (error) {
+      console.error('Error fetching project statistics:', error);
+      // Don't set error state for stats - just log it and keep using default values
+    } finally {
+      setStatsLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchProject = async () => {
@@ -194,6 +226,7 @@ const ProjectDashboard = () => {
     };
     
     fetchProject();
+    fetchProjectStats();
   }, [projectId, isOrgProjectUrl]);
 
   // Function to get the project URL in the correct format
@@ -271,12 +304,29 @@ const ProjectDashboard = () => {
       <Box sx={{ mx: 'auto', maxWidth: 'none', width: '100%' }}>
         {/* Dashboard Header */}
         <Box sx={{ mb: 4 }}>
-          <Typography variant="h4" fontWeight={600} gutterBottom>
-            {project?.name || 'Project Dashboard'}
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Track your social media performance and manage your content across platforms
-          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+            <Box>
+              <Typography variant="h4" fontWeight={600} gutterBottom>
+                {project?.name || 'Project Dashboard'}
+              </Typography>
+              <Typography variant="body1" color="text.secondary">
+                Track your social media performance and manage your content across platforms
+              </Typography>
+            </Box>
+            <Button
+              variant="outlined"
+              startIcon={<RefreshCw size={16} />}
+              onClick={fetchProjectStats}
+              disabled={statsLoading}
+              sx={{ 
+                borderColor: 'divider',
+                color: 'text.secondary',
+                '&:hover': { borderColor: 'primary.main' }
+              }}
+            >
+              {statsLoading ? 'Refreshing...' : 'Refresh Stats'}
+            </Button>
+          </Box>
         </Box>
 
         {/* Dashboard Stats Cards */}
@@ -289,20 +339,33 @@ const ProjectDashboard = () => {
                   <BarChart3 size={22} />
                 </Avatar>
               </Box>
-              <Typography variant="h3" fontWeight={700} gutterBottom sx={{ color: 'text.primary' }}>{stats.totalPosts}</Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Chip 
-                  label={`+12.5%`} 
-                  size="small" 
-                  sx={{ 
-                    bgcolor: alpha(theme.palette.success.main, 0.1), 
-                    color: theme.palette.success.main,
-                    mr: 1,
-                    fontWeight: 600
-                  }} 
-                />
-                <Typography variant="body2" color="text.secondary">vs last period</Typography>
-              </Box>
+              {statsLoading ? (
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <CircularProgress size={24} color="primary" />
+                  <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                    Loading...
+                  </Typography>
+                </Box>
+              ) : (
+                <>
+                  <Typography variant="h3" fontWeight={700} gutterBottom sx={{ color: 'text.primary' }}>
+                    {stats.totalPosts.toLocaleString()}
+                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Chip 
+                      label={`+12.5%`} 
+                      size="small" 
+                      sx={{ 
+                        bgcolor: alpha(theme.palette.success.main, 0.1), 
+                        color: theme.palette.success.main,
+                        mr: 1,
+                        fontWeight: 600
+                      }} 
+                    />
+                    <Typography variant="body2" color="text.secondary">vs last period</Typography>
+                  </Box>
+                </>
+              )}
             </Paper>
           </Grid>
           <Grid gridColumn={{ xs: 'span 12', sm: 'span 6', md: 'span 3', xl: 'span 3' }}>
@@ -313,20 +376,33 @@ const ProjectDashboard = () => {
                   <Users size={22} />
                 </Avatar>
               </Box>
-              <Typography variant="h3" fontWeight={700} gutterBottom sx={{ color: 'text.primary' }}>{stats.totalAccounts}</Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Chip 
-                  label={`+5.2%`} 
-                  size="small" 
-                  sx={{ 
-                    bgcolor: alpha(theme.palette.success.main, 0.1), 
-                    color: theme.palette.success.main,
-                    mr: 1,
-                    fontWeight: 600
-                  }} 
-                />
-                <Typography variant="body2" color="text.secondary">vs last period</Typography>
-              </Box>
+              {statsLoading ? (
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <CircularProgress size={24} color="secondary" />
+                  <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                    Loading...
+                  </Typography>
+                </Box>
+              ) : (
+                <>
+                  <Typography variant="h3" fontWeight={700} gutterBottom sx={{ color: 'text.primary' }}>
+                    {stats.totalAccounts.toLocaleString()}
+                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Chip 
+                      label={`+5.2%`} 
+                      size="small" 
+                      sx={{ 
+                        bgcolor: alpha(theme.palette.success.main, 0.1), 
+                        color: theme.palette.success.main,
+                        mr: 1,
+                        fontWeight: 600
+                      }} 
+                    />
+                    <Typography variant="body2" color="text.secondary">vs last period</Typography>
+                  </Box>
+                </>
+              )}
             </Paper>
           </Grid>
           <Grid gridColumn={{ xs: 'span 12', sm: 'span 6', md: 'span 3', xl: 'span 3' }}>
@@ -337,20 +413,33 @@ const ProjectDashboard = () => {
                   <TrendingUp size={22} />
                 </Avatar>
               </Box>
-              <Typography variant="h3" fontWeight={700} gutterBottom sx={{ color: 'text.primary' }}>{stats.engagementRate}%</Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Chip 
-                  label={`+0.8%`} 
-                  size="small" 
-                  sx={{ 
-                    bgcolor: alpha(theme.palette.success.main, 0.1), 
-                    color: theme.palette.success.main,
-                    mr: 1,
-                    fontWeight: 600
-                  }} 
-                />
-                <Typography variant="body2" color="text.secondary">vs last period</Typography>
-              </Box>
+              {statsLoading ? (
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <CircularProgress size={24} color="success" />
+                  <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                    Loading...
+                  </Typography>
+                </Box>
+              ) : (
+                <>
+                  <Typography variant="h3" fontWeight={700} gutterBottom sx={{ color: 'text.primary' }}>
+                    {stats.engagementRate}%
+                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Chip 
+                      label={`+0.8%`} 
+                      size="small" 
+                      sx={{ 
+                        bgcolor: alpha(theme.palette.success.main, 0.1), 
+                        color: theme.palette.success.main,
+                        mr: 1,
+                        fontWeight: 600
+                      }} 
+                    />
+                    <Typography variant="body2" color="text.secondary">vs last period</Typography>
+                  </Box>
+                </>
+              )}
             </Paper>
           </Grid>
           <Grid gridColumn={{ xs: 'span 12', sm: 'span 6', md: 'span 3', xl: 'span 3' }}>
@@ -361,20 +450,33 @@ const ProjectDashboard = () => {
                   <HardDrive size={22} />
                 </Avatar>
               </Box>
-              <Typography variant="h3" fontWeight={700} gutterBottom sx={{ color: 'text.primary' }}>{stats.totalStorageUsed}</Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Chip 
-                  label={`-20.3%`} 
-                  size="small" 
-                  sx={{ 
-                    bgcolor: alpha(theme.palette.error.main, 0.1), 
-                    color: theme.palette.error.main,
-                    mr: 1,
-                    fontWeight: 600
-                  }} 
-                />
-                <Typography variant="body2" color="text.secondary">vs last period</Typography>
-              </Box>
+              {statsLoading ? (
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <CircularProgress size={24} color="warning" />
+                  <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                    Loading...
+                  </Typography>
+                </Box>
+              ) : (
+                <>
+                  <Typography variant="h3" fontWeight={700} gutterBottom sx={{ color: 'text.primary' }}>
+                    {stats.totalStorageUsed}
+                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Chip 
+                      label={`${Math.round((stats.creditBalance / stats.maxCredits) * 100)}%`} 
+                      size="small" 
+                      sx={{ 
+                        bgcolor: alpha(theme.palette.info.main, 0.1), 
+                        color: theme.palette.info.main,
+                        mr: 1,
+                        fontWeight: 600
+                      }} 
+                    />
+                    <Typography variant="body2" color="text.secondary">of quota used</Typography>
+                  </Box>
+                </>
+              )}
             </Paper>
           </Grid>
         </Grid>

@@ -40,6 +40,7 @@ import {
   Menu,
   ListItemIcon,
   ListItemText,
+  Collapse,
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -60,6 +61,9 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import GetAppIcon from '@mui/icons-material/GetApp';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import SortIcon from '@mui/icons-material/Sort';
+import DateRangeIcon from '@mui/icons-material/DateRange';
+import ChatIcon from '@mui/icons-material/Chat';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { apiFetch } from '../utils/api';
 
 interface InstagramPost {
@@ -109,6 +113,7 @@ interface FolderStats {
   totalPosts: number;
   uniqueUsers: number;
   avgLikes: number;
+  avgComments: number;
   verifiedAccounts: number;
 }
 
@@ -172,6 +177,7 @@ const InstagramDataUpload = () => {
     totalPosts: 0,
     uniqueUsers: 0,
     avgLikes: 0,
+    avgComments: 0,
     verifiedAccounts: 0
   });
   // Remove upload tab state as we're using single upload now
@@ -181,9 +187,16 @@ const InstagramDataUpload = () => {
   const [sortMenuAnchor, setSortMenuAnchor] = useState<null | HTMLElement>(null);
   const [sortBy, setSortBy] = useState<string>('date_posted');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  
+  // Filter state
+  const [showFilters, setShowFilters] = useState(false);
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [minLikes, setMinLikes] = useState<string>('');
+  const [maxLikes, setMaxLikes] = useState<string>('');
 
   // Fetch Instagram posts/comments with pagination
-  const fetchPosts = async (pageNumber = 0, pageSize = 10, searchTerm = '', contentType = '') => {
+  const fetchPosts = async (pageNumber = 0, pageSize = 10, searchTerm = '', contentType = '', useFilters = false) => {
     try {
       setIsLoading(true);
       
@@ -205,12 +218,23 @@ const InstagramDataUpload = () => {
       const searchParam = searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : '';
       const projectParam = projectId ? `&project=${projectId}` : '';
       
+      // Add sorting parameters
+      const sortParams = `&sort_by=${sortBy}&sort_order=${sortOrder}`;
+      
+      // Add filter parameters if useFilters is true
+      const filterParams = useFilters ? [
+        startDate ? `&start_date=${startDate}` : '',
+        endDate ? `&end_date=${endDate}` : '',
+        minLikes ? `&min_likes=${minLikes}` : '',
+        maxLikes ? `&max_likes=${maxLikes}` : ''
+      ].join('') : '';
+      
       // Check folder category first and call appropriate endpoint
       if (currentFolder?.category === 'comments') {
         console.log('🔄 Comments folder detected - using comments endpoint directly');
         
         // For comments folders, use the folder contents endpoint or direct comments API
-        const commentsApiUrl = `/api/instagram-data/folders/${folderId}/contents/?page=${pageNumber + 1}&page_size=${pageSize}${searchParam}${projectParam}`;
+        const commentsApiUrl = `/api/instagram-data/folders/${folderId}/contents/?page=${pageNumber + 1}&page_size=${pageSize}${searchParam}${projectParam}${filterParams}${sortParams}`;
         console.log('🔄 Fetching comments from:', commentsApiUrl);
         
         const response = await apiFetch(commentsApiUrl);
@@ -255,7 +279,7 @@ const InstagramDataUpload = () => {
         const contentTypeParam = contentType && contentType !== 'all' ? `&content_type=${contentType}` : '';
         const folderParam = `folder_id=${folderId}`;
         
-        const postsApiUrl = `/api/instagram-data/posts/?${folderParam}&page=${pageNumber + 1}&page_size=${pageSize}${searchParam}${contentTypeParam}${projectParam}`;
+        const postsApiUrl = `/api/instagram-data/posts/?${folderParam}&page=${pageNumber + 1}&page_size=${pageSize}${searchParam}${contentTypeParam}${projectParam}${filterParams}${sortParams}`;
         console.log('🚀 Fetching posts from:', postsApiUrl);
         
         const response = await apiFetch(postsApiUrl);
@@ -354,7 +378,7 @@ const InstagramDataUpload = () => {
       // Use different endpoint based on folder category
       if (currentFolder?.category === 'comments') {
         console.log('📈 Fetching comments folder stats...');
-        const statsApiUrl = `/api/instagram-data/comments/?${folderParam}&page_size=1000${projectParam}`;
+        const statsApiUrl = `/api/instagram-data/comments/stats/?${folderParam}${projectParam}`;
         console.log('📈 Fetching comments stats from:', statsApiUrl);
         
         const response = await apiFetch(statsApiUrl);
@@ -367,33 +391,24 @@ const InstagramDataUpload = () => {
         const data = await response.json();
         console.log('📈 Comments stats API response data:', data);
         
-        if (data && typeof data === 'object' && 'results' in data) {
-          const allComments = data.results || [];
-          const uniqueUsers = [...new Set(allComments.map((comment: InstagramComment) => comment.comment_user))].length;
-          const totalLikes = allComments.reduce((acc: number, comment: InstagramComment) => acc + comment.likes_number, 0);
-          const avgLikes = allComments.length > 0 ? Math.round(totalLikes / allComments.length) : 0;
-          // For comments, we don't have verified accounts info, so we'll set it to 0
-          const verifiedAccounts = 0;
-          
-          console.log('📈 Calculated comments stats:', {
-            totalComments: data.count || 0,
-            uniqueUsers,
-            avgLikes,
-            verifiedAccounts,
-            actualCommentsLength: allComments.length
-          });
-          
-          setFolderStats({
-            totalPosts: data.count || 0, // This represents total comments for comments folders
-            uniqueUsers,
-            avgLikes,
-            verifiedAccounts
-          });
-        }
+        setFolderStats({
+          totalPosts: data.totalComments || 0, // This represents total comments for comments folders
+          uniqueUsers: data.uniqueCommenters || 0,
+          avgLikes: Math.round(data.avgLikes || 0),
+          avgComments: Math.round(data.avgReplies || 0), // For comments, use avgReplies as avgComments
+          verifiedAccounts: 0 // Comments don't have verified account info
+        });
+        
+        console.log('📈 Set comments stats:', {
+          totalComments: data.totalComments || 0,
+          uniqueCommenters: data.uniqueCommenters || 0,
+          avgLikes: data.avgLikes || 0
+        });
+        
       } else {
-        // For posts/reels folders, use the posts endpoint
+        // For posts/reels folders, use the posts stats endpoint
         console.log('📈 Fetching posts folder stats...');
-        const statsApiUrl = `/api/instagram-data/posts/?${folderParam}&page_size=1000${projectParam}`;
+        const statsApiUrl = `/api/instagram-data/posts/stats/?${folderParam}${projectParam}`;
         console.log('📈 Fetching posts stats from:', statsApiUrl);
         
         const response = await apiFetch(statsApiUrl);
@@ -406,28 +421,20 @@ const InstagramDataUpload = () => {
         const data = await response.json();
         console.log('📈 Posts stats API response data:', data);
         
-        if (data && typeof data === 'object' && 'results' in data) {
-          const allPosts = data.results || [];
-          const uniqueUsers = [...new Set(allPosts.map((post: InstagramPost) => post.user_posted))].length;
-          const totalLikes = allPosts.reduce((acc: number, post: InstagramPost) => acc + post.likes, 0);
-          const avgLikes = allPosts.length > 0 ? Math.round(totalLikes / allPosts.length) : 0;
-          const verifiedAccounts = allPosts.filter((post: InstagramPost) => post.is_verified).length;
-          
-          console.log('📈 Calculated posts stats:', {
-            totalPosts: data.count || 0,
-            uniqueUsers,
-            avgLikes,
-            verifiedAccounts,
-            actualPostsLength: allPosts.length
-          });
-          
-          setFolderStats({
-            totalPosts: data.count || 0,
-            uniqueUsers,
-            avgLikes,
-            verifiedAccounts
-          });
-        }
+        setFolderStats({
+          totalPosts: data.totalPosts || 0,
+          uniqueUsers: data.uniqueUsers || 0,
+          avgLikes: Math.round(data.avgLikes || 0),
+          avgComments: Math.round(data.avgComments || 0), // For posts, use avgComments
+          verifiedAccounts: data.verifiedAccounts || 0
+        });
+        
+        console.log('📈 Set posts stats:', {
+          totalPosts: data.totalPosts || 0,
+          uniqueUsers: data.uniqueUsers || 0,
+          avgLikes: data.avgLikes || 0,
+          verifiedAccounts: data.verifiedAccounts || 0
+        });
       }
     } catch (error) {
       console.error('Error fetching folder statistics:', error);
@@ -468,18 +475,21 @@ const InstagramDataUpload = () => {
   useEffect(() => {
     if (folderId && currentFolder) {
       console.log('📁 Folder details loaded, now fetching data...');
-      fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter);
+      const hasFilterValues = Boolean(startDate || endDate || minLikes || maxLikes);
+      fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter, hasFilterValues);
       fetchFolderStats();
     }
   }, [folderId, currentFolder]); // Re-fetch when folder ID or folder details change
   
-  // This effect handles pagination, search, and content type filter changes
+  // This effect handles pagination, search, content type filter, sorting, and filtering changes
   useEffect(() => {
     // Only fetch if we have both folderId and currentFolder loaded
     if (folderId && currentFolder) {
-      fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter);
+      // Check if there are actual filter values to apply
+      const hasFilterValues = Boolean(startDate || endDate || minLikes || maxLikes);
+      fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter, hasFilterValues);
     }
-  }, [page, rowsPerPage, searchTerm, contentTypeFilter, currentFolder]);
+  }, [page, rowsPerPage, searchTerm, contentTypeFilter, sortBy, sortOrder, showFilters, startDate, endDate, minLikes, maxLikes, currentFolder]);
 
   // Handle file change
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -676,7 +686,7 @@ const InstagramDataUpload = () => {
           
           // Refresh the data in the proper order
           await fetchFolderDetails(); // Refresh folder details first
-          await fetchPosts(0, rowsPerPage, '', 'all'); // Reset to page 0 with no filters
+          await fetchPosts(0, rowsPerPage, '', 'all', false); // Reset to page 0 with no filters
           fetchFolderStats(); // Update statistics
           
           // Clear success message after 5 seconds
@@ -824,6 +834,11 @@ const InstagramDataUpload = () => {
     }
   };
 
+  const handleBackNavigation = () => {
+    // Use the same logic as handleGoToFolders for back navigation
+    handleGoToFolders();
+  };
+
   const handleCopyLink = (url: string) => {
     navigator.clipboard.writeText(url);
     setSnackbarMessage('Link copied to clipboard!');
@@ -854,11 +869,45 @@ const InstagramDataUpload = () => {
 
   const handleSort = (field: string) => {
     const newOrder = sortBy === field && sortOrder === 'desc' ? 'asc' : 'desc';
-    setSortBy(field);
+    
+    // Map frontend field names to backend field names based on folder category
+    let backendField = field;
+    if (currentFolder?.category === 'comments') {
+      // Map comment-specific field names
+      const fieldMapping: { [key: string]: string } = {
+        'likes': 'likes_number',
+        'num_comments': 'replies_number',
+        'user_posted': 'comment_user',
+        'date_posted': 'comment_date'
+      };
+      backendField = fieldMapping[field] || field;
+    }
+    
+    setSortBy(backendField);
     setSortOrder(newOrder);
     handleSortMenuClose();
-    // Trigger data refresh with new sorting
-    fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter);
+    // Trigger data refresh with new sorting and current filters
+    const hasFilterValues = Boolean(startDate || endDate || minLikes || maxLikes);
+    fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter, hasFilterValues);
+  };
+
+  // Filter handlers
+  const handleFilterToggle = () => {
+    setShowFilters(!showFilters);
+  };
+
+  const handleApplyFilters = () => {
+    // Check if there are actual filter values to apply
+    const hasFilterValues = Boolean(startDate || endDate || minLikes || maxLikes);
+    fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter, hasFilterValues);
+  };
+
+  const handleClearFilters = () => {
+    setStartDate('');
+    setEndDate('');
+    setMinLikes('');
+    setMaxLikes('');
+    fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter, false);
   };
 
   return (
@@ -890,13 +939,30 @@ const InstagramDataUpload = () => {
       {/* Header Section */}
       <Box sx={{ mb: 4 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-          <Box>
-            <Typography variant="h4" component="h1" fontWeight={600} sx={{ mb: 1 }}>
-              {currentFolder ? currentFolder.name : 'Instagram Data Management'}
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              {currentFolder ? currentFolder.description || `${currentFolder.category_display || currentFolder.category} data analysis` : 'Manage and analyze your Instagram data'}
-            </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            {currentFolder && (
+              <IconButton
+                onClick={handleBackNavigation}
+                sx={{ 
+                  color: 'primary.main',
+                  '&:hover': { 
+                    backgroundColor: 'primary.light',
+                    color: 'white'
+                  }
+                }}
+                size="large"
+              >
+                <ArrowBackIcon />
+              </IconButton>
+            )}
+            <Box>
+              <Typography variant="h4" component="h1" fontWeight={600} sx={{ mb: 1 }}>
+                {currentFolder ? currentFolder.name : 'Instagram Data Management'}
+              </Typography>
+              <Typography variant="body1" color="text.secondary">
+                {currentFolder ? currentFolder.description || `${currentFolder.category_display || currentFolder.category} data analysis` : 'Manage and analyze your Instagram data'}
+              </Typography>
+            </Box>
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Button
@@ -911,7 +977,8 @@ const InstagramDataUpload = () => {
                 setPage(0);
                 
                 // Refresh all data
-                fetchPosts(0, rowsPerPage, searchTerm, contentTypeFilter);
+                const hasFilterValues = Boolean(startDate || endDate || minLikes || maxLikes);
+                fetchPosts(0, rowsPerPage, searchTerm, contentTypeFilter, hasFilterValues);
                 fetchFolderStats();
                 fetchFolderDetails();
               }}
@@ -924,13 +991,7 @@ const InstagramDataUpload = () => {
               startIcon={<GetAppIcon />}
               onClick={() => handleDownloadCSV(undefined)}
             >
-              Export
-            </Button>
-            <Button
-              variant="outlined"
-              onClick={handleGoToFolders}
-            >
-              All Folders
+              Export CSV
             </Button>
           </Box>
         </Box>
@@ -950,16 +1011,18 @@ const InstagramDataUpload = () => {
         {/* Single Summary Box */}
         <Paper sx={{ p: 3, mb: 3, border: '1px solid', borderColor: 'divider' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6" fontWeight={600}>
-              Data Overview
-            </Typography>
-            <IconButton
-              onClick={handleSortMenuOpen}
-              size="small"
-              sx={{ color: 'text.secondary' }}
-            >
-              <MoreVertIcon />
-            </IconButton>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography variant="h6" fontWeight={600}>
+                Data Overview
+              </Typography>
+              <Chip 
+                label={`Sorted by ${sortBy} (${sortOrder})`}
+                size="small"
+                color="primary"
+                variant="outlined"
+              />
+            </Box>
+        
             <Menu
               anchorEl={sortMenuAnchor}
               open={Boolean(sortMenuAnchor)}
@@ -973,34 +1036,62 @@ const InstagramDataUpload = () => {
                 horizontal: 'right',
               }}
             >
-              <MenuItem onClick={() => handleSort('date_posted')}>
+              <MenuItem onClick={() => handleSort('date_posted')} selected={sortBy === (currentFolder?.category === 'comments' ? 'comment_date' : 'date_posted')}>
                 <ListItemIcon>
                   <SortIcon fontSize="small" />
                 </ListItemIcon>
-                <ListItemText>Sort by Date</ListItemText>
+                <ListItemText>
+                  Sort by {currentFolder?.category === 'comments' ? 'Comment Date' : 'Date'}
+                  {sortBy === (currentFolder?.category === 'comments' ? 'comment_date' : 'date_posted') && (
+                    <Typography variant="caption" color="primary" sx={{ ml: 1 }}>
+                      ({sortOrder})
+                    </Typography>
+                  )}
+                </ListItemText>
               </MenuItem>
-              <MenuItem onClick={() => handleSort('likes')}>
+              <MenuItem onClick={() => handleSort('likes')} selected={sortBy === (currentFolder?.category === 'comments' ? 'likes_number' : 'likes')}>
                 <ListItemIcon>
                   <ThumbUpIcon fontSize="small" />
                 </ListItemIcon>
-                <ListItemText>Sort by Likes</ListItemText>
+                <ListItemText>
+                  Sort by Likes
+                  {sortBy === (currentFolder?.category === 'comments' ? 'likes_number' : 'likes') && (
+                    <Typography variant="caption" color="primary" sx={{ ml: 1 }}>
+                      ({sortOrder})
+                    </Typography>
+                  )}
+                </ListItemText>
               </MenuItem>
-              <MenuItem onClick={() => handleSort('user_posted')}>
+              <MenuItem onClick={() => handleSort('user_posted')} selected={sortBy === (currentFolder?.category === 'comments' ? 'comment_user' : 'user_posted')}>
                 <ListItemIcon>
                   <GroupIcon fontSize="small" />
                 </ListItemIcon>
-                <ListItemText>Sort by User</ListItemText>
+                <ListItemText>
+                  Sort by {currentFolder?.category === 'comments' ? 'Commenter' : 'User'}
+                  {sortBy === (currentFolder?.category === 'comments' ? 'comment_user' : 'user_posted') && (
+                    <Typography variant="caption" color="primary" sx={{ ml: 1 }}>
+                      ({sortOrder})
+                    </Typography>
+                  )}
+                </ListItemText>
               </MenuItem>
-              <MenuItem onClick={() => handleSort('num_comments')}>
+              <MenuItem onClick={() => handleSort('num_comments')} selected={sortBy === (currentFolder?.category === 'comments' ? 'replies_number' : 'num_comments')}>
                 <ListItemIcon>
                   <AnalyticsIcon fontSize="small" />
                 </ListItemIcon>
-                <ListItemText>Sort by Comments</ListItemText>
+                <ListItemText>
+                  Sort by {currentFolder?.category === 'comments' ? 'Replies' : 'Comments'}
+                  {sortBy === (currentFolder?.category === 'comments' ? 'replies_number' : 'num_comments') && (
+                    <Typography variant="caption" color="primary" sx={{ ml: 1 }}>
+                      ({sortOrder})
+                    </Typography>
+                  )}
+                </ListItemText>
               </MenuItem>
             </Menu>
           </Box>
           
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr' }, gap: 4 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr 1fr' }, gap: 4 }}>
             <Box sx={{ textAlign: 'center' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
                 <AnalyticsIcon sx={{ color: 'primary.main', mr: 1 }} />
@@ -1009,7 +1100,11 @@ const InstagramDataUpload = () => {
                 </Typography>
               </Box>
               <Typography variant="body2" color="text.secondary">
-                Total {currentFolder?.category === 'comments' ? 'Comments' : 'Posts'}
+                Total {currentFolder?.category === 'comments'
+                  ? 'Comments'
+                  : currentFolder?.category === 'reels'
+                  ? 'Reels'
+                  : 'Posts'}
               </Typography>
             </Box>
             
@@ -1039,6 +1134,18 @@ const InstagramDataUpload = () => {
             
             <Box sx={{ textAlign: 'center' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
+                <ChatIcon sx={{ color: 'info.main', mr: 1 }} />
+                <Typography variant="h4" fontWeight={600}>
+                  {folderStats.avgComments.toLocaleString()}
+                </Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                Avg. {currentFolder?.category === 'comments' ? 'Replies' : 'Comments'}
+              </Typography>
+            </Box>
+            
+            <Box sx={{ textAlign: 'center' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
                 <VerifiedIcon sx={{ color: 'warning.main', mr: 1 }} />
                 <Typography variant="h4" fontWeight={600}>
                   {folderStats.verifiedAccounts.toLocaleString()}
@@ -1055,11 +1162,13 @@ const InstagramDataUpload = () => {
       {/* Tabs Section */}
       <Paper sx={{ mb: 3 }}>
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs value={tabValue} onChange={handleTabChange} aria-label="data management tabs">
-            <Tab label="Data Overview" {...a11yProps(0)} />
-            <Tab label="Upload & Management" {...a11yProps(1)} />
-            <Tab label="Analytics" {...a11yProps(2)} />
-          </Tabs>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Tabs value={tabValue} onChange={handleTabChange} aria-label="data management tabs">
+              <Tab label="Data Overview" {...a11yProps(0)} />
+              <Tab label="Upload & Management" {...a11yProps(1)} />
+              <Tab label="Analytics" {...a11yProps(2)} />
+            </Tabs>
+          </Box>
         </Box>
         
         {/* Tab Panel 0: Data Overview */}
@@ -1079,14 +1188,12 @@ const InstagramDataUpload = () => {
                   </InputAdornment>
                 ),
                 endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      edge="end"
-                      onClick={handleSortMenuOpen}
-                      size="small"
-                    >
-                      <MoreVertIcon />
-                    </IconButton>
+                  <InputAdornment position="end" sx={{ pr: 0 }}>
+                    <Tooltip title={`Sort by ${sortBy} (${sortOrder})`}>
+                      <IconButton onClick={handleSortMenuOpen} sx={{ p: 0 }}>
+                        <SortIcon />
+                      </IconButton>
+                    </Tooltip>
                   </InputAdornment>
                 ),
               }}
@@ -1109,10 +1216,108 @@ const InstagramDataUpload = () => {
               </FormControl>
             )}
             
-            <IconButton onClick={() => fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter)}>
-              <FilterListIcon />
-            </IconButton>
+            <Tooltip title="Filter data">
+              <IconButton onClick={handleFilterToggle}>
+                <FilterListIcon />
+              </IconButton>
+            </Tooltip>
           </Box>
+
+          {/* Filter Controls */}
+          <Collapse in={showFilters}>
+            <Paper sx={{ p: 3, mb: 3, border: '1px solid', borderColor: 'divider' }}>
+              <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
+                <FilterListIcon sx={{ mr: 1 }} />
+                Filter Options
+              </Typography>
+              
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr' }, gap: 2 }}>
+                {/* Date Range Filters */}
+                <TextField
+                  label="Start Date"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  size="small"
+                  InputLabelProps={{ shrink: true }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <DateRangeIcon />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+                
+                <TextField
+                  label="End Date"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  size="small"
+                  InputLabelProps={{ shrink: true }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <DateRangeIcon />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+                
+                {/* Likes Range Filters */}
+                <TextField
+                  label="Min Likes"
+                  type="number"
+                  value={minLikes}
+                  onChange={(e) => setMinLikes(e.target.value)}
+                  size="small"
+                  InputLabelProps={{ shrink: true }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <ThumbUpIcon />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+                
+                <TextField
+                  label="Max Likes"
+                  type="number"
+                  value={maxLikes}
+                  onChange={(e) => setMaxLikes(e.target.value)}
+                  size="small"
+                  InputLabelProps={{ shrink: true }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <ThumbUpIcon />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Box>
+              
+              <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+                <Button
+                  variant="contained"
+                  onClick={handleApplyFilters}
+                  disabled={isLoading}
+                  startIcon={<FilterListIcon />}
+                >
+                  Apply Filters
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={handleClearFilters}
+                  disabled={isLoading}
+                >
+                  Clear Filters
+                </Button>
+              </Box>
+            </Paper>
+          </Collapse>
 
           {/* Data Table */}
           <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
@@ -1484,7 +1689,8 @@ const InstagramDataUpload = () => {
                         setPage(0);
                         
                         // Refresh all data
-                        fetchPosts(0, rowsPerPage, searchTerm, contentTypeFilter);
+                        const hasFilterValues = Boolean(startDate || endDate || minLikes || maxLikes);
+                        fetchPosts(0, rowsPerPage, searchTerm, contentTypeFilter, hasFilterValues);
                         fetchFolderStats();
                         fetchFolderDetails();
                       }}

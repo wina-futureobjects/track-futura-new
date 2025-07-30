@@ -4,7 +4,7 @@ from .views import (
     ProjectListCreateView, ProjectDetailView,
     OrganizationListCreateView, OrganizationDetailView,
     OrganizationMembershipView, OrganizationMembershipDetailView,
-    UserSearchView, OrganizationStatsView, CSRFTokenView
+    UserSearchView, OrganizationStatsView, ProjectStatsView, CSRFTokenView
 )
 from rest_framework.authtoken.views import obtain_auth_token
 
@@ -27,4 +27,5 @@ urlpatterns = [
     # Project routes
     path('projects/', ProjectListCreateView.as_view(), name='project-list'),
     path('projects/<int:pk>/', ProjectDetailView.as_view(), name='project-detail'),
+    path('projects/<int:project_id>/stats/', ProjectStatsView.as_view(), name='project-stats'),
 ]

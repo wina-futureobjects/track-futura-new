@@ -146,6 +146,117 @@ class OrganizationStatsView(APIView):
         except Organization.DoesNotExist:
             raise NotFound("Organization not found")
 
+
+class ProjectStatsView(APIView):
+    """
+    Get statistics for a project
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, project_id, format=None):
+        try:
+            # Check if user has access to the project
+            project = Project.objects.get(id=project_id)
+            if not project.authorized_users.filter(id=request.user.id).exists() and project.owner != request.user:
+                raise PermissionDenied("You don't have access to this project")
+
+            # Import models for statistics calculation
+            from facebook_data.models import FacebookPost, Folder as FacebookFolder
+            from instagram_data.models import InstagramPost, Folder as InstagramFolder
+            from linkedin_data.models import LinkedInPost, Folder as LinkedInFolder
+            from tiktok_data.models import TikTokPost, Folder as TikTokFolder
+            from track_accounts.models import TrackSource
+            from reports.models import GeneratedReport
+            from django.db.models import Count, Q
+
+            # Calculate total posts across all platforms
+            total_posts = 0
+            total_accounts = 0
+            
+            # Facebook posts
+            facebook_folders = FacebookFolder.objects.filter(project=project)
+            facebook_posts = FacebookPost.objects.filter(folder__in=facebook_folders)
+            total_posts += facebook_posts.count()
+            
+            # Instagram posts
+            instagram_folders = InstagramFolder.objects.filter(project=project)
+            instagram_posts = InstagramPost.objects.filter(folder__in=instagram_folders)
+            total_posts += instagram_posts.count()
+            
+            # LinkedIn posts
+            linkedin_folders = LinkedInFolder.objects.filter(project=project)
+            linkedin_posts = LinkedInPost.objects.filter(folder__in=linkedin_folders)
+            total_posts += linkedin_posts.count()
+            
+            # TikTok posts
+            tiktok_folders = TikTokFolder.objects.filter(project=project)
+            tiktok_posts = TikTokPost.objects.filter(folder__in=tiktok_folders)
+            total_posts += tiktok_posts.count()
+            
+            # Track sources (accounts)
+            total_accounts = TrackSource.objects.filter(project=project).count()
+            
+            # Generated reports
+            total_reports = GeneratedReport.objects.filter(project=project).count()
+            
+            # Calculate engagement rate (simplified - could be enhanced with actual engagement data)
+            # For now, we'll use a placeholder calculation
+            engagement_rate = 3.2  # Placeholder - could be calculated from actual engagement data
+            
+            # Calculate growth rate (simplified - could be enhanced with historical data)
+            growth_rate = 5.8  # Placeholder - could be calculated from historical data
+            
+            # Calculate storage used (simplified - could be enhanced with actual file sizes)
+            # For now, we'll estimate based on number of posts
+            estimated_storage_mb = total_posts * 0.5  # Estimate 0.5MB per post
+            if estimated_storage_mb > 1024:
+                total_storage_used = f"{estimated_storage_mb / 1024:.1f} GB"
+            else:
+                total_storage_used = f"{estimated_storage_mb:.1f} MB"
+            
+            # Credit balance and max credits (placeholder - could be enhanced with actual credit system)
+            credit_balance = 2400
+            max_credits = 5000
+
+            stats = {
+                'totalPosts': total_posts,
+                'totalAccounts': total_accounts,
+                'totalReports': total_reports,
+                'totalStorageUsed': total_storage_used,
+                'creditBalance': credit_balance,
+                'maxCredits': max_credits,
+                'engagementRate': engagement_rate,
+                'growthRate': growth_rate,
+                'platforms': {
+                    'facebook': {
+                        'posts': facebook_posts.count(),
+                        'folders': facebook_folders.count()
+                    },
+                    'instagram': {
+                        'posts': instagram_posts.count(),
+                        'folders': instagram_folders.count()
+                    },
+                    'linkedin': {
+                        'posts': linkedin_posts.count(),
+                        'folders': linkedin_folders.count()
+                    },
+                    'tiktok': {
+                        'posts': tiktok_posts.count(),
+                        'folders': tiktok_folders.count()
+                    }
+                }
+            }
+
+            return Response(stats)
+
+        except Project.DoesNotExist:
+            raise NotFound("Project not found")
+        except Exception as e:
+            return Response(
+                {'error': f'Error calculating project statistics: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 class OrganizationMembershipView(generics.ListCreateAPIView):
     """
     List members of an organization or add new members

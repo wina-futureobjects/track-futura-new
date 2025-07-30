@@ -9,6 +9,16 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # Remove indexes first before removing fields
+        migrations.RemoveIndex(
+            model_name='tracksource',
+            name='track_accou_iac_no_3db030_idx',
+        ),
+        migrations.RemoveIndex(
+            model_name='tracksource',
+            name='track_accou_risk_cl_6a4e41_idx',
+        ),
+        
         # Remove unused fields from TrackSource
         migrations.RemoveField(
             model_name='tracksource',
