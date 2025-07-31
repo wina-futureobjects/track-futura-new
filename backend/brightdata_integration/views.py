@@ -1667,6 +1667,61 @@ class BatchScraperJobViewSet(viewsets.ModelViewSet):
 
         return Response({'status': 'Job cancelled successfully'})
 
+    def update(self, request, *args, **kwargs):
+        """Update a batch scraper job"""
+        try:
+            # ===== DETAILED CONSOLE LOGGING FOR FRONTEND =====
+            print("\n" + "="*80)
+            print("🔄 BATCH JOB UPDATE - BACKEND DEBUG")
+            print("="*80)
+            print(f"Request Data: {request.data}")
+            print(f"Request Method: {request.method}")
+            print(f"Request Path: {request.path}")
+            print("="*80)
+
+            # Get the job instance
+            job = self.get_object()
+            
+            # Update the job with the new data
+            job.name = request.data.get('name', job.name)
+            job.platforms_to_scrape = request.data.get('platforms_to_scrape', job.platforms_to_scrape)
+            job.content_types_to_scrape = request.data.get('content_types_to_scrape', job.content_types_to_scrape)
+            job.num_of_posts = request.data.get('num_of_posts', job.num_of_posts)
+            job.start_date = request.data.get('start_date', job.start_date)
+            job.end_date = request.data.get('end_date', job.end_date)
+            job.auto_create_folders = request.data.get('auto_create_folders', job.auto_create_folders)
+            job.output_folder_pattern = request.data.get('output_folder_pattern', job.output_folder_pattern)
+            job.platform_params = request.data.get('platform_params', job.platform_params)
+            
+            job.save()
+
+            print(f"✅ Job Updated:")
+            print(f"   Job ID: {job.id}")
+            print(f"   Job Name: {job.name}")
+            print(f"   Platforms: {job.platforms_to_scrape}")
+            print(f"   Content Types: {job.content_types_to_scrape}")
+            print("="*80 + "\n")
+
+            return Response({
+                'job_id': job.id,
+                'success': True,
+                'message': 'Batch job updated successfully',
+                'debug_info': {
+                    'platforms': job.platforms_to_scrape,
+                    'content_types': job.content_types_to_scrape,
+                    'num_of_posts': job.num_of_posts,
+                    'job_name': job.name
+                }
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            print(f"❌ Exception in update:")
+            print(f"   Error: {str(e)}")
+            print("="*80 + "\n")
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
     @action(detail=False, methods=['POST'])
     def create_and_execute(self, request):
         """Create and execute a batch scraper job"""
@@ -1690,7 +1745,8 @@ class BatchScraperJobViewSet(viewsets.ModelViewSet):
                 start_date=request.data.get('start_date'),
                 end_date=request.data.get('end_date'),
                 auto_create_folders=request.data.get('auto_create_folders', True),
-                output_folder_pattern=request.data.get('output_folder_pattern')
+                output_folder_pattern=request.data.get('output_folder_pattern'),
+                platform_params=request.data.get('platform_params', {})
             )
 
             print(f"✅ Job Created and Executed:")

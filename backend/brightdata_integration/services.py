@@ -43,7 +43,8 @@ class AutomatedBatchScraper:
                         content_types_to_scrape: Dict[str, List[str]] = None,
                         num_of_posts: int = 10,
                         start_date: str = None, end_date: str = None,
-                        auto_create_folders: bool = True, output_folder_pattern: str = None) -> BatchScraperJob:
+                        auto_create_folders: bool = True, output_folder_pattern: str = None,
+                        platform_params: Dict = None) -> BatchScraperJob:
         """
         Create a new batch scraper job
 
@@ -87,6 +88,7 @@ class AutomatedBatchScraper:
             end_date=end_date,
             auto_create_folders=auto_create_folders,
             output_folder_pattern=output_folder_pattern,
+            platform_params=platform_params,
         )
 
         self.logger.info(f"Created batch job: {job.name} for project {project_id}")
@@ -351,12 +353,20 @@ class AutomatedBatchScraper:
             'tiktok': self._trigger_tiktok_batch,
         }
 
-        batch_method = platform_batch_methods.get(platform)
-        if not batch_method:
-            self.logger.error(f"No batch trigger method found for platform: {platform}")
-            return False
-
-        return batch_method(requests)
+        # Handle platform-specific content types
+        if platform == 'facebook':
+            # Facebook supports both posts and comments
+            return self._trigger_facebook_batch(requests)
+        elif platform == 'instagram':
+            # Instagram supports posts, reels, and comments
+            return self._trigger_instagram_batch(requests)
+        else:
+            # Other platforms use the standard mapping
+            batch_method = platform_batch_methods.get(platform)
+            if not batch_method:
+                self.logger.error(f"No batch trigger method found for platform: {platform}")
+                return False
+            return batch_method(requests)
 
     def _get_platform_url(self, source: TrackSource, platform: str) -> Optional[str]:
         """
@@ -500,6 +510,17 @@ class AutomatedBatchScraper:
                 folder_id=folder_id,
                 status='pending'
             )
+
+            # Store platform-specific parameters in request_payload for later use
+            if job.platform_params:
+                platform_params = job.platform_params.get(platform_config_key, {})
+                if platform_params:
+                    scraper_request.request_payload = {
+                        'platform_params': platform_params,
+                        'source_name': source.name,
+                        'platform': platform_config_key
+                    }
+                    scraper_request.save()
 
             self.logger.info(f"Created scraper request for {source.name} on {platform} ({content_type})")
             return scraper_request
@@ -743,16 +764,36 @@ class AutomatedBatchScraper:
         if not requests:
             return True
 
+        # Get platform-specific parameters from the first request
+        platform_params = {}
+        if requests[0].request_payload and 'platform_params' in requests[0].request_payload:
+            platform_params = requests[0].request_payload['platform_params']
+
         # Create batch payload with all sources
         payload = []
         for request in requests:
-            payload.append({
+            # Base payload for Facebook
+            item = {
                 "url": request.target_url,
                 "num_of_posts": request.num_of_posts,
                 "posts_to_not_include": [],
                 "start_date": request.start_date.strftime('%m-%d-%Y') if request.start_date else "",
                 "end_date": request.end_date.strftime('%m-%d-%Y') if request.end_date else "",
-            })
+            }
+
+            # Add platform-specific parameters for Facebook Posts
+            if request.platform == 'facebook_posts':
+                if 'include_profile_data' in platform_params:
+                    item['include_profile_data'] = platform_params['include_profile_data']
+
+            # Add platform-specific parameters for Facebook Comments
+            elif request.platform == 'facebook_comments':
+                if 'limit_records' in platform_params:
+                    item['limit_records'] = platform_params['limit_records']
+                if 'get_all_replies' in platform_params:
+                    item['get_all_replies'] = platform_params['get_all_replies']
+
+            payload.append(item)
 
         # Use the first request for API call configuration, but update ALL requests with the response
         success = self._make_brightdata_batch_request(requests, payload)
@@ -766,27 +807,46 @@ class AutomatedBatchScraper:
         # Get content type from the first request (all requests in batch have same content type)
         content_type = requests[0].platform.split('_')[-1]  # gets 'posts', 'reels', etc.
 
+        # Get platform-specific parameters from the first request
+        platform_params = {}
+        if requests[0].request_payload and 'platform_params' in requests[0].request_payload:
+            platform_params = requests[0].request_payload['platform_params']
+
         # Create batch payload with all sources
         payload = []
         for request in requests:
             if content_type == 'reels':
                 # Instagram Reels API format
-                payload.append({
+                item = {
                     "url": request.target_url,
                     "start_date": request.start_date.strftime('%m-%d-%Y') if request.start_date else "",
                     "end_date": request.end_date.strftime('%m-%d-%Y') if request.end_date else "",
                     "all_reels": False,  # Default to specific date range instead of all reels
-                })
+                }
+                payload.append(item)
+            elif content_type == 'comments':
+                # Instagram Comments API format
+                item = {
+                    "url": request.target_url,
+                    "num_of_posts": request.num_of_posts,
+                    "start_date": request.start_date.strftime('%m-%d-%Y') if request.start_date else "",
+                    "end_date": request.end_date.strftime('%m-%d-%Y') if request.end_date else "",
+                }
+                # Add platform-specific parameters for Instagram Comments
+                if 'limit_records' in platform_params:
+                    item['limit_records'] = platform_params['limit_records']
+                payload.append(item)
             else:
                 # Instagram Posts API format (includes posts and other content types)
-                payload.append({
+                item = {
                     "url": request.target_url,
                     "num_of_posts": request.num_of_posts,
                     "start_date": request.start_date.strftime('%m-%d-%Y') if request.start_date else "",
                     "end_date": request.end_date.strftime('%m-%d-%Y') if request.end_date else "",
                     "post_type": "Post" if content_type == 'posts' else content_type.title(),
                     "posts_to_not_include": [],  # Could be extended to support excluded posts
-                })
+                }
+                payload.append(item)
 
         # Use the first request for API call configuration, but update ALL requests with the response
         success = self._make_brightdata_batch_request(requests, payload)
@@ -797,15 +857,27 @@ class AutomatedBatchScraper:
         if not requests:
             return True
 
+        # Get platform-specific parameters from the first request
+        platform_params = {}
+        if requests[0].request_payload and 'platform_params' in requests[0].request_payload:
+            platform_params = requests[0].request_payload['platform_params']
+
         # Create batch payload with all sources
         payload = []
         for request in requests:
-            payload.append({
+            # Base payload for LinkedIn
+            item = {
                 "url": request.target_url,
                 "num_of_posts": request.num_of_posts,
                 "start_date": request.start_date.strftime('%m-%d-%Y') if request.start_date else "",
                 "end_date": request.end_date.strftime('%m-%d-%Y') if request.end_date else "",
-            })
+            }
+
+            # Add platform-specific parameters for LinkedIn Posts
+            if 'limit' in platform_params:
+                item['limit'] = platform_params['limit']
+
+            payload.append(item)
 
         # Use the first request for API call configuration, but update ALL requests with the response
         success = self._make_brightdata_batch_request(requests, payload)
@@ -864,8 +936,26 @@ class AutomatedBatchScraper:
                 "include_errors": "true",
             }
 
-            # Add Instagram-specific parameters
+            # Add platform-specific parameters
             if primary_request.platform.startswith('instagram'):
+                params.update({
+                    "type": "discover_new",
+                    "discover_by": "url",
+                })
+            elif primary_request.platform.startswith('facebook'):
+                # Facebook-specific parameters
+                params.update({
+                    "type": "discover_new",
+                    "discover_by": "url",
+                })
+            elif primary_request.platform.startswith('linkedin'):
+                # LinkedIn-specific parameters
+                params.update({
+                    "type": "discover_new",
+                    "discover_by": "url",
+                })
+            elif primary_request.platform.startswith('tiktok'):
+                # TikTok-specific parameters
                 params.update({
                     "type": "discover_new",
                     "discover_by": "url",
@@ -887,6 +977,19 @@ class AutomatedBatchScraper:
             print(f"Headers: {headers}")
             print(f"Params: {params}")
             print(f"Payload ({len(payload)} items): {payload}")
+            print()
+            
+            # Log platform-specific parameters being sent
+            if payload and len(payload) > 0:
+                print("🔧 PLATFORM-SPECIFIC PARAMETERS:")
+                sample_item = payload[0]
+                platform_specific_keys = [k for k in sample_item.keys() if k not in ['url', 'num_of_posts', 'start_date', 'end_date', 'posts_to_not_include', 'post_type', 'all_reels']]
+                if platform_specific_keys:
+                    print(f"   Additional parameters: {platform_specific_keys}")
+                    for key in platform_specific_keys:
+                        print(f"   - {key}: {sample_item.get(key)}")
+                else:
+                    print("   No additional platform-specific parameters")
             print()
 
             # Log batch details
