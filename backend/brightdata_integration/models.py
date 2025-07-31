@@ -73,6 +73,9 @@ class BatchScraperJob(models.Model):
     auto_create_folders = models.BooleanField(default=True, help_text="Auto-create folders for results by platform and date")
     output_folder_pattern = models.CharField(max_length=255, default="{platform}_{content_type}_{date}_{job_name}",
                                            help_text="Pattern for auto-created folder names")
+    
+    # Platform-specific parameters
+    platform_params = models.JSONField(null=True, blank=True, help_text="Platform-specific parameters for scraping")
 
     # Job status and metadata
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')

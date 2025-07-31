@@ -24,7 +24,7 @@ class BatchScraperJobSerializer(serializers.ModelSerializer):
             'id', 'name', 'project', 'project_name', 'source_folder_ids', 'platforms_to_scrape', 'platforms_display',
             'content_types_to_scrape', 'content_types_display',
             'num_of_posts', 'start_date', 'end_date', 'auto_create_folders', 'output_folder_pattern',
-            'status', 'total_sources', 'processed_sources', 'successful_requests', 'failed_requests',
+            'platform_params', 'status', 'total_sources', 'processed_sources', 'successful_requests', 'failed_requests',
             # Legacy fields for backward compatibility
             'total_accounts', 'processed_accounts',
             'job_metadata', 'error_log', 'created_at', 'updated_at', 'started_at', 'completed_at'
@@ -37,7 +37,7 @@ class BatchScraperJobCreateSerializer(serializers.ModelSerializer):
         model = BatchScraperJob
         fields = [
             'name', 'project', 'source_folder_ids', 'platforms_to_scrape', 'content_types_to_scrape',
-            'num_of_posts', 'start_date', 'end_date', 'auto_create_folders', 'output_folder_pattern'
+            'num_of_posts', 'start_date', 'end_date', 'auto_create_folders', 'output_folder_pattern', 'platform_params'
         ]
 
 class ScraperRequestSerializer(serializers.ModelSerializer):

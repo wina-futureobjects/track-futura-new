@@ -43,7 +43,8 @@ class AutomatedBatchScraper:
                         content_types_to_scrape: Dict[str, List[str]] = None,
                         num_of_posts: int = 10,
                         start_date: str = None, end_date: str = None,
-                        auto_create_folders: bool = True, output_folder_pattern: str = None) -> BatchScraperJob:
+                        auto_create_folders: bool = True, output_folder_pattern: str = None,
+                        platform_params: Dict = None) -> BatchScraperJob:
         """
         Create a new batch scraper job
 
@@ -87,6 +88,7 @@ class AutomatedBatchScraper:
             end_date=end_date,
             auto_create_folders=auto_create_folders,
             output_folder_pattern=output_folder_pattern,
+            platform_params=platform_params,
         )
 
         self.logger.info(f"Created batch job: {job.name} for project {project_id}")
