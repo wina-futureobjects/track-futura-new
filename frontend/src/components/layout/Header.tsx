@@ -48,6 +48,7 @@ import futureObjectLogo from '../../assets/images/logos/future-object.png';
 interface HeaderProps {
   open: boolean;
   onToggle: () => void;
+  showSidebarToggle?: boolean;
 }
 
 // Define interfaces for Organization and Project
@@ -281,7 +282,7 @@ const getPathInfo = (pathname: string): {
   return { organizationId, projectId, projectsListPath, projectPath, isDashboardPath, showDashboardLabel };
 };
 
-const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
+const Header: React.FC<HeaderProps> = ({ open, onToggle, showSidebarToggle = true }) => {
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -934,22 +935,24 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
           px: 3,
           borderRadius: 0,
         }}>
-          <IconButton
-            size="medium"
-            edge="start"
-            color="inherit"
-            aria-label="toggle sidebar"
-            sx={{ 
-              flexShrink: 0,
-              '&:hover': {
-                backgroundColor: theme => `rgba(210, 145, 226, 0.08)`,
-                color: theme => theme.palette.primary.main,
-              }
-            }}
-            onClick={onToggle}
-          >
-            <MenuIcon />
-          </IconButton>
+          {showSidebarToggle && (
+            <IconButton
+              size="medium"
+              edge="start"
+              color="inherit"
+              aria-label="toggle sidebar"
+              sx={{ 
+                flexShrink: 0,
+                '&:hover': {
+                  backgroundColor: theme => `rgba(210, 145, 226, 0.08)`,
+                  color: theme => theme.palette.primary.main,
+                }
+              }}
+              onClick={onToggle}
+            >
+              <MenuIcon />
+            </IconButton>
+          )}
           
           {/* Use memoized breadcrumb component */}
           {renderBreadcrumbs}

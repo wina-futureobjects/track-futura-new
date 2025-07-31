@@ -30,7 +30,7 @@ const NoSidebarLayout: React.FC<NoSidebarLayoutProps> = ({ children }) => {
       <DemoBar />
       
       {/* Use the shared Header component */}
-      <Header open={false} onToggle={handleToggle} />
+      <Header open={false} onToggle={handleToggle} showSidebarToggle={false} />
       
       <Box
         component="main"

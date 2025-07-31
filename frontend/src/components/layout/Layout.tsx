@@ -75,7 +75,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     >
       <CssBaseline />
       <DemoBar />
-      <Header open={open} onToggle={toggleDrawer} />
+      <Header open={open} onToggle={toggleDrawer} showSidebarToggle={true} />
       <Sidebar open={open} onClose={handleDrawerClose} onToggle={toggleDrawer} />
       <Main open={open} isMobile={isMobile}>
         <Box
