@@ -7,6 +7,7 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
+from rest_framework.pagination import PageNumberPagination
 from django.http import HttpResponse
 from django.db.models import Q
 from .models import TrackSource, ReportFolder, ReportEntry
@@ -15,12 +16,22 @@ from .serializers import (
     ReportFolderSerializer, ReportEntrySerializer, ReportFolderDetailSerializer
 )
 
+class CustomPageNumberPagination(PageNumberPagination):
+    """
+    Custom pagination class that respects the page_size parameter
+    """
+    page_size = 25  # Default page size
+    page_size_query_param = 'page_size'
+    max_page_size = 1000
+    page_query_param = 'page'
+
 class TrackSourceViewSet(viewsets.ModelViewSet):
     """
     API endpoint for managing Track Sources (formerly Track Accounts)
     """
     serializer_class = TrackSourceSerializer
     permission_classes = [AllowAny]  # For testing, use proper permissions in production
+    pagination_class = CustomPageNumberPagination
     
     def get_queryset(self):
         """Filter sources based on query parameters"""
@@ -37,6 +48,67 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(
                 Q(name__icontains=search)
             )
+        
+        # Social media filters
+        has_facebook = self.request.query_params.get('has_facebook')
+        has_instagram = self.request.query_params.get('has_instagram')
+        has_linkedin = self.request.query_params.get('has_linkedin')
+        has_tiktok = self.request.query_params.get('has_tiktok')
+        
+        # Apply social media filters (AND logic - sources must have ALL selected platforms)
+        if has_facebook == 'true':
+            queryset = queryset.filter(facebook_link__isnull=False).exclude(facebook_link='')
+        
+        if has_instagram == 'true':
+            queryset = queryset.filter(instagram_link__isnull=False).exclude(instagram_link='')
+        
+        if has_linkedin == 'true':
+            queryset = queryset.filter(linkedin_link__isnull=False).exclude(linkedin_link='')
+        
+        if has_tiktok == 'true':
+            queryset = queryset.filter(tiktok_link__isnull=False).exclude(tiktok_link='')
+        
+        # Date filters
+        date_range = self.request.query_params.get('date_range')
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+        
+        # Apply date filters
+        if date_range and date_range != 'all':
+            today = datetime.date.today()
+            
+            if date_range == 'today':
+                queryset = queryset.filter(created_at__date=today)
+            elif date_range == 'week':
+                week_ago = today - datetime.timedelta(days=7)
+                queryset = queryset.filter(created_at__date__gte=week_ago, created_at__date__lte=today)
+            elif date_range == 'month':
+                month_ago = today - datetime.timedelta(days=30)
+                queryset = queryset.filter(created_at__date__gte=month_ago, created_at__date__lte=today)
+            elif date_range == 'year':
+                year_ago = today - datetime.timedelta(days=365)
+                queryset = queryset.filter(created_at__date__gte=year_ago, created_at__date__lte=today)
+        
+        # Custom date range
+        if start_date:
+            queryset = queryset.filter(created_at__date__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(created_at__date__lte=end_date)
+        
+        print(f"=== BACKEND FILTER DEBUG ===")
+        print(f"Project ID: {project_id}")
+        print(f"Search: {search}")
+        print(f"Has Facebook: {has_facebook}")
+        print(f"Has Instagram: {has_instagram}")
+        print(f"Has LinkedIn: {has_linkedin}")
+        print(f"Has TikTok: {has_tiktok}")
+        print(f"Date Range: {date_range}")
+        print(f"Start Date: {start_date}")
+        print(f"End Date: {end_date}")
+        print(f"Page: {self.request.query_params.get('page')}")
+        print(f"Page Size: {self.request.query_params.get('page_size')}")
+        print(f"Final queryset count: {queryset.count()}")
+        print(f"=== END BACKEND FILTER DEBUG ===")
         
         return queryset.order_by('name')
     
@@ -55,6 +127,27 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
         # Get project from request data directly
         project_id = self.request.data.get('project')
         serializer.save(project_id=project_id)
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        Custom destroy method to handle deletion with proper logging
+        """
+        try:
+            instance = self.get_object()
+            print(f"Attempting to delete TrackSource: {instance.id} - {instance.name}")
+            
+            # Perform the deletion
+            self.perform_destroy(instance)
+            
+            print(f"Successfully deleted TrackSource: {instance.id} - {instance.name}")
+            return Response(status=status.HTTP_204_NO_CONTENT)
+            
+        except Exception as e:
+            print(f"Error deleting TrackSource: {str(e)}")
+            return Response(
+                {'error': f'Failed to delete source: {str(e)}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
     @action(detail=False, methods=['POST'])
     def upload_csv(self, request):

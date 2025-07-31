@@ -1,5 +1,5 @@
 import React, { useState, useEffect, ChangeEvent } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -15,17 +15,11 @@ import {
   IconButton,
   Alert,
   Snackbar,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Chip,
   Stack,
-  Tooltip,
   CircularProgress,
   Card,
   CardContent,
-  Divider,
+  Tooltip,
 } from '@mui/material';
 import {
   CloudUpload as CloudUploadIcon,
@@ -34,7 +28,6 @@ import {
   Delete as DeleteIcon,
   Save as SaveIcon,
   Publish as PublishIcon,
-  Info as InfoIcon,
   Clear as ClearIcon,
   ViewList as ViewListIcon,
   Person as PersonIcon,
@@ -51,6 +44,55 @@ interface DraftSource {
   other_social_media: string;
 }
 
+// Validation functions
+const validateFacebookLink = (link: string): boolean => {
+  if (!link.trim()) return true; // Empty is valid
+  const facebookRegex = /^(https?:\/\/)?(www\.)?(facebook\.com|fb\.com)\/.+/i;
+  return facebookRegex.test(link);
+};
+
+const validateInstagramLink = (link: string): boolean => {
+  if (!link.trim()) return true; // Empty is valid
+  const instagramRegex = /^(https?:\/\/)?(www\.)?(instagram\.com|instagr\.am)\/.+/i;
+  return instagramRegex.test(link);
+};
+
+const validateLinkedInLink = (link: string): boolean => {
+  if (!link.trim()) return true; // Empty is valid
+  const linkedinRegex = /^(https?:\/\/)?(www\.)?(linkedin\.com)\/(in|company)\/.+/i;
+  return linkedinRegex.test(link);
+};
+
+const validateTikTokLink = (link: string): boolean => {
+  if (!link.trim()) return true; // Empty is valid
+  const tiktokRegex = /^(https?:\/\/)?(www\.)?(tiktok\.com)\/@.+/i;
+  return tiktokRegex.test(link);
+};
+
+const getValidationMessage = (platform: string, link: string): string => {
+  if (!link.trim()) return '';
+  
+  let isValid = false;
+  switch (platform) {
+    case 'facebook':
+      isValid = validateFacebookLink(link);
+      break;
+    case 'instagram':
+      isValid = validateInstagramLink(link);
+      break;
+    case 'linkedin':
+      isValid = validateLinkedInLink(link);
+      break;
+    case 'tiktok':
+      isValid = validateTikTokLink(link);
+      break;
+    default:
+      isValid = true;
+  }
+  
+  return isValid ? '' : 'Please enter a valid social media URL.';
+};
+
 interface BulkSourceCreateProps {
   organizationId?: string;
   projectId?: string;
@@ -66,7 +108,6 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
   const [draftSources, setDraftSources] = useState<DraftSource[]>([]);
   const [loading, setLoading] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
@@ -220,10 +261,33 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
     showSnackbar('Draft saved successfully', 'success');
   };
 
+  // Check if there are any validation errors in bulk mode
+  const hasValidationErrors = (): boolean => {
+    // Check for missing names
+    const hasMissingNames = draftSources.some(source => !source.name.trim());
+    if (hasMissingNames) return true;
+    
+    // Check for invalid social media links
+    const hasInvalidLinks = draftSources.some(source => 
+      (source.facebook_link && !validateFacebookLink(source.facebook_link)) ||
+      (source.instagram_link && !validateInstagramLink(source.instagram_link)) ||
+      (source.linkedin_link && !validateLinkedInLink(source.linkedin_link)) ||
+      (source.tiktok_link && !validateTikTokLink(source.tiktok_link))
+    );
+    
+    return hasInvalidLinks;
+  };
+
   // Create all sources
   const handleCreateSources = async () => {
     if (draftSources.length === 0) {
       showSnackbar('No sources to create', 'error');
+      return;
+    }
+
+    // Check for validation errors
+    if (hasValidationErrors()) {
+      showSnackbar('Check the link errors before creating sources', 'error');
       return;
     }
 
@@ -330,7 +394,7 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
             <Typography variant="body1" sx={{ color: '#64748b' }}>
               {mode === 'bulk' 
                 ? 'Upload CSV data or manually add multiple sources, then create them all at once'
-                : 'Quickly add a single source with all social media links'
+                : 'Quickly add a single source with social media links'
               }
             </Typography>
           </Box>
@@ -366,7 +430,7 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
             Source Information
           </Typography>
           
-          <Stack spacing={3}>
+          <Stack spacing={2}>
             <TextField
               fullWidth
               label="Source Name"
@@ -381,9 +445,8 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
               required
             />
             
-            <Stack direction="row" spacing={2}>
+            <Stack direction="row" justifyContent="space-between">
               <TextField
-                fullWidth
                 label="Facebook Link"
                 placeholder="https://facebook.com/..."
                 value={draftSources[0]?.facebook_link || ''}
@@ -393,9 +456,28 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
                   }
                   handleFieldChange(draftSources[0]?.id || generateId(), 'facebook_link', e.target.value);
                 }}
+                error={draftSources[0]?.facebook_link ? !validateFacebookLink(draftSources[0]?.facebook_link) : false}
+                helperText={getValidationMessage('facebook', draftSources[0]?.facebook_link || '')}
+                sx={{
+                  width: '47%',
+                  '& .MuiFormHelperText-root': {
+                    color: (draftSources[0]?.facebook_link && !validateFacebookLink(draftSources[0]?.facebook_link)) ? '#d32f2f !important' : 'inherit'
+                  },
+                  '& .MuiOutlinedInput-root': {
+                    '&.Mui-error': {
+                      '& fieldset': {
+                        borderColor: '#d32f2f !important'
+                      }
+                    },
+                    '&:not(.Mui-error)': {
+                      '& fieldset': {
+                        borderColor: '#d0d7de !important'
+                      }
+                    }
+                  }
+                }}
               />
               <TextField
-                fullWidth
                 label="Instagram Link"
                 placeholder="https://instagram.com/..."
                 value={draftSources[0]?.instagram_link || ''}
@@ -405,12 +487,31 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
                   }
                   handleFieldChange(draftSources[0]?.id || generateId(), 'instagram_link', e.target.value);
                 }}
+                error={draftSources[0]?.instagram_link ? !validateInstagramLink(draftSources[0]?.instagram_link) : false}
+                helperText={getValidationMessage('instagram', draftSources[0]?.instagram_link || '')}
+                sx={{
+                  width: '47%',
+                  '& .MuiFormHelperText-root': {
+                    color: (draftSources[0]?.instagram_link && !validateInstagramLink(draftSources[0]?.instagram_link)) ? '#d32f2f !important' : 'inherit'
+                  },
+                  '& .MuiOutlinedInput-root': {
+                    '&.Mui-error': {
+                      '& fieldset': {
+                        borderColor: '#d32f2f !important'
+                      }
+                    },
+                    '&:not(.Mui-error)': {
+                      '& fieldset': {
+                        borderColor: '#d0d7de !important'
+                      }
+                    }
+                  }
+                }}
               />
             </Stack>
             
-            <Stack direction="row" spacing={2}>
+            <Stack direction="row" justifyContent="space-between">
               <TextField
-                fullWidth
                 label="LinkedIn Link"
                 placeholder="https://linkedin.com/in/..."
                 value={draftSources[0]?.linkedin_link || ''}
@@ -420,9 +521,28 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
                   }
                   handleFieldChange(draftSources[0]?.id || generateId(), 'linkedin_link', e.target.value);
                 }}
+                error={draftSources[0]?.linkedin_link ? !validateLinkedInLink(draftSources[0]?.linkedin_link) : false}
+                helperText={getValidationMessage('linkedin', draftSources[0]?.linkedin_link || '')}
+                sx={{
+                  width: '47%',
+                  '& .MuiFormHelperText-root': {
+                    color: (draftSources[0]?.linkedin_link && !validateLinkedInLink(draftSources[0]?.linkedin_link)) ? '#d32f2f !important' : 'inherit'
+                  },
+                  '& .MuiOutlinedInput-root': {
+                    '&.Mui-error': {
+                      '& fieldset': {
+                        borderColor: '#d32f2f !important'
+                      }
+                    },
+                    '&:not(.Mui-error)': {
+                      '& fieldset': {
+                        borderColor: '#d0d7de !important'
+                      }
+                    }
+                  }
+                }}
               />
               <TextField
-                fullWidth
                 label="TikTok Link"
                 placeholder="https://tiktok.com/@..."
                 value={draftSources[0]?.tiktok_link || ''}
@@ -431,6 +551,26 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
                     handleAddRow();
                   }
                   handleFieldChange(draftSources[0]?.id || generateId(), 'tiktok_link', e.target.value);
+                }}
+                error={draftSources[0]?.tiktok_link ? !validateTikTokLink(draftSources[0]?.tiktok_link) : false}
+                helperText={getValidationMessage('tiktok', draftSources[0]?.tiktok_link || '')}
+                sx={{
+                  width: '47%',
+                  '& .MuiFormHelperText-root': {
+                    color: (draftSources[0]?.tiktok_link && !validateTikTokLink(draftSources[0]?.tiktok_link)) ? '#d32f2f !important' : 'inherit'
+                  },
+                  '& .MuiOutlinedInput-root': {
+                    '&.Mui-error': {
+                      '& fieldset': {
+                        borderColor: '#d32f2f !important'
+                      }
+                    },
+                    '&:not(.Mui-error)': {
+                      '& fieldset': {
+                        borderColor: '#d0d7de !important'
+                      }
+                    }
+                  }
                 }}
               />
             </Stack>
@@ -458,18 +598,25 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
               >
                 Clear
               </Button>
-              <Button
-                variant="contained"
-                startIcon={<SaveIcon />}
-                onClick={handleCreateSources}
-                disabled={loading || draftSources.length === 0 || !draftSources[0]?.name?.trim()}
+              <Tooltip 
+                title={!draftSources[0]?.name?.trim() ? "*Source name is required" : ""}
+                open={!draftSources[0]?.name?.trim() ? undefined : false}
               >
-                {loading ? (
-                  <CircularProgress size={20} color="inherit" />
-                ) : (
-                  'Create Source'
-                )}
-              </Button>
+                <span>
+                  <Button
+                    variant="contained"
+                    startIcon={<SaveIcon />}
+                    onClick={handleCreateSources}
+                    disabled={loading || draftSources.length === 0 || !draftSources[0]?.name?.trim()}
+                  >
+                    {loading ? (
+                      <CircularProgress size={20} color="inherit" />
+                    ) : (
+                      'Create Source'
+                    )}
+                  </Button>
+                </span>
+              </Tooltip>
             </Box>
           </Stack>
         </Paper>
@@ -480,53 +627,78 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
         <>
           {/* Actions */}
           <Paper sx={{ p: 3, mb: 3 }}>
-            <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap', gap: 2 }}>
-              {/* CSV Upload */}
-              <Button
-                variant="outlined"
-                component="label"
-                startIcon={<CloudUploadIcon />}
-                sx={{ minWidth: 'fit-content' }}
-              >
-                Upload CSV
-                <input
-                  type="file"
-                  hidden
-                  accept=".csv"
-                  onChange={handleCsvFileChange}
-                />
-              </Button>
-
-              {/* Download Template */}
-              <Button
-                variant="outlined"
-                startIcon={<DownloadIcon />}
-                onClick={handleDownloadTemplate}
-              >
-                Download Template
-              </Button>
-
-              {/* Add Row */}
-              <Button
-                variant="outlined"
-                startIcon={<AddIcon />}
-                onClick={handleAddRow}
-              >
-                Add Row
-              </Button>
-
-              {/* Clear Draft */}
-              {draftSources.length > 0 && (
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              {/* Left side - CSV operations */}
+              <Stack direction="row" spacing={2}>
+                {/* CSV Upload */}
                 <Button
                   variant="outlined"
-                  color="error"
-                  startIcon={<ClearIcon />}
-                  onClick={handleClearDraft}
+                  component="label"
+                  startIcon={<CloudUploadIcon />}
+                  sx={{ minWidth: 'fit-content' }}
                 >
-                  Clear All
+                  Upload CSV
+                  <input
+                    type="file"
+                    hidden
+                    accept=".csv"
+                    onChange={handleCsvFileChange}
+                  />
                 </Button>
-              )}
-            </Stack>
+
+                {/* Download Template */}
+                <Button
+                  variant="outlined"
+                  startIcon={<DownloadIcon />}
+                  onClick={handleDownloadTemplate}
+                >
+                  Download Template
+                </Button>
+              </Stack>
+
+              {/* Right side - Row management */}
+              <Stack direction="row" spacing={2}>
+                {/* Add Row */}
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={handleAddRow}
+                  sx={{ 
+                    fontWeight: 600,
+                    boxShadow: 2,
+                    bgcolor: '#10b981',
+                    color: 'white',
+                    '&:hover': { 
+                      boxShadow: 4,
+                      bgcolor: '#059669'
+                    }
+                  }}
+                >
+                  Add Row
+                </Button>
+
+                {/* Clear Draft */}
+                {draftSources.length > 0 && (
+                  <Button
+                    variant="contained"
+                    startIcon={<ClearIcon />}
+                    onClick={handleClearDraft}
+                    sx={{ 
+                      fontWeight: 600,
+                      boxShadow: 2,
+                      bgcolor: '#dc2626',
+                      color: 'white',
+                      '&:hover': { 
+                        boxShadow: 4,
+                        bgcolor: '#b91c1c'
+                      }
+                    }}
+                  >
+                    Clear All
+                  </Button>
+                )}
+              </Stack>
+            </Box>
 
             {csvFile && (
               <Alert severity="info" sx={{ mt: 2 }}>
@@ -562,6 +734,23 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
                             onChange={(e) => handleFieldChange(source.id, 'name', e.target.value)}
                             error={!source.name.trim()}
                             helperText={!source.name.trim() ? 'Required' : ''}
+                            sx={{
+                              '& .MuiFormHelperText-root': {
+                                color: !source.name.trim() ? '#d32f2f !important' : 'inherit'
+                              },
+                              '& .MuiOutlinedInput-root': {
+                                '&.Mui-error': {
+                                  '& fieldset': {
+                                    borderColor: '#d32f2f !important'
+                                  }
+                                },
+                                '&:not(.Mui-error)': {
+                                  '& fieldset': {
+                                    borderColor: '#d0d7de !important'
+                                  }
+                                }
+                              }
+                            }}
                           />
                         </TableCell>
                         <TableCell>
@@ -571,6 +760,25 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
                             value={source.facebook_link}
                             onChange={(e) => handleFieldChange(source.id, 'facebook_link', e.target.value)}
                             placeholder="https://facebook.com/..."
+                            error={source.facebook_link ? !validateFacebookLink(source.facebook_link) : false}
+                            helperText={getValidationMessage('facebook', source.facebook_link)}
+                            sx={{
+                              '& .MuiFormHelperText-root': {
+                                color: (source.facebook_link && !validateFacebookLink(source.facebook_link)) ? '#d32f2f !important' : 'inherit'
+                              },
+                              '& .MuiOutlinedInput-root': {
+                                '&.Mui-error': {
+                                  '& fieldset': {
+                                    borderColor: '#d32f2f !important'
+                                  }
+                                },
+                                '&:not(.Mui-error)': {
+                                  '& fieldset': {
+                                    borderColor: '#d0d7de !important'
+                                  }
+                                }
+                              }
+                            }}
                           />
                         </TableCell>
                         <TableCell>
@@ -580,6 +788,25 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
                             value={source.instagram_link}
                             onChange={(e) => handleFieldChange(source.id, 'instagram_link', e.target.value)}
                             placeholder="https://instagram.com/..."
+                            error={source.instagram_link ? !validateInstagramLink(source.instagram_link) : false}
+                            helperText={getValidationMessage('instagram', source.instagram_link)}
+                            sx={{
+                              '& .MuiFormHelperText-root': {
+                                color: (source.instagram_link && !validateInstagramLink(source.instagram_link)) ? '#d32f2f !important' : 'inherit'
+                              },
+                              '& .MuiOutlinedInput-root': {
+                                '&.Mui-error': {
+                                  '& fieldset': {
+                                    borderColor: '#d32f2f !important'
+                                  }
+                                },
+                                '&:not(.Mui-error)': {
+                                  '& fieldset': {
+                                    borderColor: '#d0d7de !important'
+                                  }
+                                }
+                              }
+                            }}
                           />
                         </TableCell>
                         <TableCell>
@@ -589,6 +816,25 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
                             value={source.linkedin_link}
                             onChange={(e) => handleFieldChange(source.id, 'linkedin_link', e.target.value)}
                             placeholder="https://linkedin.com/in/..."
+                            error={source.linkedin_link ? !validateLinkedInLink(source.linkedin_link) : false}
+                            helperText={getValidationMessage('linkedin', source.linkedin_link)}
+                            sx={{
+                              '& .MuiFormHelperText-root': {
+                                color: (source.linkedin_link && !validateLinkedInLink(source.linkedin_link)) ? '#d32f2f !important' : 'inherit'
+                              },
+                              '& .MuiOutlinedInput-root': {
+                                '&.Mui-error': {
+                                  '& fieldset': {
+                                    borderColor: '#d32f2f !important'
+                                  }
+                                },
+                                '&:not(.Mui-error)': {
+                                  '& fieldset': {
+                                    borderColor: '#d0d7de !important'
+                                  }
+                                }
+                              }
+                            }}
                           />
                         </TableCell>
                         <TableCell>
@@ -598,6 +844,25 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
                             value={source.tiktok_link}
                             onChange={(e) => handleFieldChange(source.id, 'tiktok_link', e.target.value)}
                             placeholder="https://tiktok.com/@..."
+                            error={source.tiktok_link ? !validateTikTokLink(source.tiktok_link) : false}
+                            helperText={getValidationMessage('tiktok', source.tiktok_link)}
+                            sx={{
+                              '& .MuiFormHelperText-root': {
+                                color: (source.tiktok_link && !validateTikTokLink(source.tiktok_link)) ? '#d32f2f !important' : 'inherit'
+                              },
+                              '& .MuiOutlinedInput-root': {
+                                '&.Mui-error': {
+                                  '& fieldset': {
+                                    borderColor: '#d32f2f !important'
+                                  }
+                                },
+                                '&:not(.Mui-error)': {
+                                  '& fieldset': {
+                                    borderColor: '#d0d7de !important'
+                                  }
+                                }
+                              }
+                            }}
                           />
                         </TableCell>
                         <TableCell>
@@ -640,19 +905,26 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
                     >
                       Save Draft
                     </Button>
-                    <Button
-                      variant="contained"
-                      startIcon={<PublishIcon />}
-                      onClick={handleCreateSources}
-                      disabled={loading || draftSources.length === 0}
-                      sx={{ minWidth: 140 }}
+                    <Tooltip 
+                      title={hasValidationErrors() ? "Check the link errors before creating sources" : ""}
+                      open={hasValidationErrors() ? undefined : false}
                     >
-                      {loading ? (
-                        <CircularProgress size={20} color="inherit" />
-                      ) : (
-                        `Create ${draftSources.length} Sources`
-                      )}
-                    </Button>
+                      <span>
+                        <Button
+                          variant="contained"
+                          startIcon={<PublishIcon />}
+                          onClick={handleCreateSources}
+                          disabled={loading || draftSources.length === 0 || hasValidationErrors()}
+                          sx={{ minWidth: 140 }}
+                        >
+                          {loading ? (
+                            <CircularProgress size={20} color="inherit" />
+                          ) : (
+                            `Create ${draftSources.length} Sources`
+                          )}
+                        </Button>
+                      </span>
+                    </Tooltip>
                   </Stack>
                 </Stack>
               </Box>

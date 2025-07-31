@@ -20,20 +20,20 @@ import {
   Snackbar,
   Alert,
   Tooltip,
-  FormGroup,
-  FormControlLabel,
-  Checkbox,
-  Divider,
   Card,
   CardContent,
-  Stack,
   Avatar,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import {
   Search as SearchIcon,
   Add as AddIcon,
   Edit as EditIcon,
+  Delete as DeleteIcon,
   PersonAdd as PersonAddIcon,
   Facebook as FacebookIcon,
   Instagram as InstagramIcon,
@@ -120,6 +120,13 @@ const TrackSourcesList = () => {
     severity: 'success' as 'success' | 'error'
   });
 
+  // Delete confirmation dialog state
+  const [deleteDialog, setDeleteDialog] = useState({
+    open: false,
+    sourceId: null as number | null,
+    sourceName: '',
+  });
+
   // Fetch sources with filters
   const fetchSources = async (
     pageNumber = 0, 
@@ -169,7 +176,7 @@ const TrackSourcesList = () => {
       console.log('Current URL:', location.pathname);
       console.log('Fetch URL:', `/api/track-accounts/sources/?${queryParams}`);
       
-      const response = await apiFetch(`/track-accounts/sources/?${queryParams}`);
+      const response = await apiFetch(`/api/track-accounts/sources/?${queryParams}`);
       console.log('Fetch response status:', response.status);
       console.log('Fetch response ok:', response.ok);
       
@@ -214,14 +221,21 @@ const TrackSourcesList = () => {
         queryParams = `?project=${projectId}`;
       }
       
-      const response = await apiFetch(`/track-accounts/sources/statistics/${queryParams}`);
+      const response = await apiFetch(`/api/track-accounts/sources/statistics/${queryParams}`);
       if (response.ok) {
         const stats = await response.json();
         setFilterStats(stats);
+        console.log('Updated filter stats:', stats);
       }
     } catch (error) {
       console.error('Error fetching filter stats:', error);
     }
+  };
+
+  // Refresh both sources and stats
+  const refreshData = () => {
+    fetchSources(page, rowsPerPage, searchTerm, socialMediaFilters);
+    fetchFilterStats();
   };
 
   // Initial data load
@@ -239,6 +253,12 @@ const TrackSourcesList = () => {
   // Handle rows per page change
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newRowsPerPage = parseInt(event.target.value, 10);
+    console.log('=== ROWS PER PAGE CHANGE DEBUG ===');
+    console.log('New rows per page:', newRowsPerPage);
+    console.log('Current page:', page);
+    console.log('Current search term:', searchTerm);
+    console.log('Current social media filters:', socialMediaFilters);
+    
     setRowsPerPage(newRowsPerPage);
     setPage(0);
     fetchSources(0, newRowsPerPage, searchTerm, socialMediaFilters);
@@ -260,16 +280,7 @@ const TrackSourcesList = () => {
     }
   };
 
-  const handleSocialMediaFilterChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, checked } = event.target;
-    const updatedFilters = {
-      ...socialMediaFilters,
-      [name]: checked
-    };
-    setSocialMediaFilters(updatedFilters);
-    setPage(0);
-    fetchSources(0, rowsPerPage, searchTerm, updatedFilters);
-  };
+
 
   // Clear all filters
   const handleClearFilters = () => {
@@ -287,6 +298,8 @@ const TrackSourcesList = () => {
       hasLinkedIn: false,
       hasTikTok: false,
     });
+    // Refresh stats after clearing filters
+    fetchFilterStats();
   };
 
   // Show snackbar message
@@ -306,12 +319,68 @@ const TrackSourcesList = () => {
     });
   };
 
+  // Handle delete source
+  const handleDeleteSource = (sourceId: number, sourceName: string) => {
+    setDeleteDialog({
+      open: true,
+      sourceId,
+      sourceName,
+    });
+  };
+
+  // Confirm delete
+  const confirmDelete = async () => {
+    if (!deleteDialog.sourceId) return;
+
+    try {
+      console.log('Attempting to delete source:', deleteDialog.sourceId);
+      console.log('Delete URL:', `/api/track-accounts/sources/${deleteDialog.sourceId}/`);
+      
+      const response = await apiFetch(`/api/track-accounts/sources/${deleteDialog.sourceId}/`, {
+        method: 'DELETE',
+      });
+
+      console.log('Delete response status:', response.status);
+      console.log('Delete response ok:', response.ok);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Delete response error:', errorText);
+        throw new Error(`Failed to delete source: ${response.status} ${errorText}`);
+      }
+
+      showSnackbar(`Source "${deleteDialog.sourceName}" deleted successfully`, 'success');
+      
+      // Refresh both sources list and filter statistics
+      refreshData();
+      
+      // Close dialog
+      setDeleteDialog({
+        open: false,
+        sourceId: null,
+        sourceName: '',
+      });
+    } catch (error) {
+      console.error('Delete error:', error);
+      showSnackbar(`Failed to delete source: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    }
+  };
+
+  // Cancel delete
+  const cancelDelete = () => {
+    setDeleteDialog({
+      open: false,
+      sourceId: null,
+      sourceName: '',
+    });
+  };
+
   // Handle CSV download
   const handleCsvDownload = async () => {
     if (!projectId) return;
 
     try {
-      const response = await apiFetch(`/track-accounts/sources/download_csv/?project=${projectId}`);
+      const response = await apiFetch(`/api/track-accounts/sources/download_csv/?project=${projectId}`);
       
       if (!response.ok) {
         throw new Error('Download failed');
@@ -351,153 +420,7 @@ const TrackSourcesList = () => {
     socialMediaFilters.hasLinkedIn || socialMediaFilters.hasTikTok;
 
   return (
-    <Box sx={{ display: 'flex', height: '100vh', bgcolor: '#f8fafc' }}>
-      {/* Left Sidebar - Filters */}
-      <Box sx={{ 
-        width: 320, 
-        bgcolor: 'white', 
-        borderRight: '1px solid #e2e8f0',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden'
-      }}>
-        {/* Filter Header */}
-        <Box sx={{ p: 3, borderBottom: '1px solid #e2e8f0' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
-              Filters
-            </Typography>
-            {hasActiveFilters && (
-              <Button
-                size="small"
-                startIcon={<ClearIcon />}
-                onClick={handleClearFilters}
-                sx={{ color: '#64748b', fontSize: '0.75rem' }}
-              >
-                Clear all
-              </Button>
-            )}
-          </Box>
-          
-          {/* Search */}
-          <TextField
-            fullWidth
-            placeholder="Search sources..."
-            value={searchTerm}
-            onChange={handleSearchChange}
-            onKeyPress={handleKeyPress}
-            size="small"
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon sx={{ color: '#64748b', fontSize: 20 }} />
-                </InputAdornment>
-              ),
-            }}
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                bgcolor: '#f8fafc',
-                '&:hover': { bgcolor: '#f1f5f9' },
-                '&.Mui-focused': { bgcolor: 'white' }
-              }
-            }}
-          />
-        </Box>
-
-        {/* Filter Content */}
-        <Box sx={{ flex: 1, overflow: 'auto', p: 3 }}>
-          <Stack spacing={3}>
-            {/* Social Media Presence */}
-            <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: '#374151' }}>
-                Social Media Presence
-              </Typography>
-              <FormGroup>
-                <FormControlLabel
-                  control={
-                    <Checkbox 
-                      checked={socialMediaFilters.hasFacebook}
-                      onChange={handleSocialMediaFilterChange}
-                      name="hasFacebook"
-                      size="small"
-                    />
-                  }
-                  label={
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <FacebookIcon sx={{ fontSize: 16, color: '#4267B2', mr: 1 }} />
-                        <Typography variant="body2">Facebook</Typography>
-                      </Box>
-                      <Chip label={filterStats.socialMediaCounts.facebook} size="small" variant="outlined" />
-                    </Box>
-                  }
-                  sx={{ mb: 1 }}
-                />
-                <FormControlLabel
-                  control={
-                    <Checkbox 
-                      checked={socialMediaFilters.hasInstagram}
-                      onChange={handleSocialMediaFilterChange}
-                      name="hasInstagram"
-                      size="small"
-                    />
-                  }
-                  label={
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <InstagramIcon sx={{ fontSize: 16, color: '#E1306C', mr: 1 }} />
-                        <Typography variant="body2">Instagram</Typography>
-                      </Box>
-                      <Chip label={filterStats.socialMediaCounts.instagram} size="small" variant="outlined" />
-                    </Box>
-                  }
-                  sx={{ mb: 1 }}
-                />
-                <FormControlLabel
-                  control={
-                    <Checkbox 
-                      checked={socialMediaFilters.hasLinkedIn}
-                      onChange={handleSocialMediaFilterChange}
-                      name="hasLinkedIn"
-                      size="small"
-                    />
-                  }
-                  label={
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <LinkedInIcon sx={{ fontSize: 16, color: '#0077B5', mr: 1 }} />
-                        <Typography variant="body2">LinkedIn</Typography>
-                      </Box>
-                      <Chip label={filterStats.socialMediaCounts.linkedin} size="small" variant="outlined" />
-                    </Box>
-                  }
-                  sx={{ mb: 1 }}
-                />
-                <FormControlLabel
-                  control={
-                    <Checkbox 
-                      checked={socialMediaFilters.hasTikTok}
-                      onChange={handleSocialMediaFilterChange}
-                      name="hasTikTok"
-                      size="small"
-                    />
-                  }
-                  label={
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <TikTokIcon sx={{ fontSize: 16, color: '#000', mr: 1 }} />
-                        <Typography variant="body2">TikTok</Typography>
-                      </Box>
-                      <Chip label={filterStats.socialMediaCounts.tiktok} size="small" variant="outlined" />
-                    </Box>
-                  }
-                />
-              </FormGroup>
-            </Box>
-          </Stack>
-        </Box>
-      </Box>
-
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: '#f8fafc' }}>
       {/* Main Content */}
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Header */}
@@ -582,6 +505,288 @@ const TrackSourcesList = () => {
                 </Box>
               </CardContent>
             </Card>
+          </Box>
+        </Box>
+
+        {/* Filters Section - Now horizontally under Source Collection */}
+        <Box sx={{ p: 3, bgcolor: 'white', borderBottom: '1px solid #e2e8f0' }}>
+          {/* Search Row */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#374151', minWidth: 80 }}>
+              Search :
+            </Typography>
+            <TextField
+              placeholder="Search sources..."
+              value={searchTerm}
+              onChange={handleSearchChange}
+              onKeyPress={handleKeyPress}
+              size="small"
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon sx={{ color: '#64748b', fontSize: 20 }} />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{
+                width: 1000,
+                '& .MuiOutlinedInput-root': {
+                  bgcolor: '#f8fafc',
+                  '&:hover': { bgcolor: '#f1f5f9' },
+                  '&.Mui-focused': { bgcolor: 'white' }
+                }
+              }}
+            />
+            {hasActiveFilters && (
+              <Button
+                size="small"
+                startIcon={<ClearIcon />}
+                onClick={handleClearFilters}
+                sx={{ color: '#64748b', fontSize: '0.75rem', ml: 'auto' }}
+              >
+                Clear all
+              </Button>
+            )}
+          </Box>
+
+          {/* Social Media Presence Filters Row */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#374151', minWidth: 80 }}>
+              Social Media Presence :
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, flex: 1 }}>
+              <Button
+                variant={socialMediaFilters.hasFacebook ? "contained" : "outlined"}
+                size="small"
+                onClick={() => {
+                  const updatedFilters = {
+                    ...socialMediaFilters,
+                    hasFacebook: !socialMediaFilters.hasFacebook
+                  };
+                  setSocialMediaFilters(updatedFilters);
+                  setPage(0);
+                  fetchSources(0, rowsPerPage, searchTerm, updatedFilters);
+                  fetchFilterStats();
+                }}
+                startIcon={<FacebookIcon sx={{ fontSize: 16 }} />}
+                sx={{
+                  minWidth: 'auto',
+                  px: 2,
+                  py: 0.5,
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  ...(socialMediaFilters.hasFacebook ? {
+                    bgcolor: '#4267B2',
+                    color: 'white',
+                    border: 'none',
+                    '&:hover': { bgcolor: '#365899' }
+                  } : {
+                    border: 'none',
+                    color: '#4267B2',
+                    bgcolor: 'transparent',
+                    '&:hover': { 
+                      bgcolor: '#4267B2',
+                      color: 'white'
+                    }
+                  })
+                }}
+              >
+                Facebook
+                <Chip 
+                  label={filterStats.socialMediaCounts.facebook} 
+                  size="small" 
+                  variant="outlined"
+                  sx={{ 
+                    ml: 0.5, 
+                    height: 16, 
+                    fontSize: '0.625rem',
+                    ...(socialMediaFilters.hasFacebook ? {
+                      borderColor: 'white',
+                      color: 'white'
+                    } : {
+                      borderColor: '#4267B2',
+                      color: '#4267B2'
+                    })
+                  }} 
+                />
+              </Button>
+              
+              <Button
+                variant={socialMediaFilters.hasInstagram ? "contained" : "outlined"}
+                size="small"
+                onClick={() => {
+                  const updatedFilters = {
+                    ...socialMediaFilters,
+                    hasInstagram: !socialMediaFilters.hasInstagram
+                  };
+                  setSocialMediaFilters(updatedFilters);
+                  setPage(0);
+                  fetchSources(0, rowsPerPage, searchTerm, updatedFilters);
+                  fetchFilterStats();
+                }}
+                startIcon={<InstagramIcon sx={{ fontSize: 16 }} />}
+                sx={{
+                  minWidth: 'auto',
+                  px: 2,
+                  py: 0.5,
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  ...(socialMediaFilters.hasInstagram ? {
+                    bgcolor: '#E1306C',
+                    color: 'white',
+                    border: 'none',
+                    '&:hover': { bgcolor: '#C13584' }
+                  } : {
+                    border: 'none',
+                    color: '#E1306C',
+                    bgcolor: 'transparent',
+                    '&:hover': { 
+                      bgcolor: '#E1306C',
+                      color: 'white'
+                    }
+                  })
+                }}
+              >
+                Instagram
+                <Chip 
+                  label={filterStats.socialMediaCounts.instagram} 
+                  size="small" 
+                  variant="outlined"
+                  sx={{ 
+                    ml: 0.5, 
+                    height: 16, 
+                    fontSize: '0.625rem',
+                    ...(socialMediaFilters.hasInstagram ? {
+                      borderColor: 'white',
+                      color: 'white'
+                    } : {
+                      borderColor: '#E1306C',
+                      color: '#E1306C'
+                    })
+                  }} 
+                />
+              </Button>
+              
+              <Button
+                variant={socialMediaFilters.hasLinkedIn ? "contained" : "outlined"}
+                size="small"
+                onClick={() => {
+                  const updatedFilters = {
+                    ...socialMediaFilters,
+                    hasLinkedIn: !socialMediaFilters.hasLinkedIn
+                  };
+                  setSocialMediaFilters(updatedFilters);
+                  setPage(0);
+                  fetchSources(0, rowsPerPage, searchTerm, updatedFilters);
+                  fetchFilterStats();
+                }}
+                startIcon={<LinkedInIcon sx={{ fontSize: 16 }} />}
+                sx={{
+                  minWidth: 'auto',
+                  px: 2,
+                  py: 0.5,
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  ...(socialMediaFilters.hasLinkedIn ? {
+                    bgcolor: '#0077B5',
+                    color: 'white',
+                    border: 'none',
+                    '&:hover': { bgcolor: '#005885' }
+                  } : {
+                    border: 'none',
+                    color: '#0077B5',
+                    bgcolor: 'transparent',
+                    '&:hover': { 
+                      bgcolor: '#0077B5',
+                      color: 'white'
+                    }
+                  })
+                }}
+              >
+                LinkedIn
+                <Chip 
+                  label={filterStats.socialMediaCounts.linkedin} 
+                  size="small" 
+                  variant="outlined"
+                  sx={{ 
+                    ml: 0.5, 
+                    height: 16, 
+                    fontSize: '0.625rem',
+                    ...(socialMediaFilters.hasLinkedIn ? {
+                      borderColor: 'white',
+                      color: 'white'
+                    } : {
+                      borderColor: '#0077B5',
+                      color: '#0077B5'
+                    })
+                  }} 
+                />
+              </Button>
+              
+              <Button
+                variant={socialMediaFilters.hasTikTok ? "contained" : "outlined"}
+                size="small"
+                onClick={() => {
+                  const updatedFilters = {
+                    ...socialMediaFilters,
+                    hasTikTok: !socialMediaFilters.hasTikTok
+                  };
+                  setSocialMediaFilters(updatedFilters);
+                  setPage(0);
+                  fetchSources(0, rowsPerPage, searchTerm, updatedFilters);
+                  fetchFilterStats();
+                }}
+                startIcon={<TikTokIcon sx={{ fontSize: 16 }} />}
+                sx={{
+                  minWidth: 'auto',
+                  px: 2,
+                  py: 0.5,
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  ...(socialMediaFilters.hasTikTok ? {
+                    bgcolor: '#000',
+                    color: 'white',
+                    border: 'none',
+                    '&:hover': { bgcolor: '#333' }
+                  } : {
+                    border: 'none',
+                    color: '#000',
+                    bgcolor: 'transparent',
+                    '&:hover': { 
+                      bgcolor: '#000',
+                      color: 'white'
+                    }
+                  })
+                }}
+              >
+                TikTok
+                <Chip 
+                  label={filterStats.socialMediaCounts.tiktok} 
+                  size="small" 
+                  variant="outlined"
+                  sx={{ 
+                    ml: 0.5, 
+                    height: 16, 
+                    fontSize: '0.625rem',
+                    ...(socialMediaFilters.hasTikTok ? {
+                      borderColor: 'white',
+                      color: 'white'
+                    } : {
+                      borderColor: '#000',
+                      color: '#000'
+                    })
+                  }} 
+                />
+              </Button>
+            </Box>
           </Box>
         </Box>
 
@@ -728,14 +933,33 @@ const TrackSourcesList = () => {
                             </Box>
                           </TableCell>
                           <TableCell align="right">
-                            <Button
-                              size="small"
-                              startIcon={<EditIcon />}
-                              onClick={() => navigate(getNavigationPath(`/source-tracking/edit/${source.id}`))}
-                              sx={{ color: theme.palette.primary.main }}
-                            >
-                              Edit
-                            </Button>
+                            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                              <IconButton
+                                size="small"
+                                onClick={() => navigate(getNavigationPath(`/source-tracking/edit/${source.id}`))}
+                                sx={{ 
+                                  color: theme.palette.primary.main,
+                                  '&:hover': { 
+                                    bgcolor: theme.palette.primary.main + '1A'
+                                  }
+                                }}
+                              >
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDeleteSource(source.id, source.name)}
+                                sx={{ 
+                                  color: '#dc2626',
+                                  '&:hover': { 
+                                    bgcolor: '#dc2626',
+                                    color: 'white'
+                                  }
+                                }}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -757,6 +981,45 @@ const TrackSourcesList = () => {
           </Paper>
         </Box>
       </Box>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialog.open}
+        onClose={cancelDelete}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ color: '#dc2626', fontWeight: 600 }}>
+          Delete Source
+        </DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete the source "{deleteDialog.sourceName}"? 
+            <br/>
+            This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button
+            onClick={cancelDelete}
+            variant="outlined"
+            color="primary"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={confirmDelete}
+            variant="contained"
+            sx={{ 
+              bgcolor: '#dc2626',
+              color: 'white',
+              '&:hover': { bgcolor: '#b91c1c' }
+            }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Snackbar for notifications */}
       <Snackbar

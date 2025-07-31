@@ -110,42 +110,54 @@ const AutomatedBatchScraper = () => {
       label: 'Facebook Posts',
       icon: <FacebookIcon />,
       platform: 'facebook',
-      contentType: 'posts'
+      contentType: 'posts',
+      color: '#1877F2',
+      description: 'Scrape Facebook posts and content'
     },
     {
       value: 'facebook_reels',
       label: 'Facebook Reels',
       icon: <FacebookIcon />,
       platform: 'facebook',
-      contentType: 'reels'
+      contentType: 'reels',
+      color: '#1877F2',
+      description: 'Collect Facebook video content'
     },
     {
       value: 'instagram_posts',
       label: 'Instagram Posts',
       icon: <InstagramIcon />,
       platform: 'instagram',
-      contentType: 'posts'
+      contentType: 'posts',
+      color: '#E4405F',
+      description: 'Scrape Instagram posts and images'
     },
     {
       value: 'instagram_reels',
       label: 'Instagram Reels',
       icon: <InstagramIcon />,
       platform: 'instagram',
-      contentType: 'reels'
+      contentType: 'reels',
+      color: '#E4405F',
+      description: 'Collect Instagram video content'
     },
     {
       value: 'linkedin',
       label: 'LinkedIn Posts',
       icon: <LinkedInIcon />,
       platform: 'linkedin',
-      contentType: 'posts'
+      contentType: 'posts',
+      color: '#0A66C2',
+      description: 'Scrape LinkedIn posts and articles'
     },
     {
       value: 'tiktok',
       label: 'TikTok Posts',
       icon: <MusicVideoIcon />,
       platform: 'tiktok',
-      contentType: 'posts'
+      contentType: 'posts',
+      color: '#000000',
+      description: 'Collect TikTok video content'
     },
   ];
 
@@ -201,7 +213,11 @@ const AutomatedBatchScraper = () => {
 
   const handleCreateJob = () => {
     setJobName('');
-    setSelectedPlatforms(['facebook_posts', 'instagram_posts']);
+    // Auto-select only platforms that have active configurations
+    const configuredPlatforms = platformOptions
+      .filter(platform => configs.some(config => config.platform === platform.value && config.is_active))
+      .map(platform => platform.value);
+    setSelectedPlatforms(configuredPlatforms);
     setNumOfPosts(10);
     setStartDate(null);
     setEndDate(null);
@@ -451,48 +467,112 @@ const AutomatedBatchScraper = () => {
           </Snackbar>
 
           {/* Configuration Status */}
-          <Card sx={{ mb: 4 }}>
-            <CardContent>
-              <Typography variant="h6" sx={{ mb: 2 }}>
+          <Card sx={{ 
+            mb: 4, 
+            background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
+            border: '1px solid #dee2e6',
+            borderRadius: 2,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+          }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h5" sx={{ mb: 2, fontWeight: 600, color: '#495057' }}>
                 Platform Configurations Status
               </Typography>
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+              <Typography variant="body1" sx={{ mb: 3, color: '#6c757d', lineHeight: 1.6 }}>
+                Check the status of your BrightData configurations for each platform. Only configured platforms can be used for automated batch scraping.
+              </Typography>
+              
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 2 }}>
                 {platformOptions.map((platform) => {
                   const config = configs.find(c => c.platform === platform.value && c.is_active);
                   return (
-                    <Box key={platform.value} sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      p: 2,
-                      border: 1,
-                      borderColor: config ? 'success.main' : 'warning.main',
-                      borderRadius: 1,
-                      minWidth: '200px',
-                      backgroundColor: config ? 'rgba(76, 175, 80, 0.1)' : 'rgba(255, 152, 0, 0.1)'
-                    }}>
-                      {platform.icon}
-                      <Box sx={{ ml: 1, flexGrow: 1 }}>
-                        <Typography variant="body2" fontWeight="medium">{platform.label}</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Config: {platform.value}
-                        </Typography>
-                        <Box sx={{ mt: 0.5 }}>
-                          <Chip
-                            size="small"
-                            label={config ? 'Ready' : 'Not Configured'}
-                            color={config ? 'success' : 'warning'}
-                          />
+                    <Paper
+                      key={platform.value}
+                      elevation={config ? 3 : 1}
+                      sx={{
+                        p: 2,
+                        borderRadius: 2,
+                        border: config ? `2px solid #28a745` : '1px solid #dee2e6',
+                        background: config ? 'linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%)' : 'white',
+                        transition: 'all 0.3s ease',
+                        cursor: 'pointer',
+                        '&:hover': {
+                          transform: 'translateY(-2px)',
+                          boxShadow: config ? '0 8px 25px rgba(40, 167, 69, 0.2)' : '0 6px 20px rgba(0,0,0,0.1)'
+                        }
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                        <Box
+                          sx={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: platform.color,
+                            color: 'white',
+                            mr: 2,
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                          }}
+                        >
+                          {platform.icon}
+                        </Box>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="h6" sx={{ fontWeight: 600, color: '#495057' }}>
+                            {platform.label}
+                          </Typography>
+                          <Typography variant="body2" sx={{ color: '#6c757d', fontSize: '0.875rem' }}>
+                            {platform.description}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          {config ? (
+                            <Chip
+                              label="Ready"
+                              size="small"
+                              color="success"
+                              sx={{ 
+                                fontWeight: 600,
+                                '& .MuiChip-label': { px: 1.5 }
+                              }}
+                            />
+                          ) : (
+                            <Chip
+                              label="Not Configured"
+                              size="small"
+                              variant="outlined"
+                              sx={{ 
+                                fontWeight: 500,
+                                color: '#6c757d',
+                                borderColor: '#dee2e6',
+                                '& .MuiChip-label': { px: 1.5 }
+                              }}
+                            />
+                          )}
                         </Box>
                       </Box>
-                    </Box>
+                    </Paper>
                   );
                 })}
               </Box>
+              
               {configs.length === 0 && (
-                <Box sx={{ mt: 2 }}>
-                  <Alert severity="warning">
-                    No active platform configurations found. Please configure your BrightData settings first.
+                <Box sx={{ mt: 3, p: 2, backgroundColor: '#fff3cd', borderRadius: 1, border: '1px solid #ffeaa7' }}>
+                  <Alert severity="warning" sx={{ backgroundColor: 'transparent', '& .MuiAlert-icon': { color: '#856404' } }}>
+                    <Typography variant="body2" sx={{ color: '#856404' }}>
+                      <strong>No active platform configurations found.</strong> Please configure your BrightData settings first to enable automated batch scraping.
+                    </Typography>
                   </Alert>
+                </Box>
+              )}
+              
+              {configs.length > 0 && (
+                <Box sx={{ mt: 3, p: 2, backgroundColor: '#d1ecf1', borderRadius: 1, border: '1px solid #bee5eb' }}>
+                  <Typography variant="body2" sx={{ color: '#0c5460', textAlign: 'center' }}>
+                    🚀 <strong>Ready to scrape!</strong> You have {configs.length} platform(s) configured and ready for automated batch scraping.
+                  </Typography>
                 </Box>
               )}
             </CardContent>

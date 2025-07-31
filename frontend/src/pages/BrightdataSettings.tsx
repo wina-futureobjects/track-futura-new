@@ -47,9 +47,6 @@ import FacebookIcon from '@mui/icons-material/Facebook';
 import InstagramIcon from '@mui/icons-material/Instagram';
 import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import MusicVideoIcon from '@mui/icons-material/MusicVideo';
-import CommentIcon from '@mui/icons-material/Comment';
-import ArticleIcon from '@mui/icons-material/Article';
-import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
 import { apiFetch } from '../utils/api';
 
 interface BrightdataConfig {
@@ -86,14 +83,62 @@ const BrightdataSettings = () => {
   const [configToDelete, setConfigToDelete] = useState<number | null>(null);
 
   const platformOptions = [
-    { value: 'facebook_posts', label: 'Facebook Posts', icon: <FacebookIcon /> },
-    { value: 'facebook_reels', label: 'Facebook Reels', icon: <VideoLibraryIcon /> },
-    { value: 'facebook_comments', label: 'Facebook Comments', icon: <CommentIcon /> },
-    { value: 'instagram_posts', label: 'Instagram Posts', icon: <InstagramIcon /> },
-    { value: 'instagram_reels', label: 'Instagram Reels', icon: <VideoLibraryIcon /> },
-    { value: 'instagram_comments', label: 'Instagram Comments', icon: <CommentIcon /> },
-    { value: 'linkedin', label: 'LinkedIn', icon: <LinkedInIcon /> },
-    { value: 'tiktok', label: 'TikTok', icon: <MusicVideoIcon /> },
+    { 
+      value: 'facebook_posts', 
+      label: 'Facebook Posts', 
+      icon: <FacebookIcon />,
+      color: '#1877F2',
+      description: 'Scrape Facebook posts and content'
+    },
+    { 
+      value: 'facebook_reels', 
+      label: 'Facebook Reels', 
+      icon: <FacebookIcon />,
+      color: '#1877F2',
+      description: 'Collect Facebook video content'
+    },
+    { 
+      value: 'facebook_comments', 
+      label: 'Facebook Comments', 
+      icon: <FacebookIcon />,
+      color: '#1877F2',
+      description: 'Extract comment data from posts'
+    },
+    { 
+      value: 'instagram_posts', 
+      label: 'Instagram Posts', 
+      icon: <InstagramIcon />,
+      color: '#E4405F',
+      description: 'Scrape Instagram posts and images'
+    },
+    { 
+      value: 'instagram_reels', 
+      label: 'Instagram Reels', 
+      icon: <InstagramIcon />,
+      color: '#E4405F',
+      description: 'Collect Instagram video content'
+    },
+    { 
+      value: 'instagram_comments', 
+      label: 'Instagram Comments', 
+      icon: <InstagramIcon />,
+      color: '#E4405F',
+      description: 'Extract comment data from posts'
+    },
+    { 
+      value: 'linkedin', 
+      label: 'LinkedIn', 
+      icon: <LinkedInIcon />,
+      color: '#0A66C2',
+      description: 'Scrape LinkedIn posts and articles'
+    },
+    { 
+      value: 'tiktok', 
+      label: 'TikTok', 
+      icon: <MusicVideoIcon />,
+      color: '#000000',
+      description: 'Collect TikTok video content'
+    },
   ];
 
   useEffect(() => {
@@ -291,31 +336,106 @@ const BrightdataSettings = () => {
         </Typography>
       </Box>
 
-      <Card sx={{ mb: 4, backgroundColor: '#f5f5f5' }}>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 2 }}>
-            Platform-Specific Configurations
-          </Typography>
-          <Typography variant="body2" sx={{ mb: 2 }}>
-            The automated batch scraper requires separate Brightdata configurations for each social media platform. 
-            Each platform uses different dataset structures and may require different API tokens.
-          </Typography>
-          <Stack direction="row" spacing={2} flexWrap="wrap">
-            {platformOptions.map((platform) => {
-              const hasConfig = configs.some(c => c.platform === platform.value);
-              return (
-                <Chip
-                  key={platform.value}
-                  icon={platform.icon}
-                  label={platform.label}
-                  color={hasConfig ? 'success' : 'default'}
-                  variant={hasConfig ? 'filled' : 'outlined'}
-                />
-              );
-            })}
-          </Stack>
-        </CardContent>
-      </Card>
+             <Card sx={{ 
+         mb: 4, 
+         background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
+         border: '1px solid #dee2e6',
+         borderRadius: 2,
+         boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+       }}>
+         <CardContent sx={{ p: 3 }}>
+           <Typography variant="h5" sx={{ mb: 2, fontWeight: 600, color: '#495057' }}>
+             Platform-Specific Configurations
+           </Typography>
+           <Typography variant="body1" sx={{ mb: 3, color: '#6c757d', lineHeight: 1.6 }}>
+             The automated batch scraper requires separate Brightdata configurations for each social media platform. 
+             Each platform uses different dataset structures and may require different API tokens.
+           </Typography>
+           
+           <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 2 }}>
+             {platformOptions.map((platform) => {
+               const hasConfig = configs.some(c => c.platform === platform.value);
+               return (
+                 <Paper
+                   key={platform.value}
+                   elevation={hasConfig ? 3 : 1}
+                   sx={{
+                     p: 2,
+                     borderRadius: 2,
+                     border: hasConfig ? `2px solid #28a745` : '1px solid #dee2e6',
+                     background: hasConfig ? 'linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%)' : 'white',
+                     transition: 'all 0.3s ease',
+                     cursor: 'pointer',
+                     '&:hover': {
+                       transform: 'translateY(-2px)',
+                       boxShadow: hasConfig ? '0 8px 25px rgba(40, 167, 69, 0.2)' : '0 6px 20px rgba(0,0,0,0.1)'
+                     }
+                   }}
+                 >
+                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                     <Box
+                       sx={{
+                         width: 40,
+                         height: 40,
+                         borderRadius: '50%',
+                         display: 'flex',
+                         alignItems: 'center',
+                         justifyContent: 'center',
+                         backgroundColor: platform.color,
+                         color: 'white',
+                         mr: 2,
+                         boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                       }}
+                     >
+                       {platform.icon}
+                     </Box>
+                     <Box sx={{ flex: 1 }}>
+                       <Typography variant="h6" sx={{ fontWeight: 600, color: '#495057' }}>
+                         {platform.label}
+                       </Typography>
+                       <Typography variant="body2" sx={{ color: '#6c757d', fontSize: '0.875rem' }}>
+                         {platform.description}
+                       </Typography>
+                     </Box>
+                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                       {hasConfig ? (
+                         <Chip
+                           label="Configured"
+                           size="small"
+                           color="success"
+                           sx={{ 
+                             fontWeight: 600,
+                             '& .MuiChip-label': { px: 1.5 }
+                           }}
+                         />
+                       ) : (
+                         <Chip
+                           label="Not Configured"
+                           size="small"
+                           variant="outlined"
+                           sx={{ 
+                             fontWeight: 500,
+                             color: '#6c757d',
+                             borderColor: '#dee2e6',
+                             '& .MuiChip-label': { px: 1.5 }
+                           }}
+                         />
+                       )}
+                     </Box>
+                   </Box>
+                 </Paper>
+               );
+             })}
+           </Box>
+           
+           <Box sx={{ mt: 3, p: 2, backgroundColor: '#f8f9fa', borderRadius: 1, border: '1px solid #e9ecef' }}>
+             <Typography variant="body2" sx={{ color: '#6c757d', textAlign: 'center' }}>
+               💡 <strong>Tip:</strong> Configure at least one platform to enable automated data scraping. 
+               Each platform requires a unique Brightdata dataset ID and API token.
+             </Typography>
+           </Box>
+         </CardContent>
+       </Card>
 
       <Card sx={{ mb: 4 }}>
         <CardContent>

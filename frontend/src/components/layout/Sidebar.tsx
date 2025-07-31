@@ -11,7 +11,6 @@ import {
     Instagram as InstagramIcon,
     Logout as LogoutIcon,
     Settings as SettingsIcon,
-    SettingsSuggest as SettingsSuggestIcon,
     Storage as StorageIcon
 } from '@mui/icons-material';
 import CommentIcon from '@mui/icons-material/Comment';
@@ -216,6 +215,18 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
       category: 'main'
     },
     {
+      text: 'Data Scrapers',
+      path: '#data-scrapers',
+      icon: <AutoAwesomeIcon />,
+      category: 'data',
+      subItems: [
+        { text: 'Posts & Reels Scraper', path: getSocialMediaPath('automated-batch-scraper'), icon: <AutoAwesomeIcon /> },
+        { text: 'Comments Scraper', path: getSocialMediaPath('comments-scraper'), icon: <CommentIcon /> },
+        { text: 'Webhook Monitor', path: getSocialMediaPath('webhook-monitor'), icon: <AnalyticsIcon /> },
+        { text: 'BrightData Notifications', path: getSocialMediaPath('brightdata-notifications'), icon: <NotificationsIcon /> },
+      ]
+    },
+    {
       text: 'Data Storage',
       path: '#data-storage',
       icon: <StorageIcon />,
@@ -225,19 +236,6 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
         { text: 'Facebook Data', path: getSocialMediaPath('facebook-folders'), icon: <FacebookIcon /> },
         { text: 'LinkedIn Data', path: getSocialMediaPath('linkedin-folders'), icon: <LinkedInIcon /> },
         { text: 'TikTok Data', path: getSocialMediaPath('tiktok-folders'), icon: <MusicVideoIcon /> },
-      ]
-    },
-    {
-      text: 'Data Scrapers',
-      path: '#data-scrapers',
-      icon: <AutoAwesomeIcon />,
-      category: 'data',
-      subItems: [
-        { text: 'Posts & Reels Scraper', path: getSocialMediaPath('automated-batch-scraper'), icon: <AutoAwesomeIcon /> },
-        { text: 'Comments Scraper', path: getSocialMediaPath('comments-scraper'), icon: <CommentIcon /> },
-        { text: 'Brightdata Settings', path: getSocialMediaPath('brightdata-settings'), icon: <SettingsSuggestIcon /> },
-        { text: 'Webhook Monitor', path: getSocialMediaPath('webhook-monitor'), icon: <AnalyticsIcon /> },
-        { text: 'BrightData Notifications', path: getSocialMediaPath('brightdata-notifications'), icon: <NotificationsIcon /> },
       ]
     },
     {
@@ -310,19 +308,6 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
     return '/reports/generated';
   }
 
-  // Function to get correct path for Report Folders based on URL
-  function getReportFoldersPath() {
-    // Extract organization and project IDs from URL
-    const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
-
-    if (match) {
-      const [, orgId, projId] = match;
-      return `/organizations/${orgId}/projects/${projId}/report-folders`;
-    }
-
-    return '/report-folders';
-  }
-
   // Function to check if a menu item is active based on the current path
   const isActive = useCallback((itemPath: string) => {
     // Special handling for root path
@@ -370,9 +355,6 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
 
     if (itemPath.includes('brightdata-scraper')) {
       return location.pathname.includes('brightdata-scraper');
-    }
-    if (itemPath.includes('brightdata-settings')) {
-      return location.pathname.includes('brightdata-settings');
     }
 
     if (itemPath.includes('facebook-comment-scraper')) {
@@ -600,13 +582,24 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
             <StyledListItemButton
               onClick={handleLogout}
               sx={{
+                backgroundColor: 'transparent !important',
+                border: '1px solid transparent !important',
                 '&:hover': {
-                  backgroundColor: 'rgba(244, 67, 54, 0.04)',
+                  backgroundColor: 'rgba(244, 67, 54, 0.08) !important',
+                  border: '1px solid rgba(244, 67, 54, 0.12) !important',
+                },
+                '&:before': {
+                  display: 'none !important',
                 },
               }}
             >
               <Tooltip title={open ? '' : 'Logout'} placement="right" arrow>
-                <StyledListItemIcon sx={{ color: 'error.main' }}>
+                <StyledListItemIcon sx={{ 
+                  color: '#d32f2f !important',
+                  '& .MuiSvgIcon-root': {
+                    color: '#d32f2f !important',
+                  }
+                }}>
                   <LogoutIcon />
                 </StyledListItemIcon>
               </Tooltip>
@@ -615,7 +608,8 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
                   primary="Logout"
                   sx={{
                     '& .MuiListItemText-primary': {
-                      color: 'error.main',
+                      color: '#d32f2f !important',
+                      fontWeight: 500,
                     }
                   }}
                 />

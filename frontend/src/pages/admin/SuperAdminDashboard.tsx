@@ -16,6 +16,7 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
+  DialogContentText,
   DialogTitle,
   Select,
   MenuItem,
@@ -28,6 +29,10 @@ import {
   IconButton,
   Chip,
   InputAdornment,
+  Snackbar,
+  Alert,
+  Switch,
+  FormControlLabel,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -37,6 +42,12 @@ import {
   Person as PersonIcon,
   Business as BusinessIcon,
   SupervisorAccount as AdminIcon,
+  CheckCircle as CheckCircleIcon,
+  RadioButtonUnchecked as RadioButtonUncheckedIcon,
+  Facebook as FacebookIcon,
+  Instagram as InstagramIcon,
+  LinkedIn as LinkedInIcon,
+  MusicVideo as MusicVideoIcon,
 } from '@mui/icons-material';
 import { apiFetch } from '../../utils/api';
 
@@ -86,6 +97,24 @@ const SuperAdminDashboard = () => {
     owner_id: 0,
   });
   const [error, setError] = useState<string | null>(null);
+  
+  // Brightdata configuration dialog state
+  const [brightdataDialogOpen, setBrightdataDialogOpen] = useState(false);
+  const [brightdataForm, setBrightdataForm] = useState({
+    name: '',
+    platform: '',
+    description: '',
+    apiToken: '',
+    datasetId: '',
+    isActive: true,
+  });
+  const [brightdataConfigs, setBrightdataConfigs] = useState<any[]>([]);
+  const [brightdataLoading, setBrightdataLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editConfigId, setEditConfigId] = useState<number | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [configToDelete, setConfigToDelete] = useState<number | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [stats, setStats] = useState({
     totalUsers: 0,
     totalOrgs: 0,
@@ -98,6 +127,146 @@ const SuperAdminDashboard = () => {
   useEffect(() => {
     fetchDashboardData();
   }, []);
+
+  // Fetch Brightdata configurations when Brightdata tab is active
+  useEffect(() => {
+    if (activeTab === 3) {
+      fetchBrightdataConfigs();
+    }
+  }, [activeTab]);
+
+  const fetchBrightdataConfigs = async () => {
+    try {
+      setBrightdataLoading(true);
+      const response = await apiFetch('/api/brightdata/configs/');
+      if (!response.ok) {
+        throw new Error('Failed to fetch configurations');
+      }
+      const responseData = await response.json();
+      const data = responseData.results || responseData;
+      const configsArray = Array.isArray(data) ? data : [];
+      setBrightdataConfigs(configsArray);
+    } catch (error) {
+      console.error('Error fetching brightdata configs:', error);
+    } finally {
+      setBrightdataLoading(false);
+    }
+  };
+
+  const handleCreateBrightdataConfig = async () => {
+    // Validate required fields
+    if (!brightdataForm.name || !brightdataForm.platform || !brightdataForm.datasetId) {
+      setSuccessMessage('Please fill in all required fields');
+      return;
+    }
+
+    // For new configurations, API token is required
+    if (editConfigId === null && !brightdataForm.apiToken) {
+      setSuccessMessage('API token is required for new configurations');
+      return;
+    }
+
+    // For editing, if API token is provided, validate it's not just whitespace
+    if (editConfigId !== null && brightdataForm.apiToken && brightdataForm.apiToken.trim() === '') {
+      setSuccessMessage('API token cannot be empty. Leave the field empty to keep existing token.');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      
+      const payload: any = {
+        name: brightdataForm.name,
+        platform: brightdataForm.platform,
+        dataset_id: brightdataForm.datasetId,
+        description: brightdataForm.description || '',
+        is_active: brightdataForm.isActive,
+      };
+      
+      // Only include API token for new configs or if the user has entered a new one
+      if (brightdataForm.apiToken) {
+        payload.api_token = brightdataForm.apiToken;
+      }
+      
+      const url = editConfigId !== null 
+        ? `/api/brightdata/configs/${editConfigId}/` 
+        : '/api/brightdata/configs/';
+      
+      const method = editConfigId !== null ? 'PATCH' : 'POST';
+      
+      const response = await apiFetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save configuration');
+      }
+
+      setSuccessMessage(editConfigId !== null ? 'Configuration updated successfully!' : 'Configuration created successfully!');
+      setBrightdataDialogOpen(false);
+      setBrightdataForm({ name: '', platform: '', description: '', apiToken: '', datasetId: '', isActive: true });
+      setEditConfigId(null);
+      fetchBrightdataConfigs(); // Refresh the list
+    } catch (error: any) {
+      console.error('Error saving config:', error);
+      setSuccessMessage(error.message || 'Error saving configuration. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEditConfig = (config: any) => {
+    setEditConfigId(config.id);
+    setBrightdataForm({
+      name: config.name,
+      platform: config.platform,
+      description: config.description || '',
+      apiToken: '', // Don't set API token for security
+      datasetId: config.dataset_id,
+      isActive: config.is_active,
+    });
+    setBrightdataDialogOpen(true);
+  };
+
+  const handleDeleteClick = (configId: number) => {
+    setConfigToDelete(configId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (configToDelete === null) return;
+    
+    try {
+      setBrightdataLoading(true);
+      const response = await apiFetch(`/api/brightdata/configs/${configToDelete}/`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete configuration');
+      }
+
+      setSuccessMessage('Configuration deleted successfully');
+      fetchBrightdataConfigs();
+    } catch (error) {
+      console.error('Error deleting config:', error);
+      setSuccessMessage('Failed to delete configuration');
+    } finally {
+      setBrightdataLoading(false);
+      setDeleteDialogOpen(false);
+      setConfigToDelete(null);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteDialogOpen(false);
+    setConfigToDelete(null);
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -385,51 +554,50 @@ const SuperAdminDashboard = () => {
           <Tab label="Users" />
           <Tab label="Organizations" />
           <Tab label="System Settings" />
+          <Tab label="Brightdata Configuration" />
         </Tabs>
       </Paper>
 
-      {/* Search and Add Button */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-        <TextField
-          placeholder="Search..."
-          variant="outlined"
-          size="small"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          sx={{ width: 300 }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            ),
-          }}
-        />
-        {activeTab === 0 && (
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setOpenUserDialog(true)}
-          >
-            Add User
-          </Button>
-        )}
-        {activeTab === 1 && (
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setOpenOrgDialog(true)}
-          >
-            Add Organization
-          </Button>
-        )}
-      </Box>
-
-      {error && (
-        <Paper sx={{ p: 2, mb: 2, bgcolor: 'error.light', color: 'error.dark' }}>
-          <Typography>{error}</Typography>
-        </Paper>
+      {/* Search and Add Button - Only for Users and Organizations tabs */}
+      {(activeTab === 0 || activeTab === 1) && (
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+          <TextField
+            placeholder="Search..."
+            variant="outlined"
+            size="small"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            sx={{ width: 300 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
+          />
+          {activeTab === 0 && (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setOpenUserDialog(true)}
+            >
+              Add User
+            </Button>
+          )}
+          {activeTab === 1 && (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setOpenOrgDialog(true)}
+            >
+              Add Organization
+            </Button>
+          )}
+        </Box>
       )}
+
+
 
       {/* Users Tab */}
       {activeTab === 0 && (
@@ -553,6 +721,217 @@ const SuperAdminDashboard = () => {
         </Paper>
       )}
 
+      {/* Brightdata API Tab */}
+      {activeTab === 3 && (
+        <Box>
+          <Typography variant="h4" gutterBottom component="h1">
+            Brightdata API Configuration
+          </Typography>
+          <Typography variant="body1" color="text.secondary" paragraph sx={{ mb: 3 }}>
+            Manage your platform-specific Brightdata API configurations for automated data scraping. Each platform requires its own configuration with a unique dataset ID.
+          </Typography>
+
+          {/* Platform Overview Cards */}
+          <Card sx={{ 
+            mb: 4, 
+            background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
+            border: '1px solid #dee2e6',
+            borderRadius: 2,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+          }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h5" sx={{ mb: 2, fontWeight: 600, color: '#495057' }}>
+                Platform-Specific Configurations
+              </Typography>
+              <Typography variant="body1" sx={{ mb: 3, color: '#6c757d', lineHeight: 1.6 }}>
+                The automated batch scraper requires separate Brightdata configurations for each social media platform. 
+                Each platform uses different dataset structures and may require different API tokens.
+              </Typography>
+              
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 2 }}>
+                {[
+                  { value: 'facebook_posts', label: 'Facebook Posts', icon: <FacebookIcon />, color: '#1877F2', description: 'Scrape Facebook posts and content' },
+                  { value: 'facebook_reels', label: 'Facebook Reels', icon: <FacebookIcon />, color: '#1877F2', description: 'Collect Facebook video content' },
+                  { value: 'facebook_comments', label: 'Facebook Comments', icon: <FacebookIcon />, color: '#1877F2', description: 'Extract comment data from posts' },
+                  { value: 'instagram_posts', label: 'Instagram Posts', icon: <InstagramIcon />, color: '#E4405F', description: 'Scrape Instagram posts and images' },
+                  { value: 'instagram_reels', label: 'Instagram Reels', icon: <InstagramIcon />, color: '#E4405F', description: 'Collect Instagram video content' },
+                  { value: 'instagram_comments', label: 'Instagram Comments', icon: <InstagramIcon />, color: '#E4405F', description: 'Extract comment data from posts' },
+                  { value: 'linkedin', label: 'LinkedIn', icon: <LinkedInIcon />, color: '#0A66C2', description: 'Scrape LinkedIn posts and articles' },
+                  { value: 'tiktok', label: 'TikTok', icon: <MusicVideoIcon />, color: '#000000', description: 'Collect TikTok video content' },
+                ].map((platform) => {
+                  const hasConfig = brightdataConfigs.some(c => c.platform === platform.value);
+                  return (
+                    <Paper
+                      key={platform.value}
+                      elevation={hasConfig ? 3 : 1}
+                      sx={{
+                        p: 2,
+                        borderRadius: 2,
+                        border: hasConfig ? `2px solid #28a745` : '1px solid #dee2e6',
+                        background: hasConfig ? 'linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%)' : 'white',
+                        transition: 'all 0.3s ease',
+                        cursor: 'pointer',
+                        '&:hover': {
+                          transform: 'translateY(-2px)',
+                          boxShadow: hasConfig ? '0 8px 25px rgba(40, 167, 69, 0.2)' : '0 6px 20px rgba(0,0,0,0.1)'
+                        }
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                        <Box
+                          sx={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: platform.color,
+                            color: 'white',
+                            mr: 2,
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                          }}
+                        >
+                          {platform.icon}
+                        </Box>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="h6" sx={{ fontWeight: 600, color: '#495057' }}>
+                            {platform.label}
+                          </Typography>
+                          <Typography variant="body2" sx={{ color: '#6c757d', fontSize: '0.875rem' }}>
+                            {platform.description}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          {hasConfig ? (
+                            <Chip
+                              label="Configured"
+                              size="small"
+                              color="success"
+                              sx={{ 
+                                fontWeight: 600,
+                                '& .MuiChip-label': { px: 1.5 }
+                              }}
+                            />
+                          ) : (
+                            <Chip
+                              label="Not Configured"
+                              size="small"
+                              variant="outlined"
+                              sx={{ 
+                                fontWeight: 500,
+                                color: '#6c757d',
+                                borderColor: '#dee2e6',
+                                '& .MuiChip-label': { px: 1.5 }
+                              }}
+                            />
+                          )}
+                        </Box>
+                      </Box>
+                    </Paper>
+                  );
+                })}
+              </Box>
+              
+              <Box sx={{ mt: 3, p: 2, backgroundColor: '#f8f9fa', borderRadius: 1, border: '1px solid #e9ecef' }}>
+                <Typography variant="body2" sx={{ color: '#6c757d', textAlign: 'center' }}>
+                  💡 <strong>Tip:</strong> Configure at least one platform to enable automated data scraping. 
+                  Each platform requires a unique Brightdata dataset ID and API token.
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
+
+          {/* Configurations Table */}
+          <Card sx={{ mb: 4 }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6">
+                  API Configurations
+                </Typography>
+                <Button 
+                  variant="contained" 
+                  startIcon={<AddIcon />} 
+                  onClick={() => {
+                    setEditConfigId(null);
+                    setBrightdataForm({ name: '', platform: '', description: '', apiToken: '', datasetId: '', isActive: true });
+                    setBrightdataDialogOpen(true);
+                  }}
+                >
+                  Add New Configuration
+                </Button>
+              </Box>
+
+              {brightdataLoading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                  <CircularProgress />
+                </Box>
+              ) : (
+                <TableContainer component={Paper}>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Status</TableCell>
+                        <TableCell>Platform</TableCell>
+                        <TableCell>Name</TableCell>
+                        <TableCell>Dataset ID</TableCell>
+                        <TableCell>Created</TableCell>
+                        <TableCell>Updated</TableCell>
+                        <TableCell>Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {brightdataConfigs.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} align="center">
+                            No configurations found. Click "Add New Configuration" to create one.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        brightdataConfigs.map((config) => (
+                          <TableRow key={config.id}>
+                            <TableCell>
+                              <Chip
+                                label={config.is_active ? "Active" : "Inactive"}
+                                color={config.is_active ? "success" : "default"}
+                                size="small"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                {config.platform === 'linkedin' && <LinkedInIcon />}
+                                {config.platform === 'tiktok' && <MusicVideoIcon />}
+                                {config.platform.includes('instagram') && <InstagramIcon />}
+                                {config.platform.includes('facebook') && <FacebookIcon />}
+                                <Typography sx={{ ml: 1 }}>
+                                  {config.platform_display || config.platform}
+                                </Typography>
+                              </Box>
+                            </TableCell>
+                            <TableCell>{config.name}</TableCell>
+                            <TableCell>{config.dataset_id}</TableCell>
+                            <TableCell>{new Date(config.created_at).toLocaleString()}</TableCell>
+                            <TableCell>{new Date(config.updated_at).toLocaleString()}</TableCell>
+                            <TableCell>
+                              <IconButton size="small" onClick={() => handleEditConfig(config)}>
+                                <EditIcon />
+                              </IconButton>
+                              <IconButton size="small" color="error" onClick={() => handleDeleteClick(config.id)}>
+                                <DeleteIcon />
+                              </IconButton>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </CardContent>
+          </Card>
+        </Box>
+      )}
+
       {/* Create User Dialog */}
       <Dialog open={openUserDialog} onClose={() => setOpenUserDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Create New User</DialogTitle>
@@ -673,6 +1052,236 @@ const SuperAdminDashboard = () => {
           <Button onClick={() => setOpenOrgDialog(false)}>Cancel</Button>
           <Button onClick={handleCreateOrganization} variant="contained" color="primary">
             Create
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Brightdata Configuration Dialog */}
+      <Dialog open={brightdataDialogOpen} onClose={() => setBrightdataDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>{editConfigId !== null ? 'Edit Configuration' : 'Add New Brightdata Configuration'}</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            {editConfigId !== null 
+              ? 'Edit your Brightdata API configuration. API tokens are securely stored and will not be displayed.'
+              : 'Create a new Brightdata API configuration for data scraping. API tokens are securely stored and encrypted.'
+            }
+          </DialogContentText>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Configuration Name"
+            fullWidth
+            value={brightdataForm.name}
+            onChange={(e) => setBrightdataForm({ ...brightdataForm, name: e.target.value })}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            margin="dense"
+            label="Description (Optional)"
+            fullWidth
+            value={brightdataForm.description}
+            onChange={(e) => setBrightdataForm({ ...brightdataForm, description: e.target.value })}
+            sx={{ mb: 2 }}
+          />
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel>Platform</InputLabel>
+            <Select
+              value={brightdataForm.platform}
+              onChange={(e) => {
+                const selectedPlatform = e.target.value;
+                let datasetId = '';
+                
+                // Set dataset ID based on platform selection
+                switch (selectedPlatform) {
+                  case 'linkedin':
+                    datasetId = 'gd_lyy3tktm25m4avu764';
+                    break;
+                  case 'tiktok':
+                    datasetId = 'gd_lu702nij2f790tmv9h';
+                    break;
+                  case 'instagram_posts':
+                    datasetId = 'gd_lk5ns7kz21pck8jpis';
+                    break;
+                  case 'instagram_reels':
+                    datasetId = 'gd_lyclm20il4r5helnj';
+                    break;
+                  case 'instagram_comments':
+                    datasetId = 'gd_ltppn085pokosxh13';
+                    break;
+                  case 'facebook_comments':
+                    datasetId = 'gd_lkay758p1eanlolqw8';
+                    break;
+                  case 'facebook_reels':
+                    datasetId = 'gd_lyclm3ey2q6rww027t';
+                    break;
+                  case 'facebook_posts':
+                    datasetId = 'gd_lkaxegm826bjpoo9m5';
+                    break;
+                  default:
+                    datasetId = '';
+                }
+                
+                setBrightdataForm({ 
+                  ...brightdataForm, 
+                  platform: selectedPlatform,
+                  datasetId: datasetId
+                });
+              }}
+              label="Platform"
+            >
+              <MenuItem value="linkedin">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <LinkedInIcon />
+                  <Typography sx={{ ml: 1 }}>LinkedIn Posts</Typography>
+                </Box>
+              </MenuItem>
+              <MenuItem value="tiktok">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <MusicVideoIcon />
+                  <Typography sx={{ ml: 1 }}>TikTok Posts</Typography>
+                </Box>
+              </MenuItem>
+              <MenuItem value="instagram_posts">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <InstagramIcon />
+                  <Typography sx={{ ml: 1 }}>Instagram Posts</Typography>
+                </Box>
+              </MenuItem>
+              <MenuItem value="instagram_reels">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <InstagramIcon />
+                  <Typography sx={{ ml: 1 }}>Instagram Reels</Typography>
+                </Box>
+              </MenuItem>
+              <MenuItem value="instagram_comments">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <InstagramIcon />
+                  <Typography sx={{ ml: 1 }}>Instagram Comments</Typography>
+                </Box>
+              </MenuItem>
+              <MenuItem value="facebook_comments">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <FacebookIcon />
+                  <Typography sx={{ ml: 1 }}>Facebook Comments</Typography>
+                </Box>
+              </MenuItem>
+              <MenuItem value="facebook_reels">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <FacebookIcon />
+                  <Typography sx={{ ml: 1 }}>Facebook Reels</Typography>
+                </Box>
+              </MenuItem>
+              <MenuItem value="facebook_posts">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <FacebookIcon />
+                  <Typography sx={{ ml: 1 }}>Facebook Posts</Typography>
+                </Box>
+              </MenuItem>
+            </Select>
+          </FormControl>
+          <TextField
+            margin="dense"
+            label="Dataset ID"
+            fullWidth
+            value={brightdataForm.datasetId}
+            InputProps={{
+              readOnly: true,
+            }}
+            sx={{ mb: 2 }}
+            helperText="Automatically set based on the selected platform"
+          />
+          <TextField
+            margin="dense"
+            label="Brightdata API Token"
+            type="password"
+            fullWidth
+            value={brightdataForm.apiToken}
+            onChange={(e) => setBrightdataForm({ ...brightdataForm, apiToken: e.target.value })}
+            helperText={
+              editConfigId !== null 
+                ? "Leave empty to keep existing token unchanged" 
+                : "Authentication API token assigned to access to the services"
+            }
+            placeholder={editConfigId !== null ? "••••••••••••••••" : ""}
+            sx={{ mb: 2 }}
+            InputProps={{
+              endAdornment: editConfigId !== null && brightdataForm.apiToken === '' ? (
+                <InputAdornment position="end">
+                  <Chip 
+                    label="Keep Existing" 
+                    size="small" 
+                    color="info" 
+                    variant="outlined"
+                  />
+                </InputAdornment>
+              ) : undefined
+            }}
+          />
+          {editConfigId !== null && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              <Typography variant="body2">
+                <strong>Security Note:</strong> For security reasons, existing API tokens are not displayed. 
+                Leave the token field empty to keep the current token unchanged, or enter a new token to update it.
+              </Typography>
+            </Alert>
+          )}
+          <FormControlLabel
+            control={
+              <Switch
+                checked={brightdataForm.isActive}
+                onChange={(e) => setBrightdataForm({ ...brightdataForm, isActive: e.target.checked })}
+                color="primary"
+              />
+            }
+            label="Active Configuration"
+            sx={{ mb: 2 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBrightdataDialogOpen(false)}>Cancel</Button>
+          <Button 
+            onClick={handleCreateBrightdataConfig}
+            variant="contained" 
+            color="primary"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? <CircularProgress size={24} /> : (editConfigId !== null ? 'Update' : 'Create')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Success Message */}
+      {successMessage && (
+        <Snackbar 
+          open={!!successMessage} 
+          autoHideDuration={6000} 
+          onClose={() => setSuccessMessage(null)}
+        >
+          <Alert 
+            onClose={() => setSuccessMessage(null)} 
+            severity="success" 
+            sx={{ width: '100%' }}
+          >
+            {successMessage}
+          </Alert>
+        </Snackbar>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={handleCancelDelete}
+      >
+        <DialogTitle>Confirm Deletion</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete this configuration? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelDelete}>Cancel</Button>
+          <Button onClick={handleConfirmDelete} color="error" variant="contained">
+            Delete
           </Button>
         </DialogActions>
       </Dialog>
