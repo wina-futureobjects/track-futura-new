@@ -252,10 +252,25 @@ const ProjectsList = () => {
     setSortBy(event.target.value);
   };
 
-  // Filter projects based on search query
-  const filteredProjects = projects.filter(project => 
-    project.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter and sort projects
+  const filteredAndSortedProjects = projects
+    .filter(project =>
+      project.name.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'name':
+          return a.name.localeCompare(b.name);
+        case 'newest':
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        case 'oldest':
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        case 'last viewed':
+        default:
+          // For "last viewed", we'll sort by updated_at as a proxy
+          return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+      }
+    });
 
   return (
     <Box sx={{ 
@@ -357,7 +372,7 @@ const ProjectsList = () => {
 
       {/* Projects Count */}
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Showing {filteredProjects.length} project{filteredProjects.length !== 1 ? 's' : ''}
+        Showing {filteredAndSortedProjects.length} project{filteredAndSortedProjects.length !== 1 ? 's' : ''}
       </Typography>
 
       {/* Projects Table */}
@@ -367,7 +382,7 @@ const ProjectsList = () => {
         </Box>
       ) : (
         <>
-          {filteredProjects.length > 0 ? (
+          {filteredAndSortedProjects.length > 0 ? (
             <TableContainer component={Paper} sx={{ 
               boxShadow: 'none', 
               borderRadius: '4px',
@@ -388,14 +403,14 @@ const ProjectsList = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {filteredProjects.map((project) => (
+                  {filteredAndSortedProjects.map((project) => (
                     <TableRow 
                       key={project.id}
                       hover
                       sx={{ cursor: 'pointer' }}
                       onClick={() => handleOpenProject(project.id)}
                     >
-                      <TableCell sx={{ color: theme => theme.palette.primary.main, fontWeight: 500 }}>{project.name}</TableCell>
+                      <TableCell sx={{ color: 'primary.main', fontWeight: 500 }}>{project.name}</TableCell>
                       <TableCell>
                         {project.id.toString().padStart(8, '0').substring(0, 8)}
                       </TableCell>

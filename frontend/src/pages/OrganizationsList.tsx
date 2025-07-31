@@ -39,6 +39,18 @@ interface Organization {
   owner: number;
   owner_name: string;
   members_count: number;
+  projects_count?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface RawOrganization {
+  id: number;
+  name: string;
+  description: string | null;
+  owner: number;
+  owner_name: string;
+  members_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -57,7 +69,7 @@ const OrganizationsList = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('last viewed');
 
-  // Fetch organizations
+  // Fetch organizations with project counts
   const fetchOrganizations = async () => {
     try {
       setLoading(true);
@@ -67,16 +79,40 @@ const OrganizationsList = () => {
       }
 
       const data = await response.json();
+      let organizationsData: RawOrganization[] = [];
 
       if (Array.isArray(data)) {
-        setOrganizations(data);
+        organizationsData = data;
       } else if (data && typeof data === 'object' && 'results' in data) {
-        setOrganizations(data.results || []);
+        organizationsData = data.results || [];
       } else {
         console.error('API returned unexpected data format:', data);
         setOrganizations([]);
         setError('Received invalid data format from server.');
+        return;
       }
+
+             // Fetch project counts for each organization
+       const organizationsWithProjectCounts = await Promise.all(
+         organizationsData.map(async (org: RawOrganization) => {
+           try {
+             const projectsResponse = await apiFetch(`/api/users/projects/?organization=${org.id}`);
+             if (projectsResponse.ok) {
+               const projectsData = await projectsResponse.json();
+               const projectCount = Array.isArray(projectsData) ? projectsData.length : 
+                                  (projectsData.results ? projectsData.results.length : 0);
+               return { ...org, projects_count: projectCount };
+             } else {
+               return { ...org, projects_count: 0 };
+             }
+           } catch (error) {
+             console.error(`Error fetching projects for organization ${org.id}:`, error);
+             return { ...org, projects_count: 0 };
+           }
+         })
+       );
+
+      setOrganizations(organizationsWithProjectCounts);
     } catch (error) {
       console.error('Error fetching organizations:', error);
       setOrganizations([]);
@@ -208,10 +244,25 @@ const OrganizationsList = () => {
     setSortBy(event.target.value);
   };
 
-  // Filter organizations based on search query
-  const filteredOrganizations = organizations.filter(org =>
-    org.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter and sort organizations
+  const filteredAndSortedOrganizations = organizations
+    .filter(org =>
+      org.name.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'name':
+          return a.name.localeCompare(b.name);
+        case 'newest':
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        case 'oldest':
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        case 'last viewed':
+        default:
+          // For "last viewed", we'll sort by updated_at as a proxy
+          return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+      }
+    });
 
   return (
     <Box sx={{
@@ -229,7 +280,7 @@ const OrganizationsList = () => {
 
       {/* Header and actions */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4" component="h1" fontWeight="500">
+        <Typography variant="h3" component="h1" fontWeight="500">
           Organizations
         </Typography>
         <Button
@@ -304,7 +355,7 @@ const OrganizationsList = () => {
 
       {/* Organizations Count */}
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Showing {filteredOrganizations.length} organization{filteredOrganizations.length !== 1 ? 's' : ''}
+        Showing {filteredAndSortedOrganizations.length} organization{filteredAndSortedOrganizations.length !== 1 ? 's' : ''}
       </Typography>
 
       {/* Organizations Table */}
@@ -314,7 +365,7 @@ const OrganizationsList = () => {
         </Box>
       ) : (
         <>
-          {filteredOrganizations.length > 0 ? (
+          {filteredAndSortedOrganizations.length > 0 ? (
             <TableContainer component={Paper} sx={{
               boxShadow: 'none',
               borderRadius: '4px',
@@ -332,18 +383,18 @@ const OrganizationsList = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {filteredOrganizations.map((org) => (
+                  {filteredAndSortedOrganizations.map((org) => (
                     <TableRow
                       key={org.id}
                       hover
                       sx={{ cursor: 'pointer' }}
                       onClick={() => handleOpenOrganization(org.id)}
                     >
-                      <TableCell sx={{ color: theme.palette.primary.main, fontWeight: 500 }}>{org.name}</TableCell>
-                      <TableCell>{org.owner_name}</TableCell>
-                      <TableCell>{org.members_count}</TableCell>
-                      <TableCell>-</TableCell>
-                      <TableCell>{new Date(org.created_at).toLocaleDateString()}</TableCell>
+                                             <TableCell sx={{ color: theme.palette.primary.main, fontWeight: 500 }}>{org.name}</TableCell>
+                       <TableCell>{org.owner_name}</TableCell>
+                       <TableCell>{org.members_count}</TableCell>
+                       <TableCell>{org.projects_count || 0}</TableCell>
+                       <TableCell>{new Date(org.created_at).toLocaleDateString()}</TableCell>
                       <TableCell align="center">
                         <IconButton
                           size="small"

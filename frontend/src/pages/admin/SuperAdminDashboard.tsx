@@ -23,7 +23,7 @@ import {
   InputLabel,
   FormControl,
   CircularProgress,
-  Grid,
+  Grid as MuiGrid,
   Card,
   CardContent,
   IconButton,
@@ -33,7 +33,11 @@ import {
   Alert,
   Switch,
   FormControlLabel,
+  Breadcrumbs,
 } from '@mui/material';
+
+// Create a Grid component that inherits from MuiGrid to fix type issues
+const Grid = (props: any) => <MuiGrid {...props} />;
 import {
   Add as AddIcon,
   Search as SearchIcon,
@@ -495,53 +499,116 @@ const SuperAdminDashboard = () => {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" component="h1" gutterBottom>
-        Super Admin Dashboard
-      </Typography>
+    <Box sx={{
+      width: '100%',
+      padding: '16px 32px',
+      bgcolor: '#f5f5f5',
+      minHeight: 'calc(100vh - 56px)',
+    }}>
+      {/* Breadcrumbs */}
+      <Box sx={{ mb: 3 }}>
+        <Breadcrumbs aria-label="breadcrumb">
+          <Typography color="text.primary">Dashboard</Typography>
+        </Breadcrumbs>
+      </Box>
+
+      {/* Header and actions */}
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h3" component="h1" fontWeight="500">
+          Super Admin Dashboard
+        </Typography>
+        <Box sx={{ width: 200 }} /> {/* Spacer to match the button width in OrganizationsList */}
+      </Box>
 
       {/* Stats Cards */}
-      <Box sx={{ mb: 4 }}>
-        <Grid container spacing={3}>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" color="text.secondary">Total Users</Typography>
-                <Typography variant="h3">{stats.totalUsers}</Typography>
+      <Box sx={{ mb: 4, width: '100%', overflow: 'hidden' }}>
+        <Grid container spacing={3} sx={{ width: '100%', margin: 0 }}>
+          <Grid item xs={12} sm={6} lg={3} sx={{ padding: '12px !important', minWidth: '280px' }}>
+            <Card sx={{ height: '100%', overflow: 'hidden', width: '100%', minWidth: '260px' }}>
+              <CardContent sx={{ p: 3, '&:last-child': { pb: 3 }, height: '100%' }}>
+                <Typography variant="h6" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+                  Total Users
+                </Typography>
+                <Typography 
+                  variant="h3" 
+                  sx={{ 
+                    fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' },
+                    fontWeight: 600,
+                    wordBreak: 'break-word',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}
+                >
+                  {stats.totalUsers}
+                </Typography>
               </CardContent>
             </Card>
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" color="text.secondary">Organizations</Typography>
-                <Typography variant="h3">{stats.totalOrgs}</Typography>
+          <Grid item xs={12} sm={6} lg={3} sx={{ padding: '12px !important', minWidth: '280px' }}>
+            <Card sx={{ height: '100%', overflow: 'hidden', width: '100%', minWidth: '260px' }}>
+              <CardContent sx={{ p: 3, '&:last-child': { pb: 3 }, height: '100%' }}>
+                <Typography variant="h6" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+                  Organizations
+                </Typography>
+                <Typography 
+                  variant="h3" 
+                  sx={{ 
+                    fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' },
+                    fontWeight: 600,
+                    wordBreak: 'break-word',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}
+                >
+                  {stats.totalOrgs}
+                </Typography>
               </CardContent>
             </Card>
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" color="text.secondary">Projects</Typography>
-                <Typography variant="h3">{stats.totalProjects}</Typography>
+          <Grid item xs={12} sm={6} lg={3} sx={{ padding: '12px !important', minWidth: '280px' }}>
+            <Card sx={{ height: '100%', overflow: 'hidden', width: '100%', minWidth: '260px' }}>
+              <CardContent sx={{ p: 3, '&:last-child': { pb: 3 }, height: '100%' }}>
+                <Typography variant="h6" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+                  Projects
+                </Typography>
+                <Typography 
+                  variant="h3" 
+                  sx={{ 
+                    fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' },
+                    fontWeight: 600,
+                    wordBreak: 'break-word',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}
+                >
+                  {stats.totalProjects}
+                </Typography>
               </CardContent>
             </Card>
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" color="text.secondary">User Distribution</Typography>
+          <Grid item xs={12} sm={6} lg={3} sx={{ padding: '12px !important', minWidth: '280px' }}>
+            <Card sx={{ height: '100%', overflow: 'hidden', width: '100%', minWidth: '260px' }}>
+              <CardContent sx={{ p: 3, '&:last-child': { pb: 3 }, height: '100%' }}>
+                <Typography variant="h6" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+                  User Distribution
+                </Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                  <AdminIcon color="primary" sx={{ mr: 1 }} />
-                  <Typography variant="body2">Super Admins: {stats.superAdmins}</Typography>
+                  <AdminIcon color="primary" sx={{ mr: 1, fontSize: { xs: '1rem', sm: '1.25rem' } }} />
+                  <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                    Super Admins: {stats.superAdmins}
+                  </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
-                  <BusinessIcon color="secondary" sx={{ mr: 1 }} />
-                  <Typography variant="body2">Tenant Admins: {stats.tenantAdmins}</Typography>
+                  <BusinessIcon color="secondary" sx={{ mr: 1, fontSize: { xs: '1rem', sm: '1.25rem' } }} />
+                  <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                    Tenant Admins: {stats.tenantAdmins}
+                  </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
-                  <PersonIcon sx={{ mr: 1 }} />
-                  <Typography variant="body2">Users: {stats.regularUsers}</Typography>
+                  <PersonIcon sx={{ mr: 1, fontSize: { xs: '1rem', sm: '1.25rem' } }} />
+                  <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                    Users: {stats.regularUsers}
+                  </Typography>
                 </Box>
               </CardContent>
             </Card>

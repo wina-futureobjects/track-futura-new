@@ -1113,11 +1113,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
                   <Divider sx={{ my: 1 }} />
                   <ListItemButton 
                     onClick={() => {
-                      if (organizationId) {
-                        navigate(`/organizations/${organizationId}/projects`);
-                      } else {
-                        navigate('/organizations');
-                      }
+                      navigate('/organizations');
                       handleOrgDropdownClose();
                     }}
                     sx={{
@@ -1127,7 +1123,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle }) => {
                     }}
                   >
                     <ListItemText 
-                      primary="View All Projects"
+                      primary="View All Organizations"
                       primaryTypographyProps={{ 
                         fontSize: '14px',
                         fontWeight: 500
