@@ -26,6 +26,10 @@ import {
   TableRow,
   TableCell,
   Tooltip,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
   Chip,
   Snackbar,
   Alert,
@@ -49,9 +53,13 @@ interface Folder {
   id: number;
   name: string;
   description: string | null;
+  category: 'posts' | 'reels' | 'comments';
+  category_display: string;
   created_at: string;
   updated_at: string;
   post_count: number;
+  reel_count: number;
+  comment_count: number;
 }
 
 const LinkedInFolders = () => {
@@ -64,7 +72,7 @@ const LinkedInFolders = () => {
   const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null);
   const [folderName, setFolderName] = useState('');
   const [folderDescription, setFolderDescription] = useState('');
-
+  const [folderCategory, setFolderCategory] = useState<'posts' | 'reels' | 'comments'>('posts');
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   
@@ -180,6 +188,7 @@ const LinkedInFolders = () => {
     // Reset all states and refs
     setFolderName('');
     setFolderDescription('');
+    setFolderCategory('posts');
     setIsCreating(false);
     isCreatingRef.current = false;
     setError(null);
@@ -191,6 +200,7 @@ const LinkedInFolders = () => {
     setSelectedFolder(folder);
     setFolderName(folder.name);
     setFolderDescription(folder.description || '');
+    setFolderCategory(folder.category);
     setIsUpdating(false);
     isUpdatingRef.current = false;
     setError(null);
@@ -219,6 +229,7 @@ const LinkedInFolders = () => {
       const requestData = {
         name: folderName,
         description: folderDescription || null,
+        category: folderCategory,
         project: projectId ? parseInt(projectId, 10) : null,
       };
       
@@ -255,6 +266,7 @@ const LinkedInFolders = () => {
       // Reset form
       setFolderName('');
       setFolderDescription('');
+      setFolderCategory('posts');
       
       console.log('Folder creation completed successfully');
     } catch (error) {
@@ -291,6 +303,7 @@ const LinkedInFolders = () => {
       const requestData = {
         name: folderName,
         description: folderDescription || null,
+        category: folderCategory,
         project: projectId ? parseInt(projectId, 10) : null,
       };
       
@@ -374,10 +387,43 @@ const LinkedInFolders = () => {
     }
   };
 
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'posts':
+        return <PostAddIcon />;
+      case 'reels':
+        return <VideoLibraryIcon />;
+      case 'comments':
+        return <CommentIcon />;
+      default:
+        return <FolderIcon />;
+    }
+  };
 
+  const getCategoryColor = (category: string) => {
+    switch (category) {
+      case 'posts':
+        return 'primary';
+      case 'reels':
+        return 'secondary';
+      case 'comments':
+        return 'success';
+      default:
+        return 'default';
+    }
+  };
 
   const getContentCount = (folder: Folder) => {
-    return folder.post_count || 0;
+    switch (folder.category) {
+      case 'posts':
+        return folder.post_count || 0;
+      case 'reels':
+        return folder.reel_count || 0;
+      case 'comments':
+        return folder.comment_count || 0;
+      default:
+        return 0;
+    }
   };
 
   const renderGridView = () => (
@@ -408,10 +454,10 @@ const LinkedInFolders = () => {
                     {folder.name}
                   </Typography>
                   <Chip 
-                    icon={<PostAddIcon />}
-                    label="Posts"
+                    icon={getCategoryIcon(folder.category)}
+                    label={folder.category_display || folder.category}
                     size="small"
-                    color="primary"
+                    color={getCategoryColor(folder.category) as any}
                     sx={{ mt: 0.5 }}
                   />
                 </Box>
@@ -422,7 +468,7 @@ const LinkedInFolders = () => {
               </Typography>
               
               <Typography variant="body2" color="text.secondary">
-                {getContentCount(folder)} posts
+                {getContentCount(folder)} {folder.category === 'comments' ? 'comments' : folder.category === 'reels' ? 'reels' : 'posts'}
               </Typography>
               
               <Typography variant="caption" color="text.secondary" display="block">
@@ -463,6 +509,7 @@ const LinkedInFolders = () => {
         <TableHead>
           <TableRow>
             <TableCell>Name</TableCell>
+            <TableCell>Category</TableCell>
             <TableCell>Description</TableCell>
             <TableCell align="right">Content Count</TableCell>
             <TableCell>Created</TableCell>
@@ -484,6 +531,14 @@ const LinkedInFolders = () => {
                   <FolderIcon color="primary" sx={{ mr: 1 }} />
                   <Typography variant="body1">{folder.name}</Typography>
                 </Box>
+              </TableCell>
+              <TableCell>
+                <Chip 
+                  icon={getCategoryIcon(folder.category)}
+                  label={folder.category_display || folder.category}
+                  size="small"
+                  color={getCategoryColor(folder.category) as any}
+                />
               </TableCell>
               <TableCell>{folder.description || 'No description'}</TableCell>
               <TableCell align="right">{getContentCount(folder)}</TableCell>
@@ -595,6 +650,7 @@ const LinkedInFolders = () => {
             // Reset form
             setFolderName('');
             setFolderDescription('');
+            setFolderCategory('posts');
           }
         }}
       >
@@ -614,7 +670,34 @@ const LinkedInFolders = () => {
             disabled={isCreating}
           />
           
-
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel>Category</InputLabel>
+            <Select
+              value={folderCategory}
+              label="Category"
+              onChange={(e) => setFolderCategory(e.target.value as 'posts' | 'reels' | 'comments')}
+              disabled={isCreating}
+            >
+              <MenuItem value="posts">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <PostAddIcon sx={{ mr: 1 }} />
+                  Posts
+                </Box>
+              </MenuItem>
+              <MenuItem value="reels">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <VideoLibraryIcon sx={{ mr: 1 }} />
+                  Reels
+                </Box>
+              </MenuItem>
+              <MenuItem value="comments">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <CommentIcon sx={{ mr: 1 }} />
+                  Comments
+                </Box>
+              </MenuItem>
+            </Select>
+          </FormControl>
           
           <TextField
             margin="dense"
@@ -637,6 +720,7 @@ const LinkedInFolders = () => {
                 // Reset form
                 setFolderName('');
                 setFolderDescription('');
+                setFolderCategory('posts');
               }
             }}
             disabled={isCreating}
@@ -677,7 +761,34 @@ const LinkedInFolders = () => {
             disabled={isUpdating}
           />
           
-
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel>Category</InputLabel>
+            <Select
+              value={folderCategory}
+              label="Category"
+              onChange={(e) => setFolderCategory(e.target.value as 'posts' | 'reels' | 'comments')}
+              disabled={isUpdating}
+            >
+              <MenuItem value="posts">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <PostAddIcon sx={{ mr: 1 }} />
+                  Posts
+                </Box>
+              </MenuItem>
+              <MenuItem value="reels">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <VideoLibraryIcon sx={{ mr: 1 }} />
+                  Reels
+                </Box>
+              </MenuItem>
+              <MenuItem value="comments">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <CommentIcon sx={{ mr: 1 }} />
+                  Comments
+                </Box>
+              </MenuItem>
+            </Select>
+          </FormControl>
           
           <TextField
             margin="dense"

@@ -83,7 +83,7 @@ import NotificationsIcon from '@mui/icons-material/Notifications';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { apiFetch } from '../utils/api';
 
-interface FacebookPost {
+interface TikTokPost {
   id: number;
   url: string;
   user_posted: string;
@@ -101,19 +101,20 @@ interface FacebookPost {
   is_paid_partnership: boolean;
 }
 
-interface FacebookComment {
+interface TikTokComment {
   id: number;
   comment_id: string;
   post_id: string;
   post_url: string;
-  user_name: string;
-  user_id: string;
-  comment_text: string;
-  date_created: string;
-  num_likes: number;
-  num_replies: number;
-  source_type: string;
-  type: string;
+  post_user: string;
+  comment: string;
+  comment_date: string;
+  comment_user: string;
+  comment_user_url: string;
+  likes_number: number;
+  replies_number: number;
+  hashtag_comment: string;
+  url: string;
 }
 
 interface Folder {
@@ -175,7 +176,7 @@ function a11yProps(index: number) {
   };
 }
 
-const FacebookDataUpload = () => {
+const TikTokDataUpload = () => {
   const { folderId, organizationId, projectId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -187,13 +188,13 @@ const FacebookDataUpload = () => {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [folderLoading, setFolderLoading] = useState(false);
-  const [posts, setPosts] = useState<FacebookPost[]>([]);
-  const [comments, setComments] = useState<FacebookComment[]>([]);
+  const [posts, setPosts] = useState<TikTokPost[]>([]);
+  const [comments, setComments] = useState<TikTokComment[]>([]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filteredPosts, setFilteredPosts] = useState<FacebookPost[]>([]);
-  const [filteredComments, setFilteredComments] = useState<FacebookComment[]>([]);
+  const [filteredPosts, setFilteredPosts] = useState<TikTokPost[]>([]);
+  const [filteredComments, setFilteredComments] = useState<TikTokComment[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [currentFolder, setCurrentFolder] = useState<Folder | null>(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -209,7 +210,7 @@ const FacebookDataUpload = () => {
   const [contentTypeFilter, setContentTypeFilter] = useState<string>('all');
   const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const [tabValue, setTabValue] = useState(0);
-
+  const [sortMenuAnchor, setSortMenuAnchor] = useState<null | HTMLElement>(null);
   const [sortBy, setSortBy] = useState<string>('date_posted');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   
@@ -238,11 +239,11 @@ const FacebookDataUpload = () => {
       setIsLoading(true);
       
       // Clear existing data immediately to show loading state
-        setPosts([]);
-        setComments([]);
-        setFilteredPosts([]);
-        setFilteredComments([]);
-        setTotalCount(0);
+      setPosts([]);
+      setComments([]);
+      setFilteredPosts([]);
+      setFilteredComments([]);
+      setTotalCount(0);
       
       if (!folderId) {
         console.log('No folder ID provided, skipping data fetch');
@@ -271,18 +272,18 @@ const FacebookDataUpload = () => {
         console.log('🔄 Comments folder detected - using comments endpoint directly');
         
         // For comments folders, use the folder contents endpoint or direct comments API
-        const commentsApiUrl = `/api/facebook-data/folders/${folderId}/contents/?page=${pageNumber + 1}&page_size=${pageSize}${searchParam}${projectParam}${filterParams}${sortParams}`;
+        const commentsApiUrl = `/api/tiktok-data/folders/${folderId}/contents/?page=${pageNumber + 1}&page_size=${pageSize}${searchParam}${projectParam}${filterParams}${sortParams}`;
         console.log('🔄 Fetching comments from:', commentsApiUrl);
         
         const response = await apiFetch(commentsApiUrl);
-      
-      if (!response.ok) {
+        
+        if (!response.ok) {
           const errorText = await response.text();
           console.error('❌ Comments endpoint error:', response.status, errorText);
           throw new Error(`Failed to fetch comments: ${response.status}`);
-      }
+        }
         
-      const data = await response.json();
+        const data = await response.json();
         console.log('📝 Comments endpoint response:', data);
         console.log('📝 Comments response structure:', {
           hasResults: 'results' in data,
@@ -292,7 +293,7 @@ const FacebookDataUpload = () => {
           category: data.category
         });
         
-      if (data && typeof data === 'object') {
+        if (data && typeof data === 'object') {
           const results = data.results || [];
           console.log('✅ Setting comments data with', results.length, 'items');
           console.log('📋 First few comments:', results.slice(0, 2));
@@ -316,7 +317,7 @@ const FacebookDataUpload = () => {
         const contentTypeParam = contentType && contentType !== 'all' ? `&content_type=${contentType}` : '';
         const folderParam = `folder_id=${folderId}`;
         
-        const postsApiUrl = `/api/facebook-data/posts/?${folderParam}&page=${pageNumber + 1}&page_size=${pageSize}${searchParam}${contentTypeParam}${projectParam}${filterParams}${sortParams}`;
+        const postsApiUrl = `/api/tiktok-data/posts/?${folderParam}&page=${pageNumber + 1}&page_size=${pageSize}${searchParam}${contentTypeParam}${projectParam}${filterParams}${sortParams}`;
         console.log('🚀 Fetching posts from:', postsApiUrl);
         
         const response = await apiFetch(postsApiUrl);
@@ -346,8 +347,8 @@ const FacebookDataUpload = () => {
           
           setPosts(results);
           setFilteredPosts(results);
-        setComments([]);
-        setFilteredComments([]);
+          setComments([]);
+          setFilteredComments([]);
           setTotalCount(data.count || results.length);
           
           console.log(`✅ Successfully loaded ${results.length} posts, total count: ${data.count || results.length}`);
@@ -386,7 +387,7 @@ const FacebookDataUpload = () => {
         }
         
         // Include project parameter in the API request
-        const response = await apiFetch(`/api/facebook-data/folders/${folderId}/?project=${projectId}`);
+        const response = await apiFetch(`/api/tiktok-data/folders/${folderId}/?project=${projectId}`);
         if (response.ok) {
           const data = await response.json();
           console.log('Folder details response:', data);
@@ -415,19 +416,19 @@ const FacebookDataUpload = () => {
       // Use different endpoint based on folder category
       if (currentFolder?.category === 'comments') {
         console.log('📈 Fetching comments folder stats...');
-        const statsApiUrl = `/api/facebook-data/comments/stats/?${folderParam}${projectParam}`;
+        const statsApiUrl = `/api/tiktok-data/comments/stats/?${folderParam}${projectParam}`;
         console.log('📈 Fetching comments stats from:', statsApiUrl);
         
         const response = await apiFetch(statsApiUrl);
         console.log('📈 Comments stats API response status:', response.status, 'OK:', response.ok);
-      
-      if (!response.ok) {
+        
+        if (!response.ok) {
           throw new Error('Failed to fetch comments folder statistics');
-      }
-      
+        }
+        
         const data = await response.json();
         console.log('📈 Comments stats API response data:', data);
-      
+        
         setFolderStats({
           totalPosts: data.totalComments || 0, // This represents total comments for comments folders
           uniqueUsers: data.uniqueCommenters || 0,
@@ -445,7 +446,7 @@ const FacebookDataUpload = () => {
       } else {
         // For posts/reels folders, use the posts stats endpoint
         console.log('📈 Fetching posts folder stats...');
-        const statsApiUrl = `/api/facebook-data/posts/stats/?${folderParam}${projectParam}`;
+        const statsApiUrl = `/api/tiktok-data/posts/stats/?${folderParam}${projectParam}`;
         console.log('📈 Fetching posts stats from:', statsApiUrl);
         
         const response = await apiFetch(statsApiUrl);
@@ -483,7 +484,7 @@ const FacebookDataUpload = () => {
     try {
       // Use project ID from URL path params for the server status check
       // Include project parameter if available to avoid 404 from security filtering
-      const endpoint = projectId ? `/api/facebook-data/folders/?project=${projectId}` : '/api/facebook-data/folders/';
+      const endpoint = projectId ? `/api/tiktok-data/folders/?project=${projectId}` : '/api/tiktok-data/folders/';
       const response = await apiFetch(endpoint, { 
         method: 'HEAD',
         headers: { 'Accept': 'application/json' }
@@ -562,7 +563,7 @@ const FacebookDataUpload = () => {
 
   // Check server status on component mount
   useEffect(() => {
-      checkServerStatus();
+    checkServerStatus();
   }, []);
 
   // Initial folder details load
@@ -658,7 +659,7 @@ const FacebookDataUpload = () => {
       setUploadError('Please select a CSV file to upload');
       return;
     }
-    
+
     if (!uploadFile.name.endsWith('.csv')) {
       setUploadError('Please upload a CSV file');
       return;
@@ -682,8 +683,8 @@ const FacebookDataUpload = () => {
       // Continue with upload despite validation error
     }
 
-      const formData = new FormData();
-      formData.append('file', uploadFile);
+    const formData = new FormData();
+    formData.append('file', uploadFile);
     
     // Add folder_id to the form data if available
     if (folderId) {
@@ -695,7 +696,7 @@ const FacebookDataUpload = () => {
       setUploadError(null); // Clear previous errors
       
       // Determine the correct upload endpoint based on folder category
-      let uploadEndpoint = '/api/facebook-data/posts/upload_csv/';
+      let uploadEndpoint = '/api/tiktok-data/posts/upload_csv/';
       
       // Enhanced debugging and validation
       console.log('🔧 Upload Debug Info:');
@@ -708,7 +709,7 @@ const FacebookDataUpload = () => {
       console.log('🔧 File size:', uploadFile?.size);
       
       if (currentFolder?.category === 'comments') {
-        uploadEndpoint = '/api/facebook-data/comments/upload_csv/';
+        uploadEndpoint = '/api/tiktok-data/comments/upload_csv/';
         console.log('🔧 DETECTED COMMENTS FOLDER - Using comments endpoint');
       } else {
         console.log('🔧 Using posts endpoint (folder category is not "comments")');
@@ -724,17 +725,17 @@ const FacebookDataUpload = () => {
       // Check if the backend server is running
       try {
         const response = await apiFetch(uploadEndpoint, {
-        method: 'POST',
-        body: formData,
+          method: 'POST',
+          body: formData,
           headers: {
             'Accept': 'application/json',
           },
-      });
+        });
 
         console.log('🔧 Upload response status:', response.status);
         console.log('🔧 Upload response headers:', Object.fromEntries(response.headers.entries()));
-      
-      if (!response.ok) {
+
+        if (!response.ok) {
           const errorText = await response.text();
           console.log('🔧 Upload error response text:', errorText);
           
@@ -769,9 +770,9 @@ const FacebookDataUpload = () => {
         
         if (data.detected_content_type) {
           successMessage += ` Content type detected: ${data.detected_content_type}`;
-      }
-      
-      setUploadSuccess(successMessage);
+        }
+        
+        setUploadSuccess(successMessage);
         
         // Reset pagination to first page to see new data
         setPage(0);
@@ -795,8 +796,8 @@ const FacebookDataUpload = () => {
             setUploadSuccess(null);
           }, 5000);
         }, 500); // 500ms delay to ensure backend processing is complete
-      
-      // Reset file input
+        
+        // Reset file input
         setUploadFile(null);
         
         // Reset file input element
@@ -839,7 +840,7 @@ const FacebookDataUpload = () => {
       const projectParam = projectId ? `&project=${projectId}` : '';
       
       const response = await apiFetch(
-        `/api/facebook-data/posts/download_csv/?${folderParam}${contentTypeParam}${projectParam}`,
+        `/api/tiktok-data/posts/download_csv/?${folderParam}${contentTypeParam}${projectParam}`,
         {
           method: 'GET',
           headers: {
@@ -854,7 +855,7 @@ const FacebookDataUpload = () => {
       
       // Get the filename from the Content-Disposition header if possible
       const contentDisposition = response.headers.get('Content-Disposition');
-      let filename = 'facebook_data.csv';
+      let filename = 'tiktok_data.csv';
       if (contentDisposition) {
         const filenameMatch = contentDisposition.match(/filename="(.+)"/);
         if (filenameMatch) {
@@ -862,7 +863,7 @@ const FacebookDataUpload = () => {
         }
       } else {
         // Fallback filename based on content type
-        filename = contentType ? `facebook_${contentType}s.csv` : 'facebook_data.csv';
+        filename = contentType ? `tiktok_${contentType}s.csv` : 'tiktok_data.csv';
       }
       
       // Convert the response to a blob
@@ -960,7 +961,13 @@ const FacebookDataUpload = () => {
     setTabValue(newValue);
   };
 
+  const handleSortMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setSortMenuAnchor(event.currentTarget);
+  };
 
+  const handleSortMenuClose = () => {
+    setSortMenuAnchor(null);
+  };
 
   const handleSort = (field: string) => {
     const newOrder = sortBy === field && sortOrder === 'desc' ? 'asc' : 'desc';
@@ -968,46 +975,19 @@ const FacebookDataUpload = () => {
     // Map frontend field names to backend field names based on folder category
     let backendField = field;
     if (currentFolder?.category === 'comments') {
-      // Map comment-specific field names for Facebook
+      // Map comment-specific field names
       const fieldMapping: { [key: string]: string } = {
-        'likes': 'num_likes',
-        'num_comments': 'num_replies',
-        'user_posted': 'user_name',
-        'date_posted': 'date_created'
+        'likes': 'likes_number',
+        'num_comments': 'replies_number',
+        'user_posted': 'comment_user',
+        'date_posted': 'comment_date'
       };
       backendField = fieldMapping[field] || field;
     }
     
     setSortBy(backendField);
     setSortOrder(newOrder);
-    // Trigger data refresh with new sorting and current filters
-    const hasFilterValues = Boolean(startDate || endDate || minLikes || maxLikes);
-    fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter, hasFilterValues);
-  };
-
-  const handleSortSelectChange = (event: SelectChangeEvent) => {
-    const field = event.target.value;
-    
-    // Always set the new field, default to descending
-    setSortBy(field);
-    setSortOrder('desc');
-    
-    // Trigger data refresh with new sorting and current filters
-    const hasFilterValues = Boolean(startDate || endDate || minLikes || maxLikes);
-    fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter, hasFilterValues);
-  };
-
-  const handleSortItemClick = (field: string) => {
-    // If clicking the same field, toggle the order
-    if (sortBy === field) {
-      const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
-      setSortOrder(newOrder);
-    } else {
-      // If selecting a new field, set it with default descending order
-      setSortBy(field);
-      setSortOrder('desc');
-    }
-    
+    handleSortMenuClose();
     // Trigger data refresh with new sorting and current filters
     const hasFilterValues = Boolean(startDate || endDate || minLikes || maxLikes);
     fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter, hasFilterValues);
@@ -1091,13 +1071,13 @@ const FacebookDataUpload = () => {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <Box>
                 <Typography variant="h4" component="h1" fontWeight={600} sx={{ mb: 1 }}>
-                  {currentFolder ? currentFolder.name : 'Facebook Data Management'}
-        </Typography>
-                <Typography variant="body1" color="text.secondary">
-                  {currentFolder ? currentFolder.description || `${currentFolder.category_display || currentFolder.category} data analysis` : 'Manage and analyze your Facebook data'}
+                  {currentFolder ? currentFolder.name : 'TikTok Data Management'}
                 </Typography>
-          </Box>
-      </Box>
+                <Typography variant="body1" color="text.secondary">
+                  {currentFolder ? currentFolder.description || `${currentFolder.category_display || currentFolder.category} data analysis` : 'Manage and analyze your TikTok data'}
+                </Typography>
+              </Box>
+            </Box>
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
             {/* Auto-refresh Toggle */}
@@ -1142,35 +1122,61 @@ const FacebookDataUpload = () => {
               Export CSV
             </Button>
           </Box>
-          </Box>
-          
+        </Box>
 
+        {/* Status Chips */}
+        {currentFolder && (
+          <Box sx={{ mb: 3, display: 'flex', gap: 2 }}>
+            <Chip 
+              label={`${currentFolder.category_display || currentFolder.category} • Dynamic`} 
+              color="success" 
+              variant="outlined"
+              size="small"
+            />
+            {/* Webhook Status Label */}
+            <Chip
+              icon={<WebhookIcon />}
+              label={webhookStatus.isActive ? 'Webhook Active' : 'Webhook Inactive'}
+              color={webhookStatus.isActive ? 'success' : 'default'}
+              variant="outlined"
+              size="small"
+            />
+          </Box>
+        )}
 
         {/* Single Summary Box */}
-        <Paper sx={{ px: 3, py: 2, mb: 3, border: '1px solid', borderColor: 'divider' }}>
+        <Paper sx={{ p: 3, mb: 3, border: '1px solid', borderColor: 'divider' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <Typography variant="h6" fontWeight={600}>
                 Data Overview
               </Typography>
+              <Chip 
+                label={`Sorted by ${sortBy} (${sortOrder})`}
+                size="small"
+                color="primary"
+                variant="outlined"
+              />
             </Box>
+        
+
           </Box>
           
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr 1fr' }, gap: 4, py:2 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr 1fr' }, gap: 4 }}>
             <Box sx={{ textAlign: 'center' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
                 <AnalyticsIcon sx={{ color: 'primary.main', mr: 1 }} />
                 <Typography variant="h4" fontWeight={600}>
                   {folderStats.totalPosts.toLocaleString()}
-                  </Typography>
-            </Box>
+                </Typography>
+              </Box>
               <Typography variant="body2" color="text.secondary">
-                Total {currentFolder?.category === 'comments'
+                Total                   {currentFolder?.category === 'comments'
                   ? 'Comments'
-                  : currentFolder?.category === 'reels'
-                  ? 'Reels'
+                  : currentFolder?.category === 'videos'
+                  ? 'Videos'
                   : 'Posts'}
-                  </Typography>
+              </Typography>
             </Box>
             
             <Box sx={{ textAlign: 'center' }}>
@@ -1178,11 +1184,11 @@ const FacebookDataUpload = () => {
                 <GroupIcon sx={{ color: 'secondary.main', mr: 1 }} />
                 <Typography variant="h4" fontWeight={600}>
                   {folderStats.uniqueUsers.toLocaleString()}
-                  </Typography>
-            </Box>
+                </Typography>
+              </Box>
               <Typography variant="body2" color="text.secondary">
                 Unique Users
-                  </Typography>
+              </Typography>
             </Box>
             
             <Box sx={{ textAlign: 'center' }}>
@@ -1190,11 +1196,11 @@ const FacebookDataUpload = () => {
                 <ThumbUpIcon sx={{ color: 'success.main', mr: 1 }} />
                 <Typography variant="h4" fontWeight={600}>
                   {folderStats.avgLikes.toLocaleString()}
-                  </Typography>
-            </Box>
+                </Typography>
+              </Box>
               <Typography variant="body2" color="text.secondary">
                 Avg. Engagement
-                  </Typography>
+              </Typography>
             </Box>
             
             <Box sx={{ textAlign: 'center' }}>
@@ -1202,7 +1208,7 @@ const FacebookDataUpload = () => {
                 <ChatIcon sx={{ color: 'info.main', mr: 1 }} />
                 <Typography variant="h4" fontWeight={600}>
                   {folderStats.avgComments.toLocaleString()}
-          </Typography>
+                </Typography>
               </Box>
               <Typography variant="body2" color="text.secondary">
                 Avg. {currentFolder?.category === 'comments' ? 'Replies' : 'Comments'}
@@ -1211,10 +1217,10 @@ const FacebookDataUpload = () => {
             
             <Box sx={{ textAlign: 'center' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
-                <VerifiedIcon sx={{ color: 'primary.main', mr: 1 }} />
+                <VerifiedIcon sx={{ color: 'warning.main', mr: 1 }} />
                 <Typography variant="h4" fontWeight={600}>
                   {folderStats.verifiedAccounts.toLocaleString()}
-            </Typography>
+                </Typography>
               </Box>
               <Typography variant="body2" color="text.secondary">
                 Verified Accounts
@@ -1256,75 +1262,25 @@ const FacebookDataUpload = () => {
               sx={{ flexGrow: 1, maxWidth: 400 }}
             />
             
-            {/* Sort Dropdown */}
-            <Box sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: 1,
-              py: 0.75,
-              px: 2,
-              borderRadius: 2,
-              bgcolor: 'rgba(0, 0, 0, 0.03)'
-            }}>
-              <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500 }}>
-                Sort by:
-              </Typography>
-              <Select
-                value={sortBy}
-                onChange={handleSortSelectChange}
-                size="small"
-                variant="standard"
-                disableUnderline
-                sx={{ 
-                  minWidth: 140,
-                  '& .MuiSelect-select': {
-                    fontWeight: 500,
-                    py: 0,
-                    color: theme => theme.palette.primary.main
-                  }
-                }}
-                renderValue={(value) => {
-                  const getDisplayName = (field: string) => {
-                    if (field === (currentFolder?.category === 'comments' ? 'date_created' : 'date_posted')) {
-                      return `Date (${sortOrder === 'asc' ? 'Asc' : 'Desc'})`;
-                    } else if (field === (currentFolder?.category === 'comments' ? 'num_likes' : 'likes')) {
-                      return `Likes (${sortOrder === 'asc' ? 'Asc' : 'Desc'})`;
-                    } else if (field === (currentFolder?.category === 'comments' ? 'user_name' : 'user_posted')) {
-                      return `${currentFolder?.category === 'comments' ? 'Commenter' : 'User'} (${sortOrder === 'asc' ? 'Asc' : 'Desc'})`;
-                    } else if (field === (currentFolder?.category === 'comments' ? 'num_replies' : 'num_comments')) {
-                      return `${currentFolder?.category === 'comments' ? 'Replies' : 'Comments'} (${sortOrder === 'asc' ? 'Asc' : 'Desc'})`;
-                    }
-                    return '[Select]';
-                  };
-                  return getDisplayName(value);
-                }}
-              >
-                <MenuItem 
-                  value={currentFolder?.category === 'comments' ? 'date_created' : 'date_posted'}
-                  onClick={() => handleSortItemClick(currentFolder?.category === 'comments' ? 'date_created' : 'date_posted')}
-                >
-                  Date
-                </MenuItem>
-                <MenuItem 
-                  value={currentFolder?.category === 'comments' ? 'num_likes' : 'likes'}
-                  onClick={() => handleSortItemClick(currentFolder?.category === 'comments' ? 'num_likes' : 'likes')}
-                >
-                  Likes
-                </MenuItem>
-                <MenuItem 
-                  value={currentFolder?.category === 'comments' ? 'user_name' : 'user_posted'}
-                  onClick={() => handleSortItemClick(currentFolder?.category === 'comments' ? 'user_name' : 'user_posted')}
-                >
-                  {currentFolder?.category === 'comments' ? 'Commenter' : 'User'}
-                </MenuItem>
-                <MenuItem 
-                  value={currentFolder?.category === 'comments' ? 'num_replies' : 'num_comments'}
-                  onClick={() => handleSortItemClick(currentFolder?.category === 'comments' ? 'num_replies' : 'num_comments')}
-                >
-                  {currentFolder?.category === 'comments' ? 'Replies' : 'Comments'}
-                </MenuItem>
-              </Select>
-            </Box>
+            {/* Sort Button */}
+            <Button
+              variant="outlined"
+              startIcon={<SortIcon />}
+              onClick={handleSortMenuOpen}
+              size="small"
+              sx={{ minWidth: 140 }}
+            >
+              {sortBy === (currentFolder?.category === 'comments' ? 'comment_date' : 'date_posted') 
+                ? `Date (${sortOrder === 'asc' ? 'Asc' : 'Desc'})`
+                : sortBy === (currentFolder?.category === 'comments' ? 'likes_number' : 'likes')
+                ? `Likes (${sortOrder === 'asc' ? 'Asc' : 'Desc'})`
+                : sortBy === (currentFolder?.category === 'comments' ? 'comment_user' : 'user_posted')
+                ? `${currentFolder?.category === 'comments' ? 'Commenter' : 'User'} (${sortOrder === 'asc' ? 'Asc' : 'Desc'})`
+                : sortBy === (currentFolder?.category === 'comments' ? 'replies_number' : 'num_comments')
+                ? `${currentFolder?.category === 'comments' ? 'Replies' : 'Comments'} (${sortOrder === 'asc' ? 'Asc' : 'Desc'})`
+                : `Sort (${sortOrder === 'asc' ? 'Asc' : 'Desc'})`
+              }
+            </Button>
             
             <Tooltip title="Filter data">
               <IconButton onClick={handleFilterToggle}>
@@ -1332,8 +1288,74 @@ const FacebookDataUpload = () => {
               </IconButton>
             </Tooltip>
           </Box>
-          
 
+          {/* Sort Menu */}
+          <Menu
+            anchorEl={sortMenuAnchor}
+            open={Boolean(sortMenuAnchor)}
+            onClose={handleSortMenuClose}
+            anchorOrigin={{
+              vertical: 'bottom',
+              horizontal: 'right',
+            }}
+            transformOrigin={{
+              vertical: 'top',
+              horizontal: 'right',
+            }}
+          >
+            <MenuItem onClick={() => handleSort('date_posted')} selected={sortBy === (currentFolder?.category === 'comments' ? 'comment_date' : 'date_posted')}>
+              <ListItemIcon>
+                <SortIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>
+                Sort by {currentFolder?.category === 'comments' ? 'Comment Date' : 'Date'}
+                {sortBy === (currentFolder?.category === 'comments' ? 'comment_date' : 'date_posted') && (
+                  <Typography variant="caption" color="primary" sx={{ ml: 1 }}>
+                    ({sortOrder})
+                  </Typography>
+                )}
+              </ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => handleSort('likes')} selected={sortBy === (currentFolder?.category === 'comments' ? 'likes_number' : 'likes')}>
+              <ListItemIcon>
+                <ThumbUpIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>
+                Sort by Likes
+                {sortBy === (currentFolder?.category === 'comments' ? 'likes_number' : 'likes') && (
+                  <Typography variant="caption" color="primary" sx={{ ml: 1 }}>
+                    ({sortOrder})
+                  </Typography>
+                )}
+              </ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => handleSort('user_posted')} selected={sortBy === (currentFolder?.category === 'comments' ? 'comment_user' : 'user_posted')}>
+              <ListItemIcon>
+                <GroupIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>
+                Sort by {currentFolder?.category === 'comments' ? 'Commenter' : 'User'}
+                {sortBy === (currentFolder?.category === 'comments' ? 'comment_user' : 'user_posted') && (
+                  <Typography variant="caption" color="primary" sx={{ ml: 1 }}>
+                    ({sortOrder})
+                  </Typography>
+                )}
+              </ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => handleSort('num_comments')} selected={sortBy === (currentFolder?.category === 'comments' ? 'replies_number' : 'num_comments')}>
+              <ListItemIcon>
+                <AnalyticsIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>
+                Sort by {currentFolder?.category === 'comments' ? 'Replies' : 'Comments'}
+                {sortBy === (currentFolder?.category === 'comments' ? 'replies_number' : 'num_comments') && (
+                  <Typography variant="caption" color="primary" sx={{ ml: 1 }}>
+                    ({sortOrder})
+                  </Typography>
+                )}
+              </ListItemText>
+            </MenuItem>
+          </Menu>
 
           {/* Filter Controls */}
           <Collapse in={showFilters}>
@@ -1341,7 +1363,7 @@ const FacebookDataUpload = () => {
               <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
                 <FilterListIcon sx={{ mr: 1 }} />
                 Filter Options
-            </Typography>
+              </Typography>
               
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr' }, gap: 2 }}>
                 {/* Date Range Filters */}
@@ -1350,7 +1372,7 @@ const FacebookDataUpload = () => {
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                    size="small"
+                  size="small"
                   InputLabelProps={{ shrink: true }}
                   InputProps={{
                     startAdornment: (
@@ -1361,16 +1383,16 @@ const FacebookDataUpload = () => {
                   }}
                 />
                 
-              <TextField
+                <TextField
                   label="End Date"
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                size="small"
+                  size="small"
                   InputLabelProps={{ shrink: true }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
                         <DateRangeIcon />
                       </InputAdornment>
                     ),
@@ -1405,12 +1427,12 @@ const FacebookDataUpload = () => {
                     startAdornment: (
                       <InputAdornment position="start">
                         <ThumbUpIcon />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-          </Box>
-          
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Box>
+              
               <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
                 <Button
                   variant="contained"
@@ -1427,17 +1449,17 @@ const FacebookDataUpload = () => {
                 >
                   Clear Filters
                 </Button>
-            </Box>
+              </Box>
             </Paper>
           </Collapse>
 
           {/* Data Table */}
           <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
             <Table stickyHeader>
-                  <TableHead>
+              <TableHead>
                 <TableRow sx={{ backgroundColor: 'grey.50' }}>
-                      {currentFolder?.category === 'comments' ? (
-                        <>
+                  {currentFolder?.category === 'comments' ? (
+                    <>
                       <TableCell sx={{ fontWeight: 600 }}>Comment User</TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>Comment</TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>Post User</TableCell>
@@ -1445,9 +1467,9 @@ const FacebookDataUpload = () => {
                       <TableCell align="right" sx={{ fontWeight: 600 }}>Likes</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600 }}>Replies</TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
-                        </>
-                      ) : (
-                        <>
+                    </>
+                  ) : (
+                    <>
                       <TableCell sx={{ fontWeight: 600 }}>User</TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>Type</TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>Content</TableCell>
@@ -1455,11 +1477,11 @@ const FacebookDataUpload = () => {
                       <TableCell align="right" sx={{ fontWeight: 600 }}>Likes</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600 }}>Comments</TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
-                        </>
-                      )}
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
+                    </>
+                  )}
+                </TableRow>
+              </TableHead>
+              <TableBody>
                 {isLoading ? (
                   <TableRow>
                     <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
@@ -1477,9 +1499,9 @@ const FacebookDataUpload = () => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                      comments.map((comment) => (
+                    comments.map((comment) => (
                       <TableRow key={comment.id} hover sx={{ '&:hover': { backgroundColor: 'grey.50' } }}>
-                          <TableCell>
+                        <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center' }}>
                             <Avatar sx={{ width: 32, height: 32, mr: 2, fontSize: '0.875rem' }}>
                               {comment.comment_user.charAt(0).toUpperCase()}
@@ -1488,23 +1510,23 @@ const FacebookDataUpload = () => {
                               {comment.comment_user}
                             </Typography>
                           </Box>
-                          </TableCell>
-                          <TableCell>
+                        </TableCell>
+                        <TableCell>
                           <Typography variant="body2" sx={{ maxWidth: 300 }} noWrap>
                             {comment.comment || 'No comment text'}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
                           <Typography variant="body2">{comment.post_user || 'Unknown'}</Typography>
-                          </TableCell>
-                          <TableCell>
+                        </TableCell>
+                        <TableCell>
                           <Typography variant="body2">
                             {comment.comment_date 
                               ? new Date(comment.comment_date).toLocaleDateString() 
                               : 'Unknown'}
                           </Typography>
-                          </TableCell>
-                          <TableCell align="right">
+                        </TableCell>
+                        <TableCell align="right">
                           <Typography variant="body2">{comment.likes_number.toLocaleString()}</Typography>
                         </TableCell>
                         <TableCell align="right">
@@ -1513,24 +1535,24 @@ const FacebookDataUpload = () => {
                         <TableCell>
                           <Box sx={{ display: 'flex', gap: 0.5 }}>
                             <Tooltip title="Open Post">
-                              <IconButton
-                                size="small"
+                              <IconButton 
+                                size="small" 
                                 onClick={() => window.open(comment.post_url, '_blank')}
                               >
                                 <OpenInNewIcon fontSize="small" />
                               </IconButton>
                             </Tooltip>
                             <Tooltip title="Copy Link">
-                              <IconButton
-                                size="small"
+                              <IconButton 
+                                size="small" 
                                 onClick={() => handleCopyLink(comment.post_url)}
                               >
                                 <ContentCopyIcon fontSize="small" />
                               </IconButton>
                             </Tooltip>
                           </Box>
-                          </TableCell>
-                        </TableRow>
+                        </TableCell>
+                      </TableRow>
                     ))
                   )
                 ) : (
@@ -1541,10 +1563,10 @@ const FacebookDataUpload = () => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                      posts.map((post) => (
+                    posts.map((post) => (
                       <TableRow key={post.id} hover sx={{ '&:hover': { backgroundColor: 'grey.50' } }}>
-                          <TableCell>
-                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
                             <Avatar sx={{ width: 32, height: 32, mr: 2, fontSize: '0.875rem' }}>
                               {post.user_posted.charAt(0).toUpperCase()}
                             </Avatar>
@@ -1553,83 +1575,83 @@ const FacebookDataUpload = () => {
                                 {post.user_posted}
                               </Typography>
                               {post.is_verified && (
-                                  <Chip
-                                    size="small"
-                                    color="primary"
+                                <Chip 
+                                  size="small" 
+                                  color="primary" 
                                   label="Verified" 
                                   sx={{ mt: 0.5, height: 16, fontSize: '0.75rem' }}
-                                  />
+                                />
                               )}
                             </Box>
-                            </Box>
-                          </TableCell>
-                          <TableCell>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
                           <Chip 
                             size="small" 
-                            color={post.content_type === 'reel' ? 'secondary' : 'primary'}
+                            color={post.content_type === 'video' ? 'secondary' : 'primary'}
                             variant="outlined"
-                            label={post.content_type === 'reel' ? 'Reel' : 'Post'} 
+                            label={post.content_type === 'video' ? 'Video' : 'Post'} 
                           />
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2" sx={{ maxWidth: 300 }} noWrap>
                             {post.description || 'No description'}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
                           <Typography variant="body2">
                             {post.date_posted 
                               ? new Date(post.date_posted).toLocaleDateString() 
                               : 'Unknown'}
                           </Typography>
-                          </TableCell>
-                          <TableCell align="right">
+                        </TableCell>
+                        <TableCell align="right">
                           <Typography variant="body2" fontWeight={500}>
                             {post.likes.toLocaleString()}
                           </Typography>
-                          </TableCell>
-                          <TableCell align="right">
+                        </TableCell>
+                        <TableCell align="right">
                           <Typography variant="body2">
                             {post.num_comments.toLocaleString()}
                           </Typography>
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', gap: 0.5 }}>
-                            <Tooltip title="Open in Facebook">
-                              <IconButton
-                                size="small"
+                            <Tooltip title="Open in TikTok">
+                              <IconButton 
+                                size="small" 
                                 onClick={() => window.open(post.url, '_blank')}
                               >
                                 <OpenInNewIcon fontSize="small" />
                               </IconButton>
                             </Tooltip>
                             <Tooltip title="Copy Link">
-                              <IconButton
-                                size="small"
+                              <IconButton 
+                                size="small" 
                                 onClick={() => handleCopyLink(post.url)}
                               >
                                 <ContentCopyIcon fontSize="small" />
                               </IconButton>
                             </Tooltip>
                           </Box>
-                          </TableCell>
-                        </TableRow>
-                      ))
+                        </TableCell>
+                      </TableRow>
+                    ))
                   )
                 )}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-              
+              </TableBody>
+            </Table>
+          </TableContainer>
+          
           {/* Pagination */}
-              <TablePagination
+          <TablePagination
             rowsPerPageOptions={[5, 10, 25, 50, 100]}
-                component="div"
-                count={totalCount}
-                rowsPerPage={rowsPerPage}
-                page={page}
-                onPageChange={handleChangePage}
-                onRowsPerPageChange={handleChangeRowsPerPage}
+            component="div"
+            count={totalCount}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
             sx={{ borderTop: '1px solid', borderColor: 'divider' }}
           />
         </TabPanel>
@@ -1651,7 +1673,7 @@ const FacebookDataUpload = () => {
                       <br />
                       {currentFolder.category === 'comments' 
                         ? 'Upload comment CSV files here.'
-                        : 'Upload posts/reels CSV files here.'
+                        : 'Upload posts/videos CSV files here.'
                       }
                     </Alert>
                   )}
@@ -1669,7 +1691,7 @@ const FacebookDataUpload = () => {
                   )}
                   
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                    Upload CSV files containing Facebook data. The system automatically detects content type 
+                    Upload CSV files containing TikTok data. The system automatically detects content type 
                     based on column headers. Ensure dates are in standard format (YYYY-MM-DD).
                   </Typography>
                   
@@ -1735,10 +1757,10 @@ const FacebookDataUpload = () => {
                     <Button
                       variant="outlined"
                       startIcon={<DownloadIcon />}
-                      onClick={() => handleDownloadCSV('reel')}
+                      onClick={() => handleDownloadCSV('video')}
                       disabled={currentFolder?.category === 'comments'}
                     >
-                      Download Reels Only
+                      Download Videos Only
                     </Button>
                     <Button
                       variant="outlined"
@@ -1876,7 +1898,7 @@ const FacebookDataUpload = () => {
           </Box>
         </TabPanel>
       </Paper>
-      
+
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={3000}
@@ -1890,4 +1912,4 @@ const FacebookDataUpload = () => {
   );
 };
 
-export default FacebookDataUpload; 
+export default TikTokDataUpload; 

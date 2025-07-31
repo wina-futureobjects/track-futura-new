@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Container,
   Typography,
@@ -26,38 +26,63 @@ import {
   TableRow,
   TableCell,
   Tooltip,
-  Alert,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
   Chip,
+  Snackbar,
+  Alert,
+  Menu,
+  ListItemIcon,
+  ListItemText,
 } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
 import FolderIcon from '@mui/icons-material/Folder';
-import CommentIcon from '@mui/icons-material/Comment';
-import PostAddIcon from '@mui/icons-material/PostAdd';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import GridViewIcon from '@mui/icons-material/GridView';
 import ViewListIcon from '@mui/icons-material/ViewList';
+import PostAddIcon from '@mui/icons-material/PostAdd';
+import CommentIcon from '@mui/icons-material/Comment';
+import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
 import { apiFetch } from '../utils/api';
 
 interface Folder {
   id: number;
   name: string;
   description: string | null;
-  category: 'posts' | 'comments';
+  category: 'posts' | 'reels' | 'comments';
   category_display: string;
   created_at: string;
   updated_at: string;
-  content_count: number;
+  post_count: number;
+  reel_count: number;
+  comment_count: number;
 }
 
 const FacebookFolders = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [openNewFolderDialog, setOpenNewFolderDialog] = useState(false);
+  const [openEditFolderDialog, setOpenEditFolderDialog] = useState(false);
+  const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null);
+  const [folderName, setFolderName] = useState('');
+  const [folderDescription, setFolderDescription] = useState('');
+  const [folderCategory, setFolderCategory] = useState<'posts' | 'reels' | 'comments'>('posts');
+  const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  
+  // Add loading states for create and update operations
+  const [isCreating, setIsCreating] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  
+  // Add refs to prevent race conditions and multiple submissions
+  const isCreatingRef = useRef(false);
+  const isUpdatingRef = useRef(false);
   
   // Extract project ID from URL path or query parameters
   const getProjectId = () => {
@@ -73,17 +98,6 @@ const FacebookFolders = () => {
   };
   
   const projectId = getProjectId();
-  
-  const [folders, setFolders] = useState<Folder[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [openNewFolderDialog, setOpenNewFolderDialog] = useState(false);
-  const [openEditFolderDialog, setOpenEditFolderDialog] = useState(false);
-  const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null);
-  const [folderName, setFolderName] = useState('');
-  const [folderDescription, setFolderDescription] = useState('');
-  const [folderCategory, setFolderCategory] = useState<'posts' | 'comments'>('posts');
-  const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
 
   // Fetch folders
   const fetchFolders = async () => {
@@ -102,7 +116,7 @@ const FacebookFolders = () => {
       // Add project filter
       const url = `/api/facebook-data/folders/?project=${projectId}`;
       
-      console.log('=== FRONTEND FETCH FACEBOOK FOLDERS DEBUG ===');
+      console.log('=== FRONTEND FETCH FOLDERS DEBUG ===');
       console.log('Project ID from URL path:', projectId);
       console.log('Current URL:', location.pathname);
       console.log('Fetch URL:', url);
@@ -132,7 +146,7 @@ const FacebookFolders = () => {
         setFolders([]);
         setError('Received invalid data format from server. Please try again.');
       }
-      console.log('=== END FRONTEND FETCH FACEBOOK FOLDERS DEBUG ===');
+      console.log('=== END FRONTEND FETCH FOLDERS DEBUG ===');
     } catch (error) {
       console.error('Error fetching folders:', error);
       setFolders([]);
@@ -146,42 +160,72 @@ const FacebookFolders = () => {
     fetchFolders();
   }, [projectId]); // Add projectId as dependency
 
+  // Cleanup effect to reset states on unmount
+  useEffect(() => {
+    return () => {
+      // Reset all refs on unmount
+      isCreatingRef.current = false;
+      isUpdatingRef.current = false;
+    };
+  }, []);
+
   const handleOpenFolder = (folderId: number) => {
     // Extract organization and project IDs from URL
     const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
     
     if (match) {
       const [, orgId, projId] = match;
-      navigate(`/organizations/${orgId}/projects/${projId}/facebook-data/${folderId}`);
+              navigate(`/organizations/${orgId}/projects/${projId}/facebook-data/${folderId}`);
     } else if (projectId) {
       // If not in the pathname but we have projectId in query params
-      navigate(`/facebook-data/${folderId}?project=${projectId}`);
+              navigate(`/facebook-data/${folderId}?project=${projectId}`);
     } else {
-      navigate(`/facebook-data/${folderId}`);
+              navigate(`/facebook-data/${folderId}`);
     }
   };
 
   const handleNewFolder = () => {
+    // Reset all states and refs
     setFolderName('');
     setFolderDescription('');
     setFolderCategory('posts');
+    setIsCreating(false);
+    isCreatingRef.current = false;
+    setError(null);
     setOpenNewFolderDialog(true);
   };
 
   const handleEditFolder = (folder: Folder) => {
+    // Reset all states and refs
     setSelectedFolder(folder);
     setFolderName(folder.name);
     setFolderDescription(folder.description || '');
     setFolderCategory(folder.category);
+    setIsUpdating(false);
+    isUpdatingRef.current = false;
+    setError(null);
     setOpenEditFolderDialog(true);
   };
 
   const handleCreateFolder = async () => {
-    if (!folderName.trim()) {
+    // Double check - use both state and ref to prevent race conditions
+    if (!folderName.trim() || isCreating || isCreatingRef.current) {
+      console.log('Create folder blocked:', { 
+        folderName: folderName.trim(), 
+        isCreating, 
+        isCreatingRef: isCreatingRef.current 
+      });
       return;
     }
 
     try {
+      // Set both state and ref immediately
+      setIsCreating(true);
+      isCreatingRef.current = true;
+      setError(null);
+      
+      console.log('Starting folder creation...');
+      
       const requestData = {
         name: folderName,
         description: folderDescription || null,
@@ -189,12 +233,12 @@ const FacebookFolders = () => {
         project: projectId ? parseInt(projectId, 10) : null,
       };
       
-      console.log('=== FRONTEND FACEBOOK FOLDER CREATION DEBUG ===');
+      console.log('=== FRONTEND FOLDER CREATION DEBUG ===');
       console.log('Project ID from URL:', projectId);
       console.log('Request data being sent:', requestData);
       console.log('API endpoint:', '/api/facebook-data/folders/');
       
-      const response = await apiFetch('/api/facebook-data/folders/', {
+              const response = await apiFetch('/api/facebook-data/folders/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -213,46 +257,102 @@ const FacebookFolders = () => {
 
       const responseData = await response.json();
       console.log('Success response data:', responseData);
-      console.log('=== END FRONTEND FACEBOOK FOLDER CREATION DEBUG ===');
+      console.log('=== END FRONTEND FOLDER CREATION DEBUG ===');
 
       // Refresh folders list
-      fetchFolders();
+      await fetchFolders();
       setOpenNewFolderDialog(false);
+      
+      // Reset form
+      setFolderName('');
+      setFolderDescription('');
+      setFolderCategory('posts');
+      
+      console.log('Folder creation completed successfully');
     } catch (error) {
       console.error('Error creating folder:', error);
       setError('Failed to create folder. Please try again.');
+    } finally {
+      // Clear both state and ref
+      setIsCreating(false);
+      isCreatingRef.current = false;
+      console.log('Create folder operation finished');
     }
   };
 
   const handleUpdateFolder = async () => {
-    if (!selectedFolder || !folderName.trim()) {
+    // Double check - use both state and ref to prevent race conditions
+    if (!selectedFolder || !folderName.trim() || isUpdating || isUpdatingRef.current) {
+      console.log('Update folder blocked:', { 
+        selectedFolder: !!selectedFolder, 
+        folderName: folderName.trim(), 
+        isUpdating, 
+        isUpdatingRef: isUpdatingRef.current 
+      });
       return;
     }
 
     try {
-      const response = await apiFetch(`/api/facebook-data/folders/${selectedFolder.id}/`, {
+      // Set both state and ref immediately
+      setIsUpdating(true);
+      isUpdatingRef.current = true;
+      setError(null);
+      
+      console.log('Starting folder update...');
+      
+      const requestData = {
+        name: folderName,
+        description: folderDescription || null,
+        category: folderCategory,
+        project: projectId ? parseInt(projectId, 10) : null,
+      };
+      
+      console.log('=== FRONTEND FOLDER UPDATE DEBUG ===');
+      console.log('Folder ID:', selectedFolder.id);
+      console.log('Request data being sent:', requestData);
+      
+      // Include project parameter in URL for consistency with backend expectations
+      const updateUrl = projectId 
+                  ? `/api/facebook-data/folders/${selectedFolder.id}/?project=${projectId}`
+          : `/api/facebook-data/folders/${selectedFolder.id}/`;
+      
+      console.log('API endpoint:', updateUrl);
+      
+      const response = await apiFetch(updateUrl, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name: folderName,
-          description: folderDescription || null,
-          category: folderCategory,
-          project: projectId ? parseInt(projectId, 10) : null,
-        }),
+        body: JSON.stringify(requestData),
       });
 
+      console.log('Update response status:', response.status);
+      console.log('Update response ok:', response.ok);
+
       if (!response.ok) {
+        const errorData = await response.text();
+        console.log('Update error response:', errorData);
         throw new Error('Failed to update folder');
       }
 
+      const responseData = await response.json();
+      console.log('Update success response data:', responseData);
+      console.log('=== END FRONTEND FOLDER UPDATE DEBUG ===');
+
       // Refresh folders list
-      fetchFolders();
+      await fetchFolders();
       setOpenEditFolderDialog(false);
+      setSelectedFolder(null);
+      
+      console.log('Folder update completed successfully');
     } catch (error) {
       console.error('Error updating folder:', error);
       setError('Failed to update folder. Please try again.');
+    } finally {
+      // Clear both state and ref
+      setIsUpdating(false);
+      isUpdatingRef.current = false;
+      console.log('Update folder operation finished');
     }
   };
 
@@ -262,7 +362,7 @@ const FacebookFolders = () => {
     }
 
     try {
-      const response = await apiFetch(`/api/facebook-data/folders/${folderId}/`, {
+              const response = await apiFetch(`/api/facebook-data/folders/${folderId}/`, {
         method: 'DELETE',
       });
 
@@ -284,6 +384,45 @@ const FacebookFolders = () => {
   ) => {
     if (newViewMode !== null) {
       setViewMode(newViewMode);
+    }
+  };
+
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'posts':
+        return <PostAddIcon />;
+      case 'reels':
+        return <VideoLibraryIcon />;
+      case 'comments':
+        return <CommentIcon />;
+      default:
+        return <FolderIcon />;
+    }
+  };
+
+  const getCategoryColor = (category: string) => {
+    switch (category) {
+      case 'posts':
+        return 'primary';
+      case 'reels':
+        return 'secondary';
+      case 'comments':
+        return 'success';
+      default:
+        return 'default';
+    }
+  };
+
+  const getContentCount = (folder: Folder) => {
+    switch (folder.category) {
+      case 'posts':
+        return folder.post_count || 0;
+      case 'reels':
+        return folder.reel_count || 0;
+      case 'comments':
+        return folder.comment_count || 0;
+      default:
+        return 0;
     }
   };
 
@@ -309,23 +448,19 @@ const FacebookFolders = () => {
               onClick={() => handleOpenFolder(folder.id)}
             >
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                {folder.category === 'comments' ? (
-                  <CommentIcon color="secondary" sx={{ mr: 1, fontSize: 30 }} />
-                ) : (
-                  <PostAddIcon color="primary" sx={{ mr: 1, fontSize: 30 }} />
-                )}
-                <Typography variant="h6" component="div">
-                  {folder.name}
-                </Typography>
-              </Box>
-              
-              <Box sx={{ mb: 1 }}>
-                <Chip 
-                  label={folder.category_display} 
-                  size="small" 
-                  color={folder.category === 'comments' ? 'secondary' : 'primary'}
-                  variant="outlined"
-                />
+                <FolderIcon color="primary" sx={{ mr: 1, fontSize: 30 }} />
+                <Box sx={{ flexGrow: 1 }}>
+                  <Typography variant="h6" component="div">
+                    {folder.name}
+                  </Typography>
+                  <Chip 
+                    icon={getCategoryIcon(folder.category)}
+                    label={folder.category_display || folder.category}
+                    size="small"
+                    color={getCategoryColor(folder.category) as any}
+                    sx={{ mt: 0.5 }}
+                  />
+                </Box>
               </Box>
               
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -333,10 +468,7 @@ const FacebookFolders = () => {
               </Typography>
               
               <Typography variant="body2" color="text.secondary">
-                {folder.content_count} {folder.category === 'comments' ? 
-                  (folder.content_count === 1 ? 'comment' : 'comments') : 
-                  (folder.content_count === 1 ? 'post' : 'posts')
-                }
+                {getContentCount(folder)} {folder.category === 'comments' ? 'comments' : folder.category === 'reels' ? 'reels' : 'posts'}
               </Typography>
               
               <Typography variant="caption" color="text.secondary" display="block">
@@ -387,36 +519,29 @@ const FacebookFolders = () => {
         <TableBody>
           {folders.map((folder) => (
             <TableRow 
-              key={folder.id}
-              hover
+              key={folder.id} 
               onClick={() => handleOpenFolder(folder.id)}
-              sx={{ cursor: 'pointer' }}
+              sx={{ 
+                cursor: 'pointer', 
+                '&:hover': { backgroundColor: 'action.hover' } 
+              }}
             >
               <TableCell>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  {folder.category === 'comments' ? (
-                    <CommentIcon color="secondary" sx={{ mr: 1 }} />
-                  ) : (
-                    <PostAddIcon color="primary" sx={{ mr: 1 }} />
-                  )}
+                  <FolderIcon color="primary" sx={{ mr: 1 }} />
                   <Typography variant="body1">{folder.name}</Typography>
                 </Box>
               </TableCell>
               <TableCell>
                 <Chip 
-                  label={folder.category_display} 
-                  size="small" 
-                  color={folder.category === 'comments' ? 'secondary' : 'primary'}
-                  variant="outlined"
+                  icon={getCategoryIcon(folder.category)}
+                  label={folder.category_display || folder.category}
+                  size="small"
+                  color={getCategoryColor(folder.category) as any}
                 />
               </TableCell>
               <TableCell>{folder.description || 'No description'}</TableCell>
-              <TableCell align="right">
-                {folder.content_count} {folder.category === 'comments' ? 
-                  (folder.content_count === 1 ? 'comment' : 'comments') : 
-                  (folder.content_count === 1 ? 'post' : 'posts')
-                }
-              </TableCell>
+              <TableCell align="right">{getContentCount(folder)}</TableCell>
               <TableCell>{new Date(folder.created_at).toLocaleDateString()}</TableCell>
               <TableCell align="center">
                 <IconButton 
@@ -486,16 +611,14 @@ const FacebookFolders = () => {
         </Box>
         <Divider sx={{ mb: 4 }} />
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
-
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
             <CircularProgress />
           </Box>
+        ) : error ? (
+          <Paper sx={{ p: 3, textAlign: 'center', color: 'error.main' }}>
+            {error}
+          </Paper>
         ) : folders.length === 0 ? (
           <Paper sx={{ p: 4, textAlign: 'center' }}>
             <Typography variant="h6" gutterBottom>
@@ -509,7 +632,6 @@ const FacebookFolders = () => {
               color="primary"
               startIcon={<AddIcon />}
               onClick={handleNewFolder}
-              disabled={!projectId}
             >
               Create First Folder
             </Button>
@@ -519,8 +641,19 @@ const FacebookFolders = () => {
         )}
       </Box>
 
-      {/* Create New Folder Dialog */}
-      <Dialog open={openNewFolderDialog} onClose={() => setOpenNewFolderDialog(false)}>
+      {/* New Folder Dialog */}
+      <Dialog 
+        open={openNewFolderDialog} 
+        onClose={() => {
+          if (!isCreating && !isCreatingRef.current) {
+            setOpenNewFolderDialog(false);
+            // Reset form
+            setFolderName('');
+            setFolderDescription('');
+            setFolderCategory('posts');
+          }
+        }}
+      >
         <DialogTitle>Create New Folder</DialogTitle>
         <DialogContent sx={{ minWidth: 400 }}>
           <TextField
@@ -529,11 +662,12 @@ const FacebookFolders = () => {
             label="Folder Name"
             type="text"
             fullWidth
-            variant="outlined"
             value={folderName}
             onChange={(e) => setFolderName(e.target.value)}
             required
-            sx={{ mb: 2 }}
+            variant="outlined"
+            sx={{ mb: 2, mt: 1 }}
+            disabled={isCreating}
           />
           
           <FormControl fullWidth sx={{ mb: 2 }}>
@@ -541,12 +675,19 @@ const FacebookFolders = () => {
             <Select
               value={folderCategory}
               label="Category"
-              onChange={(e) => setFolderCategory(e.target.value as 'posts' | 'comments')}
+              onChange={(e) => setFolderCategory(e.target.value as 'posts' | 'reels' | 'comments')}
+              disabled={isCreating}
             >
               <MenuItem value="posts">
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <PostAddIcon sx={{ mr: 1 }} />
-                  Posts & Reels
+                  Posts
+                </Box>
+              </MenuItem>
+              <MenuItem value="reels">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <VideoLibraryIcon sx={{ mr: 1 }} />
+                  Reels
                 </Box>
               </MenuItem>
               <MenuItem value="comments">
@@ -563,21 +704,47 @@ const FacebookFolders = () => {
             label="Description (optional)"
             type="text"
             fullWidth
-            variant="outlined"
             multiline
             rows={3}
             value={folderDescription}
             onChange={(e) => setFolderDescription(e.target.value)}
+            variant="outlined"
+            disabled={isCreating}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenNewFolderDialog(false)}>Cancel</Button>
-          <Button onClick={handleCreateFolder} variant="contained">Create</Button>
+          <Button 
+            onClick={() => {
+              if (!isCreating && !isCreatingRef.current) {
+                setOpenNewFolderDialog(false);
+                // Reset form
+                setFolderName('');
+                setFolderDescription('');
+                setFolderCategory('posts');
+              }
+            }}
+            disabled={isCreating}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleCreateFolder();
+            }}
+            variant="contained" 
+            color="primary"
+            disabled={!folderName.trim() || isCreating || isCreatingRef.current}
+            startIcon={isCreating ? <CircularProgress size={20} /> : undefined}
+          >
+            {isCreating ? 'Creating...' : 'Create'}
+          </Button>
         </DialogActions>
       </Dialog>
 
       {/* Edit Folder Dialog */}
-      <Dialog open={openEditFolderDialog} onClose={() => setOpenEditFolderDialog(false)}>
+      <Dialog open={openEditFolderDialog} onClose={() => !isUpdating && !isUpdatingRef.current && setOpenEditFolderDialog(false)}>
         <DialogTitle>Edit Folder</DialogTitle>
         <DialogContent sx={{ minWidth: 400 }}>
           <TextField
@@ -586,11 +753,12 @@ const FacebookFolders = () => {
             label="Folder Name"
             type="text"
             fullWidth
-            variant="outlined"
             value={folderName}
             onChange={(e) => setFolderName(e.target.value)}
             required
-            sx={{ mb: 2 }}
+            variant="outlined"
+            sx={{ mb: 2, mt: 1 }}
+            disabled={isUpdating}
           />
           
           <FormControl fullWidth sx={{ mb: 2 }}>
@@ -598,12 +766,19 @@ const FacebookFolders = () => {
             <Select
               value={folderCategory}
               label="Category"
-              onChange={(e) => setFolderCategory(e.target.value as 'posts' | 'comments')}
+              onChange={(e) => setFolderCategory(e.target.value as 'posts' | 'reels' | 'comments')}
+              disabled={isUpdating}
             >
               <MenuItem value="posts">
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <PostAddIcon sx={{ mr: 1 }} />
-                  Posts & Reels
+                  Posts
+                </Box>
+              </MenuItem>
+              <MenuItem value="reels">
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <VideoLibraryIcon sx={{ mr: 1 }} />
+                  Reels
                 </Box>
               </MenuItem>
               <MenuItem value="comments">
@@ -620,18 +795,53 @@ const FacebookFolders = () => {
             label="Description (optional)"
             type="text"
             fullWidth
-            variant="outlined"
             multiline
             rows={3}
             value={folderDescription}
             onChange={(e) => setFolderDescription(e.target.value)}
+            variant="outlined"
+            disabled={isUpdating}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenEditFolderDialog(false)}>Cancel</Button>
-          <Button onClick={handleUpdateFolder} variant="contained">Update</Button>
+          <Button 
+            onClick={() => {
+              if (!isUpdating && !isUpdatingRef.current) {
+                setOpenEditFolderDialog(false);
+                setSelectedFolder(null);
+              }
+            }}
+            disabled={isUpdating}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleUpdateFolder();
+            }}
+            variant="contained" 
+            color="primary"
+            disabled={!folderName.trim() || isUpdating || isUpdatingRef.current}
+            startIcon={isUpdating ? <CircularProgress size={20} /> : undefined}
+          >
+            {isUpdating ? 'Updating...' : 'Update'}
+          </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Error Snackbar */}
+      <Snackbar
+        open={!!error}
+        autoHideDuration={6000}
+        onClose={() => setError(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setError(null)} severity="error" sx={{ width: '100%' }}>
+          {error}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 };

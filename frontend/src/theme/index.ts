@@ -27,12 +27,12 @@ const baseTheme = createTheme({
       dark: '#4FBF69',
       contrastText: '#000',
     },
-    warning: {
-      main: '#62EF83', // Green for warnings (swap)
-      light: '#7FF299',
-      dark: '#4FBF69',
-      contrastText: '#000',
-    },
+                warning: {
+              main: '#FF4444', // Bright red for warnings
+              light: '#FF6666',
+              dark: '#CC3333',
+              contrastText: '#000',
+            },
     info: {
       main: '#6EE5D9', // Teal for info
       light: '#8EEAE0',

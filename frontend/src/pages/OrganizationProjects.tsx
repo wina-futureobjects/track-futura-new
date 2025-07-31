@@ -414,27 +414,28 @@ const OrganizationProjects = () => {
           <Typography variant="body2" color="text.secondary" paragraph>
             Create your first project in this organization to get started.
           </Typography>
-          <Button 
-            variant="contained" 
-            startIcon={<AddIcon />} 
-            onClick={handleNewProject}
-            sx={{
-              borderRadius: 2,
-              bgcolor: '#62EF83', 
-              color: '#000000', 
-              textTransform: 'none',
-              fontWeight: 500,
-              boxShadow: 'none',
-              px: 3,
-              py: 1,
-              '&:hover': {
-                bgcolor: '#4FD16C',
-                boxShadow: '0 2px 8px rgba(98, 239, 131, 0.3)'
-              }
-            }}
-          >
-            Create Project
-          </Button>
+                     <Button 
+             variant="contained" 
+             startIcon={<AddIcon />} 
+             onClick={handleNewProject}
+             sx={{
+               borderRadius: 2,
+               bgcolor: '#62EF83', 
+               color: '#000000', 
+               textTransform: 'none',
+               fontWeight: 500,
+               boxShadow: 'none',
+               px: 3,
+               py: 1,
+               transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+               '&:hover': {
+                 bgcolor: '#4FD16C',
+                 boxShadow: '0 2px 8px rgba(98, 239, 131, 0.3)'
+               }
+             }}
+           >
+             Create Project
+           </Button>
         </Paper>
       );
     }
@@ -451,22 +452,22 @@ const OrganizationProjects = () => {
               }}
             >
               <Card 
-                sx={{ 
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  transition: 'transform 0.2s, box-shadow 0.2s',
-                  '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: '0 10px 20px rgba(0,0,0,0.1)',
-                  },
-                  cursor: 'pointer',
-                  borderRadius: '12px',
-                  overflow: 'hidden',
-                  border: '1px solid rgba(0,0,0,0.08)',
-                  boxShadow: 'none',
-                  position: 'relative'
-                }}
+                                 sx={{ 
+                   height: '100%',
+                   display: 'flex',
+                   flexDirection: 'column',
+                   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                   '&:hover': {
+                     transform: 'translateY(-4px)',
+                     boxShadow: '0 10px 20px rgba(0,0,0,0.1)',
+                   },
+                   cursor: 'pointer',
+                   borderRadius: '12px',
+                   overflow: 'hidden',
+                   border: '1px solid rgba(0,0,0,0.08)',
+                   boxShadow: 'none',
+                   position: 'relative'
+                 }}
               >
                 {/* Action button outside CardActionArea */}
                 <IconButton 
@@ -486,16 +487,17 @@ const OrganizationProjects = () => {
                 </IconButton>
                 
                 <CardActionArea 
-                  sx={{ 
-                    flexGrow: 1, 
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    alignItems: 'flex-start', 
-                    p: 2.5,
-                    '&:hover': {
-                      bgcolor: 'transparent'
-                    }
-                  }}
+                                   sx={{ 
+                   flexGrow: 1, 
+                   display: 'flex', 
+                   flexDirection: 'column', 
+                   alignItems: 'flex-start', 
+                   p: 2.5,
+                   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                   '&:hover': {
+                     bgcolor: 'transparent'
+                   }
+                 }}
                   onClick={() => handleOpenProject(project.id)}
                 >
                   <Box 
@@ -691,30 +693,31 @@ const OrganizationProjects = () => {
           <>
             {/* Header and actions */}
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
-              <Typography variant="h4" component="h1" fontWeight="600">
+              <Typography variant="h4" component="h1" fontWeight="600" my={1.5}>
                 {organization?.name || 'Organization'} Projects
               </Typography>
-              <Button 
-                variant="contained" 
-                startIcon={<AddIcon />}
-                onClick={handleNewProject}
-                sx={{ 
-                  borderRadius: 8,
-                  bgcolor: '#62EF83', 
-                  color: '#000000', 
-                  textTransform: 'none',
-                  fontWeight: 500,
-                  boxShadow: 'none',
-                  px: 3,
-                  py: 1.2,
-                  '&:hover': {
-                    bgcolor: '#4FD16C',
-                    boxShadow: '0 2px 8px rgba(98, 239, 131, 0.3)'
-                  }
-                }}
-              >
-                Create project
-              </Button>
+                             <Button 
+                 variant="contained" 
+                 startIcon={<AddIcon />}
+                 onClick={handleNewProject}
+                 sx={{ 
+                   borderRadius: 8,
+                   bgcolor: '#62EF83', 
+                   color: '#000000', 
+                   textTransform: 'none',
+                   fontWeight: 500,
+                   boxShadow: 'none',
+                   px: 3,
+                   py: 1.2,
+                   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                   '&:hover': {
+                     bgcolor: '#4FD16C',
+                     boxShadow: '0 2px 8px rgba(98, 239, 131, 0.3)'
+                   }
+                 }}
+               >
+                 Create project
+               </Button>
             </Box>
 
             {/* Search and filters bar */}
@@ -796,29 +799,30 @@ const OrganizationProjects = () => {
                   </Select>
                 </Box>
                 
-                <ToggleButtonGroup
-                  value={viewMode}
-                  exclusive
-                  onChange={handleViewModeChange}
-                  aria-label="view mode"
-                  size="small"
-                  sx={{ 
-                    border: 'none',
-                    bgcolor: 'rgba(0, 0, 0, 0.03)',
-                    borderRadius: 2,
-                    '& .MuiToggleButton-root': {
-                      border: 'none',
-                      py: 0.75,
-                      '&.Mui-selected': {
-                        bgcolor: 'white',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
-                        '&:hover': {
-                          bgcolor: 'white'
-                        }
-                      }
-                    }
-                  }}
-                >
+                                 <ToggleButtonGroup
+                   value={viewMode}
+                   exclusive
+                   onChange={handleViewModeChange}
+                   aria-label="view mode"
+                   size="small"
+                   sx={{ 
+                     border: 'none',
+                     bgcolor: 'rgba(0, 0, 0, 0.03)',
+                     borderRadius: 2,
+                     '& .MuiToggleButton-root': {
+                       border: 'none',
+                       py: 0.75,
+                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                       '&.Mui-selected': {
+                         bgcolor: 'white',
+                         boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+                         '&:hover': {
+                           bgcolor: 'white'
+                         }
+                       }
+                     }
+                   }}
+                 >
                   <ToggleButton value="grid" aria-label="grid view">
                     <GridViewIcon />
                   </ToggleButton>
@@ -852,30 +856,31 @@ const OrganizationProjects = () => {
           <>
             {/* Header and actions */}
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
-              <Typography variant="h4" component="h1" fontWeight="600">
+              <Typography variant="h4" component="h1" fontWeight="600" my={1.5}>
                 {organization?.name || 'Organization'} Members
               </Typography>
-              <Button 
-                variant="contained" 
-                startIcon={<GroupIcon />}
-                onClick={handleAddMember}
-                sx={{ 
-                  borderRadius: 8,
-                  bgcolor: '#62EF83', 
-                  color: '#000000', 
-                  textTransform: 'none',
-                  fontWeight: 500,
-                  boxShadow: 'none',
-                  px: 3,
-                  py: 1.2,
-                  '&:hover': {
-                    bgcolor: '#4FD16C',
-                    boxShadow: '0 2px 8px rgba(98, 239, 131, 0.3)'
-                  }
-                }}
-              >
-                Add member
-              </Button>
+                <Button 
+                 variant="contained" 
+                 startIcon={<GroupIcon />}
+                 onClick={handleAddMember}
+                 sx={{ 
+                   borderRadius: 8,
+                   bgcolor: '#62EF83', 
+                   color: '#000000', 
+                   textTransform: 'none',
+                   fontWeight: 500,
+                   boxShadow: 'none',
+                   px: 3,
+                   py: 1.2,
+                   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                   '&:hover': {
+                     bgcolor: '#4FD16C',
+                     boxShadow: '0 2px 8px rgba(98, 239, 131, 0.3)'
+                   }
+                 }}
+                >
+                  Add Member
+                </Button>
             </Box>
 
             {/* Search for members */}
@@ -1002,27 +1007,28 @@ const OrganizationProjects = () => {
                     <Typography variant="body2" color="text.secondary" paragraph>
                       Add members to your organization to collaborate on projects.
                     </Typography>
-                    <Button 
-                      variant="contained" 
-                      startIcon={<GroupIcon />} 
-                      onClick={handleAddMember}
-                      sx={{
-                        borderRadius: 8,
-                        bgcolor: '#62EF83', 
-                        color: '#000000', 
-                        textTransform: 'none',
-                        fontWeight: 500,
-                        boxShadow: 'none',
-                        px: 3,
-                        py: 1.2,
-                        '&:hover': {
-                          bgcolor: '#4FD16C',
-                          boxShadow: '0 2px 8px rgba(98, 239, 131, 0.3)'
-                        }
-                      }}
-                    >
-                      Add Member
-                    </Button>
+                                         <Button 
+                       variant="contained" 
+                       startIcon={<GroupIcon />} 
+                       onClick={handleAddMember}
+                       sx={{
+                         borderRadius: 8,
+                         bgcolor: '#62EF83', 
+                         color: '#000000', 
+                         textTransform: 'none',
+                         fontWeight: 500,
+                         boxShadow: 'none',
+                         px: 3,
+                         py: 1.2,
+                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                         '&:hover': {
+                           bgcolor: '#4FD16C',
+                           boxShadow: '0 2px 8px rgba(98, 239, 131, 0.3)'
+                         }
+                       }}
+                     >
+                       Add Member
+                     </Button>
                   </Paper>
                 )}
               </>
@@ -1036,7 +1042,7 @@ const OrganizationProjects = () => {
         {activeTab === 2 && (
           <>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
-              <Typography variant="h4" component="h1" fontWeight="600">
+              <Typography variant="h4" component="h1" fontWeight="600" my={1.5}>
                 {organization?.name || 'Organization'} Settings
               </Typography>
             </Box>
@@ -1096,21 +1102,27 @@ const OrganizationProjects = () => {
               </Box>
               
               <Box mt={3}>
-                <Button 
-                  variant="outlined" 
-                  startIcon={<SettingsIcon />}
-                  sx={{
-                    borderRadius: 8,
-                    borderColor: theme.palette.primary.main,
-                    color: theme.palette.primary.main,
-                    textTransform: 'none',
-                    fontWeight: 500,
-                    px: 3,
-                    py: 1
-                  }}
-                >
-                  Edit Organization
-                </Button>
+                                 <Button 
+                   variant="outlined" 
+                   startIcon={<SettingsIcon />}
+                   sx={{
+                     borderRadius: 8,
+                     borderColor: theme.palette.primary.main,
+                     color: theme.palette.primary.main,
+                     textTransform: 'none',
+                     fontWeight: 500,
+                     px: 3,
+                     py: 1,
+                     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                     '&:hover': {
+                       backgroundColor: theme => theme.palette.primary.main,
+                       color: '#fff',
+                       borderColor: theme => theme.palette.primary.dark,
+                     }
+                   }}
+                 >
+                   Edit Organization
+                 </Button>
               </Box>
             </Paper>
             
@@ -1118,34 +1130,41 @@ const OrganizationProjects = () => {
               p: 4, 
               borderRadius: 3,
               boxShadow: 'none',
-              border: '1px solid rgba(255, 100, 100, 0.15)',
-              bgcolor: 'rgba(255, 100, 100, 0.03)'
+              border: '1px solid rgba(255, 68, 68, 0.3)',
+              bgcolor: 'rgba(255, 68, 68, 0.12)'
             }}>
-              <Typography variant="h6" gutterBottom fontWeight={600} sx={{ color: 'error.main' }}>
+              <Typography variant="h6" gutterBottom fontWeight={600} sx={{ color: 'warning.main' }}>
                 Danger Zone
               </Typography>
               <Typography variant="body2" color="text.secondary" paragraph>
                 Permanently delete this organization and all its data. This action cannot be undone.
               </Typography>
               <Box mt={2}>
-                <Button 
-                  variant="outlined" 
-                  color="error"
-                  sx={{
-                    borderRadius: 8,
-                    textTransform: 'none',
-                    fontWeight: 500,
-                    px: 3,
-                    py: 1
-                  }}
-                  onClick={() => {
-                    if (window.confirm('Are you sure you want to delete this organization? This action cannot be undone.')) {
-                      // Delete organization API call
-                    }
-                  }}
-                >
-                  Delete Organization
-                </Button>
+                                 <Button 
+                   variant="outlined" 
+                   color="warning"
+                   sx={{
+                     borderRadius: 8,
+                     textTransform: 'none',
+                     fontWeight: 500,
+                     px: 3,
+                     py: 1,
+                     borderColor: 'warning.main',
+                     color: 'warning.main',
+                     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                     '&:hover': {
+                       borderColor: 'warning.dark',
+                       backgroundColor: 'rgba(255, 68, 68, 0.08)',
+                     }
+                   }}
+                   onClick={() => {
+                     if (window.confirm('Are you sure you want to delete this organization? This action cannot be undone.')) {
+                       // Delete organization API call
+                     }
+                   }}
+                 >
+                   Delete Organization
+                 </Button>
               </Box>
             </Paper>
           </>
@@ -1226,24 +1245,25 @@ const OrganizationProjects = () => {
           >
             Cancel
           </Button>
-          <Button 
-            onClick={handleCreateProject} 
-            variant="contained"
-            disabled={!projectName.trim()}
-            sx={{ 
-              borderRadius: 2,
-              bgcolor: '#62EF83',
-              color: '#000000',
-              textTransform: 'none',
-              px: 3,
-              '&.Mui-disabled': {
-                bgcolor: 'rgba(26, 115, 232, 0.5)',
-                color: 'white'
-              }
-            }}
-          >
-            Create
-          </Button>
+                     <Button 
+             onClick={handleCreateProject} 
+             variant="contained"
+             disabled={!projectName.trim()}
+             sx={{ 
+               borderRadius: 2,
+               bgcolor: '#62EF83',
+               color: '#000000',
+               textTransform: 'none',
+               px: 3,
+               transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+               '&.Mui-disabled': {
+                 bgcolor: 'rgba(26, 115, 232, 0.5)',
+                 color: 'white'
+               }
+             }}
+           >
+             Create
+           </Button>
         </DialogActions>
       </Dialog>
 
@@ -1311,24 +1331,25 @@ const OrganizationProjects = () => {
           >
             Cancel
           </Button>
-          <Button 
-            onClick={handleAddMemberSubmit} 
-            variant="contained"
-            disabled={!newMemberEmail.trim()}
-            sx={{ 
-              borderRadius: 2,
-              bgcolor: '#62EF83',
-              color: '#000000',
-              textTransform: 'none',
-              px: 3,
-              '&.Mui-disabled': {
-                bgcolor: 'rgba(26, 115, 232, 0.5)',
-                color: 'white'
-              }
-            }}
-          >
-            Send Invitation
-          </Button>
+                     <Button 
+             onClick={handleAddMemberSubmit} 
+             variant="contained"
+             disabled={!newMemberEmail.trim()}
+             sx={{ 
+               borderRadius: 2,
+               bgcolor: '#62EF83',
+               color: '#000000',
+               textTransform: 'none',
+               px: 3,
+               transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+               '&.Mui-disabled': {
+                 bgcolor: 'rgba(26, 115, 232, 0.5)',
+                 color: 'white'
+               }
+             }}
+           >
+             Send Invitation
+           </Button>
         </DialogActions>
       </Dialog>
 
@@ -1337,10 +1358,10 @@ const OrganizationProjects = () => {
         <Paper sx={{ 
           mt: 3,
           p: 2, 
-          bgcolor: 'rgba(255, 100, 100, 0.03)', 
-          color: 'error.main',
-          borderRadius: 3,
-          border: '1px solid rgba(255, 100, 100, 0.15)',
+                     bgcolor: 'rgba(255, 68, 68, 0.05)',
+           color: 'warning.main',
+           borderRadius: 3,
+           border: '1px solid rgba(255, 68, 68, 0.2)',
           display: 'flex',
           alignItems: 'center',
           gap: 1

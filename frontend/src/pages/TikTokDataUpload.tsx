@@ -1,5 +1,5 @@
-import { useState, useEffect, ChangeEvent } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, ChangeEvent, useCallback } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Container,
   Typography,
@@ -26,15 +26,34 @@ import {
   Breadcrumbs,
   Tooltip,
   Snackbar,
-  Tab,
-  Tabs,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
   SelectChangeEvent,
   InputAdornment,
-  Grid,
+  Tabs,
+  Tab,
+  Avatar,
+  LinearProgress,
+  Menu,
+  ListItemIcon,
+  ListItemText,
+  Collapse,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemAvatar,
+  Badge,
+  Switch,
+  FormControlLabel,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -46,6 +65,22 @@ import FolderIcon from '@mui/icons-material/Folder';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import EditIcon from '@mui/icons-material/Edit';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import GroupIcon from '@mui/icons-material/Group';
+import VerifiedIcon from '@mui/icons-material/Verified';
+import ThumbUpIcon from '@mui/icons-material/ThumbUp';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import GetAppIcon from '@mui/icons-material/GetApp';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import SortIcon from '@mui/icons-material/Sort';
+import DateRangeIcon from '@mui/icons-material/DateRange';
+import ChatIcon from '@mui/icons-material/Chat';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import WebhookIcon from '@mui/icons-material/Webhook';
+import SettingsIcon from '@mui/icons-material/Settings';
+import NotificationsIcon from '@mui/icons-material/Notifications';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { apiFetch } from '../utils/api';
 
 interface TikTokPost {
@@ -66,10 +101,28 @@ interface TikTokPost {
   is_paid_partnership: boolean;
 }
 
+interface TikTokComment {
+  id: number;
+  comment_id: string;
+  post_id: string;
+  post_url: string;
+  post_user: string;
+  comment: string;
+  comment_date: string;
+  comment_user: string;
+  comment_user_url: string;
+  likes_number: number;
+  replies_number: number;
+  hashtag_comment: string;
+  url: string;
+}
+
 interface Folder {
   id: number;
   name: string;
   description: string | null;
+  category: 'posts' | 'reels' | 'comments';
+  category_display: string;
 }
 
 // Add an interface for folder statistics
@@ -77,25 +130,71 @@ interface FolderStats {
   totalPosts: number;
   uniqueUsers: number;
   avgLikes: number;
+  avgComments: number;
   verifiedAccounts: number;
 }
 
+// BrightData Webhook Integration Interfaces - Simplified for receiving data only
+interface WebhookStatus {
+  isActive: boolean;
+  lastUpdate: string | null;
+  totalRequests: number;
+  successRate: number;
+  averageResponseTime: number;
+}
+
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`simple-tabpanel-${index}`}
+      aria-labelledby={`simple-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ p: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
+
+function a11yProps(index: number) {
+  return {
+    id: `simple-tab-${index}`,
+    'aria-controls': `simple-tabpanel-${index}`,
+  };
+}
+
 const TikTokDataUpload = () => {
-  const { folderId } = useParams();
+  const { folderId, organizationId, projectId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   
-  // Update state to handle two separate files
-  const [postFile, setPostFile] = useState<File | null>(null);
-  const [reelFile, setReelFile] = useState<File | null>(null);
+  // Update state to handle single file upload
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [folderLoading, setFolderLoading] = useState(false);
   const [posts, setPosts] = useState<TikTokPost[]>([]);
+  const [comments, setComments] = useState<TikTokComment[]>([]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredPosts, setFilteredPosts] = useState<TikTokPost[]>([]);
+  const [filteredComments, setFilteredComments] = useState<TikTokComment[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [currentFolder, setCurrentFolder] = useState<Folder | null>(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -104,57 +203,172 @@ const TikTokDataUpload = () => {
     totalPosts: 0,
     uniqueUsers: 0,
     avgLikes: 0,
+    avgComments: 0,
     verifiedAccounts: 0
   });
-  // Add tab state for upload section
-  const [uploadTabValue, setUploadTabValue] = useState(0);
-  // Add content type filter state
+  // Remove upload tab state as we're using single upload now
   const [contentTypeFilter, setContentTypeFilter] = useState<string>('all');
-  // Add a state for server status
   const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+  const [tabValue, setTabValue] = useState(0);
 
-  // Fetch TikTok posts with pagination
-  const fetchPosts = async (pageNumber = 0, pageSize = 10, searchTerm = '', contentType = '') => {
+  const [sortBy, setSortBy] = useState<string>('date_posted');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  
+  // Filter state
+  const [showFilters, setShowFilters] = useState(false);
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [minLikes, setMinLikes] = useState<string>('');
+  const [maxLikes, setMaxLikes] = useState<string>('');
+
+  // BrightData Webhook Integration State - Simplified for receiving data only
+  const [webhookStatus, setWebhookStatus] = useState<WebhookStatus>({
+    isActive: false,
+    lastUpdate: null,
+    totalRequests: 0,
+    successRate: 0,
+    averageResponseTime: 0
+  });
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
+  const [webhookLoading, setWebhookLoading] = useState(false);
+
+  // Fetch Instagram posts/comments with pagination
+  const fetchPosts = async (pageNumber = 0, pageSize = 10, searchTerm = '', contentType = '', useFilters = false) => {
     try {
       setIsLoading(true);
-      // Add folder filtering if folderId is present
-      const folderParam = folderId ? `&folder_id=${folderId}` : '';
-      // Add search param if search term exists
-      const searchParam = searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : '';
-      // Add content type filter if not 'all'
-      const contentTypeParam = contentType && contentType !== 'all' 
-        ? `&content_type=${contentType}` 
-        : '';
       
-      const response = await apiFetch(`/api/tiktok-data/posts/?page=${pageNumber + 1}&page_size=${pageSize}${folderParam}${searchParam}${contentTypeParam}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch posts');
-      }
-      const data = await response.json();
-      
-      // Check if the response has the expected pagination structure
-      if (data && typeof data === 'object' && 'results' in data) {
-        setPosts(data.results || []);
-        setFilteredPosts(data.results || []);
-        setTotalCount(data.count || 0);
-      } else if (Array.isArray(data)) {
-        // Handle case where API might return a direct array
-        setPosts(data);
-        setFilteredPosts(data);
-        setTotalCount(data.length);
-        console.warn('API returned an array instead of paginated results');
-      } else {
-        console.error('API returned unexpected data format:', data);
-        setPosts([]);
-        setFilteredPosts([]);
-        setTotalCount(0);
-      }
-    } catch (error) {
-      console.error('Error fetching posts:', error);
+      // Clear existing data immediately to show loading state
       setPosts([]);
+      setComments([]);
       setFilteredPosts([]);
+      setFilteredComments([]);
       setTotalCount(0);
+      
+      if (!folderId) {
+        console.log('No folder ID provided, skipping data fetch');
+        return;
+      }
+      
+      console.log(`📡 Fetching data for folder ${folderId}, page ${pageNumber + 1}, search: "${searchTerm}", content type: "${contentType}"`);
+      console.log(`📁 Current folder category: ${currentFolder?.category}`);
+      
+      const searchParam = searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : '';
+      const projectParam = projectId ? `&project=${projectId}` : '';
+      
+      // Add sorting parameters
+      const sortParams = `&sort_by=${sortBy}&sort_order=${sortOrder}`;
+      
+      // Add filter parameters if useFilters is true
+      const filterParams = useFilters ? [
+        startDate ? `&start_date=${startDate}` : '',
+        endDate ? `&end_date=${endDate}` : '',
+        minLikes ? `&min_likes=${minLikes}` : '',
+        maxLikes ? `&max_likes=${maxLikes}` : ''
+      ].join('') : '';
+      
+      // Check folder category first and call appropriate endpoint
+      if (currentFolder?.category === 'comments') {
+        console.log('🔄 Comments folder detected - using comments endpoint directly');
+        
+        // For comments folders, use the folder contents endpoint or direct comments API
+        const commentsApiUrl = `/api/tiktok-data/folders/${folderId}/contents/?page=${pageNumber + 1}&page_size=${pageSize}${searchParam}${projectParam}${filterParams}${sortParams}`;
+        console.log('🔄 Fetching comments from:', commentsApiUrl);
+        
+        const response = await apiFetch(commentsApiUrl);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ Comments endpoint error:', response.status, errorText);
+          throw new Error(`Failed to fetch comments: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('📝 Comments endpoint response:', data);
+        console.log('📝 Comments response structure:', {
+          hasResults: 'results' in data,
+          hasCount: 'count' in data,
+          resultsLength: data.results?.length || 0,
+          totalCount: data.count || 0,
+          category: data.category
+        });
+        
+        if (data && typeof data === 'object') {
+          const results = data.results || [];
+          console.log('✅ Setting comments data with', results.length, 'items');
+          console.log('📋 First few comments:', results.slice(0, 2));
+          
+          setComments(results);
+          setFilteredComments(results);
+          setPosts([]);
+          setFilteredPosts([]);
+          setTotalCount(data.count || results.length);
+          
+          console.log(`✅ Successfully loaded ${results.length} comments, total count: ${data.count || results.length}`);
+        } else {
+          console.error('❌ Comments endpoint returned unexpected data structure:', data);
+          throw new Error('Comments endpoint returned unexpected data format');
+        }
+        
+      } else {
+        // For posts/reels folders, use the posts endpoint
+        console.log('📊 Posts/reels folder detected - using posts endpoint');
+        
+        const contentTypeParam = contentType && contentType !== 'all' ? `&content_type=${contentType}` : '';
+        const folderParam = `folder_id=${folderId}`;
+        
+        const postsApiUrl = `/api/tiktok-data/posts/?${folderParam}&page=${pageNumber + 1}&page_size=${pageSize}${searchParam}${contentTypeParam}${projectParam}${filterParams}${sortParams}`;
+        console.log('🚀 Fetching posts from:', postsApiUrl);
+        
+        const response = await apiFetch(postsApiUrl);
+        console.log('📥 Posts API response status:', response.status, 'OK:', response.ok);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ Posts endpoint error:', response.status, errorText);
+          throw new Error(`Failed to fetch posts: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('📊 Posts endpoint response data:', data);
+        console.log('📊 Posts endpoint response structure:', {
+          hasResults: 'results' in data,
+          hasCount: 'count' in data,
+          resultsLength: data.results?.length || 0,
+          totalCount: data.count || 0,
+          dataType: typeof data,
+          dataKeys: Object.keys(data || {})
+        });
+        
+        if (data && typeof data === 'object' && 'results' in data) {
+          const results = data.results || [];
+          console.log('✅ Setting posts data with', results.length, 'items');
+          console.log('📋 First few posts:', results.slice(0, 2));
+          
+          setPosts(results);
+          setFilteredPosts(results);
+          setComments([]);
+          setFilteredComments([]);
+          setTotalCount(data.count || results.length);
+          
+          console.log(`✅ Successfully loaded ${results.length} posts, total count: ${data.count || results.length}`);
+        } else {
+          console.error('❌ Posts endpoint returned data without results structure:', data);
+          throw new Error('Posts endpoint returned unexpected data format');
+        }
+      }
+      
+    } catch (error) {
+      console.error('❌ Error fetching data:', error);
+      // Keep the empty state but show an error to the user
+      setPosts([]);
+      setComments([]);
+      setFilteredPosts([]);
+      setFilteredComments([]);
+      setTotalCount(0);
+      
+      // Set error state for user feedback
+      setUploadError(error instanceof Error ? error.message : 'Failed to load data');
     } finally {
       setIsLoading(false);
     }
@@ -164,13 +378,29 @@ const TikTokDataUpload = () => {
   const fetchFolderDetails = async () => {
     if (folderId) {
       try {
-        const response = await apiFetch(`/api/tiktok-data/folders/${folderId}/`);
+        setFolderLoading(true);
+        // Get project ID from URL path params instead of query params
+        if (!projectId) {
+          console.error('Project ID is required but not found in URL params');
+          setUploadError('Project ID is missing. Please navigate from the projects page.');
+          return;
+        }
+        
+        // Include project parameter in the API request
+        const response = await apiFetch(`/api/tiktok-data/folders/${folderId}/?project=${projectId}`);
         if (response.ok) {
           const data = await response.json();
+          console.log('Folder details response:', data);
           setCurrentFolder(data);
+        } else {
+          console.error('Failed to fetch folder details:', response.status, response.statusText);
+          setUploadError(`Failed to load folder details. Please refresh the page.`);
         }
       } catch (error) {
         console.error('Error fetching folder details:', error);
+        setUploadError(`Error loading folder details: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      } finally {
+        setFolderLoading(false);
       }
     }
   };
@@ -181,27 +411,67 @@ const TikTokDataUpload = () => {
     
     try {
       const folderParam = `folder_id=${folderId}`;
-      // Get stats for all posts in the folder (no pagination)
-      const response = await apiFetch(`/api/tiktok-data/posts/?${folderParam}&page_size=1000`);
+      const projectParam = projectId ? `&project=${projectId}` : '';
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch folder statistics');
-      }
-      
-      const data = await response.json();
-      
-      if (data && typeof data === 'object' && 'results' in data) {
-        const allPosts = data.results || [];
-        const uniqueUsers = [...new Set(allPosts.map((post: TikTokPost) => post.user_posted))].length;
-        const totalLikes = allPosts.reduce((acc: number, post: TikTokPost) => acc + post.likes, 0);
-        const avgLikes = allPosts.length > 0 ? Math.round(totalLikes / allPosts.length) : 0;
-        const verifiedAccounts = allPosts.filter((post: TikTokPost) => post.is_verified).length;
+      // Use different endpoint based on folder category
+      if (currentFolder?.category === 'comments') {
+        console.log('📈 Fetching comments folder stats...');
+        const statsApiUrl = `/api/tiktok-data/comments/stats/?${folderParam}${projectParam}`;
+        console.log('📈 Fetching comments stats from:', statsApiUrl);
+        
+        const response = await apiFetch(statsApiUrl);
+        console.log('📈 Comments stats API response status:', response.status, 'OK:', response.ok);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch comments folder statistics');
+        }
+        
+        const data = await response.json();
+        console.log('📈 Comments stats API response data:', data);
         
         setFolderStats({
-          totalPosts: data.count || 0,
-          uniqueUsers,
-          avgLikes,
-          verifiedAccounts
+          totalPosts: data.totalComments || 0, // This represents total comments for comments folders
+          uniqueUsers: data.uniqueCommenters || 0,
+          avgLikes: Math.round(data.avgLikes || 0),
+          avgComments: Math.round(data.avgReplies || 0), // For comments, use avgReplies as avgComments
+          verifiedAccounts: 0 // Comments don't have verified account info
+        });
+        
+        console.log('📈 Set comments stats:', {
+          totalComments: data.totalComments || 0,
+          uniqueCommenters: data.uniqueCommenters || 0,
+          avgLikes: data.avgLikes || 0
+        });
+        
+      } else {
+        // For posts/reels folders, use the posts stats endpoint
+        console.log('📈 Fetching posts folder stats...');
+        const statsApiUrl = `/api/tiktok-data/posts/stats/?${folderParam}${projectParam}`;
+        console.log('📈 Fetching posts stats from:', statsApiUrl);
+        
+        const response = await apiFetch(statsApiUrl);
+        console.log('📈 Posts stats API response status:', response.status, 'OK:', response.ok);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch posts folder statistics');
+        }
+        
+        const data = await response.json();
+        console.log('📈 Posts stats API response data:', data);
+        
+        setFolderStats({
+          totalPosts: data.totalPosts || 0,
+          uniqueUsers: data.uniqueUsers || 0,
+          avgLikes: Math.round(data.avgLikes || 0),
+          avgComments: Math.round(data.avgComments || 0), // For posts, use avgComments
+          verifiedAccounts: data.verifiedAccounts || 0
+        });
+        
+        console.log('📈 Set posts stats:', {
+          totalPosts: data.totalPosts || 0,
+          uniqueUsers: data.uniqueUsers || 0,
+          avgLikes: data.avgLikes || 0,
+          verifiedAccounts: data.verifiedAccounts || 0
         });
       }
     } catch (error) {
@@ -212,8 +482,10 @@ const TikTokDataUpload = () => {
   // Check server status
   const checkServerStatus = async () => {
     try {
-      // Use a simple endpoint to check if server is running
-      const response = await apiFetch('/api/tiktok-data/folders/', { 
+      // Use project ID from URL path params for the server status check
+      // Include project parameter if available to avoid 404 from security filtering
+      const endpoint = projectId ? `/api/tiktok-data/folders/?project=${projectId}` : '/api/tiktok-data/folders/';
+      const response = await apiFetch(endpoint, { 
         method: 'HEAD',
         headers: { 'Accept': 'application/json' }
       });
@@ -225,139 +497,183 @@ const TikTokDataUpload = () => {
     }
   };
 
+  // BrightData Webhook Integration Functions
+  const fetchWebhookStatus = async () => {
+    try {
+      setWebhookLoading(true);
+      const response = await apiFetch('/api/brightdata/webhook-metrics/');
+      
+      if (response.ok) {
+        const data = await response.json();
+        setWebhookStatus({
+          isActive: data.is_active || false,
+          lastUpdate: data.last_update,
+          totalRequests: data.total_requests || 0,
+          successRate: data.success_rate || 0,
+          averageResponseTime: data.average_response_time || 0
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching webhook status:', error);
+    } finally {
+      setWebhookLoading(false);
+    }
+  };
+
+  const startAutoRefresh = useCallback(() => {
+    if (refreshInterval) {
+      clearInterval(refreshInterval);
+    }
+    
+    const interval = setInterval(() => {
+      fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter, Boolean(startDate || endDate || minLikes || maxLikes));
+      fetchFolderStats();
+      fetchWebhookStatus();
+    }, 30000); // Refresh every 30 seconds
+    
+    setRefreshInterval(interval);
+  }, [page, rowsPerPage, searchTerm, contentTypeFilter, startDate, endDate, minLikes, maxLikes]);
+
+  const stopAutoRefresh = useCallback(() => {
+    if (refreshInterval) {
+      clearInterval(refreshInterval);
+      setRefreshInterval(null);
+    }
+  }, [refreshInterval]);
+
+  // Effect to handle auto-refresh
+  useEffect(() => {
+    if (autoRefresh) {
+      startAutoRefresh();
+    } else {
+      stopAutoRefresh();
+    }
+
+    return () => {
+      stopAutoRefresh();
+    };
+  }, [autoRefresh, startAutoRefresh, stopAutoRefresh]);
+
+  // Effect to fetch webhook data on component mount
+  useEffect(() => {
+    if (folderId) {
+      fetchWebhookStatus();
+    }
+  }, [folderId]);
+
   // Check server status on component mount
   useEffect(() => {
     checkServerStatus();
   }, []);
 
-  // Initial data load
+  // Initial folder details load
   useEffect(() => {
-    fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter);
     if (folderId) {
       fetchFolderDetails();
-      fetchFolderStats();
     }
   }, [folderId]); // Only re-fetch when folder ID changes
   
-  // This effect handles pagination, search, and content type filter changes
+  // Fetch data after folder details are loaded
   useEffect(() => {
-    fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter);
-  }, [page, rowsPerPage, searchTerm, contentTypeFilter]);
+    if (folderId && currentFolder) {
+      console.log('📁 Folder details loaded, now fetching data...');
+      const hasFilterValues = Boolean(startDate || endDate || minLikes || maxLikes);
+      fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter, hasFilterValues);
+      fetchFolderStats();
+    }
+  }, [folderId, currentFolder]); // Re-fetch when folder ID or folder details change
+  
+  // This effect handles pagination, search, content type filter, sorting, and filtering changes
+  useEffect(() => {
+    // Only fetch if we have both folderId and currentFolder loaded
+    if (folderId && currentFolder) {
+      // Check if there are actual filter values to apply
+      const hasFilterValues = Boolean(startDate || endDate || minLikes || maxLikes);
+      fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter, hasFilterValues);
+    }
+  }, [page, rowsPerPage, searchTerm, contentTypeFilter, sortBy, sortOrder, showFilters, startDate, endDate, minLikes, maxLikes, currentFolder]);
 
-  // Handle tab change
-  const handleUploadTabChange = (_event: React.SyntheticEvent, newValue: number) => {
-    setUploadTabValue(newValue);
-  };
-
-  // Separate handlers for post and reel file selection
-  const handlePostFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+  // Handle file change
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files.length > 0) {
-      setPostFile(event.target.files[0]);
+      setUploadFile(event.target.files[0]);
       // Reset status messages
       setUploadSuccess(null);
       setUploadError(null);
     }
   };
 
-  const handleReelFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files.length > 0) {
-      setReelFile(event.target.files[0]);
-      // Reset status messages
-      setUploadSuccess(null);
-      setUploadError(null);
-    }
-  };
-
-  // CSV validation function to check for common date format issues
+  // Validate CSV file format
   const validateCsvFile = async (file: File): Promise<{valid: boolean, message?: string}> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
+    if (!file) {
+      return { valid: false, message: 'No file selected' };
+    }
+    
+    // Check file extension
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+    if (fileExtension !== 'csv') {
+      return { valid: false, message: 'File must be a CSV' };
+    }
+    
+    // Basic check on file size
+    if (file.size === 0) {
+      return { valid: false, message: 'File is empty' };
+    }
+
+    if (file.size > 50 * 1024 * 1024) { // 50MB
+      return { valid: false, message: 'File is too large (max 50MB)' };
+    }
+    
+    // Basic check for CSV content
+    try {
+      const sample = await file.slice(0, 1000).text();
+      const lines = sample.split('\n');
       
-      reader.onload = (event) => {
-        try {
-          const csvContent = event.target?.result as string;
-          if (!csvContent) {
-            resolve({valid: false, message: 'Could not read file content'});
-            return;
-          }
-          
-          // Split into lines and get headers
-          const lines = csvContent.split('\n');
-          if (lines.length < 2) {
-            resolve({valid: false, message: 'CSV file appears to be empty or invalid'});
-            return;
-          }
-          
-          const headers = lines[0].split(',');
-          
-          // Check if date_posted column exists
-          const dateColumnIndex = headers.findIndex(h => 
-            h.trim().toLowerCase() === 'date_posted' || 
-            h.trim().toLowerCase() === '"date_posted"'
-          );
-          
-          if (dateColumnIndex === -1) {
-            // No date column found, file is valid
-            resolve({valid: true});
-            return;
-          }
-          
-          // Check a sample of rows for potential date issues
-          const sampleSize = Math.min(10, lines.length - 1); // Check up to 10 rows
-          for (let i = 1; i <= sampleSize; i++) {
-            const row = lines[i].split(',');
-            if (row.length <= dateColumnIndex) continue;
-            
-            const dateValue = row[dateColumnIndex].trim();
-            
-            // Skip empty values
-            if (!dateValue || dateValue === '""' || dateValue === "''") continue;
-            
-            // Check for common date format issues
-            if (dateValue.includes('/') || 
-                (dateValue.includes('"') && dateValue.length > 2) ||
-                dateValue.match(/^\d{1,2}-\d{1,2}-\d{4}$/)) {
-              resolve({
-                valid: false, 
-                message: 'Warning: Your CSV may contain dates in non-standard formats. ' +
-                         'Please ensure dates are in YYYY-MM-DD format or they might not be processed correctly.'
-              });
-              return;
-            }
-          }
-          
-          // If we got here, file seems valid
-          resolve({valid: true});
-          
-        } catch (error) {
-          console.error('CSV validation error:', error);
-          resolve({valid: true}); // Allow upload despite validation error
+      if (lines.length < 2) {
+        return { valid: false, message: 'CSV must contain at least a header row and one data row' };
+      }
+      
+      const header = lines[0].toLowerCase();
+      
+      // Check for required columns in the header
+      const requiredColumns = ['url']; // Only require URL field
+      for (const column of requiredColumns) {
+        if (!header.includes(column)) {
+          return { 
+            valid: false, 
+            message: `CSV is missing required column: ${column}. Please check the file format.` 
+          };
         }
-      };
+      }
       
-      reader.onerror = () => {
-        resolve({valid: false, message: 'Error reading the file'});
-      };
-      
-      reader.readAsText(file);
-    });
+      return { valid: true };
+    } catch (error) {
+      console.error('Error validating file:', error);
+      return { valid: false, message: 'Error validating file. Please check the format.' };
+    }
   };
 
-  // Handle upload for posts
-  const handlePostUpload = async () => {
-    if (!postFile) {
-      setUploadError('Please select a post CSV file to upload');
+  // Handle upload
+  const handleUpload = async () => {
+    if (!uploadFile) {
+      setUploadError('Please select a CSV file to upload');
       return;
     }
 
-    if (!postFile.name.endsWith('.csv')) {
+    if (!uploadFile.name.endsWith('.csv')) {
       setUploadError('Please upload a CSV file');
+      return;
+    }
+    
+    // Ensure folder details are loaded before upload
+    if (folderId && !currentFolder) {
+      setUploadError('Folder details are still loading. Please wait a moment and try again.');
       return;
     }
     
     // Validate CSV before uploading
     try {
-      const validationResult = await validateCsvFile(postFile);
+      const validationResult = await validateCsvFile(uploadFile);
       if (!validationResult.valid) {
         setUploadError(validationResult.message || 'CSV validation failed');
         return;
@@ -368,8 +684,7 @@ const TikTokDataUpload = () => {
     }
 
     const formData = new FormData();
-    formData.append('file', postFile);
-    formData.append('content_type', 'post');
+    formData.append('file', uploadFile);
     
     // Add folder_id to the form data if available
     if (folderId) {
@@ -380,9 +695,36 @@ const TikTokDataUpload = () => {
       setIsUploading(true);
       setUploadError(null); // Clear previous errors
       
+      // Determine the correct upload endpoint based on folder category
+      let uploadEndpoint = '/api/tiktok-data/posts/upload_csv/';
+      
+      // Enhanced debugging and validation
+      console.log('🔧 Upload Debug Info:');
+      console.log('🔧 Organization ID:', organizationId);
+      console.log('🔧 Project ID:', projectId);
+      console.log('🔧 Folder ID:', folderId);
+      console.log('🔧 Current folder object:', currentFolder);
+      console.log('🔧 Folder category:', currentFolder?.category);
+      console.log('🔧 File being uploaded:', uploadFile?.name);
+      console.log('🔧 File size:', uploadFile?.size);
+      
+      if (currentFolder?.category === 'comments') {
+        uploadEndpoint = '/api/tiktok-data/comments/upload_csv/';
+        console.log('🔧 DETECTED COMMENTS FOLDER - Using comments endpoint');
+      } else {
+        console.log('🔧 Using posts endpoint (folder category is not "comments")');
+      }
+      
+      console.log('🔧 Final upload endpoint:', uploadEndpoint);
+      
+      // Additional safety check
+      if (folderId && currentFolder && currentFolder.category === 'comments' && !uploadEndpoint.includes('comments')) {
+        throw new Error('ERROR: Comments folder detected but posts endpoint selected. This is a bug!');
+      }
+      
       // Check if the backend server is running
       try {
-        const response = await apiFetch('/api/tiktok-data/posts/upload_csv/', {
+        const response = await apiFetch(uploadEndpoint, {
           method: 'POST',
           body: formData,
           headers: {
@@ -390,8 +732,20 @@ const TikTokDataUpload = () => {
           },
         });
 
+        console.log('🔧 Upload response status:', response.status);
+        console.log('🔧 Upload response headers:', Object.fromEntries(response.headers.entries()));
+
         if (!response.ok) {
-          const errorData = await response.json();
+          const errorText = await response.text();
+          console.log('🔧 Upload error response text:', errorText);
+          
+          let errorData;
+          try {
+            errorData = JSON.parse(errorText);
+          } catch {
+            errorData = { error: errorText };
+          }
+          
           // Check for specific error messages
           let errorMessage = errorData.error || 'Upload failed';
           
@@ -400,462 +754,495 @@ const TikTokDataUpload = () => {
             errorMessage = errorMessage.join('\n');
           }
           
+          // Show a more user-friendly message for date format errors
+          if ((typeof errorMessage === 'string') && 
+              (errorMessage.includes('invalid format') || errorMessage.includes('YYYY-MM-DD'))) {
+            throw new Error('Your CSV file contains dates in an invalid format. Please check that dates use a standard format like YYYY-MM-DD.');
+          }
+          
           throw new Error(errorMessage);
         }
 
         const data = await response.json();
+        console.log('🔧 Upload success response:', data);
         
-        if (data.success) {
-          setUploadSuccess(`Successfully uploaded TikTok posts.`);
-          if (data.posts_created > 0 || data.posts_updated > 0) {
-            setUploadSuccess(
-              `Successfully processed ${data.posts_created + data.posts_updated} posts. ` +
-              `Created: ${data.posts_created}, Updated: ${data.posts_updated}, Skipped: ${data.posts_skipped}.`
-            );
-          }
-          
-          // Refresh the posts to show the newly uploaded ones
-          fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter);
-          // Also refresh the stats
-          if (folderId) {
-            fetchFolderStats();
-          }
-          
-          // Clear the file input
-          setPostFile(null);
-          
-          // Add error summary if there were some errors
-          if (data.total_errors > 0) {
-            setUploadSuccess(prevSuccess => 
-              `${prevSuccess} However, ${data.total_errors} rows had errors. See browser console for details.`
-            );
-            console.error('Upload errors:', data.errors);
-          }
-        } else {
-          throw new Error(data.error || 'Upload failed');
+        let successMessage = `${data.message}`;
+        
+        if (data.detected_content_type) {
+          successMessage += ` Content type detected: ${data.detected_content_type}`;
         }
-      } catch (error: any) {
-        // Network or API errors
-        if (error instanceof Error) {
-          setUploadError(error.message);
-        } else if (typeof error === 'string') {
-          setUploadError(error);
-        } else {
-          setUploadError('Failed to upload posts. Please check your network connection and try again.');
+        
+        setUploadSuccess(successMessage);
+        
+        // Reset pagination to first page to see new data
+        setPage(0);
+        
+        // Clear any existing search/filters to show all new data
+        setSearchTerm('');
+        setContentTypeFilter('all');
+        
+        // Add a small delay to ensure backend has finished processing
+        setTimeout(async () => {
+          // Clear any previous error states
+          setUploadError(null);
+          
+          // Refresh the data in the proper order
+          await fetchFolderDetails(); // Refresh folder details first
+          await fetchPosts(0, rowsPerPage, '', 'all', false); // Reset to page 0 with no filters
+          fetchFolderStats(); // Update statistics
+          
+          // Clear success message after 5 seconds
+          setTimeout(() => {
+            setUploadSuccess(null);
+          }, 5000);
+        }, 500); // 500ms delay to ensure backend processing is complete
+        
+        // Reset file input
+        setUploadFile(null);
+        
+        // Reset file input element
+        const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+        if (fileInput) {
+          fileInput.value = '';
         }
-        console.error('Upload error:', error);
+      } catch (networkError) {
+        console.error('Network error:', networkError);
+        console.log('🔧 Network error details:', {
+          name: networkError instanceof Error ? networkError.name : 'Unknown',
+          message: networkError instanceof Error ? networkError.message : String(networkError),
+          stack: networkError instanceof Error ? networkError.stack : undefined
+        });
+        
+        // Show more helpful error message
+        if (networkError instanceof TypeError && networkError.message.includes('Failed to fetch')) {
+          throw new Error('Failed to connect to the server. Please check if the backend server is running and try again.');
+        } else {
+          throw networkError;
+        }
       }
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  // Handle upload for reels
-  const handleReelUpload = async () => {
-    if (!reelFile) {
-      setUploadError('Please select a reel CSV file to upload');
-      return;
-    }
-
-    if (!reelFile.name.endsWith('.csv')) {
-      setUploadError('Please upload a CSV file');
-      return;
-    }
-    
-    // Validate CSV before uploading
-    try {
-      const validationResult = await validateCsvFile(reelFile);
-      if (!validationResult.valid) {
-        setUploadError(validationResult.message || 'CSV validation failed');
-        return;
-      }
+      
     } catch (error) {
-      console.error('Validation error:', error);
-      // Continue with upload despite validation error
-    }
-
-    const formData = new FormData();
-    formData.append('file', reelFile);
-    formData.append('content_type', 'reel');
-    
-    // Add folder_id to the form data if available
-    if (folderId) {
-      formData.append('folder_id', folderId);
-    }
-
-    try {
-      setIsUploading(true);
-      setUploadError(null); // Clear previous errors
-      
-      // Check if the backend server is running
-      try {
-        const response = await apiFetch('/api/tiktok-data/posts/upload_csv/', {
-          method: 'POST',
-          body: formData,
-          headers: {
-            'Accept': 'application/json',
-          },
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          // Check for specific error messages
-          let errorMessage = errorData.error || 'Upload failed';
-          
-          // Format array error messages more nicely
-          if (Array.isArray(errorMessage)) {
-            errorMessage = errorMessage.join('\n');
-          }
-          
-          throw new Error(errorMessage);
-        }
-
-        const data = await response.json();
-        
-        if (data.success) {
-          setUploadSuccess(`Successfully uploaded TikTok videos.`);
-          if (data.posts_created > 0 || data.posts_updated > 0) {
-            setUploadSuccess(
-              `Successfully processed ${data.posts_created + data.posts_updated} videos. ` +
-              `Created: ${data.posts_created}, Updated: ${data.posts_updated}, Skipped: ${data.posts_skipped}.`
-            );
-          }
-          
-          // Refresh the posts to show the newly uploaded ones
-          fetchPosts(page, rowsPerPage, searchTerm, 'reel');
-          // Also refresh the stats
-          if (folderId) {
-            fetchFolderStats();
-          }
-          
-          // Clear the file input
-          setReelFile(null);
-          
-          // Add error summary if there were some errors
-          if (data.total_errors > 0) {
-            setUploadSuccess(prevSuccess => 
-              `${prevSuccess} However, ${data.total_errors} rows had errors. See browser console for details.`
-            );
-            console.error('Upload errors:', data.errors);
-          }
-        } else {
-          throw new Error(data.error || 'Upload failed');
-        }
-      } catch (error: any) {
-        // Network or API errors
-        if (error instanceof Error) {
-          setUploadError(error.message);
-        } else if (typeof error === 'string') {
-          setUploadError(error);
-        } else {
-          setUploadError('Failed to upload videos. Please check your network connection and try again.');
-        }
-        console.error('Upload error:', error);
-      }
+      console.error('Upload error:', error);
+      setUploadError(error instanceof Error ? error.message : 'An error occurred during upload');
     } finally {
       setIsUploading(false);
     }
   };
 
-  // Handle CSV download
+  // Update download function to handle content type
   const handleDownloadCSV = async (contentType: 'post' | 'reel' | undefined) => {
     try {
-      let url = `/api/tiktok-data/posts/download_csv/?`;
+      // Add folder filtering if folderId is present
+      const folderParam = folderId ? `folder_id=${folderId}` : '';
+      // Add content type parameter
+      const contentTypeParam = contentType ? `&content_type=${contentType}` : '';
+      // Add project parameter if available for consistency
+      const projectParam = projectId ? `&project=${projectId}` : '';
       
-      // Add folder parameter if we have a folder ID
-      if (folderId) {
-        url += `folder_id=${folderId}&`;
+      const response = await apiFetch(
+        `/api/tiktok-data/posts/download_csv/?${folderParam}${contentTypeParam}${projectParam}`,
+        {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+          },
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error('Failed to download CSV');
       }
       
-      // Add content type if specified
-      if (contentType) {
-        url += `content_type=${contentType}`;
+      // Get the filename from the Content-Disposition header if possible
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = 'tiktok_data.csv';
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      } else {
+        // Fallback filename based on content type
+        filename = contentType ? `tiktok_${contentType}s.csv` : 'tiktok_data.csv';
       }
       
-      // Force download using window.location to avoid CORS issues with fetch
-      window.location.href = url;
+      // Convert the response to a blob
+      const blob = await response.blob();
       
-      // Show confirmation
-      setSnackbarMessage('Download started. Check your downloads folder.');
+      // Create a download link and trigger download
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+      
+      // Show success message
+      setSnackbarMessage('CSV downloaded successfully!');
       setSnackbarOpen(true);
+      
     } catch (error) {
-      console.error('Error downloading CSV:', error);
-      setSnackbarMessage('Failed to download data. Please try again.');
+      console.error('Download error:', error);
+      setSnackbarMessage('Failed to download CSV. Please try again.');
       setSnackbarOpen(true);
     }
   };
 
-  // Handle pagination change
   const handleChangePage = (_event: unknown, newPage: number) => {
     setPage(newPage);
+    // No need to call fetchPosts here, it will be triggered by the useEffect
   };
-  
-  // Handle rows per page change
+
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
+    const newRowsPerPage = parseInt(event.target.value, 10);
+    setRowsPerPage(newRowsPerPage);
+    setPage(0); // Reset to first page
+    // No need to call fetchPosts here, it will be triggered by the useEffect
   };
-  
-  // Handle search input change
+
   const handleSearchChange = (event: ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(event.target.value);
-    // Reset to first page when searching
-    setPage(0);
+    const value = event.target.value;
+    setSearchTerm(value);
+    setPage(0); // Reset to first page when searching
+    
+    // Search will be triggered by the useEffect hook
   };
-  
-  // Navigate back to folders
+
+  // Redirect to folders view
   const handleGoToFolders = () => {
-    navigate('/tiktok-folders');
+    // Check if we're on the new organized URL structure (with org and project IDs)
+    if (organizationId && projectId) {
+      navigate(`/organizations/${organizationId}/projects/${projectId}/instagram-folders`);
+    } else {
+      // Fallback to check if we're on the legacy URL structure with path params
+      const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)\//);
+      
+      if (match) {
+        const [, orgId, projId] = match;
+        navigate(`/organizations/${orgId}/projects/${projId}/instagram-folders`);
+      } else {
+        // Legacy fallback - try query parameters
+        const queryParams = new URLSearchParams(location.search);
+        const projectIdFromQuery = queryParams.get('project');
+        
+        if (projectIdFromQuery) {
+          navigate(`/instagram-folders?project=${projectIdFromQuery}`);
+        } else {
+          navigate('/instagram-folders');
+        }
+      }
+    }
   };
-  
+
+  const handleBackNavigation = () => {
+    // Use the same logic as handleGoToFolders for back navigation
+    handleGoToFolders();
+  };
+
   const handleCopyLink = (url: string) => {
     navigator.clipboard.writeText(url);
-    setSnackbarMessage('Link copied to clipboard');
+    setSnackbarMessage('Link copied to clipboard!');
     setSnackbarOpen(true);
   };
-  
+
   const handleCloseSnackbar = () => {
     setSnackbarOpen(false);
   };
-  
-  // Handle content type filter change
+
+  // Add handler for content type filter change
   const handleContentTypeFilterChange = (event: SelectChangeEvent) => {
-    setContentTypeFilter(event.target.value as string);
+    setContentTypeFilter(event.target.value);
     setPage(0); // Reset to first page when changing filter
   };
 
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
+
+
+
+  const handleSort = (field: string) => {
+    const newOrder = sortBy === field && sortOrder === 'desc' ? 'asc' : 'desc';
+    
+    // Map frontend field names to backend field names based on folder category
+    let backendField = field;
+    if (currentFolder?.category === 'comments') {
+      // Map comment-specific field names
+      const fieldMapping: { [key: string]: string } = {
+        'likes': 'likes_number',
+        'num_comments': 'replies_number',
+        'user_posted': 'comment_user',
+        'date_posted': 'comment_date'
+      };
+      backendField = fieldMapping[field] || field;
+    }
+    
+    setSortBy(backendField);
+    setSortOrder(newOrder);
+    // Trigger data refresh with new sorting and current filters
+    const hasFilterValues = Boolean(startDate || endDate || minLikes || maxLikes);
+    fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter, hasFilterValues);
+  };
+
+  const handleSortSelectChange = (event: SelectChangeEvent) => {
+    const field = event.target.value;
+    
+    // Always set the new field, default to descending
+    setSortBy(field);
+    setSortOrder('desc');
+    
+    // Trigger data refresh with new sorting and current filters
+    const hasFilterValues = Boolean(startDate || endDate || minLikes || maxLikes);
+    fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter, hasFilterValues);
+  };
+
+  const handleSortItemClick = (field: string) => {
+    // If clicking the same field, toggle the order
+    if (sortBy === field) {
+      const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+      setSortOrder(newOrder);
+    } else {
+      // If selecting a new field, set it with default descending order
+      setSortBy(field);
+      setSortOrder('desc');
+    }
+    
+    // Trigger data refresh with new sorting and current filters
+    const hasFilterValues = Boolean(startDate || endDate || minLikes || maxLikes);
+    fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter, hasFilterValues);
+  };
+
+  // Filter handlers
+  const handleFilterToggle = () => {
+    setShowFilters(!showFilters);
+  };
+
+  const handleApplyFilters = () => {
+    // Check if there are actual filter values to apply
+    const hasFilterValues = Boolean(startDate || endDate || minLikes || maxLikes);
+    fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter, hasFilterValues);
+  };
+
+  const handleClearFilters = () => {
+    setStartDate('');
+    setEndDate('');
+    setMinLikes('');
+    setMaxLikes('');
+    // Trigger data refresh with cleared filters
+    const hasFilterValues = Boolean(startDate || endDate || minLikes || maxLikes);
+    fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter, hasFilterValues);
+  };
+
+  // Webhook Integration Event Handlers
+  const handleRefreshWebhookData = () => {
+    fetchWebhookStatus();
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString();
+  };
+
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      {/* Page title with folder details */}
-      <Box mb={4}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          {currentFolder ? currentFolder.name : 'TikTok Data'}
-        </Typography>
-        {currentFolder?.description && (
-          <Typography variant="body1" color="text.secondary" paragraph>
-            {currentFolder.description}
-          </Typography>
-        )}
-      </Box>
-
-      {/* Folder statistics cards */}
-      {folderId && (
-        <Box mb={4}>
-          <Grid container spacing={3}>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card>
-                <CardContent>
-                  <Typography color="text.secondary" gutterBottom>
-                    Total Content
-                  </Typography>
-                  <Typography variant="h4">
-                    {folderStats.totalPosts}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card>
-                <CardContent>
-                  <Typography color="text.secondary" gutterBottom>
-                    Unique Creators
-                  </Typography>
-                  <Typography variant="h4">
-                    {folderStats.uniqueUsers}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card>
-                <CardContent>
-                  <Typography color="text.secondary" gutterBottom>
-                    Avg. Likes
-                  </Typography>
-                  <Typography variant="h4">
-                    {folderStats.avgLikes}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card>
-                <CardContent>
-                  <Typography color="text.secondary" gutterBottom>
-                    Verified Accounts
-                  </Typography>
-                  <Typography variant="h4">
-                    {folderStats.verifiedAccounts}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-        </Box>
-      )}
-
-      {/* File Upload Section */}
-      <Paper sx={{ p: 3, mb: 4 }}>
-        <Typography variant="h5" component="h2" gutterBottom>
-          Upload TikTok Data
-        </Typography>
-        
-        {serverStatus === 'offline' && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            Server appears to be offline or not responding. Please check your connection and try again.
-          </Alert>
-        )}
-
-        <Tabs 
-          value={uploadTabValue} 
-          onChange={handleUploadTabChange}
+    <Container maxWidth="xl" sx={{ mt: 2, mb: 4 }}>
+      {/* Server status indicator */}
+      {serverStatus !== 'online' && (
+        <Alert 
+          severity={serverStatus === 'checking' ? 'info' : 'error'} 
           sx={{ mb: 2 }}
+          icon={serverStatus === 'checking' ? <CircularProgress size={20} /> : undefined}
         >
-          <Tab label="Posts" />
-          <Tab label="Videos" />
-        </Tabs>
-
-        {uploadTabValue === 0 && (
-          <Box>
-            <Box mb={3}>
-              <Typography variant="body1" gutterBottom>
-                Upload a CSV file containing TikTok post data.
-              </Typography>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                File must be in CSV format and include the following columns: Post URL, User Name, Post Caption, etc.
-              </Typography>
-              <Button
-                component="label"
-                variant="outlined"
-                startIcon={<CloudUploadIcon />}
-                sx={{ my: 2 }}
-                disabled={isUploading || serverStatus === 'offline'}
-              >
-                Select Post CSV
-                <input
-                  type="file"
-                  hidden
-                  accept=".csv"
-                  onChange={handlePostFileChange}
-                />
-              </Button>
-              {postFile && (
-                <Typography variant="body2" sx={{ ml: 2, display: 'inline' }}>
-                  Selected: {postFile.name}
-                </Typography>
-              )}
-            </Box>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={handlePostUpload}
-              disabled={!postFile || isUploading || serverStatus === 'offline'}
-            >
-              {isUploading ? <CircularProgress size={24} /> : 'Upload Posts'}
-            </Button>
-            <Button
-              variant="outlined"
-              color="primary"
-              startIcon={<DownloadIcon />}
+          {serverStatus === 'checking' 
+            ? 'Checking server status...'
+            : 'Server connection issue detected. File uploads may fail.'
+          }
+          {serverStatus === 'offline' && (
+            <Button 
+              variant="outlined" 
+              size="small" 
               sx={{ ml: 2 }}
-              onClick={() => handleDownloadCSV('post')}
-              disabled={serverStatus === 'offline'}
+              onClick={checkServerStatus}
             >
-              Download Posts CSV
+              Retry Connection
             </Button>
-          </Box>
-        )}
-
-        {uploadTabValue === 1 && (
-          <Box>
-            <Box mb={3}>
-              <Typography variant="body1" gutterBottom>
-                Upload a CSV file containing TikTok video data.
-              </Typography>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                File must be in CSV format and include the following columns: Video URL, Creator Name, Video Caption, etc.
-              </Typography>
-              <Button
-                component="label"
-                variant="outlined"
-                startIcon={<CloudUploadIcon />}
-                sx={{ my: 2 }}
-                disabled={isUploading || serverStatus === 'offline'}
-              >
-                Select Video CSV
-                <input
-                  type="file"
-                  hidden
-                  accept=".csv"
-                  onChange={handleReelFileChange}
-                />
-              </Button>
-              {reelFile && (
-                <Typography variant="body2" sx={{ ml: 2, display: 'inline' }}>
-                  Selected: {reelFile.name}
-                </Typography>
-              )}
-            </Box>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={handleReelUpload}
-              disabled={!reelFile || isUploading || serverStatus === 'offline'}
-            >
-              {isUploading ? <CircularProgress size={24} /> : 'Upload Videos'}
-            </Button>
-            <Button
-              variant="outlined"
-              color="primary"
-              startIcon={<DownloadIcon />}
-              sx={{ ml: 2 }}
-              onClick={() => handleDownloadCSV('reel')}
-              disabled={serverStatus === 'offline'}
-            >
-              Download Videos CSV
-            </Button>
-          </Box>
-        )}
-
-        {uploadError && (
-          <Alert severity="error" sx={{ mt: 2 }}>
-            {uploadError}
-          </Alert>
-        )}
-        
-        {uploadSuccess && (
-          <Alert severity="success" sx={{ mt: 2 }}>
-            {uploadSuccess}
-          </Alert>
-        )}
-      </Paper>
-
-      {/* Data display section */}
-      <Paper sx={{ p: 3, mb: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap' }}>
-          <Typography variant="h5" component="h2" gutterBottom>
-            TikTok Data
-          </Typography>
+          )}
+        </Alert>
+      )}
+      
+      {/* Header Section */}
+      <Box sx={{ mb: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            {/* Content type filter */}
-            <FormControl sx={{ minWidth: 120, mt: { xs: 2, sm: 0 } }}>
-              <InputLabel id="content-type-filter-label">Content Type</InputLabel>
-              <Select
-                labelId="content-type-filter-label"
-                id="content-type-filter"
-                value={contentTypeFilter}
-                label="Content Type"
-                onChange={handleContentTypeFilterChange}
+            {currentFolder && (
+              <IconButton
+                onClick={handleBackNavigation}
+                sx={{ 
+                  color: 'primary.main',
+                  '&:hover': { 
+                    backgroundColor: 'primary.light',
+                    color: 'white'
+                  }
+                }}
                 size="small"
               >
-                <MenuItem value="all">All Types</MenuItem>
-                <MenuItem value="post">Posts</MenuItem>
-                <MenuItem value="reel">Videos</MenuItem>
-              </Select>
-            </FormControl>
-            {/* Search box */}
+                <ArrowBackIcon />
+              </IconButton>
+            )}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box>
+                <Typography variant="h4" component="h1" fontWeight={600} sx={{ mb: 1 }}>
+                  {currentFolder ? currentFolder.name : 'TikTok Data Management'}
+                </Typography>
+                <Typography variant="body1" color="text.secondary">
+                  {currentFolder ? currentFolder.description || `${currentFolder.category_display || currentFolder.category} data analysis` : 'Manage and analyze your TikTok data'}
+                </Typography>
+              </Box>
+            </Box>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            {/* Auto-refresh Toggle */}
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={autoRefresh}
+                  onChange={() => setAutoRefresh(!autoRefresh)}
+                  size="small"
+                />
+              }
+              label="Auto-refresh"
+              sx={{ ml: 1 }}
+            />
+            
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={() => {
+                // Clear any error states
+                setUploadError(null);
+                setUploadSuccess(null);
+                
+                // Reset page to 0 to ensure we see all data
+                setPage(0);
+                
+                // Refresh all data
+                const hasFilterValues = Boolean(startDate || endDate || minLikes || maxLikes);
+                fetchPosts(0, rowsPerPage, searchTerm, contentTypeFilter, hasFilterValues);
+                fetchFolderStats();
+                fetchFolderDetails();
+              }}
+              disabled={isLoading}
+            >
+              {isLoading ? 'Refreshing...' : 'Refresh'}
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<GetAppIcon />}
+              onClick={() => handleDownloadCSV(undefined)}
+            >
+              Export CSV
+            </Button>
+          </Box>
+        </Box>
+
+
+
+        {/* Single Summary Box */}
+        <Paper sx={{ px: 3, py: 2, mb: 3, border: '1px solid', borderColor: 'divider' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography variant="h6" fontWeight={600}>
+                Data Overview
+              </Typography>
+            </Box>
+          </Box>
+          
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr 1fr' }, gap: 4, py:2 }}>
+            <Box sx={{ textAlign: 'center' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
+                <AnalyticsIcon sx={{ color: 'primary.main', mr: 1 }} />
+                <Typography variant="h4" fontWeight={600}>
+                  {folderStats.totalPosts.toLocaleString()}
+                </Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                Total                   {currentFolder?.category === 'comments'
+                  ? 'Comments'
+                  : currentFolder?.category === 'videos'
+                  ? 'Videos'
+                  : 'Posts'}
+              </Typography>
+            </Box>
+            
+            <Box sx={{ textAlign: 'center' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
+                <GroupIcon sx={{ color: 'secondary.main', mr: 1 }} />
+                <Typography variant="h4" fontWeight={600}>
+                  {folderStats.uniqueUsers.toLocaleString()}
+                </Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                Unique Users
+              </Typography>
+            </Box>
+            
+            <Box sx={{ textAlign: 'center' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
+                <ThumbUpIcon sx={{ color: 'success.main', mr: 1 }} />
+                <Typography variant="h4" fontWeight={600}>
+                  {folderStats.avgLikes.toLocaleString()}
+                </Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                Avg. Engagement
+              </Typography>
+            </Box>
+            
+            <Box sx={{ textAlign: 'center' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
+                <ChatIcon sx={{ color: 'info.main', mr: 1 }} />
+                <Typography variant="h4" fontWeight={600}>
+                  {folderStats.avgComments.toLocaleString()}
+                </Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                Avg. {currentFolder?.category === 'comments' ? 'Replies' : 'Comments'}
+              </Typography>
+            </Box>
+            
+            <Box sx={{ textAlign: 'center' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
+                <VerifiedIcon sx={{ color: 'primary.main', mr: 1 }} />
+                <Typography variant="h4" fontWeight={600}>
+                  {folderStats.verifiedAccounts.toLocaleString()}
+                </Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                Verified Accounts
+              </Typography>
+            </Box>
+          </Box>
+        </Paper>
+      </Box>
+
+      {/* Tabs Section */}
+      <Paper sx={{ mb: 3 }}>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Tabs value={tabValue} onChange={handleTabChange} aria-label="data management tabs">
+              <Tab label="Data Overview" {...a11yProps(0)} />
+              <Tab label="Upload & Management" {...a11yProps(1)} />
+              <Tab label="Webhook Status" {...a11yProps(2)} />
+            </Tabs>
+          </Box>
+        </Box>
+        
+        {/* Tab Panel 0: Data Overview */}
+        <TabPanel value={tabValue} index={0}>
+          {/* Search and Filter Controls */}
+          <Box sx={{ display: 'flex', gap: 2, mb: 3, alignItems: 'center' }}>
             <TextField
-              label="Search"
+              placeholder="Search users, content, or hashtags..."
               variant="outlined"
               size="small"
               value={searchTerm}
@@ -867,145 +1254,639 @@ const TikTokDataUpload = () => {
                   </InputAdornment>
                 ),
               }}
-              sx={{ mt: { xs: 2, sm: 0 } }}
+              sx={{ flexGrow: 1, maxWidth: 400 }}
             />
+            
+            {/* Sort Dropdown */}
+            <Box sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 1,
+              py: 0.75,
+              px: 2,
+              borderRadius: 2,
+              bgcolor: 'rgba(0, 0, 0, 0.03)'
+            }}>
+              <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+                Sort by:
+              </Typography>
+              <Select
+                value={sortBy}
+                onChange={handleSortSelectChange}
+                size="small"
+                variant="standard"
+                disableUnderline
+                sx={{ 
+                  minWidth: 140,
+                  '& .MuiSelect-select': {
+                    fontWeight: 500,
+                    py: 0,
+                    color: theme => theme.palette.primary.main
+                  }
+                }}
+                renderValue={(value) => {
+                  const getDisplayName = (field: string) => {
+                    if (field === (currentFolder?.category === 'comments' ? 'comment_date' : 'date_posted')) {
+                      return `Date (${sortOrder === 'asc' ? 'Asc' : 'Desc'})`;
+                    } else if (field === (currentFolder?.category === 'comments' ? 'likes_number' : 'likes')) {
+                      return `Likes (${sortOrder === 'asc' ? 'Asc' : 'Desc'})`;
+                    } else if (field === (currentFolder?.category === 'comments' ? 'comment_user' : 'user_posted')) {
+                      return `${currentFolder?.category === 'comments' ? 'Commenter' : 'User'} (${sortOrder === 'asc' ? 'Asc' : 'Desc'})`;
+                    } else if (field === (currentFolder?.category === 'comments' ? 'replies_number' : 'num_comments')) {
+                      return `${currentFolder?.category === 'comments' ? 'Replies' : 'Comments'} (${sortOrder === 'asc' ? 'Asc' : 'Desc'})`;
+                    }
+                    return '[Select]';
+                  };
+                  return getDisplayName(value);
+                }}
+              >
+                <MenuItem 
+                  value={currentFolder?.category === 'comments' ? 'comment_date' : 'date_posted'}
+                  onClick={() => handleSortItemClick(currentFolder?.category === 'comments' ? 'comment_date' : 'date_posted')}
+                >
+                  Date
+                </MenuItem>
+                <MenuItem 
+                  value={currentFolder?.category === 'comments' ? 'likes_number' : 'likes'}
+                  onClick={() => handleSortItemClick(currentFolder?.category === 'comments' ? 'likes_number' : 'likes')}
+                >
+                  Likes
+                </MenuItem>
+                <MenuItem 
+                  value={currentFolder?.category === 'comments' ? 'comment_user' : 'user_posted'}
+                  onClick={() => handleSortItemClick(currentFolder?.category === 'comments' ? 'comment_user' : 'user_posted')}
+                >
+                  {currentFolder?.category === 'comments' ? 'Commenter' : 'User'}
+                </MenuItem>
+                <MenuItem 
+                  value={currentFolder?.category === 'comments' ? 'replies_number' : 'num_comments'}
+                  onClick={() => handleSortItemClick(currentFolder?.category === 'comments' ? 'replies_number' : 'num_comments')}
+                >
+                  {currentFolder?.category === 'comments' ? 'Replies' : 'Comments'}
+                </MenuItem>
+              </Select>
+            </Box>
+            
+            <Tooltip title="Filter data">
+              <IconButton onClick={handleFilterToggle}>
+                <FilterListIcon />
+              </IconButton>
+            </Tooltip>
           </Box>
-        </Box>
-        
-        {isLoading ? (
-          <Box display="flex" justifyContent="center" my={4}>
-            <CircularProgress />
-          </Box>
-        ) : posts.length === 0 ? (
-          <Alert severity="info">
-            No TikTok data available. Upload some data to get started.
-          </Alert>
-        ) : (
-          <>
-            <TableContainer>
-              <Table aria-label="TikTok posts table">
-                <TableHead>
+
+
+
+          {/* Filter Controls */}
+          <Collapse in={showFilters}>
+            <Paper sx={{ p: 3, mb: 3, border: '1px solid', borderColor: 'divider' }}>
+              <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
+                <FilterListIcon sx={{ mr: 1 }} />
+                Filter Options
+              </Typography>
+              
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr' }, gap: 2 }}>
+                {/* Date Range Filters */}
+                <TextField
+                  label="Start Date"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  size="small"
+                  InputLabelProps={{ shrink: true }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <DateRangeIcon />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+                
+                <TextField
+                  label="End Date"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  size="small"
+                  InputLabelProps={{ shrink: true }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <DateRangeIcon />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+                
+                {/* Likes Range Filters */}
+                <TextField
+                  label="Min Likes"
+                  type="number"
+                  value={minLikes}
+                  onChange={(e) => setMinLikes(e.target.value)}
+                  size="small"
+                  InputLabelProps={{ shrink: true }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <ThumbUpIcon />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+                
+                <TextField
+                  label="Max Likes"
+                  type="number"
+                  value={maxLikes}
+                  onChange={(e) => setMaxLikes(e.target.value)}
+                  size="small"
+                  InputLabelProps={{ shrink: true }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <ThumbUpIcon />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Box>
+              
+              <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+                <Button
+                  variant="contained"
+                  onClick={handleApplyFilters}
+                  disabled={isLoading}
+                  startIcon={<FilterListIcon />}
+                >
+                  Apply Filters
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={handleClearFilters}
+                  disabled={isLoading}
+                >
+                  Clear Filters
+                </Button>
+              </Box>
+            </Paper>
+          </Collapse>
+
+          {/* Data Table */}
+          <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+            <Table stickyHeader>
+              <TableHead>
+                <TableRow sx={{ backgroundColor: 'grey.50' }}>
+                  {currentFolder?.category === 'comments' ? (
+                    <>
+                      <TableCell sx={{ fontWeight: 600 }}>Comment User</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Comment</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Post User</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>Likes</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>Replies</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+                    </>
+                  ) : (
+                    <>
+                      <TableCell sx={{ fontWeight: 600 }}>User</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Type</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Content</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Date Posted</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>Likes</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>Comments</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+                    </>
+                  )}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {isLoading ? (
                   <TableRow>
-                    <TableCell>Creator</TableCell>
-                    <TableCell>Content</TableCell>
-                    <TableCell>Posted Date</TableCell>
-                    <TableCell>Engagement</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Actions</TableCell>
+                    <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                      <CircularProgress size={40} />
+                      <Typography variant="body2" sx={{ mt: 1 }}>
+                        Loading data...
+                      </Typography>
+                    </TableCell>
                   </TableRow>
-                </TableHead>
-                <TableBody>
-                  {posts.map((post) => (
-                    <TableRow key={post.id}>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <Box>
-                            <Typography variant="body2" component="div">
-                              {post.user_posted}
-                              {post.is_verified && (
-                                <Tooltip title="Verified Account">
-                                  <Chip 
-                                    label="Verified" 
-                                    size="small" 
-                                    color="primary" 
-                                    variant="outlined"
-                                    sx={{ ml: 1 }}
-                                  />
-                                </Tooltip>
-                              )}
-                            </Typography>
-                            {post.followers !== null && (
-                              <Typography variant="caption" color="text.secondary">
-                                {post.followers.toLocaleString()} followers
-                              </Typography>
-                            )}
-                          </Box>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ maxWidth: 250 }} noWrap>
-                          {post.description || 'No description'}
-                        </Typography>
-                        {post.hashtags && (
-                          <Typography variant="caption" color="primary">
-                            {post.hashtags.slice(0, 50)}
-                            {post.hashtags.length > 50 ? '...' : ''}
-                          </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {post.date_posted ? new Date(post.date_posted).toLocaleDateString() : 'Unknown'}
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {post.likes} likes
-                        </Typography>
-                        <Typography variant="body2">
-                          {post.num_comments} comments
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={post.content_type === 'reel' ? 'Video' : 'Post'} 
-                          size="small" 
-                          color={post.content_type === 'reel' ? 'secondary' : 'default'}
-                        />
-                        {post.is_paid_partnership && (
-                          <Chip 
-                            label="Paid" 
-                            size="small" 
-                            color="warning" 
-                            variant="outlined"
-                            sx={{ mt: 0.5 }}
-                          />
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Stack direction="row" spacing={1}>
-                          <Tooltip title="Open in TikTok">
-                            <IconButton 
-                              size="small" 
-                              onClick={() => window.open(post.url, '_blank')}
-                              color="primary"
-                            >
-                              <OpenInNewIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Copy Link">
-                            <IconButton 
-                              size="small"
-                              onClick={() => handleCopyLink(post.url)}
-                            >
-                              <ContentCopyIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </Stack>
+                ) : currentFolder?.category === 'comments' ? (
+                  comments.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                        <Typography color="text.secondary">No comments found</Typography>
                       </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-            <TablePagination
-              rowsPerPageOptions={[5, 10, 25, 50, 100]}
-              component="div"
-              count={totalCount}
-              rowsPerPage={rowsPerPage}
-              page={page}
-              onPageChange={handleChangePage}
-              onRowsPerPageChange={handleChangeRowsPerPage}
+                  ) : (
+                    comments.map((comment) => (
+                      <TableRow key={comment.id} hover sx={{ '&:hover': { backgroundColor: 'grey.50' } }}>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <Avatar sx={{ width: 32, height: 32, mr: 2, fontSize: '0.875rem' }}>
+                              {comment.comment_user.charAt(0).toUpperCase()}
+                            </Avatar>
+                            <Typography variant="body2" fontWeight={500}>
+                              {comment.comment_user}
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ maxWidth: 300 }} noWrap>
+                            {comment.comment || 'No comment text'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">{comment.post_user || 'Unknown'}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {comment.comment_date 
+                              ? new Date(comment.comment_date).toLocaleDateString() 
+                              : 'Unknown'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography variant="body2">{comment.likes_number.toLocaleString()}</Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography variant="body2">{comment.replies_number.toLocaleString()}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', gap: 0.5 }}>
+                            <Tooltip title="Open Post">
+                              <IconButton 
+                                size="small" 
+                                onClick={() => window.open(comment.post_url, '_blank')}
+                              >
+                                <OpenInNewIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Copy Link">
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleCopyLink(comment.post_url)}
+                              >
+                                <ContentCopyIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )
+                ) : (
+                  posts.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                        <Typography color="text.secondary">No posts found</Typography>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    posts.map((post) => (
+                      <TableRow key={post.id} hover sx={{ '&:hover': { backgroundColor: 'grey.50' } }}>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <Avatar sx={{ width: 32, height: 32, mr: 2, fontSize: '0.875rem' }}>
+                              {post.user_posted.charAt(0).toUpperCase()}
+                            </Avatar>
+                            <Box>
+                              <Typography variant="body2" fontWeight={500}>
+                                {post.user_posted}
+                              </Typography>
+                              {post.is_verified && (
+                                <Chip 
+                                  size="small" 
+                                  color="primary" 
+                                  label="Verified" 
+                                  sx={{ mt: 0.5, height: 16, fontSize: '0.75rem' }}
+                                />
+                              )}
+                            </Box>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Chip 
+                            size="small" 
+                            color={post.content_type === 'video' ? 'secondary' : 'primary'}
+                            variant="outlined"
+                            label={post.content_type === 'video' ? 'Video' : 'Post'} 
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ maxWidth: 300 }} noWrap>
+                            {post.description || 'No description'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {post.date_posted 
+                              ? new Date(post.date_posted).toLocaleDateString() 
+                              : 'Unknown'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography variant="body2" fontWeight={500}>
+                            {post.likes.toLocaleString()}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography variant="body2">
+                            {post.num_comments.toLocaleString()}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', gap: 0.5 }}>
+                            <Tooltip title="Open in TikTok">
+                              <IconButton 
+                                size="small" 
+                                onClick={() => window.open(post.url, '_blank')}
+                              >
+                                <OpenInNewIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Copy Link">
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleCopyLink(post.url)}
+                              >
+                                <ContentCopyIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          
+          {/* Pagination */}
+          <TablePagination
+            rowsPerPageOptions={[5, 10, 25, 50, 100]}
+            component="div"
+            count={totalCount}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+            sx={{ borderTop: '1px solid', borderColor: 'divider' }}
+          />
+        </TabPanel>
+
+        {/* Tab Panel 1: Upload & Management */}
+        <TabPanel value={tabValue} index={1}>
+          <Box sx={{ display: 'flex', gap: 3, flexDirection: { xs: 'column', md: 'row' } }}>
+            <Box sx={{ flex: 2 }}>
+              <Card sx={{ border: '1px solid', borderColor: 'divider' }}>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                    <CloudUploadIcon sx={{ mr: 1 }} />
+                    Upload CSV Data
+                  </Typography>
+                  
+                  {currentFolder && currentFolder.category && (
+                    <Alert severity="info" sx={{ mb: 2 }}>
+                      <strong>Current folder: {currentFolder.category_display || currentFolder.category}</strong>
+                      <br />
+                      {currentFolder.category === 'comments' 
+                        ? 'Upload comment CSV files here.'
+                        : 'Upload posts/videos CSV files here.'
+                      }
+                    </Alert>
+                  )}
+                  
+                  {uploadError && (
+                    <Alert severity="error" sx={{ mb: 2 }} onClose={() => setUploadError(null)}>
+                      {uploadError}
+                    </Alert>
+                  )}
+                  
+                  {uploadSuccess && (
+                    <Alert severity="success" sx={{ mb: 2 }} onClose={() => setUploadSuccess(null)}>
+                      {uploadSuccess}
+                    </Alert>
+                  )}
+                  
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                    Upload CSV files containing TikTok data. The system automatically detects content type 
+                    based on column headers. Ensure dates are in standard format (YYYY-MM-DD).
+                  </Typography>
+                  
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+                    <Button
+                      variant="outlined"
+                      component="label"
+                      startIcon={<CloudUploadIcon />}
+                      disabled={isUploading}
+                    >
+                      Select CSV File
+                      <input
+                        id="file-upload"
+                        type="file"
+                        hidden
+                        accept=".csv"
+                        onChange={handleFileChange}
+                      />
+                    </Button>
+                    <Button
+                      variant="contained"
+                      onClick={handleUpload}
+                      disabled={!uploadFile || isUploading || folderLoading || (folderId ? !currentFolder : false)}
+                      startIcon={isUploading ? <CircularProgress size={20} /> : undefined}
+                    >
+                      {isUploading ? 'Uploading...' : folderLoading ? 'Loading folder...' : 'Upload'}
+                    </Button>
+                    {uploadFile && (
+                      <Typography variant="body2" color="text.secondary">
+                        {uploadFile.name}
+                      </Typography>
+                    )}
+                  </Box>
+                  
+                  <Divider sx={{ my: 2 }} />
+                  
+                  <Button
+                    variant="outlined"
+                    startIcon={<DownloadIcon />}
+                    onClick={() => handleDownloadCSV(undefined)}
+                  >
+                    Download Current Data as CSV
+                  </Button>
+                </CardContent>
+              </Card>
+            </Box>
+            
+            <Box sx={{ flex: 1 }}>
+              <Card sx={{ border: '1px solid', borderColor: 'divider' }}>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>
+                    Quick Actions
+                  </Typography>
+                  <Stack spacing={2}>
+                    <Button
+                      variant="outlined"
+                      startIcon={<DownloadIcon />}
+                      onClick={() => handleDownloadCSV('post')}
+                      disabled={currentFolder?.category === 'comments'}
+                    >
+                      Download Posts Only
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      startIcon={<DownloadIcon />}
+                      onClick={() => handleDownloadCSV('video')}
+                      disabled={currentFolder?.category === 'comments'}
+                    >
+                      Download Videos Only
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      startIcon={<RefreshIcon />}
+                      onClick={() => {
+                        // Clear any error states
+                        setUploadError(null);
+                        setUploadSuccess(null);
+                        
+                        // Reset page to 0 to ensure we see all data
+                        setPage(0);
+                        
+                        // Refresh all data
+                        const hasFilterValues = Boolean(startDate || endDate || minLikes || maxLikes);
+                        fetchPosts(0, rowsPerPage, searchTerm, contentTypeFilter, hasFilterValues);
+                        fetchFolderStats();
+                        fetchFolderDetails();
+                      }}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? 'Refreshing...' : 'Refresh'}
+                    </Button>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Box>
+          </Box>
+        </TabPanel>
+
+        {/* Tab Panel 2: Webhook Status */}
+        <TabPanel value={tabValue} index={2}>
+          <Typography variant="h6" gutterBottom>
+            Webhook Status & Configuration
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Monitor the status of your BrightData webhook integration and view detailed metrics. Data is automatically received and stored in this folder.
+          </Typography>
+          
+          {/* Webhook Status Overview */}
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1fr' }, gap: 3, mb: 4 }}>
+            <Card>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <WebhookIcon color={webhookStatus.isActive ? 'success' : 'disabled'} sx={{ mr: 1 }} />
+                  <Typography variant="subtitle1">Webhook Status</Typography>
+                </Box>
+                <Typography variant="h4" color={webhookStatus.isActive ? 'success.main' : 'text.secondary'}>
+                  {webhookStatus.isActive ? 'Active' : 'Inactive'}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Last Update: {webhookStatus.lastUpdate ? formatDate(webhookStatus.lastUpdate) : 'Never'}
+                </Typography>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <NotificationsIcon color="primary" sx={{ mr: 1 }} />
+                  <Typography variant="subtitle1">Total Requests</Typography>
+                </Box>
+                <Typography variant="h4">{webhookStatus.totalRequests}</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Success Rate: {webhookStatus.successRate.toFixed(1)}%
+                </Typography>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <TrendingUpIcon color="primary" sx={{ mr: 1 }} />
+                  <Typography variant="subtitle1">Response Time</Typography>
+                </Box>
+                <Typography variant="h4">{webhookStatus.averageResponseTime.toFixed(2)}s</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Average processing time
+                </Typography>
+              </CardContent>
+            </Card>
+          </Box>
+
+          {/* Detailed Webhook Information */}
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3, mb: 4 }}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>Webhook Endpoint</Typography>
+                <Typography variant="body2" sx={{ fontFamily: 'monospace', bgcolor: 'grey.100', p: 1, borderRadius: 1 }}>
+                  /api/brightdata/webhook/
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  Status: {webhookStatus.isActive ? 'Active' : 'Inactive'}
+                </Typography>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>Performance Metrics</Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2">Total Requests:</Typography>
+                  <Typography variant="body2" fontWeight="bold">{webhookStatus.totalRequests}</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2">Success Rate:</Typography>
+                  <Typography variant="body2" fontWeight="bold">{webhookStatus.successRate.toFixed(1)}%</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body2">Avg Response Time:</Typography>
+                  <Typography variant="body2" fontWeight="bold">{webhookStatus.averageResponseTime.toFixed(2)}s</Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Box>
+
+          {/* Action Buttons */}
+          <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={handleRefreshWebhookData}
+              disabled={webhookLoading}
+            >
+              {webhookLoading ? 'Refreshing...' : 'Refresh Data'}
+            </Button>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={autoRefresh}
+                  onChange={() => setAutoRefresh(!autoRefresh)}
+                />
+              }
+              label="Auto-refresh (30s)"
             />
-          </>
-        )}
+          </Box>
+        </TabPanel>
       </Paper>
 
-      {/* Snackbar for notifications */}
       <Snackbar
         open={snackbarOpen}
-        autoHideDuration={6000}
+        autoHideDuration={3000}
         onClose={handleCloseSnackbar}
         message={snackbarMessage}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       />
+
+
     </Container>
   );
 };

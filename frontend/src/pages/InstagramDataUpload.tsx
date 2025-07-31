@@ -1,4 +1,4 @@
-import { useState, useEffect, ChangeEvent } from 'react';
+import { useState, useEffect, ChangeEvent, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Container,
@@ -34,13 +34,26 @@ import {
   InputAdornment,
   Tabs,
   Tab,
-  Grid,
   Avatar,
   LinearProgress,
   Menu,
   ListItemIcon,
   ListItemText,
   Collapse,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemAvatar,
+  Badge,
+  Switch,
+  FormControlLabel,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -64,6 +77,10 @@ import SortIcon from '@mui/icons-material/Sort';
 import DateRangeIcon from '@mui/icons-material/DateRange';
 import ChatIcon from '@mui/icons-material/Chat';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import WebhookIcon from '@mui/icons-material/Webhook';
+import SettingsIcon from '@mui/icons-material/Settings';
+import NotificationsIcon from '@mui/icons-material/Notifications';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { apiFetch } from '../utils/api';
 
 interface InstagramPost {
@@ -115,6 +132,15 @@ interface FolderStats {
   avgLikes: number;
   avgComments: number;
   verifiedAccounts: number;
+}
+
+// BrightData Webhook Integration Interfaces - Simplified for receiving data only
+interface WebhookStatus {
+  isActive: boolean;
+  lastUpdate: string | null;
+  totalRequests: number;
+  successRate: number;
+  averageResponseTime: number;
 }
 
 interface TabPanelProps {
@@ -184,7 +210,7 @@ const InstagramDataUpload = () => {
   const [contentTypeFilter, setContentTypeFilter] = useState<string>('all');
   const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const [tabValue, setTabValue] = useState(0);
-  const [sortMenuAnchor, setSortMenuAnchor] = useState<null | HTMLElement>(null);
+
   const [sortBy, setSortBy] = useState<string>('date_posted');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   
@@ -194,6 +220,18 @@ const InstagramDataUpload = () => {
   const [endDate, setEndDate] = useState<string>('');
   const [minLikes, setMinLikes] = useState<string>('');
   const [maxLikes, setMaxLikes] = useState<string>('');
+
+  // BrightData Webhook Integration State - Simplified for receiving data only
+  const [webhookStatus, setWebhookStatus] = useState<WebhookStatus>({
+    isActive: false,
+    lastUpdate: null,
+    totalRequests: 0,
+    successRate: 0,
+    averageResponseTime: 0
+  });
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
+  const [webhookLoading, setWebhookLoading] = useState(false);
 
   // Fetch Instagram posts/comments with pagination
   const fetchPosts = async (pageNumber = 0, pageSize = 10, searchTerm = '', contentType = '', useFilters = false) => {
@@ -458,6 +496,70 @@ const InstagramDataUpload = () => {
       setServerStatus('offline');
     }
   };
+
+  // BrightData Webhook Integration Functions
+  const fetchWebhookStatus = async () => {
+    try {
+      setWebhookLoading(true);
+      const response = await apiFetch('/api/brightdata/webhook-metrics/');
+      
+      if (response.ok) {
+        const data = await response.json();
+        setWebhookStatus({
+          isActive: data.is_active || false,
+          lastUpdate: data.last_update,
+          totalRequests: data.total_requests || 0,
+          successRate: data.success_rate || 0,
+          averageResponseTime: data.average_response_time || 0
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching webhook status:', error);
+    } finally {
+      setWebhookLoading(false);
+    }
+  };
+
+  const startAutoRefresh = useCallback(() => {
+    if (refreshInterval) {
+      clearInterval(refreshInterval);
+    }
+    
+    const interval = setInterval(() => {
+      fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter, Boolean(startDate || endDate || minLikes || maxLikes));
+      fetchFolderStats();
+      fetchWebhookStatus();
+    }, 30000); // Refresh every 30 seconds
+    
+    setRefreshInterval(interval);
+  }, [page, rowsPerPage, searchTerm, contentTypeFilter, startDate, endDate, minLikes, maxLikes]);
+
+  const stopAutoRefresh = useCallback(() => {
+    if (refreshInterval) {
+      clearInterval(refreshInterval);
+      setRefreshInterval(null);
+    }
+  }, [refreshInterval]);
+
+  // Effect to handle auto-refresh
+  useEffect(() => {
+    if (autoRefresh) {
+      startAutoRefresh();
+    } else {
+      stopAutoRefresh();
+    }
+
+    return () => {
+      stopAutoRefresh();
+    };
+  }, [autoRefresh, startAutoRefresh, stopAutoRefresh]);
+
+  // Effect to fetch webhook data on component mount
+  useEffect(() => {
+    if (folderId) {
+      fetchWebhookStatus();
+    }
+  }, [folderId]);
 
   // Check server status on component mount
   useEffect(() => {
@@ -859,13 +961,7 @@ const InstagramDataUpload = () => {
     setTabValue(newValue);
   };
 
-  const handleSortMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setSortMenuAnchor(event.currentTarget);
-  };
 
-  const handleSortMenuClose = () => {
-    setSortMenuAnchor(null);
-  };
 
   const handleSort = (field: string) => {
     const newOrder = sortBy === field && sortOrder === 'desc' ? 'asc' : 'desc';
@@ -885,7 +981,34 @@ const InstagramDataUpload = () => {
     
     setSortBy(backendField);
     setSortOrder(newOrder);
-    handleSortMenuClose();
+    // Trigger data refresh with new sorting and current filters
+    const hasFilterValues = Boolean(startDate || endDate || minLikes || maxLikes);
+    fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter, hasFilterValues);
+  };
+
+  const handleSortSelectChange = (event: SelectChangeEvent) => {
+    const field = event.target.value;
+    
+    // Always set the new field, default to descending
+    setSortBy(field);
+    setSortOrder('desc');
+    
+    // Trigger data refresh with new sorting and current filters
+    const hasFilterValues = Boolean(startDate || endDate || minLikes || maxLikes);
+    fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter, hasFilterValues);
+  };
+
+  const handleSortItemClick = (field: string) => {
+    // If clicking the same field, toggle the order
+    if (sortBy === field) {
+      const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+      setSortOrder(newOrder);
+    } else {
+      // If selecting a new field, set it with default descending order
+      setSortBy(field);
+      setSortOrder('desc');
+    }
+    
     // Trigger data refresh with new sorting and current filters
     const hasFilterValues = Boolean(startDate || endDate || minLikes || maxLikes);
     fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter, hasFilterValues);
@@ -907,7 +1030,18 @@ const InstagramDataUpload = () => {
     setEndDate('');
     setMinLikes('');
     setMaxLikes('');
-    fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter, false);
+    // Trigger data refresh with cleared filters
+    const hasFilterValues = Boolean(startDate || endDate || minLikes || maxLikes);
+    fetchPosts(page, rowsPerPage, searchTerm, contentTypeFilter, hasFilterValues);
+  };
+
+  // Webhook Integration Event Handlers
+  const handleRefreshWebhookData = () => {
+    fetchWebhookStatus();
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString();
   };
 
   return (
@@ -950,21 +1084,36 @@ const InstagramDataUpload = () => {
                     color: 'white'
                   }
                 }}
-                size="large"
+                size="small"
               >
                 <ArrowBackIcon />
               </IconButton>
             )}
-            <Box>
-              <Typography variant="h4" component="h1" fontWeight={600} sx={{ mb: 1 }}>
-                {currentFolder ? currentFolder.name : 'Instagram Data Management'}
-              </Typography>
-              <Typography variant="body1" color="text.secondary">
-                {currentFolder ? currentFolder.description || `${currentFolder.category_display || currentFolder.category} data analysis` : 'Manage and analyze your Instagram data'}
-              </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box>
+                <Typography variant="h4" component="h1" fontWeight={600} sx={{ mb: 1 }}>
+                  {currentFolder ? currentFolder.name : 'Instagram Data Management'}
+                </Typography>
+                <Typography variant="body1" color="text.secondary">
+                  {currentFolder ? currentFolder.description || `${currentFolder.category_display || currentFolder.category} data analysis` : 'Manage and analyze your Instagram data'}
+                </Typography>
+              </Box>
             </Box>
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
+            {/* Auto-refresh Toggle */}
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={autoRefresh}
+                  onChange={() => setAutoRefresh(!autoRefresh)}
+                  size="small"
+                />
+              }
+              label="Auto-refresh"
+              sx={{ ml: 1 }}
+            />
+            
             <Button
               variant="outlined"
               startIcon={<RefreshIcon />}
@@ -996,12 +1145,20 @@ const InstagramDataUpload = () => {
           </Box>
         </Box>
 
-        {/* Status Chip */}
+        {/* Status Chips */}
         {currentFolder && (
-          <Box sx={{ mb: 3 }}>
+          <Box sx={{ mb: 3, display: 'flex', gap: 2 }}>
             <Chip 
               label={`${currentFolder.category_display || currentFolder.category} • Dynamic`} 
               color="success" 
+              variant="outlined"
+              size="small"
+            />
+            {/* Webhook Status Label */}
+            <Chip
+              icon={<WebhookIcon />}
+              label={webhookStatus.isActive ? 'Webhook Active' : 'Webhook Inactive'}
+              color={webhookStatus.isActive ? 'success' : 'default'}
               variant="outlined"
               size="small"
             />
@@ -1009,89 +1166,16 @@ const InstagramDataUpload = () => {
         )}
 
         {/* Single Summary Box */}
-        <Paper sx={{ p: 3, mb: 3, border: '1px solid', borderColor: 'divider' }}>
+        <Paper sx={{ px: 3, py: 2, mb: 3, border: '1px solid', borderColor: 'divider' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <Typography variant="h6" fontWeight={600}>
                 Data Overview
               </Typography>
-              <Chip 
-                label={`Sorted by ${sortBy} (${sortOrder})`}
-                size="small"
-                color="primary"
-                variant="outlined"
-              />
             </Box>
-        
-            <Menu
-              anchorEl={sortMenuAnchor}
-              open={Boolean(sortMenuAnchor)}
-              onClose={handleSortMenuClose}
-              anchorOrigin={{
-                vertical: 'bottom',
-                horizontal: 'right',
-              }}
-              transformOrigin={{
-                vertical: 'top',
-                horizontal: 'right',
-              }}
-            >
-              <MenuItem onClick={() => handleSort('date_posted')} selected={sortBy === (currentFolder?.category === 'comments' ? 'comment_date' : 'date_posted')}>
-                <ListItemIcon>
-                  <SortIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>
-                  Sort by {currentFolder?.category === 'comments' ? 'Comment Date' : 'Date'}
-                  {sortBy === (currentFolder?.category === 'comments' ? 'comment_date' : 'date_posted') && (
-                    <Typography variant="caption" color="primary" sx={{ ml: 1 }}>
-                      ({sortOrder})
-                    </Typography>
-                  )}
-                </ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => handleSort('likes')} selected={sortBy === (currentFolder?.category === 'comments' ? 'likes_number' : 'likes')}>
-                <ListItemIcon>
-                  <ThumbUpIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>
-                  Sort by Likes
-                  {sortBy === (currentFolder?.category === 'comments' ? 'likes_number' : 'likes') && (
-                    <Typography variant="caption" color="primary" sx={{ ml: 1 }}>
-                      ({sortOrder})
-                    </Typography>
-                  )}
-                </ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => handleSort('user_posted')} selected={sortBy === (currentFolder?.category === 'comments' ? 'comment_user' : 'user_posted')}>
-                <ListItemIcon>
-                  <GroupIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>
-                  Sort by {currentFolder?.category === 'comments' ? 'Commenter' : 'User'}
-                  {sortBy === (currentFolder?.category === 'comments' ? 'comment_user' : 'user_posted') && (
-                    <Typography variant="caption" color="primary" sx={{ ml: 1 }}>
-                      ({sortOrder})
-                    </Typography>
-                  )}
-                </ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => handleSort('num_comments')} selected={sortBy === (currentFolder?.category === 'comments' ? 'replies_number' : 'num_comments')}>
-                <ListItemIcon>
-                  <AnalyticsIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>
-                  Sort by {currentFolder?.category === 'comments' ? 'Replies' : 'Comments'}
-                  {sortBy === (currentFolder?.category === 'comments' ? 'replies_number' : 'num_comments') && (
-                    <Typography variant="caption" color="primary" sx={{ ml: 1 }}>
-                      ({sortOrder})
-                    </Typography>
-                  )}
-                </ListItemText>
-              </MenuItem>
-            </Menu>
           </Box>
           
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr 1fr' }, gap: 4 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr 1fr' }, gap: 4, py:2 }}>
             <Box sx={{ textAlign: 'center' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
                 <AnalyticsIcon sx={{ color: 'primary.main', mr: 1 }} />
@@ -1146,7 +1230,7 @@ const InstagramDataUpload = () => {
             
             <Box sx={{ textAlign: 'center' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
-                <VerifiedIcon sx={{ color: 'warning.main', mr: 1 }} />
+                <VerifiedIcon sx={{ color: 'primary.main', mr: 1 }} />
                 <Typography variant="h4" fontWeight={600}>
                   {folderStats.verifiedAccounts.toLocaleString()}
                 </Typography>
@@ -1166,7 +1250,7 @@ const InstagramDataUpload = () => {
             <Tabs value={tabValue} onChange={handleTabChange} aria-label="data management tabs">
               <Tab label="Data Overview" {...a11yProps(0)} />
               <Tab label="Upload & Management" {...a11yProps(1)} />
-              <Tab label="Analytics" {...a11yProps(2)} />
+              <Tab label="Webhook Status" {...a11yProps(2)} />
             </Tabs>
           </Box>
         </Box>
@@ -1187,34 +1271,82 @@ const InstagramDataUpload = () => {
                     <SearchIcon />
                   </InputAdornment>
                 ),
-                endAdornment: (
-                  <InputAdornment position="end" sx={{ pr: 0 }}>
-                    <Tooltip title={`Sort by ${sortBy} (${sortOrder})`}>
-                      <IconButton onClick={handleSortMenuOpen} sx={{ p: 0 }}>
-                        <SortIcon />
-                      </IconButton>
-                    </Tooltip>
-                  </InputAdornment>
-                ),
               }}
               sx={{ flexGrow: 1, maxWidth: 400 }}
             />
             
-            {currentFolder?.category !== 'comments' && (
-              <FormControl size="small" sx={{ minWidth: 180 }}>
-                <InputLabel>Content Type</InputLabel>
-                <Select
-                  value={contentTypeFilter}
-                  label="Content Type"
-                  onChange={handleContentTypeFilterChange}
-                  disabled={isLoading}
+            {/* Sort Dropdown */}
+            <Box sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 1,
+              py: 0.75,
+              px: 2,
+              borderRadius: 2,
+              bgcolor: 'rgba(0, 0, 0, 0.03)'
+            }}>
+              <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+                Sort by:
+              </Typography>
+              <Select
+                value={sortBy}
+                onChange={handleSortSelectChange}
+                size="small"
+                variant="standard"
+                disableUnderline
+                sx={{ 
+                  minWidth: 140,
+                  '& .MuiSelect-select': {
+                    fontWeight: 500,
+                    py: 0,
+                    color: theme => theme.palette.primary.main
+                  }
+                }}
+                renderValue={(value) => {
+                  if (!value) {
+                    return '[Select]';
+                  }
+                  const getDisplayName = (field: string) => {
+                    if (field === (currentFolder?.category === 'comments' ? 'comment_date' : 'date_posted')) {
+                      return `Date (${sortOrder === 'asc' ? 'Asc' : 'Desc'})`;
+                    } else if (field === (currentFolder?.category === 'comments' ? 'likes_number' : 'likes')) {
+                      return `Likes (${sortOrder === 'asc' ? 'Asc' : 'Desc'})`;
+                    } else if (field === (currentFolder?.category === 'comments' ? 'comment_user' : 'user_posted')) {
+                      return `${currentFolder?.category === 'comments' ? 'Commenter' : 'User'} (${sortOrder === 'asc' ? 'Asc' : 'Desc'})`;
+                    } else if (field === (currentFolder?.category === 'comments' ? 'replies_number' : 'num_comments')) {
+                      return `${currentFolder?.category === 'comments' ? 'Replies' : 'Comments'} (${sortOrder === 'asc' ? 'Asc' : 'Desc'})`;
+                    }
+                    return '[Select]';
+                  };
+                  return getDisplayName(value);
+                }}
+              >
+                <MenuItem 
+                  value={currentFolder?.category === 'comments' ? 'comment_date' : 'date_posted'}
+                  onClick={() => handleSortItemClick(currentFolder?.category === 'comments' ? 'comment_date' : 'date_posted')}
                 >
-                  <MenuItem value="all">All Content</MenuItem>
-                  <MenuItem value="post">Posts Only</MenuItem>
-                  <MenuItem value="reel">Reels Only</MenuItem>
-                </Select>
-              </FormControl>
-            )}
+                  Date
+                </MenuItem>
+                <MenuItem 
+                  value={currentFolder?.category === 'comments' ? 'likes_number' : 'likes'}
+                  onClick={() => handleSortItemClick(currentFolder?.category === 'comments' ? 'likes_number' : 'likes')}
+                >
+                  Likes
+                </MenuItem>
+                <MenuItem 
+                  value={currentFolder?.category === 'comments' ? 'comment_user' : 'user_posted'}
+                  onClick={() => handleSortItemClick(currentFolder?.category === 'comments' ? 'comment_user' : 'user_posted')}
+                >
+                  {currentFolder?.category === 'comments' ? 'Commenter' : 'User'}
+                </MenuItem>
+                <MenuItem 
+                  value={currentFolder?.category === 'comments' ? 'replies_number' : 'num_comments'}
+                  onClick={() => handleSortItemClick(currentFolder?.category === 'comments' ? 'replies_number' : 'num_comments')}
+                >
+                  {currentFolder?.category === 'comments' ? 'Replies' : 'Comments'}
+                </MenuItem>
+              </Select>
+            </Box>
             
             <Tooltip title="Filter data">
               <IconButton onClick={handleFilterToggle}>
@@ -1222,6 +1354,8 @@ const InstagramDataUpload = () => {
               </IconButton>
             </Tooltip>
           </Box>
+
+
 
           {/* Filter Controls */}
           <Collapse in={showFilters}>
@@ -1326,71 +1460,22 @@ const InstagramDataUpload = () => {
                 <TableRow sx={{ backgroundColor: 'grey.50' }}>
                   {currentFolder?.category === 'comments' ? (
                     <>
-                      <TableCell sx={{ fontWeight: 600 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          Comment User
-                          <IconButton size="small" onClick={handleSortMenuOpen}>
-                            <MoreVertIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-                      </TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Comment User</TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>Comment</TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>Post User</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          Date
-                          <IconButton size="small" onClick={handleSortMenuOpen}>
-                            <MoreVertIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-                      </TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          Likes
-                          <IconButton size="small" onClick={handleSortMenuOpen}>
-                            <MoreVertIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-                      </TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>Likes</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600 }}>Replies</TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
                     </>
                   ) : (
                     <>
-                      <TableCell sx={{ fontWeight: 600 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          User
-                          <IconButton size="small" onClick={handleSortMenuOpen}>
-                            <MoreVertIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-                      </TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>User</TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>Type</TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>Content</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          Date Posted
-                          <IconButton size="small" onClick={handleSortMenuOpen}>
-                            <MoreVertIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-                      </TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          Likes
-                          <IconButton size="small" onClick={handleSortMenuOpen}>
-                            <MoreVertIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-                      </TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          Comments
-                          <IconButton size="small" onClick={handleSortMenuOpen}>
-                            <MoreVertIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-                      </TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Date Posted</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>Likes</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>Comments</TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
                     </>
                   )}
@@ -1705,83 +1790,111 @@ const InstagramDataUpload = () => {
           </Box>
         </TabPanel>
 
-        {/* Tab Panel 2: Analytics */}
+        {/* Tab Panel 2: Webhook Status */}
         <TabPanel value={tabValue} index={2}>
           <Typography variant="h6" gutterBottom>
-            Analytics Overview
+            Webhook Status & Configuration
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Advanced analytics features coming soon. Current data insights are available in the overview cards above.
+            Monitor the status of your BrightData webhook integration and view detailed metrics. Data is automatically received and stored in this folder.
           </Typography>
           
-          {/* Progress bars for different metrics */}
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
-            <Card sx={{ border: '1px solid', borderColor: 'divider' }}>
+          {/* Webhook Status Overview */}
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1fr' }, gap: 3, mb: 4 }}>
+            <Card>
               <CardContent>
-                <Typography variant="subtitle1" gutterBottom>
-                  Engagement Distribution
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <WebhookIcon color={webhookStatus.isActive ? 'success' : 'disabled'} sx={{ mr: 1 }} />
+                  <Typography variant="subtitle1">Webhook Status</Typography>
+                </Box>
+                <Typography variant="h4" color={webhookStatus.isActive ? 'success.main' : 'text.secondary'}>
+                  {webhookStatus.isActive ? 'Active' : 'Inactive'}
                 </Typography>
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    High Engagement Posts
-                  </Typography>
-                  <LinearProgress variant="determinate" value={75} sx={{ height: 8, borderRadius: 4 }} />
+                <Typography variant="body2" color="text.secondary">
+                  Last Update: {webhookStatus.lastUpdate ? formatDate(webhookStatus.lastUpdate) : 'Never'}
+                </Typography>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <NotificationsIcon color="primary" sx={{ mr: 1 }} />
+                  <Typography variant="subtitle1">Total Requests</Typography>
                 </Box>
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Medium Engagement Posts
-                  </Typography>
-                  <LinearProgress variant="determinate" value={45} sx={{ height: 8, borderRadius: 4 }} />
+                <Typography variant="h4">{webhookStatus.totalRequests}</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Success Rate: {webhookStatus.successRate.toFixed(1)}%
+                </Typography>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <TrendingUpIcon color="primary" sx={{ mr: 1 }} />
+                  <Typography variant="subtitle1">Response Time</Typography>
                 </Box>
-                <Box>
-                  <Typography variant="body2" color="text.secondary">
-                    Low Engagement Posts
-                  </Typography>
-                  <LinearProgress variant="determinate" value={20} sx={{ height: 8, borderRadius: 4 }} />
-                </Box>
+                <Typography variant="h4">{webhookStatus.averageResponseTime.toFixed(2)}s</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Average processing time
+                </Typography>
+              </CardContent>
+            </Card>
+          </Box>
+
+          {/* Detailed Webhook Information */}
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3, mb: 4 }}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>Webhook Endpoint</Typography>
+                <Typography variant="body2" sx={{ fontFamily: 'monospace', bgcolor: 'grey.100', p: 1, borderRadius: 1 }}>
+                  /api/brightdata/webhook/
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  Status: {webhookStatus.isActive ? 'Active' : 'Inactive'}
+                </Typography>
               </CardContent>
             </Card>
             
-            <Card sx={{ border: '1px solid', borderColor: 'divider' }}>
+            <Card>
               <CardContent>
-                <Typography variant="subtitle1" gutterBottom>
-                  Content Performance
-                </Typography>
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Posts vs Reels Ratio
-                  </Typography>
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={60} 
-                    sx={{ height: 8, borderRadius: 4 }}
-                    color="secondary" 
-                  />
+                <Typography variant="h6" gutterBottom>Performance Metrics</Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2">Total Requests:</Typography>
+                  <Typography variant="body2" fontWeight="bold">{webhookStatus.totalRequests}</Typography>
                 </Box>
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Verified Account Content
-                  </Typography>
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={30} 
-                    sx={{ height: 8, borderRadius: 4 }}
-                    color="success" 
-                  />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2">Success Rate:</Typography>
+                  <Typography variant="body2" fontWeight="bold">{webhookStatus.successRate.toFixed(1)}%</Typography>
                 </Box>
-                <Box>
-                  <Typography variant="body2" color="text.secondary">
-                    Average Response Time
-                  </Typography>
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={85} 
-                    sx={{ height: 8, borderRadius: 4 }}
-                    color="warning" 
-                  />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="body2">Avg Response Time:</Typography>
+                  <Typography variant="body2" fontWeight="bold">{webhookStatus.averageResponseTime.toFixed(2)}s</Typography>
                 </Box>
               </CardContent>
             </Card>
+          </Box>
+
+          {/* Action Buttons */}
+          <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={handleRefreshWebhookData}
+              disabled={webhookLoading}
+            >
+              {webhookLoading ? 'Refreshing...' : 'Refresh Data'}
+            </Button>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={autoRefresh}
+                  onChange={() => setAutoRefresh(!autoRefresh)}
+                />
+              }
+              label="Auto-refresh (30s)"
+            />
           </Box>
         </TabPanel>
       </Paper>
@@ -1793,6 +1906,8 @@ const InstagramDataUpload = () => {
         message={snackbarMessage}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       />
+
+
     </Container>
   );
 };

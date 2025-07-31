@@ -1,57 +1,80 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Container,
   Typography,
   Box,
   Button,
   Paper,
-  TextField,
-  IconButton,
-  Grid,
+  Stack,
   Card,
   CardContent,
   CardActions,
-  Divider,
-  Tooltip,
+  TextField,
   Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
   DialogTitle,
-  Snackbar,
-  Alert,
+  DialogContent,
+  DialogActions,
+  IconButton,
   CircularProgress,
+  Divider,
+  ToggleButtonGroup,
+  ToggleButton,
   TableContainer,
   Table,
   TableHead,
   TableBody,
   TableRow,
   TableCell,
-  ToggleButtonGroup,
-  ToggleButton,
+  Tooltip,
+  Chip,
+  Snackbar,
+  Alert,
+  Menu,
+  ListItemIcon,
+  ListItemText,
 } from '@mui/material';
-import {
-  Add as AddIcon,
-  Folder as FolderIcon,
-  Delete as DeleteIcon,
-  Edit as EditIcon,
-  ViewList as ViewListIcon,
-  GridView as GridViewIcon,
-} from '@mui/icons-material';
+import { useNavigate, useLocation } from 'react-router-dom';
+import AddIcon from '@mui/icons-material/Add';
+import FolderIcon from '@mui/icons-material/Folder';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
+import GridViewIcon from '@mui/icons-material/GridView';
+import ViewListIcon from '@mui/icons-material/ViewList';
+import PostAddIcon from '@mui/icons-material/PostAdd';
+import CommentIcon from '@mui/icons-material/Comment';
+import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
 import { apiFetch } from '../utils/api';
 
 interface Folder {
   id: number;
   name: string;
   description: string | null;
-  posts_count?: number;
-  created_at?: string;
+  created_at: string;
+  updated_at: string;
+  post_count: number;
 }
 
 const TikTokFolders = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [openNewFolderDialog, setOpenNewFolderDialog] = useState(false);
+  const [openEditFolderDialog, setOpenEditFolderDialog] = useState(false);
+  const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null);
+  const [folderName, setFolderName] = useState('');
+  const [folderDescription, setFolderDescription] = useState('');
+
+  const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  
+  // Add loading states for create and update operations
+  const [isCreating, setIsCreating] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  
+  // Add refs to prevent race conditions and multiple submissions
+  const isCreatingRef = useRef(false);
+  const isUpdatingRef = useRef(false);
   
   // Extract project ID from URL path or query parameters
   const getProjectId = () => {
@@ -67,32 +90,11 @@ const TikTokFolders = () => {
   };
   
   const projectId = getProjectId();
-  
-  const [folders, setFolders] = useState<Folder[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [newFolderName, setNewFolderName] = useState('');
-  const [newFolderDescription, setNewFolderDescription] = useState('');
-  const [openCreateDialog, setOpenCreateDialog] = useState(false);
-  const [openEditDialog, setOpenEditDialog] = useState(false);
-  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
-  const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null);
-  const [editFolderName, setEditFolderName] = useState('');
-  const [editFolderDescription, setEditFolderDescription] = useState('');
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState('');
-  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
 
-  // Fetch folders on component mount
-  useEffect(() => {
-    fetchFolders();
-  }, [projectId]);
-
+  // Fetch folders
   const fetchFolders = async () => {
     try {
       setLoading(true);
-      setError(null);
       
       // Don't fetch folders if no project is found
       if (!projectId) {
@@ -106,7 +108,7 @@ const TikTokFolders = () => {
       // Add project filter
       const url = `/api/tiktok-data/folders/?project=${projectId}`;
       
-      console.log('=== FRONTEND FETCH TIKTOK FOLDERS DEBUG ===');
+      console.log('=== FRONTEND FETCH FOLDERS DEBUG ===');
       console.log('Project ID from URL path:', projectId);
       console.log('Current URL:', location.pathname);
       console.log('Fetch URL:', url);
@@ -122,64 +124,117 @@ const TikTokFolders = () => {
       const data = await response.json();
       console.log('Raw response data:', data);
       
-      // Get the results array from the paginated response
-      const foldersData = data.results || [];
-      console.log('Folders data:', foldersData);
-      
-      // Fetch post counts for each folder
-      const foldersWithCounts = await Promise.all(
-        foldersData.map(async (folder: Folder) => {
-          try {
-            const countResponse = await apiFetch(`/api/tiktok-data/posts/?folder_id=${folder.id}&page_size=1`);
-            if (countResponse.ok) {
-              const countData = await countResponse.json();
-              return { ...folder, posts_count: countData.count || 0 };
-            }
-            return folder;
-          } catch (e) {
-            return folder;
-          }
-        })
-      );
-      
-      setFolders(foldersWithCounts);
-      console.log('=== END FRONTEND FETCH TIKTOK FOLDERS DEBUG ===');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-      console.error('Error fetching folders:', err);
+      // Check if the response is paginated (has a 'results' key)
+      if (data && typeof data === 'object' && 'results' in data) {
+        console.log('Using paginated data, count:', data.count);
+        console.log('Results:', data.results);
+        setFolders(data.results || []);
+      } else if (Array.isArray(data)) {
+        // Handle case where API returns direct array
+        console.log('Using direct array data, length:', data.length);
+        setFolders(data);
+      } else {
+        console.error('API returned unexpected data format:', data);
+        setFolders([]);
+        setError('Received invalid data format from server. Please try again.');
+      }
+      console.log('=== END FRONTEND FETCH FOLDERS DEBUG ===');
+    } catch (error) {
+      console.error('Error fetching folders:', error);
+      setFolders([]);
+      setError('Failed to load folders. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    fetchFolders();
+  }, [projectId]); // Add projectId as dependency
+
+  // Cleanup effect to reset states on unmount
+  useEffect(() => {
+    return () => {
+      // Reset all refs on unmount
+      isCreatingRef.current = false;
+      isUpdatingRef.current = false;
+    };
+  }, []);
+
+  const handleOpenFolder = (folderId: number) => {
+    // Extract organization and project IDs from URL
+    const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
+    
+    if (match) {
+      const [, orgId, projId] = match;
+              navigate(`/organizations/${orgId}/projects/${projId}/tiktok-data/${folderId}`);
+    } else if (projectId) {
+      // If not in the pathname but we have projectId in query params
+              navigate(`/tiktok-data/${folderId}?project=${projectId}`);
+    } else {
+              navigate(`/tiktok-data/${folderId}`);
+    }
+  };
+
+  const handleNewFolder = () => {
+    // Reset all states and refs
+    setFolderName('');
+    setFolderDescription('');
+    setIsCreating(false);
+    isCreatingRef.current = false;
+    setError(null);
+    setOpenNewFolderDialog(true);
+  };
+
+  const handleEditFolder = (folder: Folder) => {
+    // Reset all states and refs
+    setSelectedFolder(folder);
+    setFolderName(folder.name);
+    setFolderDescription(folder.description || '');
+    setIsUpdating(false);
+    isUpdatingRef.current = false;
+    setError(null);
+    setOpenEditFolderDialog(true);
+  };
+
   const handleCreateFolder = async () => {
-    if (!newFolderName.trim()) {
-      setSnackbarMessage('Folder name cannot be empty');
-      setSnackbarSeverity('error');
-      setSnackbarOpen(true);
+    // Double check - use both state and ref to prevent race conditions
+    if (!folderName.trim() || isCreating || isCreatingRef.current) {
+      console.log('Create folder blocked:', { 
+        folderName: folderName.trim(), 
+        isCreating, 
+        isCreatingRef: isCreatingRef.current 
+      });
       return;
     }
-    
+
     try {
+      // Set both state and ref immediately
+      setIsCreating(true);
+      isCreatingRef.current = true;
+      setError(null);
+      
+      console.log('Starting folder creation...');
+      
       const requestData = {
-        name: newFolderName,
-        description: newFolderDescription || null,
+        name: folderName,
+        description: folderDescription || null,
         project: projectId ? parseInt(projectId, 10) : null,
       };
       
-      console.log('=== FRONTEND TIKTOK FOLDER CREATION DEBUG ===');
+      console.log('=== FRONTEND FOLDER CREATION DEBUG ===');
       console.log('Project ID from URL:', projectId);
       console.log('Request data being sent:', requestData);
       console.log('API endpoint:', '/api/tiktok-data/folders/');
       
-      const response = await apiFetch('/api/tiktok-data/folders/', {
+              const response = await apiFetch('/api/tiktok-data/folders/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestData),
       });
-      
+
       console.log('Response status:', response.status);
       console.log('Response ok:', response.ok);
       
@@ -188,121 +243,126 @@ const TikTokFolders = () => {
         console.log('Error response:', errorData);
         throw new Error('Failed to create folder');
       }
+
+      const responseData = await response.json();
+      console.log('Success response data:', responseData);
+      console.log('=== END FRONTEND FOLDER CREATION DEBUG ===');
+
+      // Refresh folders list
+      await fetchFolders();
+      setOpenNewFolderDialog(false);
       
-      const newFolder = await response.json();
-      console.log('Success response data:', newFolder);
-      console.log('=== END FRONTEND TIKTOK FOLDER CREATION DEBUG ===');
+      // Reset form
+      setFolderName('');
+      setFolderDescription('');
       
-      setFolders([...folders, { ...newFolder, posts_count: 0 }]);
-      setNewFolderName('');
-      setNewFolderDescription('');
-      setOpenCreateDialog(false);
-      
-      setSnackbarMessage('Folder created successfully');
-      setSnackbarSeverity('success');
-      setSnackbarOpen(true);
-    } catch (err) {
-      setSnackbarMessage(err instanceof Error ? err.message : 'Failed to create folder');
-      setSnackbarSeverity('error');
-      setSnackbarOpen(true);
+      console.log('Folder creation completed successfully');
+    } catch (error) {
+      console.error('Error creating folder:', error);
+      setError('Failed to create folder. Please try again.');
+    } finally {
+      // Clear both state and ref
+      setIsCreating(false);
+      isCreatingRef.current = false;
+      console.log('Create folder operation finished');
     }
   };
 
   const handleUpdateFolder = async () => {
-    if (!selectedFolder) return;
-    
-    if (!editFolderName.trim()) {
-      setSnackbarMessage('Folder name cannot be empty');
-      setSnackbarSeverity('error');
-      setSnackbarOpen(true);
+    // Double check - use both state and ref to prevent race conditions
+    if (!selectedFolder || !folderName.trim() || isUpdating || isUpdatingRef.current) {
+      console.log('Update folder blocked:', { 
+        selectedFolder: !!selectedFolder, 
+        folderName: folderName.trim(), 
+        isUpdating, 
+        isUpdatingRef: isUpdatingRef.current 
+      });
       return;
     }
-    
+
     try {
-      const response = await apiFetch(`/api/tiktok-data/folders/${selectedFolder.id}/`, {
+      // Set both state and ref immediately
+      setIsUpdating(true);
+      isUpdatingRef.current = true;
+      setError(null);
+      
+      console.log('Starting folder update...');
+      
+      const requestData = {
+        name: folderName,
+        description: folderDescription || null,
+        project: projectId ? parseInt(projectId, 10) : null,
+      };
+      
+      console.log('=== FRONTEND FOLDER UPDATE DEBUG ===');
+      console.log('Folder ID:', selectedFolder.id);
+      console.log('Request data being sent:', requestData);
+      
+      // Include project parameter in URL for consistency with backend expectations
+      const updateUrl = projectId 
+                  ? `/api/tiktok-data/folders/${selectedFolder.id}/?project=${projectId}`
+          : `/api/tiktok-data/folders/${selectedFolder.id}/`;
+      
+      console.log('API endpoint:', updateUrl);
+      
+      const response = await apiFetch(updateUrl, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name: editFolderName,
-          description: editFolderDescription || null,
-          project: projectId ? parseInt(projectId, 10) : null,
-        }),
+        body: JSON.stringify(requestData),
       });
-      
+
+      console.log('Update response status:', response.status);
+      console.log('Update response ok:', response.ok);
+
       if (!response.ok) {
+        const errorData = await response.text();
+        console.log('Update error response:', errorData);
         throw new Error('Failed to update folder');
       }
+
+      const responseData = await response.json();
+      console.log('Update success response data:', responseData);
+      console.log('=== END FRONTEND FOLDER UPDATE DEBUG ===');
+
+      // Refresh folders list
+      await fetchFolders();
+      setOpenEditFolderDialog(false);
+      setSelectedFolder(null);
       
-      const updatedFolder = await response.json();
-      setFolders(folders.map(folder => 
-        folder.id === selectedFolder.id 
-          ? { ...updatedFolder, posts_count: folder.posts_count } 
-          : folder
-      ));
-      setOpenEditDialog(false);
-      
-      setSnackbarMessage('Folder updated successfully');
-      setSnackbarSeverity('success');
-      setSnackbarOpen(true);
-    } catch (err) {
-      setSnackbarMessage(err instanceof Error ? err.message : 'Failed to update folder');
-      setSnackbarSeverity('error');
-      setSnackbarOpen(true);
+      console.log('Folder update completed successfully');
+    } catch (error) {
+      console.error('Error updating folder:', error);
+      setError('Failed to update folder. Please try again.');
+    } finally {
+      // Clear both state and ref
+      setIsUpdating(false);
+      isUpdatingRef.current = false;
+      console.log('Update folder operation finished');
     }
   };
 
-  const handleDeleteFolder = async () => {
-    if (!selectedFolder) return;
-    
+  const handleDeleteFolder = async (folderId: number) => {
+    if (!window.confirm('Are you sure you want to delete this folder? All posts inside will be moved to uncategorized.')) {
+      return;
+    }
+
     try {
-      const response = await apiFetch(`/api/tiktok-data/folders/${selectedFolder.id}/`, {
+              const response = await apiFetch(`/api/tiktok-data/folders/${folderId}/`, {
         method: 'DELETE',
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to delete folder');
       }
-      
-      setFolders(folders.filter(folder => folder.id !== selectedFolder.id));
-      setOpenDeleteDialog(false);
-      
-      setSnackbarMessage('Folder deleted successfully');
-      setSnackbarSeverity('success');
-      setSnackbarOpen(true);
-    } catch (err) {
-      setSnackbarMessage(err instanceof Error ? err.message : 'Failed to delete folder');
-      setSnackbarSeverity('error');
-      setSnackbarOpen(true);
+
+      // Refresh folders list
+      fetchFolders();
+    } catch (error) {
+      console.error('Error deleting folder:', error);
+      setError('Failed to delete folder. Please try again.');
     }
-  };
-
-  const handleOpenFolder = (folderId: number) => {
-    // Extract organization and project IDs from URL
-    const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
-    
-    if (match) {
-      const [, orgId, projId] = match;
-      navigate(`/organizations/${orgId}/projects/${projId}/tiktok-data/${folderId}`);
-    } else if (projectId) {
-      // If not in the pathname but we have projectId in query params
-      navigate(`/tiktok-data/${folderId}?project=${projectId}`);
-    } else {
-      navigate(`/tiktok-data/${folderId}`);
-    }
-  };
-
-  const handleOpenEditDialog = (folder: Folder) => {
-    setSelectedFolder(folder);
-    setEditFolderName(folder.name);
-    setEditFolderDescription(folder.description || '');
-    setOpenEditDialog(true);
-  };
-
-  const handleOpenDeleteDialog = (folder: Folder) => {
-    setSelectedFolder(folder);
-    setOpenDeleteDialog(true);
   };
 
   const handleViewModeChange = (
@@ -314,70 +374,87 @@ const TikTokFolders = () => {
     }
   };
 
+
+
+  const getContentCount = (folder: Folder) => {
+    return folder.post_count || 0;
+  };
+
   const renderGridView = () => (
-    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 3, mt: 2 }}>
+    <Stack spacing={3} direction="row" useFlexGap flexWrap="wrap">
       {folders.map((folder) => (
-        <Card key={folder.id} sx={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          height: '100%',
-          transition: 'transform 0.2s, box-shadow 0.2s',
-          '&:hover': {
-            transform: 'translateY(-4px)',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-            cursor: 'pointer'
-          }
-        }}
-          onClick={() => handleOpenFolder(folder.id)}
-        >
-          <CardContent 
-            sx={{ flexGrow: 1 }}
+        <Box key={folder.id} sx={{ width: { xs: '100%', sm: '45%', md: '30%' }, mb: 3 }}>
+          <Card 
+            sx={{ 
+              height: '100%', 
+              display: 'flex', 
+              flexDirection: 'column',
+              transition: 'transform 0.2s, box-shadow 0.2s',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                cursor: 'pointer'
+              }
+            }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <FolderIcon color="primary" sx={{ mr: 1, fontSize: 30 }} />
-              <Typography variant="h6" component="div">
-                {folder.name}
+            <CardContent 
+              sx={{ flexGrow: 1 }}
+              onClick={() => handleOpenFolder(folder.id)}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <FolderIcon color="primary" sx={{ mr: 1, fontSize: 30 }} />
+                <Box sx={{ flexGrow: 1 }}>
+                  <Typography variant="h6" component="div">
+                    {folder.name}
+                  </Typography>
+                  <Chip 
+                    icon={<VideoLibraryIcon />}
+                    label="Videos"
+                    size="small"
+                    color="secondary"
+                    sx={{ mt: 0.5 }}
+                  />
+                </Box>
+              </Box>
+              
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                {folder.description || 'No description'}
               </Typography>
-            </Box>
+              
+                              <Typography variant="body2" color="text.secondary">
+                  {getContentCount(folder)} videos
+                </Typography>
+              
+              <Typography variant="caption" color="text.secondary" display="block">
+                Created: {new Date(folder.created_at).toLocaleDateString()}
+              </Typography>
+            </CardContent>
             
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              {folder.description || 'No description'}
-            </Typography>
-            
-            <Typography variant="body2" color="text.secondary">
-              {folder.posts_count || 0} posts
-            </Typography>
-          </CardContent>
-          <Divider />
-          <CardActions onClick={(e) => e.stopPropagation()}>
-            <Box sx={{ flexGrow: 1 }} />
-            <Tooltip title="Edit">
+            <CardActions sx={{ justifyContent: 'flex-end', p: 1 }}>
               <IconButton 
-                size="small"
+                size="small" 
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleOpenEditDialog(folder);
+                  handleEditFolder(folder);
                 }}
               >
                 <EditIcon fontSize="small" />
               </IconButton>
-            </Tooltip>
-            <Tooltip title="Delete">
               <IconButton 
-                size="small"
+                size="small" 
                 color="error"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleOpenDeleteDialog(folder);
+                  handleDeleteFolder(folder.id);
                 }}
               >
                 <DeleteIcon fontSize="small" />
               </IconButton>
-            </Tooltip>
-          </CardActions>
-        </Card>
+            </CardActions>
+          </Card>
+        </Box>
       ))}
-    </Box>
+    </Stack>
   );
 
   const renderListView = () => (
@@ -387,7 +464,7 @@ const TikTokFolders = () => {
           <TableRow>
             <TableCell>Name</TableCell>
             <TableCell>Description</TableCell>
-            <TableCell align="right">Posts</TableCell>
+            <TableCell align="right">Content Count</TableCell>
             <TableCell>Created</TableCell>
             <TableCell align="center">Actions</TableCell>
           </TableRow>
@@ -395,10 +472,12 @@ const TikTokFolders = () => {
         <TableBody>
           {folders.map((folder) => (
             <TableRow 
-              key={folder.id}
-              hover
+              key={folder.id} 
               onClick={() => handleOpenFolder(folder.id)}
-              sx={{ cursor: 'pointer' }}
+              sx={{ 
+                cursor: 'pointer', 
+                '&:hover': { backgroundColor: 'action.hover' } 
+              }}
             >
               <TableCell>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -407,14 +486,14 @@ const TikTokFolders = () => {
                 </Box>
               </TableCell>
               <TableCell>{folder.description || 'No description'}</TableCell>
-              <TableCell align="right">{folder.posts_count || 0}</TableCell>
-              <TableCell>{folder.created_at ? new Date(folder.created_at).toLocaleDateString() : 'Unknown'}</TableCell>
+              <TableCell align="right">{getContentCount(folder)}</TableCell>
+              <TableCell>{new Date(folder.created_at).toLocaleDateString()}</TableCell>
               <TableCell align="center">
                 <IconButton 
                   size="small" 
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleOpenEditDialog(folder);
+                    handleEditFolder(folder);
                   }}
                 >
                   <EditIcon fontSize="small" />
@@ -424,7 +503,7 @@ const TikTokFolders = () => {
                   color="error"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleOpenDeleteDialog(folder);
+                    handleDeleteFolder(folder.id);
                   }}
                 >
                   <DeleteIcon fontSize="small" />
@@ -468,7 +547,7 @@ const TikTokFolders = () => {
               variant="contained"
               color="primary"
               startIcon={<AddIcon />}
-              onClick={() => setOpenCreateDialog(true)}
+              onClick={handleNewFolder}
               disabled={!projectId}
             >
               New Folder
@@ -476,15 +555,15 @@ const TikTokFolders = () => {
           </Box>
         </Box>
         <Divider sx={{ mb: 4 }} />
-      
+
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
             <CircularProgress />
           </Box>
         ) : error ? (
-          <Alert severity="error" sx={{ my: 2 }}>
+          <Paper sx={{ p: 3, textAlign: 'center', color: 'error.main' }}>
             {error}
-          </Alert>
+          </Paper>
         ) : folders.length === 0 ? (
           <Paper sx={{ p: 4, textAlign: 'center' }}>
             <Typography variant="h6" gutterBottom>
@@ -497,8 +576,7 @@ const TikTokFolders = () => {
               variant="outlined"
               color="primary"
               startIcon={<AddIcon />}
-              onClick={() => setOpenCreateDialog(true)}
-              disabled={!projectId}
+              onClick={handleNewFolder}
             >
               Create First Folder
             </Button>
@@ -507,113 +585,146 @@ const TikTokFolders = () => {
           viewMode === 'grid' ? renderGridView() : renderListView()
         )}
       </Box>
-      
-      {/* Create Folder Dialog */}
+
+      {/* New Folder Dialog */}
       <Dialog 
-        open={openCreateDialog} 
-        onClose={() => setOpenCreateDialog(false)}
-        fullWidth
-        maxWidth="sm"
+        open={openNewFolderDialog} 
+        onClose={() => {
+          if (!isCreating && !isCreatingRef.current) {
+            setOpenNewFolderDialog(false);
+            // Reset form
+            setFolderName('');
+            setFolderDescription('');
+          }
+        }}
       >
         <DialogTitle>Create New Folder</DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ minWidth: 400 }}>
           <TextField
             autoFocus
             margin="dense"
             label="Folder Name"
+            type="text"
             fullWidth
-            value={newFolderName}
-            onChange={(e) => setNewFolderName(e.target.value)}
+            value={folderName}
+            onChange={(e) => setFolderName(e.target.value)}
             required
-            sx={{ mb: 2 }}
+            variant="outlined"
+            sx={{ mb: 2, mt: 1 }}
+            disabled={isCreating}
           />
+          
           <TextField
             margin="dense"
             label="Description (optional)"
+            type="text"
             fullWidth
             multiline
             rows={3}
-            value={newFolderDescription}
-            onChange={(e) => setNewFolderDescription(e.target.value)}
+            value={folderDescription}
+            onChange={(e) => setFolderDescription(e.target.value)}
+            variant="outlined"
+            disabled={isCreating}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenCreateDialog(false)}>Cancel</Button>
-          <Button onClick={handleCreateFolder} variant="contained" color="primary">
-            Create
+          <Button 
+            onClick={() => {
+              if (!isCreating && !isCreatingRef.current) {
+                setOpenNewFolderDialog(false);
+                // Reset form
+                setFolderName('');
+                setFolderDescription('');
+              }
+            }}
+            disabled={isCreating}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleCreateFolder();
+            }}
+            variant="contained" 
+            color="primary"
+            disabled={!folderName.trim() || isCreating || isCreatingRef.current}
+            startIcon={isCreating ? <CircularProgress size={20} /> : undefined}
+          >
+            {isCreating ? 'Creating...' : 'Create'}
           </Button>
         </DialogActions>
       </Dialog>
-      
+
       {/* Edit Folder Dialog */}
-      <Dialog 
-        open={openEditDialog} 
-        onClose={() => setOpenEditDialog(false)}
-        fullWidth
-        maxWidth="sm"
-      >
+      <Dialog open={openEditFolderDialog} onClose={() => !isUpdating && !isUpdatingRef.current && setOpenEditFolderDialog(false)}>
         <DialogTitle>Edit Folder</DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ minWidth: 400 }}>
           <TextField
             autoFocus
             margin="dense"
             label="Folder Name"
+            type="text"
             fullWidth
-            value={editFolderName}
-            onChange={(e) => setEditFolderName(e.target.value)}
+            value={folderName}
+            onChange={(e) => setFolderName(e.target.value)}
             required
-            sx={{ mb: 2 }}
+            variant="outlined"
+            sx={{ mb: 2, mt: 1 }}
+            disabled={isUpdating}
           />
+          
           <TextField
             margin="dense"
             label="Description (optional)"
+            type="text"
             fullWidth
             multiline
             rows={3}
-            value={editFolderDescription}
-            onChange={(e) => setEditFolderDescription(e.target.value)}
+            value={folderDescription}
+            onChange={(e) => setFolderDescription(e.target.value)}
+            variant="outlined"
+            disabled={isUpdating}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenEditDialog(false)}>Cancel</Button>
-          <Button onClick={handleUpdateFolder} variant="contained" color="primary">
-            Update
+          <Button 
+            onClick={() => {
+              if (!isUpdating && !isUpdatingRef.current) {
+                setOpenEditFolderDialog(false);
+                setSelectedFolder(null);
+              }
+            }}
+            disabled={isUpdating}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleUpdateFolder();
+            }}
+            variant="contained" 
+            color="primary"
+            disabled={!folderName.trim() || isUpdating || isUpdatingRef.current}
+            startIcon={isUpdating ? <CircularProgress size={20} /> : undefined}
+          >
+            {isUpdating ? 'Updating...' : 'Update'}
           </Button>
         </DialogActions>
       </Dialog>
-      
-      {/* Delete Folder Dialog */}
-      <Dialog
-        open={openDeleteDialog}
-        onClose={() => setOpenDeleteDialog(false)}
-      >
-        <DialogTitle>Confirm Deletion</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to delete the folder "{selectedFolder?.name}"? 
-            This will also delete all posts inside this folder. This action cannot be undone.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenDeleteDialog(false)}>Cancel</Button>
-          <Button onClick={handleDeleteFolder} color="error">
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
-      
-      {/* Snackbar for notifications */}
+
+      {/* Error Snackbar */}
       <Snackbar
-        open={snackbarOpen}
+        open={!!error}
         autoHideDuration={6000}
-        onClose={() => setSnackbarOpen(false)}
+        onClose={() => setError(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert 
-          onClose={() => setSnackbarOpen(false)} 
-          severity={snackbarSeverity}
-          sx={{ width: '100%' }}
-        >
-          {snackbarMessage}
+        <Alert onClose={() => setError(null)} severity="error" sx={{ width: '100%' }}>
+          {error}
         </Alert>
       </Snackbar>
     </Container>
