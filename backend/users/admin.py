@@ -7,7 +7,10 @@ from .models import (
     UserRole, 
     Organization, 
     OrganizationMembership, 
-    Project
+    Project,
+    Platform,
+    Service,
+    PlatformService
 )
 
 # UserRole Admin
@@ -81,3 +84,73 @@ class UserAdmin(BaseUserAdmin):
 # Re-register UserAdmin
 admin.site.unregister(User)
 admin.site.register(User, UserAdmin)
+
+@admin.register(Platform)
+class PlatformAdmin(admin.ModelAdmin):
+    list_display = ['display_name', 'name', 'is_enabled', 'created_by', 'created_at']
+    list_filter = ['is_enabled', 'created_at']
+    search_fields = ['name', 'display_name', 'description']
+    readonly_fields = ['created_at', 'updated_at']
+    ordering = ['display_name']
+    
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name', 'display_name', 'description')
+        }),
+        ('UI Configuration', {
+            'fields': ('icon_name', 'color')
+        }),
+        ('Status', {
+            'fields': ('is_enabled',)
+        }),
+        ('Metadata', {
+            'fields': ('created_by', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+@admin.register(Service)
+class ServiceAdmin(admin.ModelAdmin):
+    list_display = ['display_name', 'name', 'icon_name', 'created_at']
+    search_fields = ['name', 'display_name', 'description']
+    readonly_fields = ['created_at', 'updated_at']
+    ordering = ['display_name']
+    
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name', 'display_name', 'description')
+        }),
+        ('UI Configuration', {
+            'fields': ('icon_name',)
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+@admin.register(PlatformService)
+class PlatformServiceAdmin(admin.ModelAdmin):
+    list_display = ['platform', 'service', 'is_enabled', 'is_available', 'created_by', 'created_at']
+    list_filter = ['is_enabled', 'platform', 'service', 'created_at']
+    search_fields = ['platform__name', 'platform__display_name', 'service__name', 'service__display_name']
+    readonly_fields = ['created_at', 'updated_at', 'is_available']
+    ordering = ['platform__display_name', 'service__display_name']
+    
+    fieldsets = (
+        ('Platform Service Configuration', {
+            'fields': ('platform', 'service', 'is_enabled', 'description')
+        }),
+        ('Status', {
+            'fields': ('is_available',)
+        }),
+        ('Metadata', {
+            'fields': ('created_by', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def is_available(self, obj):
+        return obj.is_available
+    is_available.boolean = True
+    is_available.short_description = 'Available'

@@ -17,16 +17,10 @@ import TrackAccountsList from './pages/TrackAccountsList';
 import TrackAccountUpload from './pages/TrackAccountUpload';
 
 // Folder imports
-import FacebookFolders from './pages/FacebookFolders';
-import InstagramFolders from './pages/InstagramFolders';
-import LinkedInFolders from './pages/LinkedInFolders';
-import TikTokFolders from './pages/TikTokFolders';
+import DataStorage from './pages/DataStorage';
 
 // Data upload imports
-import FacebookDataUpload from './pages/FacebookDataUpload';
-import InstagramDataUpload from './pages/InstagramDataUpload';
-import LinkedInDataUpload from './pages/LinkedInDataUpload';
-import TikTokDataUpload from './pages/TikTokDataUpload';
+import UniversalDataPage from './pages/UniversalDataPage';
 
 // Report imports
 import GeneratedReports from './pages/GeneratedReports';
@@ -165,15 +159,9 @@ function App() {
               <Route path="/track-accounts/create" element={<LegacyRouteRedirect><TrackAccountCreate /></LegacyRouteRedirect>} />
               <Route path="/track-accounts/edit/:accountId" element={<LegacyRouteRedirect><TrackAccountEdit /></LegacyRouteRedirect>} />
 
-              {/* Legacy social media folder routes - redirect to org selection */}
-              <Route path="/instagram-folders" element={<LegacyRouteRedirect><InstagramFolders /></LegacyRouteRedirect>} />
-              <Route path="/instagram-data/:folderId" element={<LegacyRouteRedirect><InstagramDataUpload /></LegacyRouteRedirect>} />
-              <Route path="/facebook-folders" element={<LegacyRouteRedirect><FacebookFolders /></LegacyRouteRedirect>} />
-              <Route path="/facebook-data/:folderId" element={<LegacyRouteRedirect><FacebookDataUpload /></LegacyRouteRedirect>} />
-              <Route path="/linkedin-folders" element={<LegacyRouteRedirect><LinkedInFolders /></LegacyRouteRedirect>} />
-              <Route path="/linkedin-data/:folderId" element={<LegacyRouteRedirect><LinkedInDataUpload /></LegacyRouteRedirect>} />
-              <Route path="/tiktok-folders" element={<LegacyRouteRedirect><TikTokFolders /></LegacyRouteRedirect>} />
-              <Route path="/tiktok-data/:folderId" element={<LegacyRouteRedirect><TikTokDataUpload /></LegacyRouteRedirect>} />
+                             {/* Legacy social media folder routes - redirect to org selection */}
+               <Route path="/data-storage" element={<LegacyRouteRedirect><DataStorage /></LegacyRouteRedirect>} />
+               <Route path="/data/:platform/:folderId" element={<LegacyRouteRedirect><UniversalDataPage /></LegacyRouteRedirect>} />
 
               {/* Legacy analysis routes */}
               <Route path="/analysis" element={<LegacyRouteRedirect><Analysis /></LegacyRouteRedirect>} />
@@ -200,13 +188,13 @@ function App() {
               <Route path="/brightdata-scraper" element={<LegacyRouteRedirect><AutomatedBatchScraper /></LegacyRouteRedirect>} />
               <Route path="/automated-batch-scraper" element={<LegacyRouteRedirect><AutomatedBatchScraper /></LegacyRouteRedirect>} />
 
-              {/* Legacy redirects */}
-              <Route path="/projects" element={<Navigate to="/organizations" replace />} />
-              <Route path="/instagram-data" element={<Navigate to="/instagram-folders" replace />} />
-              <Route path="/facebook-data" element={<Navigate to="/facebook-folders" replace />} />
-              <Route path="/linkedin-data" element={<Navigate to="/linkedin-folders" replace />} />
-              <Route path="/tiktok-data" element={<Navigate to="/tiktok-folders" replace />} />
-              <Route path="/reports" element={<Navigate to="/report-folders" replace />} />
+                             {/* Legacy redirects */}
+               <Route path="/projects" element={<Navigate to="/organizations" replace />} />
+               <Route path="/instagram-data" element={<Navigate to="/data-storage" replace />} />
+               <Route path="/facebook-data" element={<Navigate to="/data-storage" replace />} />
+               <Route path="/linkedin-data" element={<Navigate to="/data-storage" replace />} />
+               <Route path="/tiktok-data" element={<Navigate to="/data-storage" replace />} />
+               <Route path="/reports" element={<Navigate to="/report-folders" replace />} />
 
               {/* =========================== */}
               {/* PROPER ORGANIZATION/PROJECT ROUTES */}
@@ -259,69 +247,25 @@ function App() {
               } />
 
               {/* Social Media Data Routes */}
-              {/* Instagram routes */}
-              <Route path="/organizations/:organizationId/projects/:projectId/instagram-folders" element={
+              {/* Data Storage - All Platforms */}
+              <Route path="/organizations/:organizationId/projects/:projectId/data-storage" element={
                 <ProtectedRoute>
                   <Layout>
-                    <InstagramFolders />
+                    <DataStorage />
                   </Layout>
                 </ProtectedRoute>
               } />
-              <Route path="/organizations/:organizationId/projects/:projectId/instagram-data/:folderId" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <InstagramDataUpload />
-                  </Layout>
-                </ProtectedRoute>
-              } />
+              
 
-              {/* Facebook routes */}
-              <Route path="/organizations/:organizationId/projects/:projectId/facebook-folders" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <FacebookFolders />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              <Route path="/organizations/:organizationId/projects/:projectId/facebook-data/:folderId" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <FacebookDataUpload />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-
-              {/* LinkedIn routes */}
-              <Route path="/organizations/:organizationId/projects/:projectId/linkedin-folders" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <LinkedInFolders />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              <Route path="/organizations/:organizationId/projects/:projectId/linkedin-data/:folderId" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <LinkedInDataUpload />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-
-              {/* TikTok routes */}
-              <Route path="/organizations/:organizationId/projects/:projectId/tiktok-folders" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <TikTokFolders />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              <Route path="/organizations/:organizationId/projects/:projectId/tiktok-data/:folderId" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <TikTokDataUpload />
-                  </Layout>
-                </ProtectedRoute>
-              } />
+              
+              
+                             <Route path="/organizations/:organizationId/projects/:projectId/data/:platform/:folderId" element={
+                 <ProtectedRoute>
+                   <Layout>
+                     <UniversalDataPage />
+                   </Layout>
+                 </ProtectedRoute>
+               } />
 
               {/* Comments Scraper routes */}
               <Route path="/organizations/:organizationId/projects/:projectId/comments-scraper" element={

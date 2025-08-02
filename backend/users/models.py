@@ -1,5 +1,73 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.core.validators import MinValueValidator, MaxValueValidator
+from django.utils import timezone
+import uuid
+
+# Platform and Service Management Models
+class Platform(models.Model):
+    """Model for managing available social media platforms"""
+    name = models.CharField(max_length=50, unique=True, help_text="Internal platform name (e.g., 'instagram', 'facebook')")
+    display_name = models.CharField(max_length=100, help_text="User-friendly display name (e.g., 'Instagram', 'Facebook')")
+    is_enabled = models.BooleanField(default=True, help_text="Whether this platform is available for use")
+    description = models.TextField(blank=True, null=True, help_text="Description of the platform")
+    icon_name = models.CharField(max_length=50, blank=True, null=True, help_text="Icon name for UI display")
+    color = models.CharField(max_length=7, blank=True, null=True, help_text="Hex color code for UI display")
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_platforms')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['display_name']
+        verbose_name = "Platform"
+        verbose_name_plural = "Platforms"
+
+    def __str__(self):
+        return self.display_name
+
+    def get_available_services(self):
+        """Get all enabled services for this platform"""
+        return self.platform_services.filter(is_enabled=True).select_related('service')
+
+class Service(models.Model):
+    """Model for managing available content services"""
+    name = models.CharField(max_length=50, unique=True, help_text="Internal service name (e.g., 'posts', 'reels', 'comments')")
+    display_name = models.CharField(max_length=100, help_text="User-friendly display name (e.g., 'Posts', 'Reels', 'Comments')")
+    description = models.TextField(blank=True, null=True, help_text="Description of the service")
+    icon_name = models.CharField(max_length=50, blank=True, null=True, help_text="Icon name for UI display")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['display_name']
+        verbose_name = "Service"
+        verbose_name_plural = "Services"
+
+    def __str__(self):
+        return self.display_name
+
+class PlatformService(models.Model):
+    """Model for managing platform-service combinations"""
+    platform = models.ForeignKey(Platform, on_delete=models.CASCADE, related_name='platform_services')
+    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='platform_services')
+    is_enabled = models.BooleanField(default=True, help_text="Whether this platform-service combination is available")
+    description = models.TextField(blank=True, null=True, help_text="Description of this platform-service combination")
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_platform_services')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ['platform', 'service']
+        verbose_name = "Platform Service"
+        verbose_name_plural = "Platform Services"
+
+    def __str__(self):
+        return f"{self.platform.display_name} - {self.service.display_name}"
+
+    @property
+    def is_available(self):
+        """Check if both platform and service are enabled"""
+        return self.is_enabled and self.platform.is_enabled
 
 # Create your models here.
 

@@ -11,7 +11,7 @@ import {
     Instagram as InstagramIcon,
     Logout as LogoutIcon,
     Settings as SettingsIcon,
-    Storage as StorageIcon
+    Folder as FolderIcon
 } from '@mui/icons-material';
 import CommentIcon from '@mui/icons-material/Comment';
 import LinkedInIcon from '@mui/icons-material/LinkedIn';
@@ -228,15 +228,9 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
     },
     {
       text: 'Data Storage',
-      path: '#data-storage',
-      icon: <StorageIcon />,
-      category: 'data',
-      subItems: [
-        { text: 'Instagram Data', path: getSocialMediaPath('instagram-folders'), icon: <InstagramIcon /> },
-        { text: 'Facebook Data', path: getSocialMediaPath('facebook-folders'), icon: <FacebookIcon /> },
-        { text: 'LinkedIn Data', path: getSocialMediaPath('linkedin-folders'), icon: <LinkedInIcon /> },
-        { text: 'TikTok Data', path: getSocialMediaPath('tiktok-folders'), icon: <MusicVideoIcon /> },
-      ]
+      path: getDataStoragePath(),
+      icon: <FolderIcon />,
+      category: 'data'
     },
     {
       text: 'AI Analysis',
@@ -306,6 +300,19 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
     }
 
     return '/reports/generated';
+  }
+
+  // Function to get correct path for Data Storage based on URL
+  function getDataStoragePath() {
+    // Extract organization and project IDs from URL
+    const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
+
+    if (match) {
+      const [, orgId, projId] = match;
+      return `/organizations/${orgId}/projects/${projId}/data-storage`;
+    }
+
+    return '/data-storage';
   }
 
   // Function to check if a menu item is active based on the current path
@@ -462,7 +469,9 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
 
     // For category headers with sub-items
     if (item.subItems) {
-      const menuId = item.path.replace('#', '');
+      // Check if this is a clickable category header (has a real path) or just a toggle
+      const isClickableCategory = !item.path.startsWith('#');
+      const menuId = item.path.startsWith('#') ? item.path.replace('#', '') : item.text.toLowerCase().replace(/\s+/g, '-');
       const isExpanded = expandedMenus[menuId];
       const isAnySubItemActive = isAnyCategoryItemActive(item.subItems);
 
@@ -470,29 +479,39 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
         <React.Fragment key={item.text}>
           <ListItem disablePadding sx={{ display: 'block' }}>
             <StyledListItemButton
-              active={isAnySubItemActive}
-              onClick={() => open ? handleToggleMenu(menuId) : onToggle()}
+              active={isAnySubItemActive || (isClickableCategory && itemActive)}
+              onClick={() => {
+                if (isClickableCategory) {
+                  // If it's a clickable category, navigate to the path
+                  handleNavigate(item.path);
+                } else {
+                  // If it's just a toggle, expand/collapse the menu
+                  open ? handleToggleMenu(menuId) : onToggle();
+                }
+              }}
             >
               <Tooltip title={open ? '' : item.text} placement="right" arrow>
-                <StyledListItemIcon active={isAnySubItemActive}>
+                <StyledListItemIcon active={isAnySubItemActive || (isClickableCategory && itemActive)}>
                   {item.icon}
                 </StyledListItemIcon>
               </Tooltip>
               {open && (
                 <>
                   <StyledListItemText
-                    active={isAnySubItemActive}
+                    active={isAnySubItemActive || (isClickableCategory && itemActive)}
                     primary={item.text}
                   />
-                  <CollapsibleIcon expanded={isExpanded}>
-                    <ExpandMoreIcon sx={{ fontSize: '1rem' }} />
-                  </CollapsibleIcon>
+                  {!isClickableCategory && (
+                    <CollapsibleIcon expanded={isExpanded}>
+                      <ExpandMoreIcon sx={{ fontSize: '1rem' }} />
+                    </CollapsibleIcon>
+                  )}
                 </>
               )}
             </StyledListItemButton>
           </ListItem>
 
-          {open && (
+          {open && !isClickableCategory && (
             <Collapse in={isExpanded} timeout="auto" unmountOnExit>
               <List component="div" disablePadding sx={{ pl: 1 }}>
                 {item.subItems.map(subItem => renderMenuItem(subItem, true))}

@@ -20,6 +20,21 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 from django.http import JsonResponse
+from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from .models import (
+    UserProfile, Project, Organization, OrganizationMembership, 
+    UserRole, Platform, Service, PlatformService
+)
+from .serializers import (
+    UserProfileSerializer, ProjectSerializer, OrganizationSerializer,
+    OrganizationMembershipSerializer, UserRoleSerializer,
+    PlatformSerializer, ServiceSerializer, PlatformServiceSerializer,
+    PlatformServiceCreateSerializer
+)
+from .permissions import IsSuperAdmin
 
 # Create your views here.
 
@@ -42,7 +57,31 @@ class RegisterView(generics.CreateAPIView):
 class CustomAuthToken(ObtainAuthToken):
     def post(self, request, *args, **kwargs):
         serializer = self.serializer_class(data=request.data, context={'request': request})
-        serializer.is_valid(raise_exception=True)
+        
+        if not serializer.is_valid():
+            # Check if username exists
+            username = request.data.get('username', '')
+            if username:
+                try:
+                    user = User.objects.get(username=username)
+                    # Username exists but password is wrong
+                    return Response({
+                        'error': 'wrong_password',
+                        'message': 'Incorrect password. Please try again.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                except User.DoesNotExist:
+                    # Username doesn't exist
+                    return Response({
+                        'error': 'account_not_found',
+                        'message': 'Account does not exist. Please check your username or create a new account.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                # No username provided
+                return Response({
+                    'error': 'missing_username',
+                    'message': 'Username is required.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
         user = serializer.validated_data['user']
         token, created = Token.objects.get_or_create(user=user)
 
@@ -505,3 +544,98 @@ class CSRFTokenView(APIView):
     def post(self, request, format=None):
         """Accept POST requests and return token"""
         return self.get(request, format)
+
+class PlatformViewSet(viewsets.ModelViewSet):
+    """ViewSet for Platform model - Superadmin only"""
+    queryset = Platform.objects.all()
+    serializer_class = PlatformSerializer
+    permission_classes = [IsAuthenticated, IsSuperAdmin]
+    
+    def get_queryset(self):
+        """Filter based on user permissions"""
+        if self.request.user.is_superuser:
+            return Platform.objects.all()
+        else:
+            # Regular users can only see enabled platforms
+            return Platform.objects.filter(is_enabled=True)
+    
+    def perform_create(self, serializer):
+        """Set the created_by field"""
+        serializer.save(created_by=self.request.user)
+    
+    def perform_update(self, serializer):
+        """Set the updated_by field"""
+        serializer.save()
+
+class ServiceViewSet(viewsets.ModelViewSet):
+    """ViewSet for Service model - Superadmin only"""
+    queryset = Service.objects.all()
+    serializer_class = ServiceSerializer
+    permission_classes = [IsAuthenticated, IsSuperAdmin]
+    
+    def get_queryset(self):
+        """Filter based on user permissions"""
+        if self.request.user.is_superuser:
+            return Service.objects.all()
+        else:
+            # Regular users can see all services (they're filtered by platform availability)
+            return Service.objects.all()
+
+class PlatformServiceViewSet(viewsets.ModelViewSet):
+    """ViewSet for PlatformService model - Superadmin only"""
+    queryset = PlatformService.objects.all()
+    serializer_class = PlatformServiceSerializer
+    permission_classes = [IsAuthenticated, IsSuperAdmin]
+    
+    def get_serializer_class(self):
+        """Use different serializer for creation"""
+        if self.action == 'create':
+            return PlatformServiceCreateSerializer
+        return PlatformServiceSerializer
+    
+    def get_queryset(self):
+        """Filter based on user permissions"""
+        if self.request.user.is_superuser:
+            return PlatformService.objects.select_related('platform', 'service')
+        else:
+            # Regular users can only see enabled platform-service combinations
+            return PlatformService.objects.filter(
+                is_enabled=True, 
+                platform__is_enabled=True
+            ).select_related('platform', 'service')
+    
+    def perform_create(self, serializer):
+        """Set the created_by field"""
+        serializer.save(created_by=self.request.user)
+    
+    def perform_update(self, serializer):
+        """Set the updated_by field"""
+        serializer.save()
+
+class AvailablePlatformsViewSet(viewsets.ReadOnlyModelViewSet):
+    """ViewSet for getting available platforms and services for regular users"""
+    serializer_class = PlatformSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """Get only enabled platforms with their available services"""
+        return Platform.objects.filter(is_enabled=True)
+    
+    @action(detail=True, methods=['get'])
+    def services(self, request, pk=None):
+        """Get available services for a specific platform"""
+        platform = self.get_object()
+        services = platform.get_available_services()
+        serializer = ServiceSerializer(services, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def all_available(self, request):
+        """Get all available platform-service combinations"""
+        platform_services = PlatformService.objects.filter(
+            is_enabled=True, 
+            platform__is_enabled=True
+        ).select_related('platform', 'service')
+        
+        serializer = PlatformServiceSerializer(platform_services, many=True)
+        return Response(serializer.data)

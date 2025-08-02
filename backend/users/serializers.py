@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
-from .models import UserProfile, Project, Organization, OrganizationMembership, UserRole
+from .models import UserProfile, Project, Organization, OrganizationMembership, UserRole, Platform, Service, PlatformService
 
 class UserRoleSerializer(serializers.ModelSerializer):
     role_display = serializers.CharField(source='get_role_display', read_only=True)
@@ -121,3 +121,66 @@ class ProjectDetailSerializer(ProjectSerializer):
     
     class Meta(ProjectSerializer.Meta):
         fields = ProjectSerializer.Meta.fields + ['authorized_users'] 
+
+class PlatformSerializer(serializers.ModelSerializer):
+    """Serializer for Platform model"""
+    available_services = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Platform
+        fields = [
+            'id', 'name', 'display_name', 'is_enabled', 'description', 
+            'icon_name', 'color', 'available_services', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def get_available_services(self, obj):
+        """Get available services for this platform"""
+        services = obj.get_available_services()
+        return ServiceSerializer(services, many=True).data
+
+class ServiceSerializer(serializers.ModelSerializer):
+    """Serializer for Service model"""
+    
+    class Meta:
+        model = Service
+        fields = [
+            'id', 'name', 'display_name', 'description', 
+            'icon_name', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+class PlatformServiceSerializer(serializers.ModelSerializer):
+    """Serializer for PlatformService model"""
+    platform = PlatformSerializer(read_only=True)
+    service = ServiceSerializer(read_only=True)
+    is_available = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = PlatformService
+        fields = [
+            'id', 'platform', 'service', 'is_enabled', 'is_available',
+            'description', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'is_available', 'created_at', 'updated_at']
+
+class PlatformServiceCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating PlatformService instances"""
+    
+    class Meta:
+        model = PlatformService
+        fields = [
+            'platform', 'service', 'is_enabled', 'description'
+        ]
+    
+    def validate(self, data):
+        """Validate that the platform-service combination doesn't already exist"""
+        platform = data.get('platform')
+        service = data.get('service')
+        
+        if PlatformService.objects.filter(platform=platform, service=service).exists():
+            raise serializers.ValidationError(
+                f"Platform-service combination '{platform.display_name} - {service.display_name}' already exists."
+            )
+        
+        return data 

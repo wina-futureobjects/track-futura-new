@@ -4,9 +4,14 @@ from .views import (
     ProjectListCreateView, ProjectDetailView,
     OrganizationListCreateView, OrganizationDetailView,
     OrganizationMembershipView, OrganizationMembershipDetailView,
-    UserSearchView, OrganizationStatsView, ProjectStatsView, CSRFTokenView
+    UserSearchView, OrganizationStatsView, ProjectStatsView, CSRFTokenView,
+    PlatformViewSet, ServiceViewSet, PlatformServiceViewSet,
+    AvailablePlatformsViewSet
 )
 from rest_framework.authtoken.views import obtain_auth_token
+from rest_framework.routers import DefaultRouter
+
+router = DefaultRouter()
 
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
@@ -29,3 +34,12 @@ urlpatterns = [
     path('projects/<int:pk>/', ProjectDetailView.as_view(), name='project-detail'),
     path('projects/<int:project_id>/stats/', ProjectStatsView.as_view(), name='project-stats'),
 ]
+
+# Platform and Service Management URLs
+router.register(r'platforms', PlatformViewSet, basename='platform')
+router.register(r'services', ServiceViewSet, basename='service')
+router.register(r'platform-services', PlatformServiceViewSet, basename='platform-service')
+router.register(r'available-platforms', AvailablePlatformsViewSet, basename='available-platform')
+
+# Include router URLs
+urlpatterns += router.urls

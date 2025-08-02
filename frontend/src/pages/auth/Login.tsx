@@ -73,7 +73,17 @@ const useAuth = () => {
           console.error('❌ Failed to parse error response as JSON:', parseError);
           throw new Error(`HTTP ${response.status}: Unable to parse server error response. Response: ${responseText.substring(0, 200)}`);
         }
-        throw new Error(errorData.detail || errorData.non_field_errors?.[0] || 'Login failed');
+        
+        // Handle specific error types from backend
+        if (errorData.error === 'wrong_password') {
+          throw new Error('Incorrect password. Please try again.');
+        } else if (errorData.error === 'account_not_found') {
+          throw new Error('Account does not exist. Please check your username or create a new account.');
+        } else if (errorData.error === 'missing_username') {
+          throw new Error('Username is required.');
+        } else {
+          throw new Error(errorData.message || errorData.detail || errorData.non_field_errors?.[0] || 'Login failed');
+        }
       }
 
       // Try to get the response text first to see what we're dealing with
@@ -358,7 +368,7 @@ const Login: React.FC = () => {
         navigate('/');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid username or password');
+      setError(err instanceof Error ? err.message : 'Unable to log in with provided credentials');
     } finally {
       setIsLoading(false);
     }
