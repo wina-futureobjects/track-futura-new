@@ -127,6 +127,9 @@ const TrackSourcesList = () => {
     sourceName: '',
   });
 
+  // CSV download loading state
+  const [csvDownloading, setCsvDownloading] = useState(false);
+
   // Fetch sources with filters
   const fetchSources = async (
     pageNumber = 0, 
@@ -380,27 +383,64 @@ const TrackSourcesList = () => {
     if (!projectId) return;
 
     try {
-      const response = await apiFetch(`/api/track-accounts/sources/download_csv/?project=${projectId}`);
+      setCsvDownloading(true);
+      
+      // Build query parameters to include current filters
+      let queryParams = `project=${projectId}`;
+      
+      // Add search parameter if active
+      if (searchTerm) {
+        queryParams += `&search=${encodeURIComponent(searchTerm)}`;
+      }
+      
+      // Add social media filters if active
+      if (socialMediaFilters.hasFacebook) {
+        queryParams += '&has_facebook=true';
+      }
+      if (socialMediaFilters.hasInstagram) {
+        queryParams += '&has_instagram=true';
+      }
+      if (socialMediaFilters.hasLinkedIn) {
+        queryParams += '&has_linkedin=true';
+      }
+      if (socialMediaFilters.hasTikTok) {
+        queryParams += '&has_tiktok=true';
+      }
+      
+      console.log('=== CSV DOWNLOAD DEBUG ===');
+      console.log('Download URL:', `/api/track-accounts/sources/download_csv/?${queryParams}`);
+      console.log('Current filters:', { searchTerm, socialMediaFilters });
+      
+      const response = await apiFetch(`/api/track-accounts/sources/download_csv/?${queryParams}`);
       
       if (!response.ok) {
-        throw new Error('Download failed');
+        const errorText = await response.text();
+        console.error('Download response error:', errorText);
+        throw new Error(`Download failed: ${response.status} ${errorText}`);
       }
 
       // Create a blob from the response
       const blob = await response.blob();
+      
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+      const filename = `track_sources_export_${timestamp}.csv`;
+      
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'track_sources.csv';
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       
-      showSnackbar('CSV downloaded successfully', 'success');
+      showSnackbar(`CSV exported successfully: ${filename}`, 'success');
     } catch (error) {
       console.error('Download error:', error);
-      showSnackbar('Failed to download CSV', 'error');
+      showSnackbar(`Failed to download CSV: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    } finally {
+      setCsvDownloading(false);
     }
   };
 
@@ -436,22 +476,29 @@ const TrackSourcesList = () => {
             </Box>
             <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
               {/* CSV Download */}
-              <Button
-                variant="outlined"
-                startIcon={<DownloadIcon />}
-                onClick={handleCsvDownload}
-                size="small"
-                sx={{ 
-                  borderColor: theme.palette.secondary.main,
-                  color: theme.palette.secondary.main,
-                  '&:hover': { 
-                    borderColor: theme.palette.secondary.dark,
-                    bgcolor: theme.palette.secondary.main + '0A'
-                  }
-                }}
-              >
-                Export CSV
-              </Button>
+              <Tooltip title={hasActiveFilters ? "Export filtered data as CSV" : "Export all sources as CSV"}>
+                <Button
+                  variant="outlined"
+                  startIcon={csvDownloading ? <CircularProgress size={16} /> : <DownloadIcon />}
+                  onClick={handleCsvDownload}
+                  disabled={csvDownloading}
+                  size="small"
+                  sx={{ 
+                    borderColor: theme.palette.secondary.main,
+                    color: theme.palette.secondary.main,
+                    '&:hover': { 
+                      borderColor: theme.palette.secondary.dark,
+                      bgcolor: theme.palette.secondary.main + '0A'
+                    },
+                    '&:disabled': {
+                      borderColor: theme.palette.action.disabled,
+                      color: theme.palette.action.disabled
+                    }
+                  }}
+                >
+                  {csvDownloading ? 'Exporting...' : 'Export CSV'}
+                </Button>
+              </Tooltip>
               
               {/* Add Source */}
               <Button
