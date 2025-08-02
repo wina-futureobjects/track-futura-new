@@ -235,7 +235,7 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['GET'])
     def download_csv(self, request):
         """
-        Download track sources as CSV
+        Download track sources as CSV with proper formatting
         """
         try:
             # Get query parameters for filtering
@@ -248,34 +248,85 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
             if project_id:
                 queryset = queryset.filter(project_id=project_id)
             
-            # Create CSV response
-            response = HttpResponse(content_type='text/csv')
-            response['Content-Disposition'] = 'attachment; filename="track_sources.csv"'
+            # Apply the same filters as the list view
+            search = request.query_params.get('search')
+            if search:
+                queryset = queryset.filter(Q(name__icontains=search))
             
-            writer = csv.writer(response)
+            # Social media filters
+            has_facebook = request.query_params.get('has_facebook')
+            has_instagram = request.query_params.get('has_instagram')
+            has_linkedin = request.query_params.get('has_linkedin')
+            has_tiktok = request.query_params.get('has_tiktok')
             
-            # Write header
-            writer.writerow([
+            if has_facebook == 'true':
+                queryset = queryset.filter(facebook_link__isnull=False).exclude(facebook_link='')
+            if has_instagram == 'true':
+                queryset = queryset.filter(instagram_link__isnull=False).exclude(instagram_link='')
+            if has_linkedin == 'true':
+                queryset = queryset.filter(linkedin_link__isnull=False).exclude(linkedin_link='')
+            if has_tiktok == 'true':
+                queryset = queryset.filter(tiktok_link__isnull=False).exclude(tiktok_link='')
+            
+            # Create CSV response with proper encoding
+            response = HttpResponse(content_type='text/csv; charset=utf-8')
+            response['Content-Disposition'] = 'attachment; filename="track_sources_export.csv"'
+            
+            # Use DictWriter for better handling of special characters
+            fieldnames = [
+                'ID',
                 'Name', 
-                'FACEBOOK_LINK', 'INSTAGRAM_LINK', 'LINKEDIN_LINK', 'TIKTOK_LINK',
-                'OTHER_SOCIAL_MEDIA'
-            ])
+                'Facebook Link',
+                'Instagram Link', 
+                'LinkedIn Link', 
+                'TikTok Link',
+                'Additional Links',
+                'Project ID',
+                'Created Date',
+                'Last Updated'
+            ]
+            
+            writer = csv.DictWriter(response, fieldnames=fieldnames)
+            
+            # Write export metadata as comments (some CSV readers support this)
+            writer.writerow({'ID': '# Track Sources Export'})
+            writer.writerow({'ID': f'# Export Date: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'})
+            writer.writerow({'ID': f'# Total Records: {queryset.count()}'})
+            if project_id:
+                writer.writerow({'ID': f'# Project ID: {project_id}'})
+            if search:
+                writer.writerow({'ID': f'# Search Filter: {search}'})
+            if any([has_facebook == 'true', has_instagram == 'true', has_linkedin == 'true', has_tiktok == 'true']):
+                filters = []
+                if has_facebook == 'true': filters.append('Facebook')
+                if has_instagram == 'true': filters.append('Instagram')
+                if has_linkedin == 'true': filters.append('LinkedIn')
+                if has_tiktok == 'true': filters.append('TikTok')
+                writer.writerow({'ID': f'# Social Media Filters: {", ".join(filters)}'})
+            writer.writerow({'ID': ''})  # Empty row for separation
+            
+            writer.writeheader()
             
             # Write data rows
             for source in queryset:
-                writer.writerow([
-                    source.name,
-                    source.facebook_link or '',
-                    source.instagram_link or '',
-                    source.linkedin_link or '',
-                    source.tiktok_link or '',
-                    source.other_social_media or '',
-                ])
+                writer.writerow({
+                    'ID': source.id,
+                    'Name': source.name,
+                    'Facebook Link': source.facebook_link or '',
+                    'Instagram Link': source.instagram_link or '',
+                    'LinkedIn Link': source.linkedin_link or '',
+                    'TikTok Link': source.tiktok_link or '',
+                    'Additional Links': source.other_social_media or '',
+                    'Project ID': source.project.id if source.project else '',
+                    'Created Date': source.created_at.strftime('%Y-%m-%d %H:%M:%S') if source.created_at else '',
+                    'Last Updated': source.updated_at.strftime('%Y-%m-%d %H:%M:%S') if source.updated_at else '',
+                })
             
             return response
             
         except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            print(f"CSV export error: {str(e)}")
+            return Response({'error': f'Failed to export CSV: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=False, methods=['GET'])
     def statistics(self, request):

@@ -20,6 +20,7 @@ import {
   Card,
   CardContent,
   Tooltip,
+  MenuItem,
 } from '@mui/material';
 import {
   CloudUpload as CloudUploadIcon,
@@ -36,6 +37,7 @@ import {
   LinkedIn as LinkedInIcon,
   MusicNote as TikTokIcon,
   Help as HelpIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { apiFetch } from '../../utils/api';
@@ -104,15 +106,15 @@ const validateServiceUrl = (service: string | null | undefined, url: string | un
     
     case 'facebook_comments':
       // Facebook comments: post URL (strict match for post URLs)
-      return /^https?:\/\/(www\.)?facebook\.com\/(?:(?:[a-zA-Z0-9.\-]+\/posts\/\d+)|(?:groups\/\d+\/posts\/\d+)|(?:permalink\.php\?story_fbid=\d+&id=\d+)|(?:profile\.php\?id=\d+&[^ ]*story_fbid=\d+)|(?:share\/p\/[a-zA-Z0-9]+))\/?$/i.test(url);
+      return /^https?:\/\/(www\.)?facebook\.com\/(?:(?:[a-zA-Z0-9.-]+\/posts\/\d+)|(?:groups\/\d+\/posts\/\d+)|(?:permalink\.php\?story_fbid=\d+&id=\d+)|(?:profile\.php\?id=\d+&[^ ]*story_fbid=\d+)|(?:share\/p\/[a-zA-Z0-9]+))\/?$/i.test(url);
     
     case 'facebook_reels_profile':
       // Facebook reels: profile URL, profile.php?id=, or group URL
-      return /^https?:\/\/(www\.)?facebook\.com\/(profile\.php\?id=\d+|[a-zA-Z0-9.\-]+|groups\/[a-zA-Z0-9.\-]+)\/?$/i.test(url);
+      return /^https?:\/\/(www\.)?facebook\.com\/(profile\.php\?id=\d+|[a-zA-Z0-9.-]+|groups\/[a-zA-Z0-9.-]+)\/?$/i.test(url);
 
     case 'facebook_pages_posts':
       // Facebook pages posts: page, group, or open profile URL
-      return /^https?:\/\/(www\.)?facebook\.com\/(profile\.php\?id=\d+|[a-zA-Z0-9.\-]+|groups\/[a-zA-Z0-9.\-]+)\/?$/i.test(url);
+      return /^https?:\/\/(www\.)?facebook\.com\/(profile\.php\?id=\d+|[a-zA-Z0-9.-]+|groups\/[a-zA-Z0-9.-]+)\/?$/i.test(url);
     
     default:
       return true;
@@ -155,29 +157,7 @@ const getServiceValidationMessage = (service: string | null | undefined, url: st
   }
 };
 
-const getValidationMessage = (platform: string, link: string | undefined | null): string => {
-  if (!link || !link.trim()) return '';
-  
-  let isValid = false;
-  switch (platform) {
-    case 'facebook':
-      isValid = validateFacebookLink(link);
-      break;
-    case 'instagram':
-      isValid = validateInstagramLink(link);
-      break;
-    case 'linkedin':
-      isValid = validateLinkedInLink(link);
-      break;
-    case 'tiktok':
-      isValid = validateTikTokLink(link);
-      break;
-    default:
-      isValid = true;
-  }
-  
-  return isValid ? '' : 'Please enter a valid social media URL.';
-};
+
 
 // Helper functions for the new step-by-step flow
 const getServicesForPlatform = (platform: string | null | undefined) => {
@@ -275,7 +255,7 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
     message: '',
     severity: 'success' as 'success' | 'error' | 'info'
   });
-  const [mode, setMode] = useState<'bulk' | 'single'>('bulk'); // New mode state
+  const [mode, setMode] = useState<'bulk' | 'single'>('single'); // Default to quick add mode
 
   // Load draft from localStorage on mount
   useEffect(() => {
@@ -338,11 +318,11 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
         const headers = lines[0].split(',').map(h => h.trim());
         
         // Validate headers
-        const expectedHeaders = ['Name', 'FACEBOOK_LINK', 'INSTAGRAM_LINK', 'LINKEDIN_LINK', 'TIKTOK_LINK', 'OTHER_SOCIAL_MEDIA'];
+        const expectedHeaders = ['Name', 'Platform', 'Service_Type', 'URL', 'Additional_URLs'];
         const hasValidHeaders = expectedHeaders.every(h => headers.includes(h));
         
         if (!hasValidHeaders) {
-          showSnackbar('CSV must have headers: Name, FACEBOOK_LINK, INSTAGRAM_LINK, LINKEDIN_LINK, TIKTOK_LINK, OTHER_SOCIAL_MEDIA', 'error');
+          showSnackbar('CSV must have headers: Name, Platform, Service_Type, URL, Additional_URLs', 'error');
           return;
         }
 
@@ -358,12 +338,44 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
             const source: DraftSource = {
               id: generateId(),
               name: values[headers.indexOf('Name')] || '',
-              facebook_link: values[headers.indexOf('FACEBOOK_LINK')] || null,
-              instagram_link: values[headers.indexOf('INSTAGRAM_LINK')] || null,
-              linkedin_link: values[headers.indexOf('LINKEDIN_LINK')] || null,
-              tiktok_link: values[headers.indexOf('TIKTOK_LINK')] || null,
-              other_social_media: values[headers.indexOf('OTHER_SOCIAL_MEDIA')] || null,
+              facebook_link: null, // Initialize all fields to null
+              instagram_link: null,
+              linkedin_link: null,
+              tiktok_link: null,
+              other_social_media: null,
+              selectedPlatform: values[headers.indexOf('Platform')] || null,
+              selectedService: values[headers.indexOf('Service_Type')] || null,
             };
+
+            // Parse URLs and additional URLs
+            const url = values[headers.indexOf('URL')] || null;
+            if (url) {
+              const field = getUrlFieldForService(source.selectedService);
+              if (field === 'facebook_link') {
+                source.facebook_link = url;
+              } else if (field === 'instagram_link') {
+                source.instagram_link = url;
+              } else if (field === 'linkedin_link') {
+                source.linkedin_link = url;
+              } else if (field === 'tiktok_link') {
+                source.tiktok_link = url;
+              } else if (field === 'other_social_media') {
+                source.other_social_media = url;
+              }
+            }
+
+            const additionalUrls = values[headers.indexOf('Additional_URLs')] || '';
+            if (additionalUrls) {
+              const urls = additionalUrls.split(';').map(u => u.trim()).filter(u => u);
+              source.additionalUrls = urls.map(u => ({ 
+                id: generateId(), 
+                url: u, 
+                service: source.selectedService || '' 
+              }));
+            } else {
+              source.additionalUrls = [];
+            }
+
             newSources.push(source);
           }
         }
@@ -394,6 +406,8 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
       linkedin_link: null,
       tiktok_link: null,
       other_social_media: null,
+      selectedPlatform: null,
+      selectedService: null,
       additionalUrls: [],
     };
     setDraftSources(prev => [...prev, newSource]);
@@ -552,8 +566,8 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               name: source.name.trim(),
-              ...socialMediaLinks,
               project: parseInt(projectId || '0'),
+              ...socialMediaLinks,
             }),
           });
 
@@ -596,8 +610,14 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
 
   // Download template
   const handleDownloadTemplate = () => {
-    const csvContent = 'Name,FACEBOOK_LINK,INSTAGRAM_LINK,LINKEDIN_LINK,TIKTOK_LINK,OTHER_SOCIAL_MEDIA\n' +
-                      'Example Source,https://facebook.com/example,https://instagram.com/example,https://linkedin.com/in/example,https://tiktok.com/@example,Other social media info';
+    const csvContent = 'Name,Platform,Service_Type,URL,Additional_URLs\n' +
+                      'Example Source,linkedin,linkedin_posts,https://linkedin.com/in/example,https://linkedin.com/in/example2;https://linkedin.com/in/example3\n' +
+                      'Facebook Page,facebook,facebook_pages_posts,https://facebook.com/examplepage,https://facebook.com/anotherpage\n' +
+                      'Instagram Profile,instagram,instagram_posts,https://instagram.com/example,https://instagram.com/example2\n' +
+                      'TikTok Discover,tiktok,tiktok_posts,https://tiktok.com/discover/example,\n' +
+                      'Facebook Comments,facebook,facebook_comments,https://facebook.com/example/posts/123,\n' +
+                      'Instagram Reels,instagram,instagram_reels,https://instagram.com/example,https://instagram.com/example2\n' +
+                      'Instagram Comments,instagram,instagram_comments,https://instagram.com/p/ABC123xyz/,https://instagram.com/reel/DEF456uvw/';
     
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -645,6 +665,31 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
     return getServiceValidationMessage(draftSources[0].selectedService, value);
   };
 
+  // Helper functions for bulk mode table
+  const getCurrentUrlValueForSource = (source: DraftSource) => {
+    if (!source.selectedService) return '';
+    const field = getUrlFieldForService(source.selectedService);
+    return source[field as keyof DraftSource] as string || '';
+  };
+
+  const hasUrlValidationErrorForSource = (source: DraftSource) => {
+    if (!source.selectedService) return false;
+    const field = getUrlFieldForService(source.selectedService);
+    const value = source[field as keyof DraftSource] as string;
+    if (!value) return false;
+    
+    return !validateServiceUrl(source.selectedService, value);
+  };
+
+  const getUrlValidationMessageForSource = (source: DraftSource) => {
+    if (!source.selectedService) return '';
+    const field = getUrlFieldForService(source.selectedService);
+    const value = source[field as keyof DraftSource] as string;
+    if (!value) return '';
+    
+    return getServiceValidationMessage(source.selectedService, value);
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       {/* Header */}
@@ -689,9 +734,6 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
       {/* Quick Single Mode */}
       {mode === 'single' && (
         <Paper sx={{ p: 4, mb: 3 }}>
-          <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
-            Quick Add Source
-          </Typography>
           
           <Stack spacing={3}>
             {/* Step 1: Source Name */}
@@ -715,6 +757,8 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
                       linkedin_link: null,
                       tiktok_link: null,
                       other_social_media: null,
+                      selectedPlatform: null,
+                      selectedService: null,
                     };
                     setDraftSources([newSource]);
                     // Update the name immediately
@@ -1092,11 +1136,10 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
                   <TableHead>
                     <TableRow>
                       <TableCell sx={{ fontWeight: 600, minWidth: 200 }}>Name *</TableCell>
-                      <TableCell sx={{ fontWeight: 600, minWidth: 200 }}>Facebook</TableCell>
-                      <TableCell sx={{ fontWeight: 600, minWidth: 200 }}>Instagram</TableCell>
-                      <TableCell sx={{ fontWeight: 600, minWidth: 200 }}>LinkedIn</TableCell>
-                      <TableCell sx={{ fontWeight: 600, minWidth: 200 }}>TikTok</TableCell>
-                      <TableCell sx={{ fontWeight: 600, minWidth: 200 }}>Other</TableCell>
+                      <TableCell sx={{ fontWeight: 600, minWidth: 120 }}>Platform</TableCell>
+                      <TableCell sx={{ fontWeight: 600, minWidth: 150 }}>Service Type</TableCell>
+                      <TableCell sx={{ fontWeight: 600, minWidth: 300 }}>URL</TableCell>
+                      <TableCell sx={{ fontWeight: 600, minWidth: 200 }}>Additional URLs</TableCell>
                       <TableCell sx={{ fontWeight: 600, width: 80 }}>Actions</TableCell>
                     </TableRow>
                   </TableHead>
@@ -1132,16 +1175,56 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
                         </TableCell>
                         <TableCell>
                           <TextField
+                            select
                             fullWidth
                             size="small"
-                            value={source.facebook_link || ''}
-                            onChange={(e) => handleFieldChange(source.id, 'facebook_link', e.target.value)}
-                            placeholder="https://facebook.com/..."
-                            error={source.facebook_link ? !validateFacebookLink(source.facebook_link) : false}
-                            helperText={getValidationMessage('facebook', source.facebook_link)}
+                            value={source.selectedPlatform || ''}
+                            onChange={(e) => {
+                              handleFieldChange(source.id, 'selectedPlatform' as keyof DraftSource, e.target.value);
+                              handleFieldChange(source.id, 'selectedService' as keyof DraftSource, null);
+                            }}
+                            placeholder="Select platform"
+                          >
+                            <MenuItem value="linkedin">LinkedIn</MenuItem>
+                            <MenuItem value="facebook">Facebook</MenuItem>
+                            <MenuItem value="instagram">Instagram</MenuItem>
+                            <MenuItem value="tiktok">TikTok</MenuItem>
+                          </TextField>
+                        </TableCell>
+                        <TableCell>
+                          <TextField
+                            select
+                            fullWidth
+                            size="small"
+                            value={source.selectedService || ''}
+                            onChange={(e) => handleFieldChange(source.id, 'selectedService' as keyof DraftSource, e.target.value)}
+                            disabled={!source.selectedPlatform}
+                            placeholder="Select service"
+                          >
+                            {source.selectedPlatform && getServicesForPlatform(source.selectedPlatform).map((service) => (
+                              <MenuItem key={service.key} value={service.key}>
+                                {service.label}
+                              </MenuItem>
+                            ))}
+                          </TextField>
+                        </TableCell>
+                        <TableCell>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            value={getCurrentUrlValueForSource(source) || ''}
+                            onChange={(e) => {
+                              const value = e.target.value || null;
+                              const field = getUrlFieldForService(source.selectedService);
+                              handleFieldChange(source.id, field as keyof DraftSource, value);
+                            }}
+                            placeholder={getUrlPlaceholder(source.selectedPlatform, source.selectedService)}
+                            error={hasUrlValidationErrorForSource(source)}
+                            helperText={getUrlValidationMessageForSource(source)}
+                            disabled={!source.selectedService}
                             sx={{
                               '& .MuiFormHelperText-root': {
-                                color: (source.facebook_link && !validateFacebookLink(source.facebook_link)) ? '#d32f2f !important' : 'inherit'
+                                color: hasUrlValidationErrorForSource(source) ? '#d32f2f !important' : 'inherit'
                               },
                               '& .MuiOutlinedInput-root': {
                                 '&.Mui-error': {
@@ -1159,103 +1242,59 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
                           />
                         </TableCell>
                         <TableCell>
-                          <TextField
-                            fullWidth
-                            size="small"
-                            value={source.instagram_link || ''}
-                            onChange={(e) => handleFieldChange(source.id, 'instagram_link', e.target.value)}
-                            placeholder="https://instagram.com/..."
-                            error={source.instagram_link ? !validateInstagramLink(source.instagram_link) : false}
-                            helperText={getValidationMessage('instagram', source.instagram_link)}
-                            sx={{
-                              '& .MuiFormHelperText-root': {
-                                color: (source.instagram_link && !validateInstagramLink(source.instagram_link)) ? '#d32f2f !important' : 'inherit'
-                              },
-                              '& .MuiOutlinedInput-root': {
-                                '&.Mui-error': {
-                                  '& fieldset': {
-                                    borderColor: '#d32f2f !important'
-                                  }
-                                },
-                                '&:not(.Mui-error)': {
-                                  '& fieldset': {
-                                    borderColor: '#d0d7de !important'
-                                  }
-                                }
-                              }
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <TextField
-                            fullWidth
-                            size="small"
-                            value={source.linkedin_link || ''}
-                            onChange={(e) => handleFieldChange(source.id, 'linkedin_link', e.target.value)}
-                            placeholder="https://linkedin.com/in/..."
-                            error={source.linkedin_link ? !validateLinkedInLink(source.linkedin_link) : false}
-                            helperText={getValidationMessage('linkedin', source.linkedin_link)}
-                            sx={{
-                              '& .MuiFormHelperText-root': {
-                                color: (source.linkedin_link && !validateLinkedInLink(source.linkedin_link)) ? '#d32f2f !important' : 'inherit'
-                              },
-                              '& .MuiOutlinedInput-root': {
-                                '&.Mui-error': {
-                                  '& fieldset': {
-                                    borderColor: '#d32f2f !important'
-                                  }
-                                },
-                                '&:not(.Mui-error)': {
-                                  '& fieldset': {
-                                    borderColor: '#d0d7de !important'
-                                  }
-                                }
-                              }
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <TextField
-                            fullWidth
-                            size="small"
-                            value={source.tiktok_link || ''}
-                            onChange={(e) => handleFieldChange(source.id, 'tiktok_link', e.target.value)}
-                            placeholder="https://tiktok.com/@..."
-                            error={source.tiktok_link ? !validateTikTokLink(source.tiktok_link) : false}
-                            helperText={getValidationMessage('tiktok', source.tiktok_link)}
-                            sx={{
-                              '& .MuiFormHelperText-root': {
-                                color: (source.tiktok_link && !validateTikTokLink(source.tiktok_link)) ? '#d32f2f !important' : 'inherit'
-                              },
-                              '& .MuiOutlinedInput-root': {
-                                '&.Mui-error': {
-                                  '& fieldset': {
-                                    borderColor: '#d32f2f !important'
-                                  }
-                                },
-                                '&:not(.Mui-error)': {
-                                  '& fieldset': {
-                                    borderColor: '#d0d7de !important'
-                                  }
-                                }
-                              }
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <TextField
-                            fullWidth
-                            size="small"
-                            value={source.other_social_media || ''}
-                            onChange={(e) => handleFieldChange(source.id, 'other_social_media', e.target.value)}
-                            placeholder="Other social media info"
-                          />
+                          <Box>
+                            {source.additionalUrls && source.additionalUrls.length > 0 && (
+                              <Stack spacing={1}>
+                                {source.additionalUrls.map((additionalUrl) => (
+                                  <Box key={additionalUrl.id} sx={{ display: 'flex', alignItems: 'center' }}>
+                                    <TextField
+                                      size="small"
+                                      value={additionalUrl.url}
+                                      onChange={(e) => handleUpdateAdditionalUrl(source.id, additionalUrl.id, e.target.value)}
+                                      placeholder="Additional URL"
+                                      sx={{ flexGrow: 1, mr: 1 }}
+                                    />
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => handleRemoveAdditionalUrl(source.id, additionalUrl.id)}
+                                      sx={{ 
+                                        color: '#dc2626',
+                                        '&:hover': {
+                                          bgcolor: '#fef2f2',
+                                          transform: 'scale(1.05)'
+                                        },
+                                        transition: 'all 0.2s ease-in-out'
+                                      }}
+                                    >
+                                      <CloseIcon sx={{ fontSize: 16 }} />
+                                    </IconButton>
+                                  </Box>
+                                ))}
+                              </Stack>
+                            )}
+                            <Button
+                              size="small"
+                              startIcon={<AddIcon />}
+                              onClick={() => handleAddAdditionalUrl(source.id)}
+                              disabled={!source.selectedService}
+                              sx={{ mt: 1 }}
+                            >
+                              More URLs
+                            </Button>
+                          </Box>
                         </TableCell>
                         <TableCell>
                           <IconButton
                             size="small"
-                            color="error"
                             onClick={() => handleDeleteRow(source.id)}
+                            sx={{
+                              color: '#dc2626',
+                              '&:hover': {
+                                bgcolor: '#fef2f2',
+                                transform: 'scale(1.05)'
+                              },
+                              transition: 'all 0.2s ease-in-out'
+                            }}
                           >
                             <DeleteIcon />
                           </IconButton>
