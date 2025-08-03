@@ -129,6 +129,9 @@ const TrackSourcesList = () => {
 
   // CSV download loading state
   const [csvDownloading, setCsvDownloading] = useState(false);
+  
+  // Workflow-related state
+
 
   // Fetch sources with filters
   const fetchSources = async (
@@ -239,13 +242,20 @@ const TrackSourcesList = () => {
   const refreshData = () => {
     fetchSources(page, rowsPerPage, searchTerm, socialMediaFilters);
     fetchFilterStats();
+    if (projectId) {
+      fetchWorkflowData();
+    }
   };
+  
+
 
   // Initial data load
   useEffect(() => {
-    fetchSources(page, rowsPerPage, searchTerm, socialMediaFilters);
-    fetchFilterStats();
-  }, []);
+    if (projectId) {
+      fetchSources(page, rowsPerPage, searchTerm, socialMediaFilters);
+      fetchFilterStats();
+    }
+  }, [projectId]);
 
   // Handle pagination change
   const handleChangePage = (_event: unknown, newPage: number) => {
@@ -552,6 +562,7 @@ const TrackSourcesList = () => {
                 </Box>
               </CardContent>
             </Card>
+
           </Box>
         </Box>
 

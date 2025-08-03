@@ -136,7 +136,9 @@ class PlatformSerializer(serializers.ModelSerializer):
     
     def get_available_services(self, obj):
         """Get available services for this platform"""
-        services = obj.get_available_services()
+        platform_services = obj.get_available_services()
+        # Extract the Service objects from PlatformService objects
+        services = [ps.service for ps in platform_services]
         return ServiceSerializer(services, many=True).data
 
 class ServiceSerializer(serializers.ModelSerializer):

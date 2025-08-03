@@ -11,7 +11,8 @@ import {
     Instagram as InstagramIcon,
     Logout as LogoutIcon,
     Settings as SettingsIcon,
-    Folder as FolderIcon
+    Folder as FolderIcon,
+    SmartToy as SmartToyIcon
 } from '@mui/icons-material';
 import CommentIcon from '@mui/icons-material/Comment';
 import LinkedInIcon from '@mui/icons-material/LinkedIn';
@@ -215,6 +216,12 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
       category: 'main'
     },
     {
+      text: 'Workflow Management',
+      path: getWorkflowManagementPath(),
+      icon: <SmartToyIcon />,
+      category: 'main'
+    },
+    {
       text: 'Data Scrapers',
       path: '#data-scrapers',
       icon: <AutoAwesomeIcon />,
@@ -315,6 +322,19 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
     return '/data-storage';
   }
 
+  // Function to get correct path for Workflow Management based on URL
+  function getWorkflowManagementPath() {
+    // Extract organization and project IDs from URL
+    const match = location.pathname.match(/\/organizations\/(\d+)\/projects\/(\d+)/);
+
+    if (match) {
+      const [, orgId, projId] = match;
+      return `/organizations/${orgId}/projects/${projId}/automated-batch-scraper`;
+    }
+
+    return '/automated-batch-scraper';
+  }
+
   // Function to check if a menu item is active based on the current path
   const isActive = useCallback((itemPath: string) => {
     // Special handling for root path
@@ -362,6 +382,10 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
 
     if (itemPath.includes('brightdata-scraper')) {
       return location.pathname.includes('brightdata-scraper');
+    }
+
+    if (itemPath.includes('automated-batch-scraper')) {
+      return location.pathname.includes('automated-batch-scraper');
     }
 
     if (itemPath.includes('facebook-comment-scraper')) {

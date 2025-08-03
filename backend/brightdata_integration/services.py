@@ -254,8 +254,13 @@ class AutomatedBatchScraper:
                 # Process each content type for this platform
                 for content_type in content_types:
                     try:
+                        # Get platform_service_id from job platform_params if available
+                        platform_service_id = None
+                        if job.platform_params and 'platform_service_id' in job.platform_params:
+                            platform_service_id = job.platform_params.get('platform_service_id')
+                        
                         # Get platform-specific configuration for this content type
-                        config = self._get_platform_config(platform, content_type)
+                        config = self._get_platform_config(platform, content_type, platform_service_id)
                         if not config:
                             error_msg = f"No active {platform}_{content_type}s configuration found"
                             self.logger.error(error_msg)
@@ -401,11 +406,40 @@ class AutomatedBatchScraper:
             return cleaned_url
         return None
 
-    def _get_platform_config(self, platform: str, content_type: str = 'post') -> Optional[BrightdataConfig]:
+    def _get_platform_config(self, platform: str, content_type: str = 'post', platform_service_id: int = None) -> Optional[BrightdataConfig]:
         """
         Get the active configuration for a specific platform and content type
+        Enhanced to work with PlatformService relationships
         """
-        # Ensure content type is in plural form for config lookup
+        # If platform_service_id is provided, try to get config from PlatformService first
+        if platform_service_id:
+            try:
+                from users.models import PlatformService
+                platform_service = PlatformService.objects.get(id=platform_service_id)
+                
+                # Check if PlatformService has a dataset_id configured
+                if hasattr(platform_service, 'dataset_id') and platform_service.dataset_id:
+                    # Try to find existing config for this platform-service combination
+                    platform_config_key = f'{platform_service.platform.name}_{platform_service.service.name}'
+                    config = BrightdataConfig.objects.filter(
+                        platform__icontains=platform_service.platform.name,
+                        dataset_id=platform_service.dataset_id,
+                        is_active=True
+                    ).first()
+                    
+                    if config:
+                        self.logger.info(f"Found config for PlatformService {platform_service_id}: {config}")
+                        return config
+                    
+                    # If no config found, create one using PlatformService data
+                    # This would require the PlatformService to have BrightData credentials
+                    # For now, fall back to the old method
+                    self.logger.warning(f"No BrightData config found for PlatformService {platform_service_id}, falling back to legacy method")
+                
+            except Exception as e:
+                self.logger.error(f"Error getting config for PlatformService {platform_service_id}: {str(e)}")
+        
+        # Legacy method: Ensure content type is in plural form for config lookup
         if content_type in ['post', 'posts']:
             content_type = 'posts'
         elif content_type in ['reel', 'reels']:

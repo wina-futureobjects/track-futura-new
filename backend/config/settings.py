@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     "tiktok_data",
     "brightdata_integration",
     "chat",
+    "workflow",
 ]
 
 MIDDLEWARE = [
