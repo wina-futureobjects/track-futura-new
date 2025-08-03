@@ -91,10 +91,9 @@ const SuperAdminDashboard = () => {
     email: '',
     first_name: '',
     last_name: '',
-    password: '',
-    password2: '',
-    role: 'user',
+    role: 'super_admin',
   });
+
   const [newOrg, setNewOrg] = useState({
     name: '',
     description: '',
@@ -338,6 +337,12 @@ const SuperAdminDashboard = () => {
 
   const handleCreateUser = async () => {
     try {
+      // Validate required fields
+      if (!newUser.username || !newUser.email) {
+        setError('Username and email are required');
+        return;
+      }
+
       const response = await apiFetch('/api/admin/users/', {
         method: 'POST',
         headers: {
@@ -348,12 +353,16 @@ const SuperAdminDashboard = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to create user');
+        throw new Error(errorData.detail || errorData.message || 'Failed to create user');
       }
 
+      const result = await response.json();
       setOpenUserDialog(false);
       fetchUsers();
       resetNewUser();
+      
+      // Show success message
+      setSuccessMessage(result.message || 'User created successfully. Welcome email sent.');
     } catch (error) {
       console.error('Error creating user:', error);
       setError(error instanceof Error ? error.message : 'Failed to create user');
@@ -420,13 +429,15 @@ const SuperAdminDashboard = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete user');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete user');
       }
 
       fetchUsers();
+      setSuccessMessage('User deleted successfully');
     } catch (error) {
       console.error('Error deleting user:', error);
-      setError('Failed to delete user');
+      setError(error instanceof Error ? error.message : 'Failed to delete user');
     }
   };
 
@@ -457,9 +468,7 @@ const SuperAdminDashboard = () => {
       email: '',
       first_name: '',
       last_name: '',
-      password: '',
-      password2: '',
-      role: 'user',
+      role: 'super_admin',
     });
   };
 
@@ -647,7 +656,10 @@ const SuperAdminDashboard = () => {
             <Button
               variant="contained"
               startIcon={<AddIcon />}
-              onClick={() => setOpenUserDialog(true)}
+              onClick={() => {
+              setOpenUserDialog(true);
+              resetNewUser(); // Generate random password when opening dialog
+            }}
             >
               Add User
             </Button>
@@ -999,10 +1011,13 @@ const SuperAdminDashboard = () => {
         </Box>
       )}
 
-      {/* Create User Dialog */}
-      <Dialog open={openUserDialog} onClose={() => setOpenUserDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Create New User</DialogTitle>
-        <DialogContent>
+             {/* Create User Dialog */}
+       <Dialog open={openUserDialog} onClose={() => setOpenUserDialog(false)} maxWidth="sm" fullWidth>
+         <DialogTitle>Create New User</DialogTitle>
+         <DialogContent>
+           <DialogContentText sx={{ mb: 2 }}>
+             Enter the user's information below. A secure password will be automatically generated and sent to their email address.
+           </DialogContentText>
           <TextField
             label="Username"
             fullWidth
@@ -1020,42 +1035,8 @@ const SuperAdminDashboard = () => {
             onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
             required
           />
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <TextField
-              label="First Name"
-              fullWidth
-              margin="normal"
-              value={newUser.first_name}
-              onChange={(e) => setNewUser({ ...newUser, first_name: e.target.value })}
-            />
-            <TextField
-              label="Last Name"
-              fullWidth
-              margin="normal"
-              value={newUser.last_name}
-              onChange={(e) => setNewUser({ ...newUser, last_name: e.target.value })}
-            />
-          </Box>
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <TextField
-              label="Password"
-              type="password"
-              fullWidth
-              margin="normal"
-              value={newUser.password}
-              onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-              required
-            />
-            <TextField
-              label="Confirm Password"
-              type="password"
-              fullWidth
-              margin="normal"
-              value={newUser.password2}
-              onChange={(e) => setNewUser({ ...newUser, password2: e.target.value })}
-              required
-            />
-          </Box>
+          
+
           <FormControl fullWidth margin="normal">
             <InputLabel>Role</InputLabel>
             <Select
@@ -1063,9 +1044,8 @@ const SuperAdminDashboard = () => {
               label="Role"
               onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
             >
-              <MenuItem value="user">User</MenuItem>
-              <MenuItem value="tenant_admin">Tenant Admin</MenuItem>
               <MenuItem value="super_admin">Super Admin</MenuItem>
+              <MenuItem value="tenant_admin">Tenant Admin</MenuItem>
             </Select>
           </FormControl>
         </DialogContent>
@@ -1317,22 +1297,39 @@ const SuperAdminDashboard = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Success Message */}
-      {successMessage && (
-        <Snackbar 
-          open={!!successMessage} 
-          autoHideDuration={6000} 
-          onClose={() => setSuccessMessage(null)}
-        >
-          <Alert 
-            onClose={() => setSuccessMessage(null)} 
-            severity="success" 
-            sx={{ width: '100%' }}
-          >
-            {successMessage}
-          </Alert>
-        </Snackbar>
-      )}
+             {/* Success Message */}
+       {successMessage && (
+         <Snackbar 
+           open={!!successMessage} 
+           autoHideDuration={6000} 
+           onClose={() => setSuccessMessage(null)}
+         >
+           <Alert 
+             onClose={() => setSuccessMessage(null)} 
+             severity="success" 
+             sx={{ width: '100%' }}
+           >
+             {successMessage}
+           </Alert>
+         </Snackbar>
+       )}
+
+       {/* Error Message */}
+       {error && (
+         <Snackbar 
+           open={!!error} 
+           autoHideDuration={6000} 
+           onClose={() => setError(null)}
+         >
+           <Alert 
+             onClose={() => setError(null)} 
+             severity="error" 
+             sx={{ width: '100%' }}
+           >
+             {error}
+           </Alert>
+         </Snackbar>
+       )}
 
       {/* Delete Confirmation Dialog */}
       <Dialog

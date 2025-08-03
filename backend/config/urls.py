@@ -67,6 +67,7 @@ urlpatterns = [
     path("favicon.ico", favicon_view, name="favicon"),  # Handle favicon
     path("admin/", admin.site.urls),
     path("api/users/", include("users.urls")),
+    path("api/admin/", include("users.urls_admin")),
     path("api/reports/", include("reports.urls")),
     path("api/analytics/", include("analytics.urls")),
     path("api/data-collector/", include("data_collector.urls")),
