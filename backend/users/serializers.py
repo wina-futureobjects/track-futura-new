@@ -16,7 +16,7 @@ class UserSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'global_role']
+        fields = ['id', 'username', 'email', 'global_role', 'is_active']
         read_only_fields = ['id', 'global_role']
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -34,7 +34,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('username', 'password', 'password2', 'email', 'first_name', 'last_name', 'role')
+        fields = ('username', 'password', 'password2', 'email', 'role')
 
     def validate(self, attrs):
         if attrs['password'] != attrs['password2']:
@@ -46,9 +46,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         
         user = User.objects.create(
             username=validated_data['username'],
-            email=validated_data['email'],
-            first_name=validated_data['first_name'],
-            last_name=validated_data['last_name']
+            email=validated_data['email']
         )
         user.set_password(validated_data['password'])
         user.save()

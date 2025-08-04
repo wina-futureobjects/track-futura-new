@@ -34,6 +34,7 @@ import {
   Switch,
   FormControlLabel,
   Breadcrumbs,
+  Menu,
 } from '@mui/material';
 
 // Create a Grid component that inherits from MuiGrid to fix type issues
@@ -52,6 +53,7 @@ import {
   Instagram as InstagramIcon,
   LinkedIn as LinkedInIcon,
   MusicVideo as MusicVideoIcon,
+  Cancel as CancelIcon
 } from '@mui/icons-material';
 import { apiFetch } from '../../utils/api';
 
@@ -59,8 +61,7 @@ interface User {
   id: number;
   username: string;
   email: string;
-  first_name: string;
-  last_name: string;
+  is_active: boolean;
   global_role?: {
     role: string;
     role_display: string;
@@ -84,17 +85,15 @@ const SuperAdminDashboard = () => {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState<string>('all');
   const [openUserDialog, setOpenUserDialog] = useState(false);
   const [openOrgDialog, setOpenOrgDialog] = useState(false);
   const [newUser, setNewUser] = useState({
     username: '',
     email: '',
-    first_name: '',
-    last_name: '',
-    password: '',
-    password2: '',
-    role: 'user',
+    role: 'tenant_admin',
   });
+
   const [newOrg, setNewOrg] = useState({
     name: '',
     description: '',
@@ -118,7 +117,17 @@ const SuperAdminDashboard = () => {
   const [editConfigId, setEditConfigId] = useState<number | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [configToDelete, setConfigToDelete] = useState<number | null>(null);
+  const [deleteUserDialogOpen, setDeleteUserDialogOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<number | null>(null);
+  const [deleteOrgDialogOpen, setDeleteOrgDialogOpen] = useState(false);
+  const [orgToDelete, setOrgToDelete] = useState<number | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [roleMenuAnchor, setRoleMenuAnchor] = useState<null | HTMLElement>(null);
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [roleChangeDialogOpen, setRoleChangeDialogOpen] = useState(false);
+  const [pendingRoleChange, setPendingRoleChange] = useState<{ userId: number; newRole: string } | null>(null);
+  const [statusChangeDialogOpen, setStatusChangeDialogOpen] = useState(false);
+  const [pendingStatusChange, setPendingStatusChange] = useState<{ userId: number; newStatus: boolean } | null>(null);
   const [stats, setStats] = useState({
     totalUsers: 0,
     totalOrgs: 0,
@@ -338,6 +347,12 @@ const SuperAdminDashboard = () => {
 
   const handleCreateUser = async () => {
     try {
+      // Validate required fields
+      if (!newUser.username || !newUser.email) {
+        setError('Username and email are required');
+        return;
+      }
+
       const response = await apiFetch('/api/admin/users/', {
         method: 'POST',
         headers: {
@@ -348,12 +363,16 @@ const SuperAdminDashboard = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to create user');
+        throw new Error(errorData.detail || errorData.message || 'Failed to create user');
       }
 
+      const result = await response.json();
       setOpenUserDialog(false);
       fetchUsers();
       resetNewUser();
+      
+      // Show success message
+      setSuccessMessage(result.message || 'User created successfully. Welcome email sent.');
     } catch (error) {
       console.error('Error creating user:', error);
       setError(error instanceof Error ? error.message : 'Failed to create user');
@@ -409,34 +428,50 @@ const SuperAdminDashboard = () => {
     }
   };
 
-  const handleDeleteUser = async (userId: number) => {
-    if (!window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-      return;
-    }
+  const handleDeleteUserClick = (userId: number) => {
+    setUserToDelete(userId);
+    setDeleteUserDialogOpen(true);
+  };
 
+  const handleConfirmDeleteUser = async () => {
+    if (userToDelete === null) return;
+    
     try {
-      const response = await apiFetch(`/api/admin/users/${userId}/`, {
+      const response = await apiFetch(`/api/admin/users/${userToDelete}/`, {
         method: 'DELETE',
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete user');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete user');
       }
 
       fetchUsers();
+      setSuccessMessage('User deleted successfully');
     } catch (error) {
       console.error('Error deleting user:', error);
-      setError('Failed to delete user');
+      setError(error instanceof Error ? error.message : 'Failed to delete user');
+    } finally {
+      setDeleteUserDialogOpen(false);
+      setUserToDelete(null);
     }
   };
 
-  const handleDeleteOrganization = async (orgId: number) => {
-    if (!window.confirm('Are you sure you want to delete this organization? This action cannot be undone.')) {
-      return;
-    }
+  const handleCancelDeleteUser = () => {
+    setDeleteUserDialogOpen(false);
+    setUserToDelete(null);
+  };
 
+  const handleDeleteOrganizationClick = (orgId: number) => {
+    setOrgToDelete(orgId);
+    setDeleteOrgDialogOpen(true);
+  };
+
+  const handleConfirmDeleteOrganization = async () => {
+    if (orgToDelete === null) return;
+    
     try {
-      const response = await apiFetch(`/api/admin/organizations/${orgId}/`, {
+      const response = await apiFetch(`/api/admin/organizations/${orgToDelete}/`, {
         method: 'DELETE',
       });
 
@@ -445,29 +480,99 @@ const SuperAdminDashboard = () => {
       }
 
       fetchOrganizations();
+      setSuccessMessage('Organization deleted successfully');
     } catch (error) {
       console.error('Error deleting organization:', error);
       setError('Failed to delete organization');
+    } finally {
+      setDeleteOrgDialogOpen(false);
+      setOrgToDelete(null);
     }
+  };
+
+  const handleCancelDeleteOrganization = () => {
+    setDeleteOrgDialogOpen(false);
+    setOrgToDelete(null);
+  };
+
+  const handleConfirmRoleChange = async () => {
+    if (pendingRoleChange) {
+      await handleChangeUserRole(pendingRoleChange.userId, pendingRoleChange.newRole);
+      setRoleChangeDialogOpen(false);
+      setPendingRoleChange(null);
+    }
+  };
+
+  const handleCancelRoleChange = () => {
+    setRoleChangeDialogOpen(false);
+    setPendingRoleChange(null);
+  };
+
+  const handleChangeUserStatus = async (userId: number, newStatus: boolean) => {
+    try {
+      const response = await apiFetch(`/api/admin/users/${userId}/`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ is_active: newStatus }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update user status');
+      }
+
+      // Update the user in the local state
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user.id === userId 
+            ? { ...user, is_active: newStatus }
+            : user
+        )
+      );
+
+      setSuccessMessage(`User status updated successfully to ${newStatus ? 'Active' : 'Inactive'}`);
+    } catch (error) {
+      console.error('Error updating user status:', error);
+      setError('Failed to update user status');
+    }
+  };
+
+  const handleStatusChangeClick = (userId: number, currentStatus: boolean) => {
+    setPendingStatusChange({ userId, newStatus: !currentStatus });
+    setStatusChangeDialogOpen(true);
+  };
+
+  const handleConfirmStatusChange = async () => {
+    if (pendingStatusChange) {
+      await handleChangeUserStatus(pendingStatusChange.userId, pendingStatusChange.newStatus);
+      setStatusChangeDialogOpen(false);
+      setPendingStatusChange(null);
+    }
+  };
+
+  const handleCancelStatusChange = () => {
+    setStatusChangeDialogOpen(false);
+    setPendingStatusChange(null);
   };
 
   const resetNewUser = () => {
     setNewUser({
       username: '',
       email: '',
-      first_name: '',
-      last_name: '',
-      password: '',
-      password2: '',
-      role: 'user',
+      role: 'tenant_admin',
     });
   };
 
-  const filteredUsers = users.filter(user => 
-    user.username.toLowerCase().includes(search.toLowerCase()) ||
-    user.email.toLowerCase().includes(search.toLowerCase()) ||
-    (user.first_name + ' ' + user.last_name).toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = user.username.toLowerCase().includes(search.toLowerCase()) ||
+                         user.email.toLowerCase().includes(search.toLowerCase());
+    
+    const matchesRoleFilter = roleFilter === 'all' || 
+                             user.global_role?.role === roleFilter;
+    
+    return matchesSearch && matchesRoleFilter;
+  });
 
   const filteredOrganizations = organizations.filter(org => 
     org.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -475,19 +580,129 @@ const SuperAdminDashboard = () => {
     org.owner_name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const getRoleChip = (role: string | undefined) => {
+  const getRoleChip = (role: string | undefined, userId: number) => {
     if (!role) return null;
     
-    switch (role) {
-      case 'super_admin':
-        return <Chip icon={<AdminIcon />} label="Super Admin" color="primary" size="small" />;
-      case 'tenant_admin':
-        return <Chip icon={<BusinessIcon />} label="Tenant Admin" color="secondary" size="small" />;
-      case 'user':
-        return <Chip icon={<PersonIcon />} label="User" color="default" size="small" />;
-      default:
-        return <Chip label={role} size="small" />;
-    }
+    const handleClick = (event: React.MouseEvent<HTMLElement>) => {
+      setRoleMenuAnchor(event.currentTarget);
+      setSelectedUserId(userId);
+    };
+    
+    const handleClose = () => {
+      setRoleMenuAnchor(null);
+      setSelectedUserId(null);
+    };
+    
+    const handleRoleChange = (newRole: string) => {
+      if (selectedUserId) {
+        setPendingRoleChange({ userId: selectedUserId, newRole });
+        setRoleChangeDialogOpen(true);
+      }
+      handleClose();
+    };
+    
+    const getRoleConfig = (roleType: string) => {
+      switch (roleType) {
+        case 'super_admin':
+          return { icon: <AdminIcon />, label: "Super Admin", color: "primary" as const };
+        case 'tenant_admin':
+          return { icon: <BusinessIcon />, label: "Tenant Admin", color: "secondary" as const };
+        case 'user':
+          return { icon: <PersonIcon />, label: "User", color: "default" as const };
+        default:
+          return { icon: <PersonIcon />, label: roleType, color: "default" as const };
+      }
+    };
+    
+    const roleConfig = getRoleConfig(role);
+    const open = Boolean(roleMenuAnchor) && selectedUserId === userId;
+    
+    return (
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+        <Chip 
+          icon={roleConfig.icon} 
+          label={roleConfig.label} 
+          color={roleConfig.color} 
+          size="small"
+          onClick={handleClick}
+          sx={{ 
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            '&:hover': {
+              transform: 'scale(1.05)',
+              boxShadow: 2
+            }
+          }}
+        />
+        <Menu
+          anchorEl={roleMenuAnchor}
+          open={open}
+          onClose={handleClose}
+          anchorOrigin={{
+            vertical: 'bottom',
+            horizontal: 'left',
+          }}
+          transformOrigin={{
+            vertical: 'top',
+            horizontal: 'left',
+          }}
+          sx={{
+            '& .MuiPaper-root': {
+              minWidth: '120px',
+              maxWidth: '150px',
+            },
+            '& .MuiMenuItem-root': {
+              fontSize: '0.875rem',
+              padding: '6px 12px',
+              minHeight: '32px',
+            },
+            '& .MuiSvgIcon-root': {
+              fontSize: '1rem',
+            }
+          }}
+        >
+          <MenuItem
+            onClick={() => handleRoleChange('super_admin')}
+            sx={{
+              color: '#7b1fa2',
+              '&:hover': {
+                backgroundColor: '#f3e5f5',
+                color: '#4a148c'
+              }
+            }}
+          >
+            <AdminIcon sx={{ mr: 1, fontSize: '1rem', color: '#7b1fa2' }} />
+            Super Admin
+          </MenuItem>
+          <MenuItem
+            onClick={() => handleRoleChange('tenant_admin')}
+            sx={{
+              color: '#1565c0',
+              '&:hover': {
+                backgroundColor: '#e3f2fd',
+                color: '#0d47a1'
+              }
+            }}
+          >
+            <BusinessIcon sx={{ mr: 1, fontSize: '1rem', color: '#1565c0' }} />
+            Tenant Admin
+          </MenuItem>
+          <MenuItem
+            onClick={() => handleRoleChange('user')}
+            sx={{
+              color: '#424242',
+              '&:hover': {
+                backgroundColor: '#f5f5f5',
+                color: '#212121'
+              }
+            }}
+          >
+            <PersonIcon sx={{ mr: 1, fontSize: '1rem', color: '#424242' }} />
+            User
+          </MenuItem>
+        </Menu>
+      </Box>
+    );
   };
 
   if (loading) {
@@ -628,26 +843,46 @@ const SuperAdminDashboard = () => {
       {/* Search and Add Button - Only for Users and Organizations tabs */}
       {(activeTab === 0 || activeTab === 1) && (
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-          <TextField
-            placeholder="Search..."
-            variant="outlined"
-            size="small"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            sx={{ width: 300 }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
-            }}
-          />
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+            {activeTab === 0 && (
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel>Filter by Role</InputLabel>
+                <Select
+                  value={roleFilter}
+                  label="Filter by Role"
+                  onChange={(e) => setRoleFilter(e.target.value)}
+                >
+                  <MenuItem value="all">All Roles</MenuItem>
+                  <MenuItem value="super_admin">Super Admin</MenuItem>
+                  <MenuItem value="tenant_admin">Tenant Admin</MenuItem>
+                  <MenuItem value="user">User</MenuItem>
+                </Select>
+              </FormControl>
+            )}
+            <TextField
+              placeholder="Search..."
+              variant="outlined"
+              size="small"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              sx={{ width: 300 }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Box>
           {activeTab === 0 && (
             <Button
               variant="contained"
               startIcon={<AddIcon />}
-              onClick={() => setOpenUserDialog(true)}
+              onClick={() => {
+              setOpenUserDialog(true);
+              resetNewUser(); // Generate random password when opening dialog
+            }}
             >
               Add User
             </Button>
@@ -674,9 +909,9 @@ const SuperAdminDashboard = () => {
               <TableRow>
                 <TableCell>ID</TableCell>
                 <TableCell>Username</TableCell>
-                <TableCell>Name</TableCell>
                 <TableCell>Email</TableCell>
                 <TableCell>Role</TableCell>
+                <TableCell>Status</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -686,24 +921,55 @@ const SuperAdminDashboard = () => {
                   <TableRow key={user.id}>
                     <TableCell>{user.id}</TableCell>
                     <TableCell>{user.username}</TableCell>
-                    <TableCell>{`${user.first_name} ${user.last_name}`}</TableCell>
                     <TableCell>{user.email}</TableCell>
-                    <TableCell>{getRoleChip(user.global_role?.role)}</TableCell>
+                    <TableCell>
+                      {getRoleChip(user.global_role?.role, user.id)}
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        icon={user.is_active ? <CheckCircleIcon /> : <CancelIcon />}
+                        label={user.is_active ? 'Active' : 'Inactive'}
+                        color={user.is_active ? 'success' : 'error'}
+                        size="small"
+                        variant="filled"
+                        onClick={() => handleStatusChangeClick(user.id, user.is_active)}
+                        sx={{ 
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease',
+                          fontWeight: 400,
+                          fontSize: '0.75rem',
+                          minWidth: '80px',
+                          backgroundColor: user.is_active ? '#219653' : '#d32f2f', // lighter dark green or dark red
+                          color: '#fff',
+                          '&:hover': {
+                            transform: 'scale(1.08)',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                            filter: 'brightness(1.1)',
+                            backgroundColor: user.is_active
+                              ? '#17643a' // darker green on hover
+                              : '#b71c1c', // darker red on hover for inactive
+                          },
+                          '& .MuiChip-icon': {
+                            fontSize: '0.85rem',
+                            marginLeft: '4px'
+                          },
+                          '& .MuiChip-label': {
+                            paddingLeft: '4px',
+                            paddingRight: '8px'
+                          }
+                        }}
+                      />
+                    </TableCell>
                     <TableCell align="right">
-                      <FormControl variant="outlined" size="small" sx={{ minWidth: 120, mr: 1 }}>
-                        <Select
-                          value={user.global_role?.role || 'user'}
-                          onChange={(e) => handleChangeUserRole(user.id, e.target.value)}
-                          displayEmpty
-                        >
-                          <MenuItem value="user">User</MenuItem>
-                          <MenuItem value="tenant_admin">Tenant Admin</MenuItem>
-                          <MenuItem value="super_admin">Super Admin</MenuItem>
-                        </Select>
-                      </FormControl>
                       <IconButton 
-                        color="error" 
-                        onClick={() => handleDeleteUser(user.id)}
+                        sx={{ 
+                          color: '#d32f2f',
+                          '&:hover': {
+                            backgroundColor: '#f44336',
+                            color: 'white'
+                          }
+                        }}
+                        onClick={() => handleDeleteUserClick(user.id)}
                         size="small"
                       >
                         <DeleteIcon />
@@ -750,8 +1016,14 @@ const SuperAdminDashboard = () => {
                     <TableCell>{new Date(org.created_at).toLocaleDateString()}</TableCell>
                     <TableCell align="right">
                       <IconButton 
-                        color="error" 
-                        onClick={() => handleDeleteOrganization(org.id)}
+                        sx={{ 
+                          color: '#d32f2f',
+                          '&:hover': {
+                            backgroundColor: '#f44336',
+                            color: 'white'
+                          }
+                        }}
+                        onClick={() => handleDeleteOrganizationClick(org.id)}
                         size="small"
                       >
                         <DeleteIcon />
@@ -983,7 +1255,17 @@ const SuperAdminDashboard = () => {
                               <IconButton size="small" onClick={() => handleEditConfig(config)}>
                                 <EditIcon />
                               </IconButton>
-                              <IconButton size="small" color="error" onClick={() => handleDeleteClick(config.id)}>
+                              <IconButton 
+                                size="small" 
+                                sx={{ 
+                                  color: '#d32f2f',
+                                  '&:hover': {
+                                    backgroundColor: '#f44336',
+                                    color: 'white'
+                                  }
+                                }}
+                                onClick={() => handleDeleteClick(config.id)}
+                              >
                                 <DeleteIcon />
                               </IconButton>
                             </TableCell>
@@ -999,10 +1281,13 @@ const SuperAdminDashboard = () => {
         </Box>
       )}
 
-      {/* Create User Dialog */}
-      <Dialog open={openUserDialog} onClose={() => setOpenUserDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Create New User</DialogTitle>
-        <DialogContent>
+             {/* Create User Dialog */}
+       <Dialog open={openUserDialog} onClose={() => setOpenUserDialog(false)} maxWidth="sm" fullWidth>
+         <DialogTitle>Create New User</DialogTitle>
+         <DialogContent>
+           <DialogContentText sx={{ mb: 2 }}>
+             Enter the user's information below. A secure password will be automatically generated and sent to their email address.
+           </DialogContentText>
           <TextField
             label="Username"
             fullWidth
@@ -1020,42 +1305,8 @@ const SuperAdminDashboard = () => {
             onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
             required
           />
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <TextField
-              label="First Name"
-              fullWidth
-              margin="normal"
-              value={newUser.first_name}
-              onChange={(e) => setNewUser({ ...newUser, first_name: e.target.value })}
-            />
-            <TextField
-              label="Last Name"
-              fullWidth
-              margin="normal"
-              value={newUser.last_name}
-              onChange={(e) => setNewUser({ ...newUser, last_name: e.target.value })}
-            />
-          </Box>
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <TextField
-              label="Password"
-              type="password"
-              fullWidth
-              margin="normal"
-              value={newUser.password}
-              onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-              required
-            />
-            <TextField
-              label="Confirm Password"
-              type="password"
-              fullWidth
-              margin="normal"
-              value={newUser.password2}
-              onChange={(e) => setNewUser({ ...newUser, password2: e.target.value })}
-              required
-            />
-          </Box>
+          
+
           <FormControl fullWidth margin="normal">
             <InputLabel>Role</InputLabel>
             <Select
@@ -1063,9 +1314,9 @@ const SuperAdminDashboard = () => {
               label="Role"
               onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
             >
-              <MenuItem value="user">User</MenuItem>
-              <MenuItem value="tenant_admin">Tenant Admin</MenuItem>
               <MenuItem value="super_admin">Super Admin</MenuItem>
+              <MenuItem value="tenant_admin">Tenant Admin</MenuItem>
+              <MenuItem value="user">User</MenuItem>
             </Select>
           </FormControl>
         </DialogContent>
@@ -1317,41 +1568,181 @@ const SuperAdminDashboard = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Success Message */}
-      {successMessage && (
-        <Snackbar 
-          open={!!successMessage} 
-          autoHideDuration={6000} 
-          onClose={() => setSuccessMessage(null)}
-        >
-          <Alert 
-            onClose={() => setSuccessMessage(null)} 
-            severity="success" 
-            sx={{ width: '100%' }}
-          >
-            {successMessage}
-          </Alert>
-        </Snackbar>
-      )}
+             {/* Success Message */}
+       {successMessage && (
+         <Snackbar 
+           open={!!successMessage} 
+           autoHideDuration={6000} 
+           onClose={() => setSuccessMessage(null)}
+         >
+           <Alert 
+             onClose={() => setSuccessMessage(null)} 
+             severity="success" 
+             sx={{ width: '100%' }}
+           >
+             {successMessage}
+           </Alert>
+         </Snackbar>
+       )}
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={deleteDialogOpen}
-        onClose={handleCancelDelete}
-      >
-        <DialogTitle>Confirm Deletion</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to delete this configuration? This action cannot be undone.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCancelDelete}>Cancel</Button>
-          <Button onClick={handleConfirmDelete} color="error" variant="contained">
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
+       {/* Error Message */}
+       {error && (
+         <Snackbar 
+           open={!!error} 
+           autoHideDuration={6000} 
+           onClose={() => setError(null)}
+         >
+           <Alert 
+             onClose={() => setError(null)} 
+             severity="error" 
+             sx={{ width: '100%' }}
+           >
+             {error}
+           </Alert>
+         </Snackbar>
+       )}
+
+             {/* Delete Confirmation Dialog for Brightdata Configurations */}
+       <Dialog
+         open={deleteDialogOpen}
+         onClose={handleCancelDelete}
+       >
+         <DialogTitle>Confirm Deletion</DialogTitle>
+         <DialogContent>
+           <DialogContentText>
+             Are you sure you want to delete this configuration? This action cannot be undone.
+           </DialogContentText>
+         </DialogContent>
+         <DialogActions>
+           <Button onClick={handleCancelDelete}>Cancel</Button>
+           <Button onClick={handleConfirmDelete} color="error" variant="contained">
+             Delete
+           </Button>
+         </DialogActions>
+       </Dialog>
+
+       {/* Delete User Confirmation Dialog */}
+       <Dialog
+         open={deleteUserDialogOpen}
+         onClose={handleCancelDeleteUser}
+       >
+         <DialogTitle>Confirm User Deletion</DialogTitle>
+         <DialogContent>
+           <DialogContentText>
+             Are you sure you want to delete this user? This action cannot be undone and will permanently remove the user from the system.
+           </DialogContentText>
+         </DialogContent>
+         <DialogActions>
+           <Button onClick={handleCancelDeleteUser}>Cancel</Button>
+           <Button
+             onClick={handleConfirmDeleteUser}
+             variant="contained"
+             sx={{
+               backgroundColor: '#d32f2f',
+               color: '#fff',
+               '&:hover': {
+                 backgroundColor: '#b71c1c',
+                 color: '#fff',
+               },
+             }}
+           >
+             Delete User
+           </Button>
+         </DialogActions>
+       </Dialog>
+
+       {/* Delete Organization Confirmation Dialog */}
+       <Dialog
+         open={deleteOrgDialogOpen}
+         onClose={handleCancelDeleteOrganization}
+       >
+         <DialogTitle>Confirm Organization Deletion</DialogTitle>
+         <DialogContent>
+           <DialogContentText>
+             Are you sure you want to delete this organization? This action cannot be undone and will permanently remove the organization and all associated data.
+           </DialogContentText>
+         </DialogContent>
+         <DialogActions>
+           <Button onClick={handleCancelDeleteOrganization}>Cancel</Button>
+           <Button onClick={handleConfirmDeleteOrganization} color="error" variant="contained">
+             Delete Organization
+           </Button>
+         </DialogActions>
+       </Dialog>
+
+       {/* Role Change Confirmation Dialog */}
+       <Dialog
+         open={roleChangeDialogOpen}
+         onClose={handleCancelRoleChange}
+       >
+         <DialogTitle>Confirm Role Change</DialogTitle>
+         <DialogContent>
+           <DialogContentText>
+             Are you sure you want to change this user's role to{' '}
+             <strong>
+               {pendingRoleChange?.newRole === 'super_admin' ? 'Super Admin' :
+                pendingRoleChange?.newRole === 'tenant_admin' ? 'Tenant Admin' : 'User'}
+             </strong>?
+             <br></br>
+             This action will immediately update the user's permissions and access levels.
+           </DialogContentText>
+         </DialogContent>
+         <DialogActions>
+           <Button onClick={handleCancelRoleChange}>Cancel</Button>
+           <Button 
+             onClick={handleConfirmRoleChange} 
+             variant="contained"
+             sx={{
+               backgroundColor: '#d32f2f',
+               color: '#fff',
+               '&:hover': {
+                 backgroundColor: '#b71c1c',
+                 color: '#fff',
+               },
+             }}
+           >
+             Confirm Role Change
+           </Button>
+         </DialogActions>
+       </Dialog>
+
+       {/* Status Change Confirmation Dialog */}
+       <Dialog
+         open={statusChangeDialogOpen}
+         onClose={handleCancelStatusChange}
+       >
+         <DialogTitle>Confirm Status Change</DialogTitle>
+         <DialogContent>
+           <DialogContentText>
+             Are you sure you want to change this user's status to{' '}
+             <strong>
+               {pendingStatusChange?.newStatus ? 'Active' : 'Inactive'}
+             </strong>?
+             <br></br>
+             {pendingStatusChange?.newStatus 
+               ? 'This will allow the user to access the system and perform their assigned tasks.'
+               : 'This will prevent the user from accessing the system and performing any actions.'
+             }
+           </DialogContentText>
+         </DialogContent>
+         <DialogActions>
+           <Button onClick={handleCancelStatusChange}>Cancel</Button>
+           <Button 
+             onClick={handleConfirmStatusChange} 
+             variant="contained"
+             sx={{
+               backgroundColor: '#d32f2f',
+               color: '#fff',
+               '&:hover': {
+                 backgroundColor: '#b71c1c',
+                 color: '#fff',
+               },
+             }}
+           >
+             Confirm Status Change
+           </Button>
+         </DialogActions>
+       </Dialog>
     </Box>
   );
 };

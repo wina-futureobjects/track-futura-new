@@ -35,6 +35,10 @@ from .serializers import (
     PlatformServiceCreateSerializer
 )
 from .permissions import IsSuperAdmin
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.utils.crypto import get_random_string
+from django.conf import settings
 
 # Create your views here.
 
@@ -90,8 +94,6 @@ class CustomAuthToken(ObtainAuthToken):
             'user_id': user.pk,
             'username': user.username,
             'email': user.email,
-            'first_name': user.first_name,
-            'last_name': user.last_name,
         })
 
 class UserProfileView(generics.RetrieveUpdateAPIView):
@@ -639,3 +641,185 @@ class AvailablePlatformsViewSet(viewsets.ReadOnlyModelViewSet):
         
         serializer = PlatformServiceSerializer(platform_services, many=True)
         return Response(serializer.data)
+
+
+# Admin Views for Super Admin Dashboard
+class AdminUserViewSet(viewsets.ModelViewSet):
+    """ViewSet for admin user management - Superadmin only"""
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated, IsSuperAdmin]
+    
+    def get_queryset(self):
+        return User.objects.all().order_by('-date_joined')
+    
+    def create(self, request, *args, **kwargs):
+        """Create a new user with email notification"""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        # Generate a secure random password
+        password = get_random_string(16, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*')
+        
+        # Create user with the generated password
+        user_data = serializer.validated_data.copy()
+        user_data['password'] = password
+        
+        try:
+            user = User.objects.create_user(
+                username=user_data['username'],
+                email=user_data['email'],
+                password=password
+            )
+            
+            # Create user profile
+            UserProfile.objects.create(user=user)
+            
+            # Create user role
+            role = request.data.get('role', 'user')
+            UserRole.objects.create(user=user, role=role)
+            
+            # Send email notification
+            try:
+                self.send_welcome_email(request, user, password)
+            except Exception as e:
+                # Log the error but don't fail the user creation
+                print(f"Failed to send welcome email to {user.email}: {str(e)}")
+            
+            return Response({
+                'message': 'User created successfully. Welcome email sent.',
+                'user': UserSerializer(user).data
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            return Response({
+                'error': f'Failed to create user: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def send_welcome_email(self, request, user, password):
+        """Send welcome email with login credentials"""
+        subject = 'Welcome to Track-Futura - Your Account Details'
+        
+        # Create email content
+        context = {
+            'username': user.username,
+            'email': user.email,
+            'password': password,
+            'login_url': request.build_absolute_uri('/login/'),
+            'site_name': 'Track-Futura'
+        }
+        
+        # Use the email template
+        message = render_to_string('emails/welcome_email.txt', context)
+        
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
+    
+    @action(detail=True, methods=['patch'])
+    def role(self, request, pk=None):
+        """Update user role"""
+        user = self.get_object()
+        new_role = request.data.get('role')
+        
+        if not new_role:
+            return Response({'error': 'Role is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Update or create user role
+        user_role, created = UserRole.objects.get_or_create(user=user, defaults={'role': new_role})
+        if not created:
+            user_role.role = new_role
+            user_role.save()
+        
+        return Response({'message': 'User role updated successfully'})
+    
+    def destroy(self, request, *args, **kwargs):
+        """Delete user"""
+        try:
+            user = self.get_object()
+            
+            # Check if user is trying to delete themselves
+            if user == request.user:
+                return Response({
+                    'error': 'You cannot delete your own account'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if this is the last super admin (only if user has a role)
+            try:
+                if hasattr(user, 'global_role') and user.global_role.role == 'super_admin':
+                    super_admin_count = UserRole.objects.filter(role='super_admin').count()
+                    if super_admin_count <= 1:
+                        return Response({
+                            'error': 'Cannot delete the last super admin user'
+                        }, status=status.HTTP_400_BAD_REQUEST)
+            except (UserRole.DoesNotExist, AttributeError):
+                # User doesn't have a role, proceed with deletion
+                pass
+            
+            # Delete related objects first
+            try:
+                # Delete UserRole
+                if hasattr(user, 'global_role'):
+                    user.global_role.delete()
+                
+                # Delete UserProfile
+                if hasattr(user, 'profile'):
+                    user.profile.delete()
+                
+                # Delete the user
+                user.delete()
+                
+                return Response({'message': 'User deleted successfully'})
+                
+            except Exception as e:
+                return Response({
+                    'error': f'Failed to delete user: {str(e)}'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+        except User.DoesNotExist:
+            return Response({
+                'error': 'User not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({
+                'error': f'An error occurred: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class AdminOrganizationViewSet(viewsets.ModelViewSet):
+    """ViewSet for admin organization management - Superadmin only"""
+    queryset = Organization.objects.all()
+    serializer_class = OrganizationSerializer
+    permission_classes = [IsAuthenticated, IsSuperAdmin]
+    
+    def get_queryset(self):
+        return Organization.objects.all().order_by('-created_at')
+
+
+class AdminStatsView(APIView):
+    """Get admin statistics - Superadmin only"""
+    permission_classes = [IsAuthenticated, IsSuperAdmin]
+    
+    def get(self, request):
+        """Get system statistics"""
+        total_users = User.objects.count()
+        total_orgs = Organization.objects.count()
+        total_projects = Project.objects.count()
+        
+        # Count users by role
+        super_admins = UserRole.objects.filter(role='super_admin').count()
+        tenant_admins = UserRole.objects.filter(role='tenant_admin').count()
+        regular_users = UserRole.objects.filter(role='user').count()
+        
+        return Response({
+            'totalUsers': total_users,
+            'totalOrgs': total_orgs,
+            'totalProjects': total_projects,
+            'superAdmins': super_admins,
+            'tenantAdmins': tenant_admins,
+            'regularUsers': regular_users,
+        })

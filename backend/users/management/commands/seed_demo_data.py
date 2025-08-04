@@ -76,8 +76,6 @@ class Command(BaseCommand):
             username='superadmin',
             defaults={
                 'email': 'superadmin@trackfutura.com',
-                'first_name': 'Super',
-                'last_name': 'Admin',
                 'is_active': True
             }
         )
@@ -97,8 +95,6 @@ class Command(BaseCommand):
             username='tenantadmin',
             defaults={
                 'email': 'admin@trackfutura.com',
-                'first_name': 'Admin',
-                'last_name': 'User',
                 'is_active': True
             }
         )
@@ -157,23 +153,23 @@ class Command(BaseCommand):
     def create_regular_users(self, count):
         """Create regular demo users with realistic names and emails"""
         users_data = [
-            {'username': 'alice.johnson', 'first_name': 'Alice', 'last_name': 'Johnson', 'email': 'alice.johnson@example.com'},
-            {'username': 'bob.smith', 'first_name': 'Bob', 'last_name': 'Smith', 'email': 'bob.smith@example.com'},
-            {'username': 'carol.davis', 'first_name': 'Carol', 'last_name': 'Davis', 'email': 'carol.davis@example.com'},
-            {'username': 'david.wilson', 'first_name': 'David', 'last_name': 'Wilson', 'email': 'david.wilson@example.com'},
-            {'username': 'emma.brown', 'first_name': 'Emma', 'last_name': 'Brown', 'email': 'emma.brown@example.com'},
-            {'username': 'frank.miller', 'first_name': 'Frank', 'last_name': 'Miller', 'email': 'frank.miller@example.com'},
-            {'username': 'grace.taylor', 'first_name': 'Grace', 'last_name': 'Taylor', 'email': 'grace.taylor@example.com'},
-            {'username': 'henry.clark', 'first_name': 'Henry', 'last_name': 'Clark', 'email': 'henry.clark@example.com'},
-            {'username': 'ivy.adams', 'first_name': 'Ivy', 'last_name': 'Adams', 'email': 'ivy.adams@example.com'},
-            {'username': 'jack.moore', 'first_name': 'Jack', 'last_name': 'Moore', 'email': 'jack.moore@example.com'},
-            {'username': 'kate.white', 'first_name': 'Kate', 'last_name': 'White', 'email': 'kate.white@example.com'},
-            {'username': 'liam.garcia', 'first_name': 'Liam', 'last_name': 'Garcia', 'email': 'liam.garcia@example.com'},
-            {'username': 'maya.lee', 'first_name': 'Maya', 'last_name': 'Lee', 'email': 'maya.lee@example.com'},
-            {'username': 'noah.hall', 'first_name': 'Noah', 'last_name': 'Hall', 'email': 'noah.hall@example.com'},
-            {'username': 'olivia.young', 'first_name': 'Olivia', 'last_name': 'Young', 'email': 'olivia.young@example.com'},
-            {'username': 'peter.king', 'first_name': 'Peter', 'last_name': 'King', 'email': 'peter.king@example.com'},
-            {'username': 'quinn.scott', 'first_name': 'Quinn', 'last_name': 'Scott', 'email': 'quinn.scott@example.com'},
+            {'username': 'alice.johnson', 'email': 'alice.johnson@example.com'},
+            {'username': 'bob.smith', 'email': 'bob.smith@example.com'},
+            {'username': 'carol.davis', 'email': 'carol.davis@example.com'},
+            {'username': 'david.wilson', 'email': 'david.wilson@example.com'},
+            {'username': 'emma.brown', 'email': 'emma.brown@example.com'},
+            {'username': 'frank.miller', 'email': 'frank.miller@example.com'},
+            {'username': 'grace.taylor', 'email': 'grace.taylor@example.com'},
+            {'username': 'henry.clark', 'email': 'henry.clark@example.com'},
+            {'username': 'ivy.adams', 'email': 'ivy.adams@example.com'},
+            {'username': 'jack.moore', 'email': 'jack.moore@example.com'},
+            {'username': 'kate.white', 'email': 'kate.white@example.com'},
+            {'username': 'liam.garcia', 'email': 'liam.garcia@example.com'},
+            {'username': 'maya.lee', 'email': 'maya.lee@example.com'},
+            {'username': 'noah.hall', 'email': 'noah.hall@example.com'},
+            {'username': 'olivia.young', 'email': 'olivia.young@example.com'},
+            {'username': 'peter.king', 'email': 'peter.king@example.com'},
+            {'username': 'quinn.scott', 'email': 'quinn.scott@example.com'},
         ]
         
         users = []
@@ -182,8 +178,6 @@ class Command(BaseCommand):
                 username=user_data['username'],
                 defaults={
                     'email': user_data['email'],
-                    'first_name': user_data['first_name'],
-                    'last_name': user_data['last_name'],
                     'is_active': True
                 }
             )

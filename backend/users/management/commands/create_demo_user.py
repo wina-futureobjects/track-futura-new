@@ -24,9 +24,7 @@ class Command(BaseCommand):
             user = User.objects.create_user(
                 username=username,
                 password=password,
-                email=email,
-                first_name='Demo',
-                last_name='User'
+                email=email
             )
             self.stdout.write(
                 self.style.SUCCESS(f'Created new demo user: {username}')
