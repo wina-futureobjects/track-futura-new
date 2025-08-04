@@ -176,25 +176,29 @@ const convertLegacyRoute = (
 const OrganizationProjects = () => {
   const navigate = useNavigate();
   const { organizationId } = useParams<{ organizationId: string }>();
+  const theme = useTheme();
+  
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
-  const [activeTab, setActiveTab] = useState<number>(0);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState('last viewed');
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [openNewProjectDialog, setOpenNewProjectDialog] = useState(false);
   const [openAddMemberDialog, setOpenAddMemberDialog] = useState(false);
-  const [projectName, setProjectName] = useState('');
-  const [projectDescription, setProjectDescription] = useState('');
-  const [projectPublic, setProjectPublic] = useState<boolean>(false);
+  const [newProject, setNewProject] = useState({
+    name: '',
+    description: '',
+    is_public: false
+  });
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [newMemberRole, setNewMemberRole] = useState('member');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState('');
   const [statusChangeDialogOpen, setStatusChangeDialogOpen] = useState(false);
   const [pendingStatusChange, setPendingStatusChange] = useState<{ userId: number; newStatus: boolean } | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('last viewed');
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid');
-  const theme = useTheme();
 
   useEffect(() => {
     if (organizationId) {
@@ -287,9 +291,7 @@ const OrganizationProjects = () => {
   };
 
   const handleNewProject = () => {
-    setProjectName('');
-    setProjectDescription('');
-    setProjectPublic(false);
+    setNewProject({ name: '', description: '', is_public: false });
     setOpenNewProjectDialog(true);
   };
 
@@ -300,7 +302,7 @@ const OrganizationProjects = () => {
   };
 
   const handleCreateProject = async () => {
-    if (!projectName.trim()) {
+    if (!newProject.name.trim()) {
       return;
     }
 
@@ -311,10 +313,10 @@ const OrganizationProjects = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: projectName,
-          description: projectDescription || null,
+          name: newProject.name,
+          description: newProject.description || null,
           organization: Number(organizationId),
-          is_public: projectPublic
+          is_public: newProject.is_public
         }),
       });
 
@@ -694,11 +696,16 @@ const OrganizationProjects = () => {
     );
   };
 
-  // Filter members based on search query
-  const filteredMembers = members.filter(member => 
-    member.user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    member.user.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter members based on search query and role filter
+  const filteredMembers = members.filter(member => {
+    const matchesSearch = member.user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         member.user.email.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesRoleFilter = roleFilter === 'all' || 
+                             member.role === roleFilter;
+    
+    return matchesSearch && matchesRoleFilter;
+  });
 
   return (
     <Box sx={{ 
@@ -934,7 +941,7 @@ const OrganizationProjects = () => {
                 </Button>
             </Box>
 
-            {/* Search for members */}
+            {/* Search and filters for members */}
             <Paper
               elevation={0}
               sx={{ 
@@ -951,31 +958,52 @@ const OrganizationProjects = () => {
               <Box sx={{ 
                 display: 'flex', 
                 alignItems: 'center', 
+                gap: 2,
                 width: '100%',
-                maxWidth: 500,
-                borderRadius: 2,
-                px: 2,
-                py: 0.5,
-                bgcolor: 'rgba(0, 0, 0, 0.03)'
+                maxWidth: 600
               }}>
-                <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />
-                <TextField
-                  placeholder="Search members by name or email"
-                  variant="standard"
-                  fullWidth
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  sx={{ 
-                    '& .MuiInput-root': {
-                      '&::before, &::after': {
-                        display: 'none'
+                <FormControl size="small" sx={{ minWidth: 150 }}>
+                  <InputLabel>Filter by Role</InputLabel>
+                  <Select
+                    value={roleFilter}
+                    label="Filter by Role"
+                    onChange={(e) => setRoleFilter(e.target.value)}
+                  >
+                    <MenuItem value="all">All Roles</MenuItem>
+                    <MenuItem value="admin">Admin</MenuItem>
+                    <MenuItem value="member">Member</MenuItem>
+                    <MenuItem value="viewer">Viewer</MenuItem>
+                  </Select>
+                </FormControl>
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  flex: 1,
+                  maxWidth: 400,
+                  borderRadius: 2,
+                  px: 2,
+                  py: 0.5,
+                  bgcolor: 'rgba(0, 0, 0, 0.03)'
+                }}>
+                  <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />
+                  <TextField
+                    placeholder="Search members by name or email"
+                    variant="standard"
+                    fullWidth
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    sx={{ 
+                      '& .MuiInput-root': {
+                        '&::before, &::after': {
+                          display: 'none'
+                        }
+                      },
+                      '& .MuiInputBase-input': {
+                        py: 1
                       }
-                    },
-                    '& .MuiInputBase-input': {
-                      py: 1
-                    }
-                  }}
-                />
+                    }}
+                  />
+                </Box>
               </Box>
             </Paper>
 
@@ -1277,8 +1305,8 @@ const OrganizationProjects = () => {
             type="text"
             fullWidth
             variant="outlined"
-            value={projectName}
-            onChange={(e) => setProjectName(e.target.value)}
+            value={newProject.name}
+            onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
             sx={{ mb: 3, mt: 2 }}
           />
           <TextField
@@ -1290,8 +1318,8 @@ const OrganizationProjects = () => {
             variant="outlined"
             multiline
             rows={3}
-            value={projectDescription}
-            onChange={(e) => setProjectDescription(e.target.value)}
+            value={newProject.description}
+            onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
             sx={{ mb: 2 }}
           />
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
@@ -1300,8 +1328,8 @@ const OrganizationProjects = () => {
             </Typography>
             <FormControl component="fieldset">
               <Select
-                value={projectPublic ? "public" : "private"}
-                onChange={(e) => setProjectPublic(e.target.value === "public")}
+                value={newProject.is_public ? "public" : "private"}
+                onChange={(e) => setNewProject({ ...newProject, is_public: e.target.value === "public" })}
                 size="small"
                 sx={{ minWidth: 120 }}
               >
@@ -1311,7 +1339,7 @@ const OrganizationProjects = () => {
             </FormControl>
           </Box>
           <Typography variant="caption" color="text.secondary">
-            {projectPublic 
+            {newProject.is_public 
               ? "Public projects can be viewed by anyone with the link." 
               : "Private projects are only visible to organization members."}
           </Typography>
@@ -1326,7 +1354,7 @@ const OrganizationProjects = () => {
                      <Button 
              onClick={handleCreateProject} 
              variant="contained"
-             disabled={!projectName.trim()}
+             disabled={!newProject.name.trim()}
              sx={{ 
                borderRadius: 2,
                bgcolor: '#62EF83',

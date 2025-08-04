@@ -90,6 +90,7 @@ const TenantAdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
   const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState<string>('all');
   const [openAddMemberDialog, setOpenAddMemberDialog] = useState(false);
   const [openNewProjectDialog, setOpenNewProjectDialog] = useState(false);
   const [newMember, setNewMember] = useState({
@@ -408,10 +409,15 @@ const TenantAdminDashboard = () => {
     setPendingStatusChange(null);
   };
 
-  const filteredMembers = members.filter(member => 
-    member.user.username.toLowerCase().includes(search.toLowerCase()) ||
-    member.user.email.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredMembers = members.filter(member => {
+    const matchesSearch = member.user.username.toLowerCase().includes(search.toLowerCase()) ||
+                         member.user.email.toLowerCase().includes(search.toLowerCase());
+    
+    const matchesRoleFilter = roleFilter === 'all' || 
+                             member.role === roleFilter;
+    
+    return matchesSearch && matchesRoleFilter;
+  });
 
   const filteredProjects = projects.filter(project => 
     project.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -518,21 +524,38 @@ const TenantAdminDashboard = () => {
 
           {/* Search and Add Button */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-            <TextField
-              placeholder={`Search ${activeTab === 0 ? 'members' : activeTab === 1 ? 'projects' : ''}...`}
-              variant="outlined"
-              size="small"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              sx={{ width: 300 }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
-              }}
-            />
+            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+              {activeTab === 0 && (
+                <FormControl size="small" sx={{ minWidth: 150 }}>
+                  <InputLabel>Filter by Role</InputLabel>
+                  <Select
+                    value={roleFilter}
+                    label="Filter by Role"
+                    onChange={(e) => setRoleFilter(e.target.value)}
+                  >
+                    <MenuItem value="all">All Roles</MenuItem>
+                    <MenuItem value="admin">Admin</MenuItem>
+                    <MenuItem value="member">Member</MenuItem>
+                    <MenuItem value="viewer">Viewer</MenuItem>
+                  </Select>
+                </FormControl>
+              )}
+              <TextField
+                placeholder={`Search ${activeTab === 0 ? 'members' : activeTab === 1 ? 'projects' : ''}...`}
+                variant="outlined"
+                size="small"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                sx={{ width: 300 }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Box>
             {activeTab === 0 && (
               <Button
                 variant="contained"

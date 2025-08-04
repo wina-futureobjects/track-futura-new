@@ -85,12 +85,13 @@ const SuperAdminDashboard = () => {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState<string>('all');
   const [openUserDialog, setOpenUserDialog] = useState(false);
   const [openOrgDialog, setOpenOrgDialog] = useState(false);
   const [newUser, setNewUser] = useState({
     username: '',
     email: '',
-    role: 'super_admin',
+    role: 'tenant_admin',
   });
 
   const [newOrg, setNewOrg] = useState({
@@ -559,14 +560,19 @@ const SuperAdminDashboard = () => {
     setNewUser({
       username: '',
       email: '',
-      role: 'super_admin',
+      role: 'tenant_admin',
     });
   };
 
-  const filteredUsers = users.filter(user => 
-    user.username.toLowerCase().includes(search.toLowerCase()) ||
-    user.email.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = user.username.toLowerCase().includes(search.toLowerCase()) ||
+                         user.email.toLowerCase().includes(search.toLowerCase());
+    
+    const matchesRoleFilter = roleFilter === 'all' || 
+                             user.global_role?.role === roleFilter;
+    
+    return matchesSearch && matchesRoleFilter;
+  });
 
   const filteredOrganizations = organizations.filter(org => 
     org.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -837,21 +843,38 @@ const SuperAdminDashboard = () => {
       {/* Search and Add Button - Only for Users and Organizations tabs */}
       {(activeTab === 0 || activeTab === 1) && (
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-          <TextField
-            placeholder="Search..."
-            variant="outlined"
-            size="small"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            sx={{ width: 300 }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
-            }}
-          />
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+            {activeTab === 0 && (
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel>Filter by Role</InputLabel>
+                <Select
+                  value={roleFilter}
+                  label="Filter by Role"
+                  onChange={(e) => setRoleFilter(e.target.value)}
+                >
+                  <MenuItem value="all">All Roles</MenuItem>
+                  <MenuItem value="super_admin">Super Admin</MenuItem>
+                  <MenuItem value="tenant_admin">Tenant Admin</MenuItem>
+                  <MenuItem value="user">User</MenuItem>
+                </Select>
+              </FormControl>
+            )}
+            <TextField
+              placeholder="Search..."
+              variant="outlined"
+              size="small"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              sx={{ width: 300 }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Box>
           {activeTab === 0 && (
             <Button
               variant="contained"
@@ -1293,6 +1316,7 @@ const SuperAdminDashboard = () => {
             >
               <MenuItem value="super_admin">Super Admin</MenuItem>
               <MenuItem value="tenant_admin">Tenant Admin</MenuItem>
+              <MenuItem value="user">User</MenuItem>
             </Select>
           </FormControl>
         </DialogContent>
