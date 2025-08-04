@@ -73,8 +73,15 @@ class AutomatedBatchScraper:
                 'facebook': ['post']
             }
 
+        # Automatically generate output folder pattern based on platform and service
         if output_folder_pattern is None:
-            output_folder_pattern = "{platform}_{content_type}_{date}_{job_name}"
+            # Extract service name from platform_params if available
+            service_name = "default"
+            if platform_params and 'service_name' in platform_params:
+                service_name = platform_params['service_name']
+            
+            # Create pattern: {platform}/{service}/{date}
+            output_folder_pattern = "{platform}/{service}/{date}"
 
         # Create the job
         job = BatchScraperJob.objects.create(

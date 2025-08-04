@@ -145,8 +145,7 @@ const AutomatedBatchScraper = () => {
     numOfPosts: 10,
     startDate: null as Dayjs | null,
     endDate: null as Dayjs | null,
-    autoCreateFolders: true,
-    outputFolderPattern: '{platform}/{service}/{date}'
+    autoCreateFolders: true
   });
 
   // Delete confirmation dialog state
@@ -255,8 +254,7 @@ const AutomatedBatchScraper = () => {
       numOfPosts: 10,
       startDate: null,
       endDate: null,
-      autoCreateFolders: true,
-      outputFolderPattern: `{platform}/{service}/{date}`
+      autoCreateFolders: true
     });
     setConfigDialogOpen(true);
   };
@@ -288,7 +286,6 @@ const AutomatedBatchScraper = () => {
         start_date: configForm.startDate?.toISOString() || null,
         end_date: configForm.endDate?.toISOString() || null,
         auto_create_folders: configForm.autoCreateFolders,
-        output_folder_pattern: configForm.outputFolderPattern,
         platform_params: {
           'platform_name': selectedInputCollection.platform_name,
           'service_name': selectedInputCollection.service_name,
@@ -385,6 +382,20 @@ const AutomatedBatchScraper = () => {
   const getPlatformColor = (platformName: string) => {
     const platform = platformOptions.find(p => p.value === platformName.toLowerCase());
     return platform ? platform.color : '#6c757d';
+  };
+
+  // Helper function to get platform name for display
+  const getPlatformName = (collection: any): string => {
+    return collection.platform_name || 'N/A';
+  };
+
+  // Helper function to get service type for display
+  const getServiceType = (collection: any): string => {
+    const platform = collection.platform_name?.toLowerCase();
+    if (platform === 'tiktok') {
+      return 'Videos - Collect by URL';
+    }
+    return 'Posts - Discover by URL';
   };
 
   // Initial data load
@@ -598,7 +609,8 @@ const AutomatedBatchScraper = () => {
                     <TableHead>
                       <TableRow>
                         <TableCell>Collection</TableCell>
-                        <TableCell>Platform & Service</TableCell>
+                        <TableCell>Platform</TableCell>
+                        <TableCell>Service</TableCell>
                         <TableCell>URLs</TableCell>
                         <TableCell>Status</TableCell>
                         <TableCell>Created</TableCell>
@@ -619,30 +631,14 @@ const AutomatedBatchScraper = () => {
                             </Box>
                           </TableCell>
                           <TableCell>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Box
-                                sx={{
-                                  width: 32,
-                                  height: 32,
-                                  borderRadius: '50%',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  backgroundColor: getPlatformColor(collection.platform_name),
-                                  color: 'white'
-                                }}
-                              >
-                                {getPlatformIcon(collection.platform_name)}
-                              </Box>
-                              <Box>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {collection.platform_name}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  {collection.service_name}
-                                </Typography>
-                              </Box>
-                            </Box>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {getPlatformName(collection)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {getServiceType(collection)}
+                            </Typography>
                           </TableCell>
                           <TableCell>
                             <Typography variant="body2">
@@ -1013,15 +1009,6 @@ const AutomatedBatchScraper = () => {
                   </Grid>
                 </Grid>
 
-                <TextField
-                  label="Output Folder Pattern"
-                  fullWidth
-                  value={configForm.outputFolderPattern}
-                  onChange={(e) => setConfigForm({ ...configForm, outputFolderPattern: e.target.value })}
-                  placeholder="{platform}/{service}/{date}"
-                  helperText="Pattern for organizing scraped data folders"
-                />
-
                 <FormControlLabel
                   control={
                     <Checkbox
@@ -1029,7 +1016,7 @@ const AutomatedBatchScraper = () => {
                       onChange={(e) => setConfigForm({ ...configForm, autoCreateFolders: e.target.checked })}
                     />
                   }
-                  label="Auto-create folders for scraped data"
+                  label="Automatically organize scraped data by platform and service"
                 />
               </Stack>
             </DialogContent>

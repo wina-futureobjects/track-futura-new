@@ -465,6 +465,33 @@ const TrackSourcesList = () => {
     socialMediaFilters.hasFacebook || socialMediaFilters.hasInstagram || 
     socialMediaFilters.hasLinkedIn || socialMediaFilters.hasTikTok;
 
+  // Helper function to determine platform from source links
+  const getPlatform = (source: TrackSource): string => {
+    if (source.instagram_link) return 'Instagram';
+    if (source.facebook_link) return 'Facebook';
+    if (source.linkedin_link) return 'LinkedIn';
+    if (source.tiktok_link) return 'TikTok';
+    return 'N/A';
+  };
+
+  // Helper function to determine service type
+  const getService = (source: TrackSource): string => {
+    // Determine service type based on platform
+    if (source.instagram_link) {
+      return 'Posts - Discover by URL';
+    }
+    if (source.facebook_link) {
+      return 'Posts - Discover by URL';
+    }
+    if (source.linkedin_link) {
+      return 'Posts - Discover by URL';
+    }
+    if (source.tiktok_link) {
+      return 'Videos - Collect by URL';
+    }
+    return 'Posts - Discover by URL';
+  };
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: '#f8fafc' }}>
       {/* Main Content */}
@@ -875,9 +902,9 @@ const TrackSourcesList = () => {
                     <TableHead sx={{ bgcolor: '#f8fafc' }}>
                       <TableRow>
                         <TableCell sx={{ fontWeight: 600, color: '#374151' }}>Source</TableCell>
+                        <TableCell sx={{ fontWeight: 600, color: '#374151' }} align="center">Social Media</TableCell>
                         <TableCell sx={{ fontWeight: 600, color: '#374151' }} align="center">Service</TableCell>
                         <TableCell sx={{ fontWeight: 600, color: '#374151' }} align="center">URLs</TableCell>
-                        <TableCell sx={{ fontWeight: 600, color: '#374151' }} align="center">Social Media</TableCell>
                         <TableCell sx={{ fontWeight: 600, color: '#374151' }} align="right">Actions</TableCell>
                       </TableRow>
                     </TableHead>
@@ -893,19 +920,6 @@ const TrackSourcesList = () => {
                                 ID: {source.id}
                               </Typography>
                             </Box>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                              {source.service_name || 'N/A'}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Chip
-                              label={source.url_count}
-                              size="small"
-                              color={source.url_count > 0 ? 'primary' : 'default'}
-                              sx={{ fontWeight: 500 }}
-                            />
                           </TableCell>
                           <TableCell align="center">
                             <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
@@ -1000,6 +1014,19 @@ const TrackSourcesList = () => {
                                 </Typography>
                               )}
                             </Box>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {getService(source)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Chip
+                              label={source.url_count}
+                              size="small"
+                              color={source.url_count > 0 ? 'primary' : 'default'}
+                              sx={{ fontWeight: 500 }}
+                            />
                           </TableCell>
                           <TableCell align="right">
                             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
