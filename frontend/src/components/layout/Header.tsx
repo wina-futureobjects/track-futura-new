@@ -333,7 +333,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle, showSidebarToggle = tru
     // Load user data
     const user = getCurrentUser();
     if (user) {
-      setUserName(`${user.first_name} ${user.last_name}`.trim() || user.username);
+      setUserName(user.username);
       setUserEmail(user.email || '');
     }
   }, []);

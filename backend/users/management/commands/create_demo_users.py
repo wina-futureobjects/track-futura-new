@@ -11,9 +11,7 @@ class Command(BaseCommand):
             username='superadmin',
             email='superadmin@example.com',
             defaults={
-                'is_active': True,
-                'first_name': 'Super',
-                'last_name': 'Admin'
+                'is_active': True
             }
         )
         
@@ -40,9 +38,7 @@ class Command(BaseCommand):
             username='tenantadmin',
             email='tenantadmin@example.com',
             defaults={
-                'is_active': True,
-                'first_name': 'Tenant',
-                'last_name': 'Admin'
+                'is_active': True
             }
         )
         
@@ -69,9 +65,7 @@ class Command(BaseCommand):
             username='user',
             email='user@example.com',
             defaults={
-                'is_active': True,
-                'first_name': 'Regular',
-                'last_name': 'User'
+                'is_active': True
             }
         )
         

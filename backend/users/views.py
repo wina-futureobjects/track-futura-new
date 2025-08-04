@@ -94,8 +94,6 @@ class CustomAuthToken(ObtainAuthToken):
             'user_id': user.pk,
             'username': user.username,
             'email': user.email,
-            'first_name': user.first_name,
-            'last_name': user.last_name,
         })
 
 class UserProfileView(generics.RetrieveUpdateAPIView):
@@ -671,9 +669,7 @@ class AdminUserViewSet(viewsets.ModelViewSet):
             user = User.objects.create_user(
                 username=user_data['username'],
                 email=user_data['email'],
-                password=password,
-                first_name=user_data.get('first_name', ''),
-                last_name=user_data.get('last_name', '')
+                password=password
             )
             
             # Create user profile

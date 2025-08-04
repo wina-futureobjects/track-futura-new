@@ -16,6 +16,7 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
+  DialogContentText,
   DialogTitle,
   Select,
   MenuItem,
@@ -36,6 +37,8 @@ import {
   Person as PersonIcon,
   Edit as EditIcon,
   FolderOpen as ProjectIcon,
+  CheckCircle as CheckCircleIcon,
+  Cancel as CancelIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../../utils/api';
@@ -55,8 +58,7 @@ interface User {
   id: number;
   username: string;
   email: string;
-  first_name: string;
-  last_name: string;
+  is_active: boolean;
 }
 
 interface Member {
@@ -100,6 +102,8 @@ const TenantAdminDashboard = () => {
     is_public: false,
   });
   const [error, setError] = useState<string | null>(null);
+  const [statusChangeDialogOpen, setStatusChangeDialogOpen] = useState(false);
+  const [pendingStatusChange, setPendingStatusChange] = useState<{ userId: number; newStatus: boolean } | null>(null);
   const [stats, setStats] = useState({
     totalMembers: 0,
     totalProjects: 0,
@@ -356,10 +360,57 @@ const TenantAdminDashboard = () => {
     navigate(`/dashboard/${projectId}`);
   };
 
+  const handleChangeUserStatus = async (userId: number, newStatus: boolean) => {
+    try {
+      const response = await apiFetch(`/api/admin/users/${userId}/`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ is_active: newStatus }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update user status');
+      }
+
+      // Update the user in the local state
+      setMembers(prevMembers => 
+        prevMembers.map(member => 
+          member.user.id === userId 
+            ? { ...member, user: { ...member.user, is_active: newStatus } }
+            : member
+        )
+      );
+
+      setError(null);
+    } catch (error) {
+      console.error('Error updating user status:', error);
+      setError('Failed to update user status');
+    }
+  };
+
+  const handleStatusChangeClick = (userId: number, currentStatus: boolean) => {
+    setPendingStatusChange({ userId, newStatus: !currentStatus });
+    setStatusChangeDialogOpen(true);
+  };
+
+  const handleConfirmStatusChange = async () => {
+    if (pendingStatusChange) {
+      await handleChangeUserStatus(pendingStatusChange.userId, pendingStatusChange.newStatus);
+      setStatusChangeDialogOpen(false);
+      setPendingStatusChange(null);
+    }
+  };
+
+  const handleCancelStatusChange = () => {
+    setStatusChangeDialogOpen(false);
+    setPendingStatusChange(null);
+  };
+
   const filteredMembers = members.filter(member => 
     member.user.username.toLowerCase().includes(search.toLowerCase()) ||
-    member.user.email.toLowerCase().includes(search.toLowerCase()) ||
-    `${member.user.first_name} ${member.user.last_name}`.toLowerCase().includes(search.toLowerCase())
+    member.user.email.toLowerCase().includes(search.toLowerCase())
   );
 
   const filteredProjects = projects.filter(project => 
@@ -514,10 +565,10 @@ const TenantAdminDashboard = () => {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Name</TableCell>
                     <TableCell>Username</TableCell>
                     <TableCell>Email</TableCell>
                     <TableCell>Role</TableCell>
+                    <TableCell>Status</TableCell>
                     <TableCell>Joined</TableCell>
                     <TableCell align="right">Actions</TableCell>
                   </TableRow>
@@ -526,7 +577,6 @@ const TenantAdminDashboard = () => {
                   {filteredMembers.length > 0 ? (
                     filteredMembers.map((member) => (
                       <TableRow key={member.id}>
-                        <TableCell>{`${member.user.first_name} ${member.user.last_name}`}</TableCell>
                         <TableCell>{member.user.username}</TableCell>
                         <TableCell>{member.user.email}</TableCell>
                         <TableCell>
@@ -534,6 +584,36 @@ const TenantAdminDashboard = () => {
                             label={member.role} 
                             color={member.role === 'admin' ? 'primary' : member.role === 'member' ? 'secondary' : 'default'} 
                             size="small" 
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            icon={member.user.is_active ? <CheckCircleIcon /> : <CancelIcon />}
+                            label={member.user.is_active ? 'Active' : 'Inactive'}
+                            color={member.user.is_active ? 'success' : 'error'}
+                            size="small"
+                            variant="filled"
+                            onClick={() => handleStatusChangeClick(member.user.id, member.user.is_active)}
+                            sx={{ 
+                              cursor: 'pointer',
+                              transition: 'all 0.3s ease',
+                              fontWeight: 600,
+                              fontSize: '0.75rem',
+                              minWidth: '80px',
+                              '&:hover': {
+                                transform: 'scale(1.08)',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                filter: 'brightness(1.1)'
+                              },
+                              '& .MuiChip-icon': {
+                                fontSize: '1rem',
+                                marginLeft: '4px'
+                              },
+                              '& .MuiChip-label': {
+                                paddingLeft: '4px',
+                                paddingRight: '8px'
+                              }
+                            }}
                           />
                         </TableCell>
                         <TableCell>{new Date(member.date_joined).toLocaleDateString()}</TableCell>
@@ -773,6 +853,44 @@ const TenantAdminDashboard = () => {
           <Button onClick={() => setOpenNewProjectDialog(false)}>Cancel</Button>
           <Button onClick={handleCreateProject} variant="contained" color="primary">
             Create Project
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Status Change Confirmation Dialog */}
+      <Dialog
+        open={statusChangeDialogOpen}
+        onClose={handleCancelStatusChange}
+      >
+        <DialogTitle>Confirm Status Change</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to change this user's status to{' '}
+            <strong>
+              {pendingStatusChange?.newStatus ? 'Active' : 'Inactive'}
+            </strong>?
+            <br></br>
+            {pendingStatusChange?.newStatus 
+              ? 'This will allow the user to access the system and perform their assigned tasks.'
+              : 'This will prevent the user from accessing the system and performing any actions.'
+            }
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelStatusChange}>Cancel</Button>
+          <Button 
+            onClick={handleConfirmStatusChange} 
+            variant="contained"
+            sx={{
+              backgroundColor: '#d32f2f',
+              color: '#fff',
+              '&:hover': {
+                backgroundColor: '#b71c1c',
+                color: '#fff',
+              },
+            }}
+          >
+            Confirm Status Change
           </Button>
         </DialogActions>
       </Dialog>
