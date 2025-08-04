@@ -7,14 +7,35 @@ class Folder(models.Model):
     """
     Model for organizing TikTok posts into folders
     """
+    CATEGORY_CHOICES = (
+        ('posts', 'Posts'),
+        ('reels', 'Reels'),
+        ('comments', 'Comments'),
+    )
+    
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, null=True)
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='posts', help_text="Type of content stored in this folder")
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='tiktok_folders', null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.get_category_display()})"
+    
+    @property
+    def category_display(self):
+        return dict(self.CATEGORY_CHOICES)[self.category]
+    
+    def get_content_count(self):
+        """Get the count of content items in this folder based on category"""
+        if self.category == 'posts':
+            return self.posts.count()
+        elif self.category == 'reels':
+            return self.posts.filter(content_type='reel').count()
+        elif self.category == 'comments':
+            return 0  # TikTok doesn't have separate comments model yet
+        return 0
     
     class Meta:
         ordering = ['-created_at']

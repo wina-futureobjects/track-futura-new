@@ -51,6 +51,22 @@ class FolderViewSet(viewsets.ModelViewSet):
         queryset = Folder.objects.filter(project_id=project_id)
         return queryset
     
+    def get_object(self):
+        """
+        Override get_object to handle detail endpoints without requiring project parameter
+        """
+        # For detail endpoints, get the object directly by ID
+        if self.action in ['retrieve', 'update', 'partial_update', 'destroy']:
+            folder_id = self.kwargs.get('pk')
+            try:
+                return Folder.objects.get(id=folder_id)
+            except Folder.DoesNotExist:
+                from rest_framework.exceptions import NotFound
+                raise NotFound("No Folder matches the given query.")
+        
+        # For list endpoints, use the filtered queryset
+        return super().get_object()
+    
     def create(self, request, *args, **kwargs):
         """
         Override create method to ensure project ID is saved

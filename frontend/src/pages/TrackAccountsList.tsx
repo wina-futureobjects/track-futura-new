@@ -54,6 +54,8 @@ interface TrackSource {
   linkedin_link: string | null;
   tiktok_link: string | null;
   other_social_media: string | null;
+  service_name: string | null;
+  url_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -129,9 +131,6 @@ const TrackSourcesList = () => {
 
   // CSV download loading state
   const [csvDownloading, setCsvDownloading] = useState(false);
-  
-  // Workflow-related state
-
 
   // Fetch sources with filters
   const fetchSources = async (
@@ -242,9 +241,6 @@ const TrackSourcesList = () => {
   const refreshData = () => {
     fetchSources(page, rowsPerPage, searchTerm, socialMediaFilters);
     fetchFilterStats();
-    if (projectId) {
-      fetchWorkflowData();
-    }
   };
   
 
@@ -879,6 +875,8 @@ const TrackSourcesList = () => {
                     <TableHead sx={{ bgcolor: '#f8fafc' }}>
                       <TableRow>
                         <TableCell sx={{ fontWeight: 600, color: '#374151' }}>Source</TableCell>
+                        <TableCell sx={{ fontWeight: 600, color: '#374151' }} align="center">Service</TableCell>
+                        <TableCell sx={{ fontWeight: 600, color: '#374151' }} align="center">URLs</TableCell>
                         <TableCell sx={{ fontWeight: 600, color: '#374151' }} align="center">Social Media</TableCell>
                         <TableCell sx={{ fontWeight: 600, color: '#374151' }} align="right">Actions</TableCell>
                       </TableRow>
@@ -895,6 +893,19 @@ const TrackSourcesList = () => {
                                 ID: {source.id}
                               </Typography>
                             </Box>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {source.service_name || 'N/A'}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Chip
+                              label={source.url_count}
+                              size="small"
+                              color={source.url_count > 0 ? 'primary' : 'default'}
+                              sx={{ fontWeight: 500 }}
+                            />
                           </TableCell>
                           <TableCell align="center">
                             <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>

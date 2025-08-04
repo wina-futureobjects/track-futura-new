@@ -688,21 +688,6 @@ const AutomatedBatchScraper = () => {
                                   <VisibilityIcon fontSize="small" />
                                 </IconButton>
                               </Tooltip>
-                              <Tooltip title="Delete">
-                                <IconButton
-                                  size="small"
-                                  onClick={() => handleDeleteItem(collection.id, `${collection.platform_name} - ${collection.service_name}`, 'input')}
-                                  sx={{ 
-                                    color: '#dc2626',
-                                    '&:hover': { 
-                                      bgcolor: '#dc2626',
-                                      color: 'white'
-                                    }
-                                  }}
-                                >
-                                  <DeleteIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
                             </Box>
                           </TableCell>
                         </TableRow>

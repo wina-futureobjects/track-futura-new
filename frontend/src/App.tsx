@@ -187,6 +187,7 @@ function App() {
               <Route path="/facebook-comment-scraper" element={<LegacyRouteRedirect><FacebookCommentScraper /></LegacyRouteRedirect>} />
               <Route path="/brightdata-scraper" element={<LegacyRouteRedirect><AutomatedBatchScraper /></LegacyRouteRedirect>} />
               <Route path="/automated-batch-scraper" element={<LegacyRouteRedirect><AutomatedBatchScraper /></LegacyRouteRedirect>} />
+              <Route path="/workflow-management" element={<LegacyRouteRedirect><AutomatedBatchScraper /></LegacyRouteRedirect>} />
 
                              {/* Legacy redirects */}
                <Route path="/projects" element={<Navigate to="/organizations" replace />} />
@@ -372,6 +373,15 @@ function App() {
               } />
 
               <Route path="/organizations/:organizationId/projects/:projectId/automated-batch-scraper" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <AutomatedBatchScraper />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+
+              {/* Workflow Management route - separate from scraper */}
+              <Route path="/organizations/:organizationId/projects/:projectId/workflow-management" element={
                 <ProtectedRoute>
                   <Layout>
                     <AutomatedBatchScraper />

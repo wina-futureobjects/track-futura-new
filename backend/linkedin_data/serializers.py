@@ -8,10 +8,11 @@ class LinkedInPostSerializer(serializers.ModelSerializer):
 
 class FolderSerializer(serializers.ModelSerializer):
     post_count = serializers.SerializerMethodField()
+    category_display = serializers.ReadOnlyField()
     
     class Meta:
         model = Folder
-        fields = ['id', 'name', 'description', 'project', 'created_at', 'updated_at', 'post_count']
+        fields = ['id', 'name', 'description', 'category', 'category_display', 'project', 'created_at', 'updated_at', 'post_count']
     
     def create(self, validated_data):
         """

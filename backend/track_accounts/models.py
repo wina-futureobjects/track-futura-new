@@ -22,6 +22,10 @@ class TrackSource(models.Model):
     
     other_social_media = models.TextField(blank=True, null=True)
     
+    # Service and URL information
+    service_name = models.CharField(max_length=100, blank=True, null=True)
+    url_count = models.IntegerField(default=0)
+    
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

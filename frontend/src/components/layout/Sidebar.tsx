@@ -222,18 +222,6 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
       category: 'main'
     },
     {
-      text: 'Data Scrapers',
-      path: '#data-scrapers',
-      icon: <AutoAwesomeIcon />,
-      category: 'data',
-      subItems: [
-        { text: 'Posts & Reels Scraper', path: getSocialMediaPath('automated-batch-scraper'), icon: <AutoAwesomeIcon /> },
-        { text: 'Comments Scraper', path: getSocialMediaPath('comments-scraper'), icon: <CommentIcon /> },
-        { text: 'Webhook Monitor', path: getSocialMediaPath('webhook-monitor'), icon: <AnalyticsIcon /> },
-        { text: 'BrightData Notifications', path: getSocialMediaPath('brightdata-notifications'), icon: <NotificationsIcon /> },
-      ]
-    },
-    {
       text: 'Data Storage',
       path: getDataStoragePath(),
       icon: <FolderIcon />,
@@ -329,10 +317,10 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
 
     if (match) {
       const [, orgId, projId] = match;
-      return `/organizations/${orgId}/projects/${projId}/automated-batch-scraper`;
+      return `/organizations/${orgId}/projects/${projId}/workflow-management`;
     }
 
-    return '/automated-batch-scraper';
+    return '/workflow-management';
   }
 
   // Function to check if a menu item is active based on the current path
@@ -384,8 +372,12 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
       return location.pathname.includes('brightdata-scraper');
     }
 
+    if (itemPath.includes('workflow-management')) {
+      return location.pathname.includes('workflow-management');
+    }
+
     if (itemPath.includes('automated-batch-scraper')) {
-      return location.pathname.includes('automated-batch-scraper');
+      return location.pathname.includes('automated-batch-scraper') && !location.pathname.includes('workflow-management');
     }
 
     if (itemPath.includes('facebook-comment-scraper')) {
