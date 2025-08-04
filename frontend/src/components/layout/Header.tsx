@@ -348,20 +348,24 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle, showSidebarToggle = tru
   
   // Separate effect for organization name to prevent unnecessary re-renders
   useEffect(() => {
+    console.log('Organization ID changed:', organizationId);
     if (organizationId && typeof organizationId === 'string') {
       fetchOrganizationName(organizationId);
     } else {
       // Reset to default if no valid ID
+      console.log('Resetting organization name to default');
       setOrganizationName('Organization');
     }
   }, [organizationId]);
   
   // Separate effect for project name to prevent unnecessary re-renders
   useEffect(() => {
+    console.log('Project ID changed:', projectId);
     if (projectId && typeof projectId === 'string') {
       fetchProjectName(projectId);
     } else {
       // Reset to default if no valid ID
+      console.log('Resetting project name to default');
       setProjectName('Project');
     }
   }, [projectId]);
@@ -552,7 +556,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle, showSidebarToggle = tru
           }}
         >
           <BusinessOutlinedIcon sx={{ mr: 0.5, fontSize: 18 }} />
-          {organizationName}
+          {(() => { console.log('Rendering organization name:', organizationName); return organizationName; })()}
           <KeyboardArrowDown sx={{ 
             ml: 0.5, 
             fontSize: 18,
@@ -644,7 +648,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle, showSidebarToggle = tru
           }}
         >
           <FolderOutlinedIcon sx={{ mr: 0.5, fontSize: 18 }} />
-          {projectName}
+          {(() => { console.log('Rendering project name:', projectName); return projectName; })()}
           <KeyboardArrowDown sx={{ 
             ml: 0.5, 
             fontSize: 18,
@@ -741,10 +745,18 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle, showSidebarToggle = tru
   // Async functions that are used in effects
   const fetchOrganizationName = async (id: string) => {
     try {
+      console.log('Fetching organization name for ID:', id);
       const response = await apiFetch(`/api/users/organizations/${id}/`);
+      console.log('Organization response status:', response.status);
       if (response.ok) {
         const data = await response.json();
-        setOrganizationName(data.name || 'Organization');
+        console.log('Organization data:', data);
+        const name = data.name || 'Organization';
+        console.log('Setting organization name to:', name);
+        setOrganizationName(name);
+      } else {
+        console.error('Failed to fetch organization name:', response.status);
+        setOrganizationName('Organization');
       }
     } catch (error) {
       console.error('Error fetching organization name:', error);
@@ -754,10 +766,18 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle, showSidebarToggle = tru
 
   const fetchProjectName = async (id: string) => {
     try {
+      console.log('Fetching project name for ID:', id);
       const response = await apiFetch(`/api/users/projects/${id}/`);
+      console.log('Project response status:', response.status);
       if (response.ok) {
         const data = await response.json();
-        setProjectName(data.name || 'Project');
+        console.log('Project data:', data);
+        const name = data.name || 'Project';
+        console.log('Setting project name to:', name);
+        setProjectName(name);
+      } else {
+        console.error('Failed to fetch project name:', response.status);
+        setProjectName('Project');
       }
     } catch (error) {
       console.error('Error fetching project name:', error);

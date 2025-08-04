@@ -29,6 +29,50 @@ const TrackAccountEdit = () => {
   const [account, setAccount] = useState<TrackAccount | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Add state for organization and project names
+  const [organizationName, setOrganizationName] = useState('Organization');
+  const [projectName, setProjectName] = useState('Project');
+
+  // Fetch organization name
+  useEffect(() => {
+    if (!organizationId) return;
+    
+    apiFetch(`/api/users/organizations/${organizationId}/`)
+      .then(response => {
+        if (response.ok) {
+          return response.json();
+        }
+        throw new Error('Failed to fetch organization');
+      })
+      .then(data => {
+        setOrganizationName(data.name || 'Organization');
+      })
+      .catch(err => {
+        console.error('Error fetching organization name:', err);
+        setOrganizationName('Organization');
+      });
+  }, [organizationId]);
+
+  // Fetch project name
+  useEffect(() => {
+    if (!projectId) return;
+    
+    apiFetch(`/api/users/projects/${projectId}/`)
+      .then(response => {
+        if (response.ok) {
+          return response.json();
+        }
+        throw new Error('Failed to fetch project');
+      })
+      .then(data => {
+        setProjectName(data.name || 'Project');
+      })
+      .catch(err => {
+        console.error('Error fetching project name:', err);
+        setProjectName('Project');
+      });
+  }, [projectId]);
 
   // Fetch source data
   useEffect(() => {
@@ -95,7 +139,7 @@ const TrackAccountEdit = () => {
               sx={{ display: 'flex', alignItems: 'center' }}
               onClick={() => navigate(`/organizations/${organizationId}/projects`)}
             >
-              Organization {organizationId}
+              {organizationName}
             </Link>
           )}
           {projectId && (
@@ -105,7 +149,7 @@ const TrackAccountEdit = () => {
               sx={{ display: 'flex', alignItems: 'center' }}
               onClick={() => navigate(`/organizations/${organizationId}/projects/${projectId}`)}
             >
-              Project {projectId}
+              {projectName}
             </Link>
           )}
           <Link
@@ -121,7 +165,7 @@ const TrackAccountEdit = () => {
             }}
           >
             <TrackChangesIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            Source Tracking
+            Input Source Tracking
           </Link>
           <Typography color="text.primary" sx={{ display: 'flex', alignItems: 'center' }}>
             <EditIcon sx={{ mr: 0.5 }} fontSize="inherit" />

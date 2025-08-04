@@ -834,7 +834,7 @@ const SuperAdminDashboard = () => {
       <Paper sx={{ mb: 3 }}>
         <Tabs value={activeTab} onChange={handleTabChange} centered>
           <Tab label="Users" />
-          <Tab label="Organizations" />
+          <Tab label="Ongoing....." />
           <Tab label="System Settings" />
           <Tab label="Brightdata Configuration" />
         </Tabs>

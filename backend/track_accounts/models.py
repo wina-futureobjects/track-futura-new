@@ -8,11 +8,23 @@ class TrackSource(models.Model):
     """
     Model for storing Track Source data
     """
+    # Platform choices
+    PLATFORM_CHOICES = [
+        ('facebook', 'Facebook'),
+        ('instagram', 'Instagram'),
+        ('linkedin', 'LinkedIn'),
+        ('tiktok', 'TikTok'),
+    ]
+    
     # Reference to the project
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='track_sources', null=True)
     
     # Core fields
     name = models.CharField(max_length=255)
+    
+    # Platform and service information
+    platform = models.CharField(max_length=20, choices=PLATFORM_CHOICES, blank=True, null=True)
+    service_name = models.CharField(max_length=100, blank=True, null=True)
     
     # Social media profile URLs
     facebook_link = models.URLField(max_length=500, blank=True, null=True)
@@ -22,8 +34,7 @@ class TrackSource(models.Model):
     
     other_social_media = models.TextField(blank=True, null=True)
     
-    # Service and URL information
-    service_name = models.CharField(max_length=100, blank=True, null=True)
+    # URL information
     url_count = models.IntegerField(default=0)
     
     # Metadata
@@ -34,11 +45,13 @@ class TrackSource(models.Model):
         return self.name
     
     class Meta:
-        ordering = ['name']
+        ordering = ['created_at']
         verbose_name = "Track Source"
         verbose_name_plural = "Track Sources"
         indexes = [
             models.Index(fields=['name']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['platform']),
         ]
 
 # Keep backward compatibility alias

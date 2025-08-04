@@ -55,18 +55,27 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
         has_linkedin = self.request.query_params.get('has_linkedin')
         has_tiktok = self.request.query_params.get('has_tiktok')
         
-        # Apply social media filters (AND logic - sources must have ALL selected platforms)
+        # Apply social media filters (OR logic - sources must have ANY of the selected platforms)
+        social_media_conditions = []
+        
         if has_facebook == 'true':
-            queryset = queryset.filter(facebook_link__isnull=False).exclude(facebook_link='')
+            social_media_conditions.append(Q(facebook_link__isnull=False) & ~Q(facebook_link=''))
         
         if has_instagram == 'true':
-            queryset = queryset.filter(instagram_link__isnull=False).exclude(instagram_link='')
+            social_media_conditions.append(Q(instagram_link__isnull=False) & ~Q(instagram_link=''))
         
         if has_linkedin == 'true':
-            queryset = queryset.filter(linkedin_link__isnull=False).exclude(linkedin_link='')
+            social_media_conditions.append(Q(linkedin_link__isnull=False) & ~Q(linkedin_link=''))
         
         if has_tiktok == 'true':
-            queryset = queryset.filter(tiktok_link__isnull=False).exclude(tiktok_link='')
+            social_media_conditions.append(Q(tiktok_link__isnull=False) & ~Q(tiktok_link=''))
+        
+        # Apply OR logic if any social media filters are selected
+        if social_media_conditions:
+            combined_condition = social_media_conditions[0]
+            for condition in social_media_conditions[1:]:
+                combined_condition |= condition
+            queryset = queryset.filter(combined_condition)
         
         # Date filters
         date_range = self.request.query_params.get('date_range')
@@ -110,7 +119,7 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
         print(f"Final queryset count: {queryset.count()}")
         print(f"=== END BACKEND FILTER DEBUG ===")
         
-        return queryset.order_by('name')
+        return queryset.order_by('created_at')
     
     def perform_create(self, serializer):
         """
@@ -241,8 +250,8 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
             # Get query parameters for filtering
             project_id = request.query_params.get('project')
             
-            # Start with base queryset
-            queryset = TrackSource.objects.all()
+            # Start with base queryset - include project to avoid N+1 queries
+            queryset = TrackSource.objects.select_related('project').all()
             
             # Filter by project if specified
             if project_id:
@@ -259,29 +268,44 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
             has_linkedin = request.query_params.get('has_linkedin')
             has_tiktok = request.query_params.get('has_tiktok')
             
-            if has_facebook == 'true':
-                queryset = queryset.filter(facebook_link__isnull=False).exclude(facebook_link='')
-            if has_instagram == 'true':
-                queryset = queryset.filter(instagram_link__isnull=False).exclude(instagram_link='')
-            if has_linkedin == 'true':
-                queryset = queryset.filter(linkedin_link__isnull=False).exclude(linkedin_link='')
-            if has_tiktok == 'true':
-                queryset = queryset.filter(tiktok_link__isnull=False).exclude(tiktok_link='')
+            # Apply social media filters (OR logic - sources must have ANY of the selected platforms)
+            social_media_conditions = []
             
-            # Create CSV response with proper encoding
+            if has_facebook == 'true':
+                social_media_conditions.append(Q(facebook_link__isnull=False) & ~Q(facebook_link=''))
+            
+            if has_instagram == 'true':
+                social_media_conditions.append(Q(instagram_link__isnull=False) & ~Q(instagram_link=''))
+            
+            if has_linkedin == 'true':
+                social_media_conditions.append(Q(linkedin_link__isnull=False) & ~Q(linkedin_link=''))
+            
+            if has_tiktok == 'true':
+                social_media_conditions.append(Q(tiktok_link__isnull=False) & ~Q(tiktok_link=''))
+            
+            # Apply OR logic if any social media filters are selected
+            if social_media_conditions:
+                combined_condition = social_media_conditions[0]
+                for condition in social_media_conditions[1:]:
+                    combined_condition |= condition
+                queryset = queryset.filter(combined_condition)
+            
+            # Get total count for metadata
+            total_count = queryset.count()
+            
+            # Create CSV response with proper encoding and CORS headers
             response = HttpResponse(content_type='text/csv; charset=utf-8')
             response['Content-Disposition'] = 'attachment; filename="track_sources_export.csv"'
             
             # Use DictWriter for better handling of special characters
             fieldnames = [
-                'ID',
                 'Name', 
+                'Platform',
+                'Service Type',
                 'Facebook Link',
                 'Instagram Link', 
                 'LinkedIn Link', 
                 'TikTok Link',
-                'Additional Links',
-                'Project ID',
                 'Created Date',
                 'Last Updated'
             ]
@@ -289,39 +313,49 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
             writer = csv.DictWriter(response, fieldnames=fieldnames)
             
             # Write export metadata as comments (some CSV readers support this)
-            writer.writerow({'ID': '# Track Sources Export'})
-            writer.writerow({'ID': f'# Export Date: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'})
-            writer.writerow({'ID': f'# Total Records: {queryset.count()}'})
+            writer.writerow({'Name': '# Track Sources Export'})
+            writer.writerow({'Name': f'# Export Date: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'})
+            writer.writerow({'Name': f'# Total Records: {total_count}'})
             if project_id:
-                writer.writerow({'ID': f'# Project ID: {project_id}'})
+                # Get project name for the header comment
+                project_name = ''
+                if project_id:
+                    try:
+                        project = queryset.first().project if queryset.exists() else None
+                        if project:
+                            project_name = project.name
+                    except:
+                        pass
+                if project_name:
+                    writer.writerow({'Name': f'# Project Name: {project_name}'})
             if search:
-                writer.writerow({'ID': f'# Search Filter: {search}'})
+                writer.writerow({'Name': f'# Search Filter: {search}'})
             if any([has_facebook == 'true', has_instagram == 'true', has_linkedin == 'true', has_tiktok == 'true']):
                 filters = []
                 if has_facebook == 'true': filters.append('Facebook')
                 if has_instagram == 'true': filters.append('Instagram')
                 if has_linkedin == 'true': filters.append('LinkedIn')
                 if has_tiktok == 'true': filters.append('TikTok')
-                writer.writerow({'ID': f'# Social Media Filters: {", ".join(filters)}'})
-            writer.writerow({'ID': ''})  # Empty row for separation
+                writer.writerow({'Name': f'# Social Media Filters: {", ".join(filters)}'})
+            writer.writerow({'Name': ''})  # Empty row for separation
             
             writer.writeheader()
             
             # Write data rows
             for source in queryset:
                 writer.writerow({
-                    'ID': source.id,
                     'Name': source.name,
+                    'Platform': source.platform or '',
+                    'Service Type': source.service_name or '',
                     'Facebook Link': source.facebook_link or '',
                     'Instagram Link': source.instagram_link or '',
                     'LinkedIn Link': source.linkedin_link or '',
                     'TikTok Link': source.tiktok_link or '',
-                    'Additional Links': source.other_social_media or '',
-                    'Project ID': source.project.id if source.project else '',
                     'Created Date': source.created_at.strftime('%Y-%m-%d %H:%M:%S') if source.created_at else '',
                     'Last Updated': source.updated_at.strftime('%Y-%m-%d %H:%M:%S') if source.updated_at else '',
                 })
             
+            print(f"CSV export successful: {total_count} records exported")
             return response
             
         except Exception as e:

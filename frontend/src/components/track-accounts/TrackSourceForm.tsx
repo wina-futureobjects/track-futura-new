@@ -6,10 +6,11 @@ import {
   Typography,
   Paper,
   CircularProgress,
-  Alert,
   Stack,
   Tooltip,
   IconButton,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import FacebookIcon from '@mui/icons-material/Facebook';
@@ -18,8 +19,7 @@ import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import MusicNoteIcon from '@mui/icons-material/MusicNote'; // For TikTok
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
-import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
+
 import HelpIcon from '@mui/icons-material/Help';
 import { useTheme } from '@mui/material/styles';
 import { apiFetch } from '../../utils/api';
@@ -30,25 +30,34 @@ const validateServiceUrl = (service: string | null | undefined, url: string | un
   
   switch (service) {
     case 'linkedin_posts':
-      return /^(https?:\/\/)?(www\.)?linkedin\.com\/in\/[^/?#]+(?:\/)?(?:\?.*)?$/i.test(url);
+      // LinkedIn posts: Accepts profile or company URLs with or without trailing slash and with optional query parameters
+      return /^(https?:\/\/)?(www\.)?linkedin\.com\/(in|company)\/[^/?#]+(?:\/)?(?:\?.*)?$/i.test(url);
     
     case 'tiktok_posts':
+      // TikTok posts: URL of the TikTok Discover page with something after /discover/
       return /^(https?:\/\/)?(www\.)?tiktok\.com\/discover\/[^/?#]+/i.test(url);
     
     case 'instagram_posts':
-    case 'instagram_reels':
+      // Instagram posts: Accepts only valid Instagram profile URLs (1-30 chars, alphanumeric, dot, underscore)
       return /^https?:\/\/(www\.)?instagram\.com\/([a-zA-Z0-9._]{1,30})\/?$/i.test(url);
 
+    case 'instagram_reels':
+      // Instagram reels: Accepts only valid Instagram profile URLs (1-30 chars, alphanumeric, dot, underscore)
+      return /^https?:\/\/(www\.)?instagram\.com\/([a-zA-Z0-9._]{1,30})\/?$/i.test(url);
     case 'instagram_comments':
+      // Instagram comments: specific post URL (p, reel, or tv)
       return /^https?:\/\/(www\.)?instagram\.com\/(p|reel|tv)\/[a-zA-Z0-9_-]{5,}\/?$/i.test(url);
     
     case 'facebook_comments':
+      // Facebook comments: post URL (strict match for post URLs)
       return /^https?:\/\/(www\.)?facebook\.com\/(?:(?:[a-zA-Z0-9.-]+\/posts\/\d+)|(?:groups\/\d+\/posts\/\d+)|(?:permalink\.php\?story_fbid=\d+&id=\d+)|(?:profile\.php\?id=\d+&[^ ]*story_fbid=\d+)|(?:share\/p\/[a-zA-Z0-9]+))\/?$/i.test(url);
     
     case 'facebook_reels_profile':
+      // Facebook reels: profile URL, profile.php?id=, or group URL
       return /^https?:\/\/(www\.)?facebook\.com\/(profile\.php\?id=\d+|[a-zA-Z0-9.-]+|groups\/[a-zA-Z0-9.-]+)\/?$/i.test(url);
 
     case 'facebook_pages_posts':
+      // Facebook pages posts: page, group, or open profile URL
       return /^https?:\/\/(www\.)?facebook\.com\/(profile\.php\?id=\d+|[a-zA-Z0-9.-]+|groups\/[a-zA-Z0-9.-]+)\/?$/i.test(url);
     
     default:
@@ -70,6 +79,8 @@ const getServiceValidationMessage = (service: string | null | undefined, url: st
       return 'Please enter the TikTok Discover page URL';
     
     case 'instagram_posts':
+      return 'Please enter a valid Instagram profile URL';
+    
     case 'instagram_reels':
       return 'Please enter a valid Instagram profile URL';
     
@@ -186,7 +197,6 @@ interface TrackSource {
   updated_at?: string;
   selectedPlatform?: string | null;
   selectedService?: string | null;
-  additionalUrls?: Array<{ id: string; url: string; service: string }>;
 }
 
 const TrackSourceForm: React.FC<TrackSourceFormProps> = ({ 
@@ -199,8 +209,13 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
   const theme = useTheme();
   const [loading, setLoading] = useState(false);
   const [loadingSource, setLoadingSource] = useState(!!sourceId);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  
+  // Snackbar state
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' as 'success' | 'error'
+  });
   
   // Form state
   const [formData, setFormData] = useState<TrackSource>({
@@ -213,9 +228,25 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
     other_social_media: '',
     project: projectId ? parseInt(projectId) : null,
     selectedPlatform: null,
-    selectedService: null,
-    additionalUrls: []
+    selectedService: null
   });
+
+  // Show snackbar message
+  const showSnackbar = (message: string, severity: 'success' | 'error') => {
+    setSnackbar({
+      open: true,
+      message,
+      severity
+    });
+  };
+
+  // Handle snackbar close
+  const handleCloseSnackbar = () => {
+    setSnackbar({
+      ...snackbar,
+      open: false
+    });
+  };
 
   // Load source data if editing
   useEffect(() => {
@@ -229,63 +260,25 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
             throw new Error('Failed to load source data');
           }
           
-                     const sourceData = await response.json();
-           console.log('Loaded source data:', sourceData);
+          const sourceData = await response.json();
+          console.log('Loaded source data:', sourceData);
           
-                     // Determine platform and service based on existing data
-           let selectedPlatform = null;
-           let selectedService = null;
-           
-           // Check which social media links exist and set the appropriate platform/service
-           // Priority order: LinkedIn, TikTok, Instagram, Facebook
-           if (sourceData.linkedin_link && sourceData.linkedin_link.trim()) {
-             selectedPlatform = 'linkedin';
-             selectedService = 'linkedin_posts';
-           } else if (sourceData.tiktok_link && sourceData.tiktok_link.trim()) {
-             selectedPlatform = 'tiktok';
-             selectedService = 'tiktok_posts';
-           } else if (sourceData.instagram_link && sourceData.instagram_link.trim()) {
-             selectedPlatform = 'instagram';
-             // Try to determine if it's a post URL or profile URL
-             if (sourceData.instagram_link.includes('/p/') || sourceData.instagram_link.includes('/reel/') || sourceData.instagram_link.includes('/tv/')) {
-               selectedService = 'instagram_comments';
-             } else {
-               selectedService = 'instagram_posts';
-             }
-           } else if (sourceData.facebook_link && sourceData.facebook_link.trim()) {
-             selectedPlatform = 'facebook';
-             // Try to determine if it's a post URL or profile URL
-             if (sourceData.facebook_link.includes('/posts/') || sourceData.facebook_link.includes('permalink.php') || sourceData.facebook_link.includes('share/p/')) {
-               selectedService = 'facebook_comments';
-             } else {
-               selectedService = 'facebook_pages_posts';
-             }
-           }
+          // Use the stored platform and service_name from the database
+          const selectedPlatform = sourceData.platform || null;
+          const selectedService = sourceData.service_name || null;
           
-                     // Parse additional URLs from other_social_media field if it exists
-           let additionalUrls: Array<{ id: string; url: string; service: string }> = [];
-           if (sourceData.other_social_media && sourceData.other_social_media.trim()) {
-             const urls = sourceData.other_social_media.split(';').map((url: string) => url.trim()).filter((url: string) => url);
-             additionalUrls = urls.map((url: string) => ({
-               id: `url_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-               url,
-               service: selectedService || ''
-             }));
-           }
-           
-           console.log('Determined platform:', selectedPlatform, 'service:', selectedService);
-           console.log('Additional URLs:', additionalUrls);
-           
-           setFormData({
-             ...sourceData,
-             project: sourceData.project || (projectId ? parseInt(projectId, 10) : null),
-             selectedPlatform,
-             selectedService,
-             additionalUrls
-           });
+          console.log('Using stored platform:', selectedPlatform, 'service:', selectedService);
+          
+          // Set the form data with the stored values
+          setFormData({
+            ...sourceData,
+            project: sourceData.project || (projectId ? parseInt(projectId, 10) : null),
+            selectedPlatform,
+            selectedService
+          });
         } catch (error) {
           console.error('Error loading source:', error);
-          setError('Failed to load source data. Please try again.');
+          showSnackbar('Failed to load source data. Please try again.', 'error');
         } finally {
           setLoadingSource(false);
         }
@@ -303,39 +296,7 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
     }));
   };
 
-  // Generate unique ID for additional URLs
-  const generateId = () => `url_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-  // Add additional URL
-  const handleAddAdditionalUrl = () => {
-    const newUrl = {
-      id: generateId(),
-      url: '',
-      service: formData.selectedService || ''
-    };
-    setFormData(prev => ({
-      ...prev,
-      additionalUrls: [...(prev.additionalUrls || []), newUrl]
-    }));
-  };
-
-  // Remove additional URL
-  const handleRemoveAdditionalUrl = (urlId: string) => {
-    setFormData(prev => ({
-      ...prev,
-      additionalUrls: (prev.additionalUrls || []).filter(url => url.id !== urlId)
-    }));
-  };
-
-  // Update additional URL
-  const handleUpdateAdditionalUrl = (urlId: string, url: string) => {
-    setFormData(prev => ({
-      ...prev,
-      additionalUrls: (prev.additionalUrls || []).map(additionalUrl => 
-        additionalUrl.id === urlId ? { ...additionalUrl, url } : additionalUrl
-      )
-    }));
-  };
 
   // Helper functions for validation
   const getCurrentUrlValue = () => {
@@ -381,19 +342,17 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
     
     // Check for validation errors
     if (hasValidationErrors()) {
-      setError('Please correct the errors before saving.');
+      showSnackbar('Please correct the errors before saving.', 'error');
       return;
     }
 
     // Validate required fields
     if (!formData.name.trim()) {
-      setError('Source name is required');
+      showSnackbar('Source name is required', 'error');
       return;
     }
     
     setLoading(true);
-    setError(null);
-    setSuccess(null);
     
     try {
       const url = sourceId 
@@ -403,32 +362,44 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
       const method = sourceId ? 'PUT' : 'POST';
       
       // Prepare the main social media links
-      const socialMediaLinks = {
-        facebook_link: formData.facebook_link?.trim() || null,
-        instagram_link: formData.instagram_link?.trim() || null,
-        linkedin_link: formData.linkedin_link?.trim() || null,
-        tiktok_link: formData.tiktok_link?.trim() || null,
-        other_social_media: formData.other_social_media?.trim() || null,
+      const socialMediaLinks: {
+        facebook_link: string | null;
+        instagram_link: string | null;
+        linkedin_link: string | null;
+        tiktok_link: string | null;
+        other_social_media: string | null;
+      } = {
+        facebook_link: null,
+        instagram_link: null,
+        linkedin_link: null,
+        tiktok_link: null,
+        other_social_media: null,
       };
 
-      // Add additional URLs to the appropriate field
-      if (formData.additionalUrls && formData.additionalUrls.length > 0) {
-        const additionalUrls = formData.additionalUrls
-          .filter(url => url.url.trim())
-          .map(url => url.url.trim());
-        
-        if (additionalUrls.length > 0) {
-          const existingOther = socialMediaLinks.other_social_media;
-          const combinedOther = existingOther 
-            ? `${existingOther}; ${additionalUrls.join('; ')}`
-            : additionalUrls.join('; ');
-          socialMediaLinks.other_social_media = combinedOther;
+      // Get the main URL for the selected platform
+      const mainUrl = getCurrentUrlValue();
+      
+      if (mainUrl && mainUrl.trim()) {
+        // Store in the appropriate platform field based on selected service
+        if (formData.selectedService) {
+          const field = getUrlFieldForService(formData.selectedService);
+          if (field === 'facebook_link') {
+            socialMediaLinks.facebook_link = mainUrl.trim();
+          } else if (field === 'instagram_link') {
+            socialMediaLinks.instagram_link = mainUrl.trim();
+          } else if (field === 'linkedin_link') {
+            socialMediaLinks.linkedin_link = mainUrl.trim();
+          } else if (field === 'tiktok_link') {
+            socialMediaLinks.tiktok_link = mainUrl.trim();
+          }
         }
       }
       
       const requestData = { 
         name: formData.name.trim(),
         project: projectId ? parseInt(projectId, 10) : formData.project,
+        platform: formData.selectedPlatform,
+        service_name: formData.selectedService,
         ...socialMediaLinks
       };
       
@@ -447,7 +418,7 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
       
       const savedSource = await response.json();
       
-      setSuccess(`Source ${sourceId ? 'updated' : 'created'} successfully!`);
+      showSnackbar(`Source ${sourceId ? 'updated' : 'created'} successfully!`, 'success');
       
       // Callback if provided
       if (onSuccess) {
@@ -464,7 +435,7 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
       }
     } catch (error) {
       console.error('Error saving source:', error);
-      setError(error instanceof Error ? error.message : 'An unknown error occurred');
+      showSnackbar(error instanceof Error ? error.message : 'An unknown error occurred', 'error');
     } finally {
       setLoading(false);
     }
@@ -493,17 +464,7 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
         {sourceId ? 'Edit Track Source' : 'Create New Track Source'}
       </Typography>
       
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {error}
-        </Alert>
-      )}
-      
-      {success && (
-        <Alert severity="success" sx={{ mb: 3 }}>
-          {success}
-        </Alert>
-      )}
+
       
       <form onSubmit={handleSubmit}>
         <Stack spacing={3}>
@@ -639,27 +600,6 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
                     <HelpIcon sx={{ fontSize: 16 }} />
                   </IconButton>
                 </Tooltip>
-                <Box sx={{ flexGrow: 1 }} />
-                <Tooltip title="Add another URL for this source" arrow>
-                  <IconButton 
-                    size="small" 
-                    sx={{ 
-                      color: '#10b981', 
-                      p: 0.5,
-                      bgcolor: '#ecfdf5',
-                      border: '1px solid #10b981',
-                      '&:hover': {
-                        bgcolor: '#10b981',
-                        color: 'white',
-                        transform: 'scale(1.05)'
-                      },
-                      transition: 'all 0.2s ease-in-out'
-                    }}
-                    onClick={handleAddAdditionalUrl}
-                  >
-                    <AddIcon sx={{ fontSize: 16 }} />
-                  </IconButton>
-                </Tooltip>
               </Box>
               <TextField
                 fullWidth
@@ -691,60 +631,6 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
                   }
                 }}
               />
-
-              {/* Additional URL inputs */}
-              {formData.additionalUrls && formData.additionalUrls.length > 0 && (
-                <Box sx={{ mt: 1 }}>
-                  {formData.additionalUrls.map((additionalUrl) => (
-                    <Box key={additionalUrl.id} sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label={`${getServiceLabel(formData.selectedService)} URL`}
-                        placeholder={getUrlPlaceholder(formData.selectedPlatform, formData.selectedService)}
-                        value={additionalUrl.url}
-                        onChange={(e) => handleUpdateAdditionalUrl(additionalUrl.id, e.target.value)}
-                        error={additionalUrl.url ? !validateServiceUrl(formData.selectedService, additionalUrl.url) : false}
-                        helperText={additionalUrl.url ? getServiceValidationMessage(formData.selectedService, additionalUrl.url) : ''}
-                        sx={{
-                          '& .MuiFormHelperText-root': {
-                            color: (additionalUrl.url && !validateServiceUrl(formData.selectedService, additionalUrl.url)) ? '#d32f2f !important' : 'inherit'
-                          },
-                          '& .MuiOutlinedInput-root': {
-                            '&.Mui-error': {
-                              '& fieldset': {
-                                borderColor: '#d32f2f !important'
-                              }
-                            },
-                            '&:not(.Mui-error)': {
-                              '& fieldset': {
-                                borderColor: '#d0d7de !important'
-                              }
-                            }
-                          }
-                        }}
-                      />
-                      <IconButton
-                        size="small"
-                        onClick={() => handleRemoveAdditionalUrl(additionalUrl.id)}
-                        sx={{ 
-                          ml: 1,
-                          color: '#dc2626',
-                          bgcolor: '#fef2f2',
-                          '&:hover': {
-                            bgcolor: '#dc2626',
-                            color: 'white',
-                            transform: 'scale(1.05)'
-                          },
-                          transition: 'all 0.2s ease-in-out'
-                        }}
-                      >
-                        <DeleteIcon sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    </Box>
-                  ))}
-                </Box>
-              )}
             </Box>
           )}
 
@@ -788,6 +674,23 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
           </Box>
         </Stack>
       </form>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Paper>
   );
 };

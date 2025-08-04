@@ -3,11 +3,11 @@ from .models import TrackSource, TrackAccount, ReportFolder, ReportEntry
 
 @admin.register(TrackSource)
 class TrackSourceAdmin(admin.ModelAdmin):
-    list_display = ('name', 'facebook_link', 'instagram_link', 'linkedin_link', 'tiktok_link', 'project')
-    list_filter = ('project',)
+    list_display = ('name', 'platform', 'service_name', 'facebook_link', 'instagram_link', 'linkedin_link', 'tiktok_link', 'project')
+    list_filter = ('project', 'platform', 'service_name')
     search_fields = ('name',)
     readonly_fields = ('created_at', 'updated_at')
-    ordering = ('name',)
+    ordering = ('created_at',)
     raw_id_fields = ('project',)
     list_select_related = ('project',)
 

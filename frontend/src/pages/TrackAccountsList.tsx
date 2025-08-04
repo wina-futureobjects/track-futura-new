@@ -49,6 +49,7 @@ import { apiFetch } from '../utils/api';
 interface TrackSource {
   id: number;
   name: string;
+  platform: string | null;
   facebook_link: string | null;
   instagram_link: string | null;
   linkedin_link: string | null;
@@ -273,21 +274,22 @@ const TrackSourcesList = () => {
     fetchSources(0, newRowsPerPage, searchTerm, socialMediaFilters);
   };
 
-  // Handle search
+  // Handle search input change
   const handleSearchChange = (event: ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
   };
 
-  const handleSearch = () => {
-    setPage(0);
-    fetchSources(0, rowsPerPage, searchTerm, socialMediaFilters);
-  };
+  // Debounced search effect
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (projectId) {
+        setPage(0);
+        fetchSources(0, rowsPerPage, searchTerm, socialMediaFilters);
+      }
+    }, 500); // 500ms delay
 
-  const handleKeyPress = (event: React.KeyboardEvent) => {
-    if (event.key === 'Enter') {
-      handleSearch();
-    }
-  };
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm, projectId]); // Dependencies for the effect
 
 
 
@@ -386,7 +388,10 @@ const TrackSourcesList = () => {
 
   // Handle CSV download
   const handleCsvDownload = async () => {
-    if (!projectId) return;
+    if (!projectId) {
+      showSnackbar('No project selected for export', 'error');
+      return;
+    }
 
     try {
       setCsvDownloading(true);
@@ -417,12 +422,35 @@ const TrackSourcesList = () => {
       console.log('Download URL:', `/api/track-accounts/sources/download_csv/?${queryParams}`);
       console.log('Current filters:', { searchTerm, socialMediaFilters });
       
-      const response = await apiFetch(`/api/track-accounts/sources/download_csv/?${queryParams}`);
+      // Use direct fetch for CSV download to avoid apiFetch header interference
+      const baseUrl = window.location.origin;
+      const downloadUrl = `${baseUrl}/api/track-accounts/sources/download_csv/?${queryParams}`;
+      
+      const response = await fetch(downloadUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'text/csv, application/json',
+        },
+        credentials: 'include',
+      });
       
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Download response error:', errorText);
-        throw new Error(`Download failed: ${response.status} ${errorText}`);
+        
+        // Try to parse as JSON for better error messages
+        try {
+          const errorJson = JSON.parse(errorText);
+          throw new Error(errorJson.error || errorJson.detail || `Download failed: ${response.status}`);
+        } catch {
+          throw new Error(`Download failed: ${response.status} ${errorText}`);
+        }
+      }
+      
+      // Check content type to ensure we got CSV
+      const contentType = response.headers.get('content-type');
+      if (!contentType || (!contentType.includes('text/csv') && !contentType.includes('application/octet-stream'))) {
+        console.warn('Unexpected content type:', contentType);
       }
 
       // Create a blob from the response
@@ -438,8 +466,12 @@ const TrackSourcesList = () => {
       a.download = filename;
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      
+      // Clean up the download link with a timeout to ensure it's processed
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }, 100);
       
       showSnackbar(`CSV exported successfully: ${filename}`, 'success');
     } catch (error) {
@@ -465,31 +497,29 @@ const TrackSourcesList = () => {
     socialMediaFilters.hasFacebook || socialMediaFilters.hasInstagram || 
     socialMediaFilters.hasLinkedIn || socialMediaFilters.hasTikTok;
 
-  // Helper function to determine platform from source links
-  const getPlatform = (source: TrackSource): string => {
-    if (source.instagram_link) return 'Instagram';
-    if (source.facebook_link) return 'Facebook';
-    if (source.linkedin_link) return 'LinkedIn';
-    if (source.tiktok_link) return 'TikTok';
-    return 'N/A';
-  };
+
 
   // Helper function to determine service type
   const getService = (source: TrackSource): string => {
-    // Determine service type based on platform
-    if (source.instagram_link) {
-      return 'Posts - Discover by URL';
+    // Use the service_name from the database (user input from step 3)
+    if (source.service_name) {
+      // Map service keys to display labels
+      const serviceLabels: { [key: string]: string } = {
+        'linkedin_posts': 'Posts',
+        'tiktok_posts': 'Posts',
+        'instagram_posts': 'Posts',
+        'instagram_reels': 'Reels',
+        'instagram_comments': 'Comments',
+        'facebook_pages_posts': 'Posts',
+        'facebook_reels_profile': 'Reels',
+        'facebook_comments': 'Comments',
+      };
+      
+      return serviceLabels[source.service_name] || source.service_name;
     }
-    if (source.facebook_link) {
-      return 'Posts - Discover by URL';
-    }
-    if (source.linkedin_link) {
-      return 'Posts - Discover by URL';
-    }
-    if (source.tiktok_link) {
-      return 'Videos - Collect by URL';
-    }
-    return 'Posts - Discover by URL';
+    
+    // Fallback if no service_name is set
+    return 'Posts';
   };
 
   return (
@@ -504,7 +534,7 @@ const TrackSourcesList = () => {
                 Source Collection
               </Typography>
               <Typography variant="body1" sx={{ color: '#64748b' }}>
-                Manage and track social media sources for monitoring
+                Manage sources with social media links of corresponding platform service type for this project.
               </Typography>
             </Box>
             <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
@@ -567,24 +597,26 @@ const TrackSourcesList = () => {
                 </Box>
               </CardContent>
             </Card>
-            <Card sx={{ bgcolor: '#f0fdf4', border: '1px solid #10b981' }}>
-              <CardContent sx={{ p: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Avatar sx={{ bgcolor: '#10b981', mr: 2 }}>
-                    <TrendingUpIcon />
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                      {filterStats.socialMediaCounts.facebook + filterStats.socialMediaCounts.instagram + 
-                       filterStats.socialMediaCounts.linkedin + filterStats.socialMediaCounts.tiktok}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Social Accounts
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
+                         <Card sx={{ bgcolor: '#f0fdf4', border: '1px solid #10b981' }}>
+               <CardContent sx={{ p: 2 }}>
+                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                   <Avatar sx={{ bgcolor: '#10b981', mr: 2 }}>
+                     <TrendingUpIcon />
+                   </Avatar>
+                   <Box>
+                     <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                       {sources.filter(source => 
+                         source.facebook_link || source.instagram_link || 
+                         source.linkedin_link || source.tiktok_link
+                       ).length}
+                     </Typography>
+                     <Typography variant="body2" color="text.secondary">
+                       Social Accounts
+                     </Typography>
+                   </Box>
+                 </Box>
+               </CardContent>
+             </Card>
 
           </Box>
         </Box>
@@ -600,7 +632,6 @@ const TrackSourcesList = () => {
               placeholder="Search sources..."
               value={searchTerm}
               onChange={handleSearchChange}
-              onKeyPress={handleKeyPress}
               size="small"
               InputProps={{
                 startAdornment: (
@@ -904,7 +935,6 @@ const TrackSourcesList = () => {
                         <TableCell sx={{ fontWeight: 600, color: '#374151' }}>Source</TableCell>
                         <TableCell sx={{ fontWeight: 600, color: '#374151' }} align="center">Social Media</TableCell>
                         <TableCell sx={{ fontWeight: 600, color: '#374151' }} align="center">Service</TableCell>
-                        <TableCell sx={{ fontWeight: 600, color: '#374151' }} align="center">URLs</TableCell>
                         <TableCell sx={{ fontWeight: 600, color: '#374151' }} align="right">Actions</TableCell>
                       </TableRow>
                     </TableHead>
@@ -915,9 +945,6 @@ const TrackSourcesList = () => {
                             <Box>
                               <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                                 {source.name}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                ID: {source.id}
                               </Typography>
                             </Box>
                           </TableCell>
@@ -1019,14 +1046,6 @@ const TrackSourcesList = () => {
                             <Typography variant="body2" sx={{ fontWeight: 500 }}>
                               {getService(source)}
                             </Typography>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Chip
-                              label={source.url_count}
-                              size="small"
-                              color={source.url_count > 0 ? 'primary' : 'default'}
-                              sx={{ fontWeight: 500 }}
-                            />
                           </TableCell>
                           <TableCell align="right">
                             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>

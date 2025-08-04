@@ -7,9 +7,10 @@ class TrackSourceSerializer(serializers.ModelSerializer):
         model = TrackSource
         fields = [
             'id', 'name',
+            'platform', 'service_name',
             'facebook_link', 'instagram_link', 'linkedin_link', 'tiktok_link', 
             'other_social_media',
-            'service_name', 'url_count',
+            'url_count',
             'project', 'created_at', 'updated_at'
         ]
     

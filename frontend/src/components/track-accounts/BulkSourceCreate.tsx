@@ -37,7 +37,6 @@ import {
   LinkedIn as LinkedInIcon,
   MusicNote as TikTokIcon,
   Help as HelpIcon,
-  Close as CloseIcon,
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { apiFetch } from '../../utils/api';
@@ -52,33 +51,9 @@ interface DraftSource {
   other_social_media: string | null;
   selectedPlatform?: string | null;
   selectedService?: string | null;
-  additionalUrls?: Array<{ id: string; url: string; service: string }>;
 }
 
-// Validation functions
-const validateFacebookLink = (link: string | undefined | null): boolean => {
-  if (!link || !link.trim()) return true; // Empty is valid
-  const facebookRegex = /^(https?:\/\/)?(www\.)?(facebook\.com|fb\.com)\/.+/i;
-  return facebookRegex.test(link);
-};
 
-const validateInstagramLink = (link: string | undefined | null): boolean => {
-  if (!link || !link.trim()) return true; // Empty is valid
-  const instagramRegex = /^(https?:\/\/)?(www\.)?(instagram\.com|instagr\.am)\/.+/i;
-  return instagramRegex.test(link);
-};
-
-const validateLinkedInLink = (link: string | undefined | null): boolean => {
-  if (!link || !link.trim()) return true; // Empty is valid
-  const linkedinRegex = /^(https?:\/\/)?(www\.)?(linkedin\.com)\/(in|company)\/.+/i;
-  return linkedinRegex.test(link);
-};
-
-const validateTikTokLink = (link: string | undefined | null): boolean => {
-  if (!link || !link.trim()) return true; // Empty is valid
-  const tiktokRegex = /^(https?:\/\/)?(www\.)?(tiktok\.com)\/@.+/i;
-  return tiktokRegex.test(link);
-};
 
 // Service-specific validation functions
 const validateServiceUrl = (service: string | null | undefined, url: string | undefined | null): boolean => {
@@ -86,8 +61,8 @@ const validateServiceUrl = (service: string | null | undefined, url: string | un
   
   switch (service) {
     case 'linkedin_posts':
-      // LinkedIn posts: Accepts profile URLs with or without trailing slash and with optional query parameters
-      return /^(https?:\/\/)?(www\.)?linkedin\.com\/in\/[^/?#]+(?:\/)?(?:\?.*)?$/i.test(url);
+      // LinkedIn posts: Accepts profile or company URLs with or without trailing slash and with optional query parameters
+      return /^(https?:\/\/)?(www\.)?linkedin\.com\/(in|company)\/[^/?#]+(?:\/)?(?:\?.*)?$/i.test(url);
     
     case 'tiktok_posts':
       // TikTok posts: URL of the TikTok Discover page with something after /discover/
@@ -318,11 +293,11 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
         const headers = lines[0].split(',').map(h => h.trim());
         
         // Validate headers
-        const expectedHeaders = ['Name', 'Platform', 'Service_Type', 'URL', 'Additional_URLs'];
+        const expectedHeaders = ['Name', 'Platform', 'Service_Type', 'URL'];
         const hasValidHeaders = expectedHeaders.every(h => headers.includes(h));
         
         if (!hasValidHeaders) {
-          showSnackbar('CSV must have headers: Name, Platform, Service_Type, URL, Additional_URLs', 'error');
+          showSnackbar('CSV must have headers: Name, Platform, Service_Type, URL', 'error');
           return;
         }
 
@@ -364,17 +339,7 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
               }
             }
 
-            const additionalUrls = values[headers.indexOf('Additional_URLs')] || '';
-            if (additionalUrls) {
-              const urls = additionalUrls.split(';').map(u => u.trim()).filter(u => u);
-              source.additionalUrls = urls.map(u => ({ 
-                id: generateId(), 
-                url: u, 
-                service: source.selectedService || '' 
-              }));
-            } else {
-              source.additionalUrls = [];
-            }
+
 
             newSources.push(source);
           }
@@ -408,7 +373,6 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
       other_social_media: null,
       selectedPlatform: null,
       selectedService: null,
-      additionalUrls: [],
     };
     setDraftSources(prev => [...prev, newSource]);
   };
@@ -418,51 +382,7 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
     setDraftSources(prev => prev.filter(source => source.id !== id));
   };
 
-  // Add additional URL
-  const handleAddAdditionalUrl = (sourceId: string) => {
-    setDraftSources(prev => prev.map(source => {
-      if (source.id === sourceId) {
-        const newUrl = {
-          id: generateId(),
-          url: '',
-          service: source.selectedService || ''
-        };
-        return {
-          ...source,
-          additionalUrls: [...(source.additionalUrls || []), newUrl]
-        };
-      }
-      return source;
-    }));
-  };
 
-  // Remove additional URL
-  const handleRemoveAdditionalUrl = (sourceId: string, urlId: string) => {
-    setDraftSources(prev => prev.map(source => {
-      if (source.id === sourceId) {
-        return {
-          ...source,
-          additionalUrls: (source.additionalUrls || []).filter(url => url.id !== urlId)
-        };
-      }
-      return source;
-    }));
-  };
-
-  // Update additional URL
-  const handleUpdateAdditionalUrl = (sourceId: string, urlId: string, url: string) => {
-    setDraftSources(prev => prev.map(source => {
-      if (source.id === sourceId) {
-        return {
-          ...source,
-          additionalUrls: (source.additionalUrls || []).map(additionalUrl => 
-            additionalUrl.id === urlId ? { ...additionalUrl, url } : additionalUrl
-          )
-        };
-      }
-      return source;
-    }));
-  };
 
   // Update field
   const handleFieldChange = (id: string, field: keyof DraftSource, value: string | null) => {
@@ -497,13 +417,17 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
     const hasMissingNames = draftSources.some(source => !source.name.trim());
     if (hasMissingNames) return true;
     
-    // Check for invalid social media links
-    const hasInvalidLinks = draftSources.some(source => 
-      (source.facebook_link && !validateFacebookLink(source.facebook_link)) ||
-      (source.instagram_link && !validateInstagramLink(source.instagram_link)) ||
-      (source.linkedin_link && !validateLinkedInLink(source.linkedin_link)) ||
-      (source.tiktok_link && !validateTikTokLink(source.tiktok_link))
-    );
+    // Check for invalid URLs based on selected service
+    const hasInvalidLinks = draftSources.some(source => {
+      if (!source.selectedService) return false;
+      
+      const field = getUrlFieldForService(source.selectedService);
+      const urlValue = source[field as keyof DraftSource] as string;
+      
+      if (!urlValue || !urlValue.trim()) return false;
+      
+      return !validateServiceUrl(source.selectedService, urlValue);
+    });
     
     return hasInvalidLinks;
   };
@@ -536,28 +460,35 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
       for (const source of draftSources) {
         try {
           // Prepare the main social media links
-          const socialMediaLinks = {
-            facebook_link: source.facebook_link?.trim() || null,
-            instagram_link: source.instagram_link?.trim() || null,
-            linkedin_link: source.linkedin_link?.trim() || null,
-            tiktok_link: source.tiktok_link?.trim() || null,
-            other_social_media: source.other_social_media?.trim() || null,
+          const socialMediaLinks: {
+            facebook_link: string | null;
+            instagram_link: string | null;
+            linkedin_link: string | null;
+            tiktok_link: string | null;
+            other_social_media: string | null;
+          } = {
+            facebook_link: null,
+            instagram_link: null,
+            linkedin_link: null,
+            tiktok_link: null,
+            other_social_media: null,
           };
 
-          // Add additional URLs to the appropriate field
-          if (source.additionalUrls && source.additionalUrls.length > 0) {
-            const additionalUrls = source.additionalUrls
-              .filter(url => url.url.trim())
-              .map(url => url.url.trim());
+          // Get the URL for the selected service and store it in the appropriate field
+          if (source.selectedService) {
+            const field = getUrlFieldForService(source.selectedService);
+            const urlValue = source[field as keyof DraftSource] as string;
             
-            if (additionalUrls.length > 0) {
-              // For now, we'll append additional URLs to the other_social_media field
-              // This could be enhanced to store them separately in the backend
-              const existingOther = socialMediaLinks.other_social_media;
-              const combinedOther = existingOther 
-                ? `${existingOther}; ${additionalUrls.join('; ')}`
-                : additionalUrls.join('; ');
-              socialMediaLinks.other_social_media = combinedOther;
+            if (urlValue && urlValue.trim()) {
+              if (field === 'facebook_link') {
+                socialMediaLinks.facebook_link = urlValue.trim();
+              } else if (field === 'instagram_link') {
+                socialMediaLinks.instagram_link = urlValue.trim();
+              } else if (field === 'linkedin_link') {
+                socialMediaLinks.linkedin_link = urlValue.trim();
+              } else if (field === 'tiktok_link') {
+                socialMediaLinks.tiktok_link = urlValue.trim();
+              }
             }
           }
 
@@ -567,6 +498,8 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
             body: JSON.stringify({
               name: source.name.trim(),
               project: parseInt(projectId || '0'),
+              platform: source.selectedPlatform,
+              service_name: source.selectedService,
               ...socialMediaLinks,
             }),
           });
@@ -610,14 +543,14 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
 
   // Download template
   const handleDownloadTemplate = () => {
-    const csvContent = 'Name,Platform,Service_Type,URL,Additional_URLs\n' +
-                      'Example Source,linkedin,linkedin_posts,https://linkedin.com/in/example,https://linkedin.com/in/example2;https://linkedin.com/in/example3\n' +
-                      'Facebook Page,facebook,facebook_pages_posts,https://facebook.com/examplepage,https://facebook.com/anotherpage\n' +
-                      'Instagram Profile,instagram,instagram_posts,https://instagram.com/example,https://instagram.com/example2\n' +
-                      'TikTok Discover,tiktok,tiktok_posts,https://tiktok.com/discover/example,\n' +
-                      'Facebook Comments,facebook,facebook_comments,https://facebook.com/example/posts/123,\n' +
-                      'Instagram Reels,instagram,instagram_reels,https://instagram.com/example,https://instagram.com/example2\n' +
-                      'Instagram Comments,instagram,instagram_comments,https://instagram.com/p/ABC123xyz/,https://instagram.com/reel/DEF456uvw/';
+    const csvContent = 'Name,Platform,Service_Type,URL\n' +
+                      'Example Source,linkedin,linkedin_posts,https://linkedin.com/company/example\n' +
+                      'Facebook Page,facebook,facebook_pages_posts,https://facebook.com/examplepage\n' +
+                      'Instagram Profile,instagram,instagram_posts,https://instagram.com/example\n' +
+                      'TikTok Discover,tiktok,tiktok_posts,https://tiktok.com/discover/example\n' +
+                      'Facebook Comments,facebook,facebook_comments,https://facebook.com/example/posts/123\n' +
+                      'Instagram Reels,instagram,instagram_reels,https://instagram.com/example\n' +
+                      'Instagram Comments,instagram,instagram_comments,https://instagram.com/p/ABC123xyz/';
     
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -885,31 +818,6 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
                       <HelpIcon sx={{ fontSize: 16 }} />
                     </IconButton>
                   </Tooltip>
-                  <Box sx={{ flexGrow: 1 }} />
-                  <Tooltip title="Add another URL for this source" arrow>
-                    <IconButton 
-                      size="small" 
-                      sx={{ 
-                        color: '#10b981', 
-                        p: 0.5,
-                        bgcolor: '#ecfdf5',
-                        border: '1px solid #10b981',
-                        '&:hover': {
-                          bgcolor: '#10b981',
-                          color: 'white',
-                          transform: 'scale(1.05)'
-                        },
-                        transition: 'all 0.2s ease-in-out'
-                      }}
-                      onClick={() => {
-                        if (draftSources[0]) {
-                          handleAddAdditionalUrl(draftSources[0].id);
-                        }
-                      }}
-                    >
-                      <AddIcon sx={{ fontSize: 16 }} />
-                    </IconButton>
-                  </Tooltip>
                 </Box>
                 <TextField
                   fullWidth
@@ -941,60 +849,6 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
                     }
                   }}
                 />
-
-                {/* Additional URL inputs */}
-                {draftSources[0]?.additionalUrls && draftSources[0].additionalUrls.length > 0 && (
-                  <Box sx={{ mt: 1 }}>
-                                          {draftSources[0].additionalUrls.map((additionalUrl) => (
-                        <Box key={additionalUrl.id} sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                        <TextField
-                          fullWidth
-                          size="small"
-                          label={`${getServiceLabel(draftSources[0]?.selectedService)} URL`}
-                          placeholder={getUrlPlaceholder(draftSources[0]?.selectedPlatform, draftSources[0]?.selectedService)}
-                          value={additionalUrl.url}
-                          onChange={(e) => handleUpdateAdditionalUrl(draftSources[0].id, additionalUrl.id, e.target.value)}
-                          error={additionalUrl.url ? !validateServiceUrl(draftSources[0]?.selectedService, additionalUrl.url) : false}
-                          helperText={additionalUrl.url ? getServiceValidationMessage(draftSources[0]?.selectedService, additionalUrl.url) : ''}
-                          sx={{
-                            '& .MuiFormHelperText-root': {
-                              color: (additionalUrl.url && !validateServiceUrl(draftSources[0]?.selectedService, additionalUrl.url)) ? '#d32f2f !important' : 'inherit'
-                            },
-                            '& .MuiOutlinedInput-root': {
-                              '&.Mui-error': {
-                                '& fieldset': {
-                                  borderColor: '#d32f2f !important'
-                                }
-                              },
-                              '&:not(.Mui-error)': {
-                                '& fieldset': {
-                                  borderColor: '#d0d7de !important'
-                                }
-                              }
-                            }
-                          }}
-                        />
-                        <IconButton
-                          size="small"
-                          onClick={() => handleRemoveAdditionalUrl(draftSources[0].id, additionalUrl.id)}
-                          sx={{ 
-                            ml: 1,
-                            color: '#dc2626',
-                            bgcolor: '#fef2f2',
-                            '&:hover': {
-                              bgcolor: '#dc2626',
-                              color: 'white',
-                              transform: 'scale(1.05)'
-                            },
-                            transition: 'all 0.2s ease-in-out'
-                          }}
-                        >
-                          <DeleteIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </Box>
-                    ))}
-                  </Box>
-                )}
               </Box>
             )}
 
@@ -1139,7 +993,6 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
                       <TableCell sx={{ fontWeight: 600, minWidth: 120 }}>Platform</TableCell>
                       <TableCell sx={{ fontWeight: 600, minWidth: 150 }}>Service Type</TableCell>
                       <TableCell sx={{ fontWeight: 600, minWidth: 300 }}>URL</TableCell>
-                      <TableCell sx={{ fontWeight: 600, minWidth: 200 }}>Additional URLs</TableCell>
                       <TableCell sx={{ fontWeight: 600, width: 80 }}>Actions</TableCell>
                     </TableRow>
                   </TableHead>
@@ -1241,48 +1094,7 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
                             }}
                           />
                         </TableCell>
-                        <TableCell>
-                          <Box>
-                            {source.additionalUrls && source.additionalUrls.length > 0 && (
-                              <Stack spacing={1}>
-                                {source.additionalUrls.map((additionalUrl) => (
-                                  <Box key={additionalUrl.id} sx={{ display: 'flex', alignItems: 'center' }}>
-                                    <TextField
-                                      size="small"
-                                      value={additionalUrl.url}
-                                      onChange={(e) => handleUpdateAdditionalUrl(source.id, additionalUrl.id, e.target.value)}
-                                      placeholder="Additional URL"
-                                      sx={{ flexGrow: 1, mr: 1 }}
-                                    />
-                                    <IconButton
-                                      size="small"
-                                      onClick={() => handleRemoveAdditionalUrl(source.id, additionalUrl.id)}
-                                      sx={{ 
-                                        color: '#dc2626',
-                                        '&:hover': {
-                                          bgcolor: '#fef2f2',
-                                          transform: 'scale(1.05)'
-                                        },
-                                        transition: 'all 0.2s ease-in-out'
-                                      }}
-                                    >
-                                      <CloseIcon sx={{ fontSize: 16 }} />
-                                    </IconButton>
-                                  </Box>
-                                ))}
-                              </Stack>
-                            )}
-                            <Button
-                              size="small"
-                              startIcon={<AddIcon />}
-                              onClick={() => handleAddAdditionalUrl(source.id)}
-                              disabled={!source.selectedService}
-                              sx={{ mt: 1 }}
-                            >
-                              More URLs
-                            </Button>
-                          </Box>
-                        </TableCell>
+
                         <TableCell>
                           <IconButton
                             size="small"
