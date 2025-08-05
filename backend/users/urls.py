@@ -5,7 +5,7 @@ from .views import (
     OrganizationListCreateView, OrganizationDetailView,
     OrganizationMembershipView, OrganizationMembershipDetailView,
     UserSearchView, OrganizationStatsView, ProjectStatsView, CSRFTokenView,
-    PlatformViewSet, ServiceViewSet, PlatformServiceViewSet,
+    CurrentUserView, PlatformViewSet, ServiceViewSet, PlatformServiceViewSet,
     AvailablePlatformsViewSet
 )
 from rest_framework.authtoken.views import obtain_auth_token
@@ -17,6 +17,7 @@ urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
     path('login/', CustomAuthToken.as_view(), name='login'),
     path('profile/', UserProfileView.as_view(), name='profile'),
+    path('me/', CurrentUserView.as_view(), name='current-user'),
     path('csrf-token/', CSRFTokenView.as_view(), name='csrf-token'),
 
     # User search

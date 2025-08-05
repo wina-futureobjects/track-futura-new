@@ -92,6 +92,7 @@ class UserRole(models.Model):
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     avatar = models.CharField(max_length=255, blank=True, null=True)
+    company = models.ForeignKey('Company', on_delete=models.SET_NULL, null=True, blank=True, related_name='users')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -168,3 +169,48 @@ class Project(models.Model):
     
     class Meta:
         ordering = ['-created_at']
+
+
+class Company(models.Model):
+    """
+    Company model for managing company information
+    """
+    STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('inactive', 'Inactive'),
+    ]
+    
+    name = models.CharField(max_length=200, help_text="Company name")
+    email = models.EmailField(help_text="Primary contact email")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+    phone = models.CharField(max_length=20, blank=True, null=True, help_text="Contact phone number")
+    address = models.TextField(blank=True, null=True, help_text="Company address")
+    website = models.URLField(blank=True, null=True, help_text="Company website")
+    industry = models.CharField(max_length=100, blank=True, null=True, help_text="Company industry")
+    size = models.CharField(max_length=50, blank=True, null=True, help_text="Company size (e.g., Small, Medium, Large)")
+    description = models.TextField(blank=True, null=True, help_text="Company description")
+    notes = models.TextField(blank=True, null=True, help_text="Additional notes")
+    
+    # Contact person information
+    contact_person = models.CharField(max_length=100, blank=True, null=True, help_text="Primary contact person")
+    contact_email = models.EmailField(blank=True, null=True, help_text="Contact person email")
+    contact_phone = models.CharField(max_length=20, blank=True, null=True, help_text="Contact person phone")
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    # Created by
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_companies')
+    
+    class Meta:
+        verbose_name = "Company"
+        verbose_name_plural = "Companies"
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.name} ({self.status})"
+    
+    @property
+    def is_active(self):
+        return self.status == 'active'

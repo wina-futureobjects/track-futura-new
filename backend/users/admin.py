@@ -10,7 +10,8 @@ from .models import (
     Project,
     Platform,
     Service,
-    PlatformService
+    PlatformService,
+    Company
 )
 
 # UserRole Admin
@@ -138,19 +139,52 @@ class PlatformServiceAdmin(admin.ModelAdmin):
     ordering = ['platform__display_name', 'service__display_name']
     
     fieldsets = (
-        ('Platform Service Configuration', {
-            'fields': ('platform', 'service', 'is_enabled', 'description')
+        ('Basic Information', {
+            'fields': ('platform', 'service', 'is_enabled')
         }),
-        ('Status', {
-            'fields': ('is_available',)
+        ('Configuration', {
+            'fields': ('config', 'metadata')
         }),
-        ('Metadata', {
-            'fields': ('created_by', 'created_at', 'updated_at'),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',)
         }),
     )
     
     def is_available(self, obj):
-        return obj.is_available
+        return obj.is_enabled and obj.platform.is_enabled
     is_available.boolean = True
     is_available.short_description = 'Available'
+
+@admin.register(Company)
+class CompanyAdmin(admin.ModelAdmin):
+    list_display = ['name', 'email', 'status', 'contact_person', 'industry', 'created_at']
+    list_filter = ['status', 'industry', 'size', 'created_at']
+    search_fields = ['name', 'email', 'contact_person', 'contact_email', 'description']
+    readonly_fields = ['created_at', 'updated_at']
+    ordering = ['-created_at']
+    
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name', 'email', 'status', 'description')
+        }),
+        ('Contact Information', {
+            'fields': ('phone', 'contact_person', 'contact_email', 'contact_phone')
+        }),
+        ('Company Details', {
+            'fields': ('industry', 'size', 'website', 'address')
+        }),
+        ('Additional Information', {
+            'fields': ('notes',),
+            'classes': ('collapse',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at', 'created_by'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def save_model(self, request, obj, form, change):
+        if not change:  # Only set created_by for new objects
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)

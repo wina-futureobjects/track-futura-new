@@ -10,7 +10,9 @@ from .serializers import (
     UserSerializer, RegisterSerializer, UserProfileSerializer,
     ProjectSerializer, ProjectDetailSerializer,
     OrganizationSerializer, OrganizationDetailSerializer,
-    OrganizationMembershipSerializer
+    OrganizationMembershipSerializer, AdminUserCreateSerializer, AdminUserUpdateSerializer,
+    PlatformSerializer, ServiceSerializer, PlatformServiceSerializer,
+    PlatformServiceCreateSerializer, CompanySerializer
 )
 from .models import UserProfile, Project, Organization, OrganizationMembership
 from rest_framework.authtoken.views import ObtainAuthToken
@@ -26,13 +28,13 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import (
     UserProfile, Project, Organization, OrganizationMembership, 
-    UserRole, Platform, Service, PlatformService
+    UserRole, Platform, Service, PlatformService, Company
 )
 from .serializers import (
     UserProfileSerializer, ProjectSerializer, OrganizationSerializer,
     OrganizationMembershipSerializer, UserRoleSerializer,
     PlatformSerializer, ServiceSerializer, PlatformServiceSerializer,
-    PlatformServiceCreateSerializer
+    PlatformServiceCreateSerializer, CompanySerializer, AdminUserCreateSerializer
 )
 from .permissions import IsSuperAdmin
 from django.core.mail import send_mail
@@ -517,6 +519,19 @@ class ProjectDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 @method_decorator(never_cache, name='dispatch')
+class CurrentUserView(APIView):
+    """Get current user information"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        """Get current user details"""
+        return Response({
+            'id': request.user.id,
+            'username': request.user.username,
+            'email': request.user.email,
+            'is_active': request.user.is_active,
+        })
+
 class CSRFTokenView(APIView):
     """
     Provide CSRF token for frontend applications
@@ -653,35 +668,24 @@ class AdminUserViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return User.objects.all().order_by('-date_joined')
     
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return AdminUserCreateSerializer
+        elif self.action in ['update', 'partial_update']:
+            return AdminUserUpdateSerializer
+        return UserSerializer
+    
     def create(self, request, *args, **kwargs):
-        """Create a new user with email notification"""
+        """Create a new user with company assignment and email notification"""
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        # Generate a secure random password
-        password = get_random_string(16, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*')
-        
-        # Create user with the generated password
-        user_data = serializer.validated_data.copy()
-        user_data['password'] = password
-        
         try:
-            user = User.objects.create_user(
-                username=user_data['username'],
-                email=user_data['email'],
-                password=password
-            )
+            user = serializer.save()
             
-            # Create user profile
-            UserProfile.objects.create(user=user)
-            
-            # Create user role
-            role = request.data.get('role', 'user')
-            UserRole.objects.create(user=user, role=role)
-            
-            # Send email notification
+            # Send email notification with the generated password
             try:
-                self.send_welcome_email(request, user, password)
+                self.send_welcome_email(request, user, user._generated_password)
             except Exception as e:
                 # Log the error but don't fail the user creation
                 print(f"Failed to send welcome email to {user.email}: {str(e)}")
@@ -729,6 +733,12 @@ class AdminUserViewSet(viewsets.ModelViewSet):
         if not new_role:
             return Response({'error': 'Role is required'}, status=status.HTTP_400_BAD_REQUEST)
         
+        # Check if user is trying to change their own role
+        if user == request.user:
+            return Response({
+                'error': 'You cannot change your own role'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
         # Update or create user role
         user_role, created = UserRole.objects.get_or_create(user=user, defaults={'role': new_role})
         if not created:
@@ -736,6 +746,46 @@ class AdminUserViewSet(viewsets.ModelViewSet):
             user_role.save()
         
         return Response({'message': 'User role updated successfully'})
+    
+    def update(self, request, *args, **kwargs):
+        """Update user with protection against self-deactivation and self-role-change"""
+        user = self.get_object()
+        
+        # Check if user is trying to deactivate themselves
+        if user == request.user:
+            is_active = request.data.get('is_active')
+            if is_active is False:
+                return Response({
+                    'error': 'You cannot deactivate your own account'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if user is trying to change their own role
+            if 'role' in request.data:
+                return Response({
+                    'error': 'You cannot change your own role'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        return super().update(request, *args, **kwargs)
+    
+    def partial_update(self, request, *args, **kwargs):
+        """Partial update user with protection against self-deactivation and self-role-change"""
+        user = self.get_object()
+        
+        # Check if user is trying to deactivate themselves
+        if user == request.user:
+            is_active = request.data.get('is_active')
+            if is_active is False:
+                return Response({
+                    'error': 'You cannot deactivate your own account'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if user is trying to change their own role
+            if 'role' in request.data:
+                return Response({
+                    'error': 'You cannot change your own role'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        return super().partial_update(request, *args, **kwargs)
     
     def destroy(self, request, *args, **kwargs):
         """Delete user"""
@@ -809,6 +859,7 @@ class AdminStatsView(APIView):
         total_users = User.objects.count()
         total_orgs = Organization.objects.count()
         total_projects = Project.objects.count()
+        total_companies = Company.objects.count()
         
         # Count users by role
         super_admins = UserRole.objects.filter(role='super_admin').count()
@@ -819,7 +870,20 @@ class AdminStatsView(APIView):
             'totalUsers': total_users,
             'totalOrgs': total_orgs,
             'totalProjects': total_projects,
+            'totalCompanies': total_companies,
             'superAdmins': super_admins,
             'tenantAdmins': tenant_admins,
             'regularUsers': regular_users,
         })
+
+class AdminCompanyViewSet(viewsets.ModelViewSet):
+    """ViewSet for admin company management - Superadmin only"""
+    queryset = Company.objects.all()
+    serializer_class = CompanySerializer
+    permission_classes = [IsAuthenticated, IsSuperAdmin]
+    
+    def get_queryset(self):
+        return Company.objects.all().order_by('-created_at')
+    
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
