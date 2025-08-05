@@ -259,14 +259,13 @@ function App() {
               
 
               
-              
-                             <Route path="/organizations/:organizationId/projects/:projectId/data/:platform/:folderId" element={
-                 <ProtectedRoute>
-                   <Layout>
-                     <UniversalDataPage />
-                   </Layout>
-                 </ProtectedRoute>
-               } />
+              <Route path="/organizations/:organizationId/projects/:projectId/data/:platform/:folderId" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <UniversalDataPage />
+                  </Layout>
+                </ProtectedRoute>
+              } />
 
               {/* Comments Scraper routes */}
               <Route path="/organizations/:organizationId/projects/:projectId/comments-scraper" element={

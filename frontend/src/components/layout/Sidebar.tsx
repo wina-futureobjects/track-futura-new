@@ -227,6 +227,7 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
       icon: <FolderIcon />,
       category: 'data'
     },
+
     {
       text: 'AI Analysis',
       path: getSocialMediaPath('analysis'),
@@ -310,6 +311,8 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
     return '/data-storage';
   }
 
+
+
   // Function to get correct path for Workflow Management based on URL
   function getWorkflowManagementPath() {
     // Extract organization and project IDs from URL
@@ -374,6 +377,10 @@ const Sidebar: React.FC<SidebarProps> = ({ open, onClose, onToggle }) => {
 
     if (itemPath.includes('workflow-management')) {
       return location.pathname.includes('workflow-management');
+    }
+
+    if (itemPath.includes('hierarchical-data-storage')) {
+      return location.pathname.includes('hierarchical-data-storage');
     }
 
     if (itemPath.includes('automated-batch-scraper')) {

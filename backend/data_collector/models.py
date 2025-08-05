@@ -1,3 +1,3 @@
 from django.db import models
 
-# Create your models here.
+# This file is intentionally empty - hierarchical data storage models have been removed

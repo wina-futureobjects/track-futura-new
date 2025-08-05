@@ -15,7 +15,9 @@ class BrightdataConfig(models.Model):
         ('instagram_posts', 'Instagram Posts'),
         ('instagram_reels', 'Instagram Reels'),
         ('instagram_comments', 'Instagram Comments'),
+        ('tiktok_posts', 'TikTok Posts'),
         ('tiktok', 'TikTok'),
+        ('linkedin_posts', 'LinkedIn Posts'),
         ('linkedin', 'LinkedIn'),
     )
 

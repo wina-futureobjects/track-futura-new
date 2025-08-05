@@ -118,8 +118,8 @@ class AutomatedBatchScraper:
 
             self.logger.info(f"Starting execution of batch job: {job.name} for project {job.project_id}")
 
-            # Get all tracked sources from the project
-            sources = self._get_accounts_from_folders(job.source_folder_ids)
+            # Get sources - either from input collection URLs or from project TrackSources
+            sources = self._get_sources_for_job(job)
             job.total_sources = len(sources)
             job.total_accounts = len(sources)  # Keep legacy field in sync
             job.save()
@@ -207,6 +207,59 @@ class AutomatedBatchScraper:
             # Clean up job context
             if hasattr(self, '_current_job'):
                 delattr(self, '_current_job')
+
+    def _get_sources_for_job(self, job: BatchScraperJob) -> List[TrackSource]:
+        """
+        Get sources for a batch job - either from input collection URLs or from project TrackSources
+        """
+        # Check if this job is associated with an input collection
+        if job.platform_params and 'input_collection_id' in job.platform_params:
+            return self._get_sources_from_input_collection(job)
+        else:
+            # Fall back to getting sources from project (legacy behavior)
+            return self._get_accounts_from_folders(job.source_folder_ids)
+
+    def _get_sources_from_input_collection(self, job: BatchScraperJob) -> List[TrackSource]:
+        """
+        Create TrackSource objects from input collection URLs
+        """
+        try:
+            from workflow.models import InputCollection
+            
+            input_collection_id = job.platform_params.get('input_collection_id')
+            input_collection = InputCollection.objects.get(id=input_collection_id)
+            
+            sources = []
+            platform_name = job.platform_params.get('platform_name', '').lower()
+            
+            for i, url in enumerate(input_collection.urls):
+                # Create a temporary TrackSource object for each URL
+                source = TrackSource(
+                    id=f"temp_{input_collection_id}_{i}",  # Temporary ID
+                    name=f"{input_collection.platform_service.platform.name} Source {i+1}",
+                    project=job.project,
+                    created_at=timezone.now(),
+                    updated_at=timezone.now()
+                )
+                
+                # Set the appropriate platform link based on the platform
+                if platform_name == 'instagram':
+                    source.instagram_link = url
+                elif platform_name == 'facebook':
+                    source.facebook_link = url
+                elif platform_name == 'linkedin':
+                    source.linkedin_link = url
+                elif platform_name == 'tiktok':
+                    source.tiktok_link = url
+                
+                sources.append(source)
+            
+            self.logger.info(f"Created {len(sources)} sources from input collection {input_collection_id}")
+            return sources
+            
+        except Exception as e:
+            self.logger.error(f"Error getting sources from input collection: {str(e)}")
+            return []
 
     def _get_accounts_from_folders(self, folder_ids: List[int]) -> List[TrackSource]:
         """
@@ -446,15 +499,23 @@ class AutomatedBatchScraper:
             except Exception as e:
                 self.logger.error(f"Error getting config for PlatformService {platform_service_id}: {str(e)}")
         
-        # Legacy method: Ensure content type is in plural form for config lookup
-        if content_type in ['post', 'posts']:
-            content_type = 'posts'
-        elif content_type in ['reel', 'reels']:
-            content_type = 'reels'
-        elif content_type in ['comment', 'comments']:
-            content_type = 'comments'
-
-        platform_config_key = f'{platform}_{content_type}'  # e.g., instagram_posts, facebook_reels
+        # Legacy method: Map platform names to match our BrightData configs
+        if platform == 'linkedin':
+            # LinkedIn config is now 'linkedin_posts'
+            platform_config_key = 'linkedin_posts'
+        elif platform == 'tiktok':
+            # TikTok config is now 'tiktok_posts'
+            platform_config_key = 'tiktok_posts'
+        else:
+            # For Facebook and Instagram, use the content type suffix
+            if content_type in ['post', 'posts']:
+                content_type = 'posts'
+            elif content_type in ['reel', 'reels']:
+                content_type = 'reels'
+            elif content_type in ['comment', 'comments']:
+                content_type = 'comments'
+            platform_config_key = f'{platform}_{content_type}'  # e.g., instagram_posts, facebook_reels
+        
         return BrightdataConfig.objects.filter(platform=platform_config_key, is_active=True).first()
 
     def _get_platform_config_key(self, platform: str, content_type: str = 'post') -> str:

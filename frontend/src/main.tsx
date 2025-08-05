@@ -14,7 +14,7 @@ declare global {
 // Set the API base URL based on environment
 window.API_BASE_URL = import.meta.env.PROD
   ? `https://${window.location.hostname}` // Use same domain in production
-  : '';
+  : 'http://127.0.0.1:8000'; // Use direct backend URL in development
 
 const theme = createTheme({
   palette: {

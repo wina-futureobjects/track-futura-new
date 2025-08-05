@@ -70,6 +70,11 @@ export const getApiBaseUrl = (): string => {
   }
 
   console.log('🛠️ Development mode detected');
+  console.log('🔍 Window location details:', {
+    port: typeof window !== 'undefined' ? window.location.port : 'undefined',
+    hostname: typeof window !== 'undefined' ? window.location.hostname : 'undefined',
+    href: typeof window !== 'undefined' ? window.location.href : 'undefined'
+  });
 
   // In development, try to use the direct backend URL if proxy is not working
   // Check if we're running on localhost:5173 (Vite dev server)
@@ -79,9 +84,9 @@ export const getApiBaseUrl = (): string => {
     return 'http://127.0.0.1:8000';
   }
 
-  // Default: use relative URLs which will be handled by the Vite proxy
-  console.log('✅ Using relative API URLs (proxy)');
-  return '';
+  // Force direct backend URL for development to fix transaction issues
+  console.log('✅ Using development direct API URL: http://127.0.0.1:8000 (forced)');
+  return 'http://127.0.0.1:8000';
 };
 
 /**
