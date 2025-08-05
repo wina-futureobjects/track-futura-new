@@ -752,7 +752,7 @@ const OrganizationProjects = () => {
             {/* Header and actions */}
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
               <Typography variant="h4" component="h1" fontWeight="600" my={1.5}>
-                {organization?.name || 'Organization'} Organization 
+                {organization?.name || 'Organization'}
               </Typography>
                              <Button 
                  variant="contained" 
