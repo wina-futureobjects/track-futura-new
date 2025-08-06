@@ -35,6 +35,7 @@ import {
   Chip,
   ToggleButtonGroup,
   ToggleButton,
+  Tooltip,
 } from '@mui/material';
 import { useNavigate, useParams } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
@@ -46,6 +47,7 @@ import ViewListIcon from '@mui/icons-material/ViewList';
 import GridViewIcon from '@mui/icons-material/GridView';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { apiFetch } from '../utils/api';
 import { useTheme } from '@mui/material/styles';
 
@@ -739,7 +741,7 @@ const OrganizationProjects = () => {
             },
           }}
         >
-          <Tab label="Projects" id="tab-0" />
+          <Tab label="Projects List" id="tab-0" />
           <Tab label="Members" id="tab-1" />
           <Tab label="Settings" id="tab-2" />
         </Tabs>
@@ -1295,7 +1297,7 @@ const OrganizationProjects = () => {
         </DialogTitle>
         <DialogContent sx={{ pb: 2, pt: 2 }}>
           <Typography variant="body2" color="text.secondary" paragraph>
-            Create a new project to organize your documents, assistants, and more.
+            Create a new project to organize your findings.
           </Typography>
           <TextField
             autoFocus
@@ -1323,8 +1325,33 @@ const OrganizationProjects = () => {
             sx={{ mb: 2 }}
           />
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+            <Typography variant="body2" sx={{ mr: 0.5 }}>
+              Project visibility 
+            </Typography>
+            <Tooltip
+              title={newProject.is_public
+                ? "Public projects can be viewed by anyone with the link."
+                : "Private projects are only visible to organization members."}
+              arrow
+              placement="bottom"
+              componentsProps={{
+                tooltip: {
+                  sx: { 
+                    whiteSpace: 'nowrap',
+                    width: 'fit-content',
+                    maxWidth: 'none',
+                    minWidth: 'unset',
+                    p: 1
+                  }
+                }
+              }}
+            >
+              <IconButton size="small" sx={{ mr: 0.25, p: 0.25, color: 'text.secondary' }}>
+                <HelpOutlineIcon fontSize="inherit" sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Tooltip>
             <Typography variant="body2" sx={{ mr: 2 }}>
-              Project visibility:
+              :
             </Typography>
             <FormControl component="fieldset">
               <Select
@@ -1338,11 +1365,6 @@ const OrganizationProjects = () => {
               </Select>
             </FormControl>
           </Box>
-          <Typography variant="caption" color="text.secondary">
-            {newProject.is_public 
-              ? "Public projects can be viewed by anyone with the link." 
-              : "Private projects are only visible to organization members."}
-          </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid rgba(0, 0, 0, 0.05)' }}>
           <Button 
