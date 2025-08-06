@@ -18,6 +18,7 @@ import TrackAccountUpload from './pages/TrackAccountUpload';
 
 // Folder imports
 import DataStorage from './pages/DataStorage';
+import FolderContents from './pages/FolderContents';
 
 // Data upload imports
 import UniversalDataPage from './pages/UniversalDataPage';
@@ -257,7 +258,14 @@ function App() {
                 </ProtectedRoute>
               } />
               
-
+              {/* Folder Contents - File Explorer Style */}
+              <Route path="/organizations/:organizationId/projects/:projectId/data-storage/:folderType/:folderId" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <FolderContents />
+                  </Layout>
+                </ProtectedRoute>
+              } />
               
               <Route path="/organizations/:organizationId/projects/:projectId/data/:platform/:folderId" element={
                 <ProtectedRoute>

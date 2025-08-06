@@ -9,10 +9,16 @@ class TikTokPostSerializer(serializers.ModelSerializer):
 class FolderSerializer(serializers.ModelSerializer):
     post_count = serializers.SerializerMethodField()
     category_display = serializers.ReadOnlyField()
+    platform = serializers.SerializerMethodField()
+    subfolders = serializers.SerializerMethodField()
     
     class Meta:
         model = Folder
-        fields = ['id', 'name', 'description', 'category', 'category_display', 'project', 'created_at', 'updated_at', 'post_count']
+        fields = [
+            'id', 'name', 'description', 'category', 'category_display', 'project', 
+            'created_at', 'updated_at', 'post_count', 'parent_folder', 'folder_type', 
+            'scraping_run', 'platform', 'subfolders'
+        ]
     
     def create(self, validated_data):
         """
@@ -60,4 +66,13 @@ class FolderSerializer(serializers.ModelSerializer):
         return instance
     
     def get_post_count(self, obj):
-        return obj.posts.count() 
+        return obj.posts.count()
+    
+    def get_platform(self, obj):
+        return 'tiktok'
+    
+    def get_subfolders(self, obj):
+        # Only include subfolders if they exist and are prefetched
+        if hasattr(obj, '_prefetched_objects_cache') and 'subfolders' in obj._prefetched_objects_cache:
+            return FolderSerializer(obj.subfolders.all(), many=True).data
+        return [] 

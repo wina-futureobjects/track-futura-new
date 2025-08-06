@@ -6,10 +6,16 @@ class FolderSerializer(serializers.ModelSerializer):
     reel_count = serializers.SerializerMethodField()
     comment_count = serializers.SerializerMethodField()
     category_display = serializers.ReadOnlyField()
+    platform = serializers.SerializerMethodField()
+    subfolders = serializers.SerializerMethodField()
     
     class Meta:
         model = Folder
-        fields = ['id', 'name', 'description', 'category', 'category_display', 'project', 'created_at', 'updated_at', 'post_count', 'reel_count', 'comment_count']
+        fields = [
+            'id', 'name', 'description', 'category', 'category_display', 'project', 
+            'created_at', 'updated_at', 'post_count', 'reel_count', 'comment_count',
+            'parent_folder', 'folder_type', 'scraping_run', 'platform', 'subfolders'
+        ]
     
     def create(self, validated_data):
         """
@@ -64,6 +70,15 @@ class FolderSerializer(serializers.ModelSerializer):
     
     def get_comment_count(self, obj):
         return obj.comments.count()
+    
+    def get_platform(self, obj):
+        return 'facebook'
+    
+    def get_subfolders(self, obj):
+        # Only include subfolders if they exist and are prefetched
+        if hasattr(obj, '_prefetched_objects_cache') and 'subfolders' in obj._prefetched_objects_cache:
+            return FolderSerializer(obj.subfolders.all(), many=True).data
+        return []
 
 class FacebookPostSerializer(serializers.ModelSerializer):
     class Meta:

@@ -13,10 +13,22 @@ class Folder(models.Model):
         ('comments', 'Comments'),
     )
     
+    FOLDER_TYPE_CHOICES = (
+        ('run', 'Scraping Run'),
+        ('service', 'Platform Service'),
+        ('content', 'Content Folder'),
+    )
+    
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, null=True)
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='posts', help_text="Type of content stored in this folder")
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='linkedin_folders', null=True)
+    
+    # Hierarchical folder structure
+    parent_folder = models.ForeignKey('self', on_delete=models.CASCADE, related_name='subfolders', null=True, blank=True, help_text="Parent folder in the hierarchy")
+    folder_type = models.CharField(max_length=20, choices=FOLDER_TYPE_CHOICES, default='content', help_text="Type of folder in the hierarchy")
+    scraping_run = models.ForeignKey('workflow.ScrapingRun', on_delete=models.CASCADE, related_name='linkedin_folders', null=True, blank=True, help_text="Associated scraping run")
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -29,12 +41,26 @@ class Folder(models.Model):
     
     def get_content_count(self):
         """Get the count of content items in this folder based on category"""
-        if self.category == 'posts':
-            return self.posts.count()
-        elif self.category == 'reels':
-            return self.posts.filter(content_type='reel').count()
-        elif self.category == 'comments':
-            return 0  # LinkedIn doesn't have separate comments model yet
+        if self.folder_type == 'run':
+            # For run folders, count all content in subfolders
+            total_count = 0
+            for subfolder in self.subfolders.all():
+                total_count += subfolder.get_content_count()
+            return total_count
+        elif self.folder_type == 'service':
+            # For service folders, count all content in subfolders
+            total_count = 0
+            for subfolder in self.subfolders.all():
+                total_count += subfolder.get_content_count()
+            return total_count
+        else:
+            # For content folders, count based on category
+            if self.category == 'posts':
+                return self.posts.count()
+            elif self.category == 'reels':
+                return self.posts.filter(content_type='reel').count()
+            elif self.category == 'comments':
+                return 0  # LinkedIn doesn't have separate comments model yet
         return 0
     
     class Meta:

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import TrackSource, ReportFolder, ReportEntry
+from .models import TrackSource, ReportFolder, ReportEntry, UnifiedRunFolder
 from users.models import Project
 
 class TrackSourceSerializer(serializers.ModelSerializer):
@@ -97,4 +97,28 @@ class ReportFolderDetailSerializer(ReportFolderSerializer):
     entries = ReportEntrySerializer(many=True, read_only=True)
     
     class Meta(ReportFolderSerializer.Meta):
-        fields = ReportFolderSerializer.Meta.fields + ['entries'] 
+        fields = ReportFolderSerializer.Meta.fields + ['entries']
+
+class UnifiedRunFolderSerializer(serializers.ModelSerializer):
+    platform = serializers.SerializerMethodField()
+    subfolders = serializers.SerializerMethodField()
+    post_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = UnifiedRunFolder
+        fields = [
+            'id', 'name', 'description', 'folder_type', 'category', 
+            'project', 'scraping_run', 'parent_folder', 'platform', 
+            'subfolders', 'post_count', 'created_at', 'updated_at'
+        ]
+    
+    def get_platform(self, obj):
+        return 'unified'
+    
+    def get_subfolders(self, obj):
+        if hasattr(obj, '_prefetched_objects_cache') and 'subfolders' in obj._prefetched_objects_cache:
+            return UnifiedRunFolderSerializer(obj.subfolders.all(), many=True).data
+        return []
+    
+    def get_post_count(self, obj):
+        return obj.get_content_count() 

@@ -10,10 +10,11 @@ from rest_framework.permissions import AllowAny
 from rest_framework.pagination import PageNumberPagination
 from django.http import HttpResponse
 from django.db.models import Q
-from .models import TrackSource, ReportFolder, ReportEntry
+from .models import TrackSource, ReportFolder, ReportEntry, UnifiedRunFolder
 from .serializers import (
     TrackSourceSerializer,
-    ReportFolderSerializer, ReportEntrySerializer, ReportFolderDetailSerializer
+    ReportFolderSerializer, ReportEntrySerializer, ReportFolderDetailSerializer,
+    UnifiedRunFolderSerializer
 )
 
 class CustomPageNumberPagination(PageNumberPagination):
@@ -516,4 +517,38 @@ class ReportFolderViewSet(viewsets.ModelViewSet):
         return None 
 
 # Keep backward compatibility alias
-TrackAccountViewSet = TrackSourceViewSet 
+TrackAccountViewSet = TrackSourceViewSet
+
+class UnifiedRunFolderViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for managing unified run folders
+    """
+    queryset = UnifiedRunFolder.objects.all()
+    serializer_class = UnifiedRunFolderSerializer
+    permission_classes = [AllowAny]  # For testing, use proper permissions in production
+    
+    def get_queryset(self):
+        """
+        Filter folders by project and handle query parameters
+        """
+        project_id = self.request.query_params.get('project')
+        if project_id:
+            queryset = UnifiedRunFolder.objects.filter(project_id=project_id)
+        else:
+            queryset = UnifiedRunFolder.objects.all()
+        
+        # Filter by parent folder if specified
+        parent_folder = self.request.query_params.get('parent_folder')
+        if parent_folder:
+            try:
+                parent_folder_id = int(parent_folder)
+                queryset = queryset.filter(parent_folder_id=parent_folder_id)
+            except (ValueError, TypeError):
+                return UnifiedRunFolder.objects.none()
+        
+        # Check if hierarchical data is requested
+        include_hierarchy = self.request.query_params.get('include_hierarchy', 'false').lower() == 'true'
+        if include_hierarchy:
+            queryset = queryset.prefetch_related('subfolders')
+        
+        return queryset 

@@ -698,6 +698,18 @@ class WorkflowService:
             
             logger.info(f"Created scraping run {scraping_run.id} for project {project.name}")
             
+            # Create hierarchical folders
+            from .folder_service import FolderService
+            folder_service = FolderService()
+            
+            # Get all TrackSource records for this project
+            track_sources = TrackSource.objects.filter(project=scraping_run.project)
+            
+            if track_sources.exists():
+                # Create hierarchical folder structure
+                created_folders = folder_service.create_hierarchical_folders(scraping_run, list(track_sources))
+                logger.info(f"Created hierarchical folders for scraping run {scraping_run.id}")
+            
             # Create jobs directly from TrackSource items
             self._create_scraping_jobs_from_tracksources(scraping_run, configuration)
             

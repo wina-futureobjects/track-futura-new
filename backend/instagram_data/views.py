@@ -63,6 +63,22 @@ class FolderViewSet(viewsets.ModelViewSet):
         # Filter by project
         queryset = Folder.objects.filter(project_id=project_id)
         
+        # Filter by parent folder if specified
+        parent_folder = self.request.query_params.get('parent_folder')
+        if parent_folder:
+            try:
+                parent_folder_id = int(parent_folder)
+                queryset = queryset.filter(parent_folder_id=parent_folder_id)
+            except (ValueError, TypeError):
+                return Folder.objects.none()
+        
+        # Check if hierarchical data is requested
+        include_hierarchy = self.request.query_params.get('include_hierarchy', 'false').lower() == 'true'
+        
+        if include_hierarchy:
+            # Prefetch related subfolders for hierarchical display
+            queryset = queryset.prefetch_related('subfolders')
+        
         print(f"Total folders in DB: {Folder.objects.count()}")
         print(f"Folders for project {project_id}: {queryset.count()}")
         

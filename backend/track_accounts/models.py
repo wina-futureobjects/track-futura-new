@@ -129,3 +129,50 @@ class ReportEntry(models.Model):
         ordering = ['-posting_date']
         verbose_name = "Report Entry"
         verbose_name_plural = "Report Entries"
+
+class UnifiedRunFolder(models.Model):
+    """
+    Model for storing unified run folders (platform-agnostic)
+    """
+    FOLDER_TYPE_CHOICES = [
+        ('run', 'Run'),
+        ('service', 'Service'),
+        ('content', 'Content'),
+    ]
+    
+    CATEGORY_CHOICES = [
+        ('posts', 'Posts'),
+        ('reels', 'Reels'),
+        ('comments', 'Comments'),
+    ]
+    
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    folder_type = models.CharField(max_length=20, choices=FOLDER_TYPE_CHOICES, default='content')
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='posts')
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='unified_run_folders', null=True)
+    scraping_run = models.ForeignKey('workflow.ScrapingRun', on_delete=models.CASCADE, related_name='unified_folders', null=True, blank=True)
+    parent_folder = models.ForeignKey('self', on_delete=models.CASCADE, related_name='subfolders', null=True, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return self.name
+    
+    def get_content_count(self):
+        """Get the count of content items in this folder"""
+        if self.folder_type == 'run':
+            # Count all service folders
+            return self.subfolders.filter(folder_type='service').count()
+        elif self.folder_type == 'service':
+            # Count all content folders
+            return self.subfolders.filter(folder_type='content').count()
+        else:
+            # Content folder - no subfolders
+            return 0
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Unified Run Folder"
+        verbose_name_plural = "Unified Run Folders"
