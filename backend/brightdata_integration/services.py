@@ -185,6 +185,13 @@ class AutomatedBatchScraper:
             job.completed_at = timezone.now()
             job.save()
 
+            # Update ScrapingJob statuses based on ScraperRequest results
+            try:
+                from workflow.services import update_scraping_jobs_from_batch_job
+                update_scraping_jobs_from_batch_job(job.id)
+            except Exception as e:
+                self.logger.error(f"Error updating ScrapingJob statuses for batch job {job.id}: {str(e)}")
+
             self.logger.info(f"Completed batch job: {job.name}. Success: {successful_requests}, Failed: {failed_requests}, Batch calls: {len(batch_results)}")
             return True
 
@@ -874,17 +881,22 @@ class AutomatedBatchScraper:
         # Create batch payload with all sources
         payload = []
         for request in requests:
-            # Base payload for Facebook
+            # Base payload for Facebook batch API - use URL directly like Instagram
             item = {
                 "url": request.target_url,
-                "num_of_posts": request.num_of_posts,
-                "posts_to_not_include": [],
-                "start_date": request.start_date.strftime('%m-%d-%Y') if request.start_date else "",
-                "end_date": request.end_date.strftime('%m-%d-%Y') if request.end_date else "",
             }
 
             # Add platform-specific parameters for Facebook Posts
             if request.platform == 'facebook_posts':
+                # Add num_of_posts to limit the output
+                item['num_of_posts'] = request.num_of_posts
+                # Add date parameters if available
+                if request.start_date:
+                    item['start_date'] = request.start_date.strftime('%m-%d-%Y')
+                if request.end_date:
+                    item['end_date'] = request.end_date.strftime('%m-%d-%Y')
+                # Add posts_to_not_include (empty array as default)
+                item['posts_to_not_include'] = []
                 if 'include_profile_data' in platform_params:
                     item['include_profile_data'] = platform_params['include_profile_data']
 
@@ -967,12 +979,9 @@ class AutomatedBatchScraper:
         # Create batch payload with all sources
         payload = []
         for request in requests:
-            # Base payload for LinkedIn
+            # Base payload for LinkedIn batch API (simplified - no num_of_posts, start_date, end_date)
             item = {
                 "url": request.target_url,
-                "num_of_posts": request.num_of_posts,
-                "start_date": request.start_date.strftime('%m-%d-%Y') if request.start_date else "",
-                "end_date": request.end_date.strftime('%m-%d-%Y') if request.end_date else "",
             }
 
             # Add platform-specific parameters for LinkedIn Posts
@@ -993,11 +1002,9 @@ class AutomatedBatchScraper:
         # Create batch payload with all sources
         payload = []
         for request in requests:
+            # TikTok batch API needs URL field with uppercase "URL"
             payload.append({
-                "url": request.target_url,
-                "num_of_posts": request.num_of_posts,
-                "start_date": request.start_date.strftime('%m-%d-%Y') if request.start_date else "",
-                "end_date": request.end_date.strftime('%m-%d-%Y') if request.end_date else "",
+                "URL": request.target_url,
             })
 
         # Use the first request for API call configuration, but update ALL requests with the response
@@ -1033,6 +1040,8 @@ class AutomatedBatchScraper:
             params = {
                 "dataset_id": config.dataset_id,
                 "endpoint": f"{base_url}/api/brightdata/webhook/",
+                "auth_header": f"Bearer {webhook_token}",
+                "notify": f"{base_url}/api/brightdata/notify/",
                 "format": "json",
                 "uncompressed_webhook": "true",
                 "include_errors": "true",
@@ -1048,7 +1057,7 @@ class AutomatedBatchScraper:
                 # Facebook-specific parameters
                 params.update({
                     "type": "discover_new",
-                    "discover_by": "url",
+                    "discover_by": "user_name",
                 })
             elif primary_request.platform.startswith('linkedin'):
                 # LinkedIn-specific parameters

@@ -126,15 +126,15 @@ const BrightdataSettings = () => {
       description: 'Extract comment data from posts'
     },
     { 
-      value: 'linkedin', 
-      label: 'LinkedIn', 
+      value: 'linkedin_posts', 
+      label: 'LinkedIn Posts', 
       icon: <LinkedInIcon />,
       color: '#0A66C2',
       description: 'Scrape LinkedIn posts and articles'
     },
     { 
-      value: 'tiktok', 
-      label: 'TikTok', 
+      value: 'tiktok_posts', 
+      label: 'TikTok Posts', 
       icon: <MusicVideoIcon />,
       color: '#000000',
       description: 'Collect TikTok video content'

@@ -43,6 +43,7 @@ import {
   Folder as FolderIcon,
   TrendingUp as TrendingUpIcon,
   Download as DownloadIcon,
+  SmartToy as SmartToyIcon,
 } from '@mui/icons-material';
 import { apiFetch } from '../utils/api';
 
@@ -94,7 +95,7 @@ const TrackSourcesList = () => {
   const [sources, setSources] = useState<TrackSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -136,7 +137,7 @@ const TrackSourcesList = () => {
   // Fetch sources with filters
   const fetchSources = async (
     pageNumber = 0, 
-    pageSize = 25, 
+    pageSize = 10, 
     searchQuery = '',
     socialMedia = socialMediaFilters
   ) => {
@@ -499,8 +500,37 @@ const TrackSourcesList = () => {
 
 
 
-  // Helper function to determine service type
-  const getService = (source: TrackSource): string => {
+  // Helper functions to match workflow management page
+  const getPlatformIcon = (platformName: string) => {
+    switch (platformName.toLowerCase()) {
+      case 'facebook': return <FacebookIcon />;
+      case 'instagram': return <InstagramIcon />;
+      case 'linkedin': return <LinkedInIcon />;
+      case 'tiktok': return <TikTokIcon />;
+      default: return <SmartToyIcon />;
+    }
+  };
+
+  const getPlatformColor = (platformName: string) => {
+    switch (platformName.toLowerCase()) {
+      case 'facebook': return '#1877f2';
+      case 'instagram': return '#e4405f';
+      case 'linkedin': return '#0077b5';
+      case 'tiktok': return '#000000';
+      default: return '#666666';
+    }
+  };
+
+  const getPlatformName = (source: TrackSource): string => {
+    // Determine platform based on which link is present
+    if (source.facebook_link) return 'Facebook';
+    if (source.instagram_link) return 'Instagram';
+    if (source.linkedin_link) return 'LinkedIn';
+    if (source.tiktok_link) return 'TikTok';
+    return source.platform || 'Unknown';
+  };
+
+  const getServiceType = (source: TrackSource): string => {
     // Use the service_name from the database (user input from step 3)
     if (source.service_name) {
       // Map service keys to display labels
@@ -520,6 +550,20 @@ const TrackSourcesList = () => {
     
     // Fallback if no service_name is set
     return 'Posts';
+  };
+
+  const getFirstUrl = (source: TrackSource): string => {
+    // Get the first available URL from the source
+    if (source.instagram_link) return source.instagram_link;
+    if (source.facebook_link) return source.facebook_link;
+    if (source.linkedin_link) return source.linkedin_link;
+    if (source.tiktok_link) return source.tiktok_link;
+    return 'No URL';
+  };
+
+  // Keep the old getService function for backward compatibility
+  const getService = (source: TrackSource): string => {
+    return getServiceType(source);
   };
 
   return (
@@ -928,159 +972,90 @@ const TrackSourcesList = () => {
               </Box>
             ) : (
               <>
-                <TableContainer>
-                  <Table>
-                    <TableHead sx={{ bgcolor: '#f8fafc' }}>
-                      <TableRow>
-                        <TableCell sx={{ fontWeight: 600, color: '#374151' }}>Source</TableCell>
-                        <TableCell sx={{ fontWeight: 600, color: '#374151' }} align="center">Social Media</TableCell>
-                        <TableCell sx={{ fontWeight: 600, color: '#374151' }} align="center">Service</TableCell>
-                        <TableCell sx={{ fontWeight: 600, color: '#374151' }} align="right">Actions</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {sources.map((source) => (
-                        <TableRow key={source.id} sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
-                          <TableCell>
-                            <Box>
-                              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                {source.name}
-                              </Typography>
-                            </Box>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
-                              {source.instagram_link && (
-                                <Tooltip title={`Instagram: ${source.instagram_link}`}>
-                                  <IconButton 
-                                    size="small" 
-                                    onClick={() => {
-                                      const url = source.instagram_link?.startsWith('http') 
-                                        ? source.instagram_link 
-                                        : `https://www.instagram.com/${source.instagram_link}`;
-                                      window.open(url, '_blank');
-                                    }}
-                                    sx={{ 
-                                      bgcolor: '#fce7f3', 
-                                      color: '#E1306C',
-                                      '&:hover': { bgcolor: '#fbcfe8' }
-                                    }}
-                                  >
-                                    <InstagramIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                              )}
-                              
-                              {source.facebook_link && (
-                                <Tooltip title={`Facebook: ${source.facebook_link}`}>
-                                  <IconButton 
-                                    size="small" 
-                                    onClick={() => {
-                                      const url = source.facebook_link?.startsWith('http') 
-                                        ? source.facebook_link 
-                                        : `https://www.facebook.com/${source.facebook_link}`;
-                                      window.open(url, '_blank');
-                                    }}
-                                    sx={{ 
-                                      bgcolor: '#dbeafe', 
-                                      color: '#4267B2',
-                                      '&:hover': { bgcolor: '#bfdbfe' }
-                                    }}
-                                  >
-                                    <FacebookIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                              )}
-                              
-                              {source.linkedin_link && (
-                                <Tooltip title={`LinkedIn: ${source.linkedin_link}`}>
-                                  <IconButton 
-                                    size="small" 
-                                    onClick={() => {
-                                      const url = source.linkedin_link?.startsWith('http') 
-                                        ? source.linkedin_link 
-                                        : `https://www.linkedin.com/in/${source.linkedin_link}`;
-                                      window.open(url, '_blank');
-                                    }}
-                                    sx={{ 
-                                      bgcolor: '#e0f2fe', 
-                                      color: '#0077B5',
-                                      '&:hover': { bgcolor: '#b3e5fc' }
-                                    }}
-                                  >
-                                    <LinkedInIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                              )}
-                              
-                              {source.tiktok_link && (
-                                <Tooltip title={`TikTok: ${source.tiktok_link}`}>
-                                  <IconButton 
-                                    size="small" 
-                                    onClick={() => {
-                                      const url = source.tiktok_link?.startsWith('http') 
-                                        ? source.tiktok_link 
-                                        : `https://www.tiktok.com/@${source.tiktok_link}`;
-                                      window.open(url, '_blank');
-                                    }}
-                                    sx={{ 
-                                      bgcolor: '#f3f4f6', 
-                                      color: '#000',
-                                      '&:hover': { bgcolor: '#e5e7eb' }
-                                    }}
-                                  >
-                                    <TikTokIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                              )}
-                              
-                              {!source.instagram_link && !source.facebook_link && 
-                               !source.linkedin_link && !source.tiktok_link && (
-                                <Typography variant="body2" color="text.secondary">
-                                  No accounts
-                                </Typography>
-                              )}
-                            </Box>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                              {getService(source)}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="right">
-                            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                              <IconButton
-                                size="small"
-                                onClick={() => navigate(getNavigationPath(`/source-tracking/edit/${source.id}`))}
-                                sx={{ 
-                                  color: theme.palette.primary.main,
-                                  '&:hover': { 
-                                    bgcolor: theme.palette.primary.main + '1A'
-                                  }
-                                }}
-                              >
-                                <EditIcon fontSize="small" />
-                              </IconButton>
-                              <IconButton
-                                size="small"
-                                onClick={() => handleDeleteSource(source.id, source.name)}
-                                sx={{ 
-                                  color: '#dc2626',
-                                  '&:hover': { 
-                                    bgcolor: '#dc2626',
-                                    color: 'white'
-                                  }
-                                }}
-                              >
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </Box>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
+                                 <TableContainer component={Paper}>
+                   <Table>
+                     <TableHead>
+                       <TableRow>
+                         <TableCell>Name</TableCell>
+                         <TableCell>Platform</TableCell>
+                         <TableCell>Service</TableCell>
+                         <TableCell>URL</TableCell>
+                         <TableCell align="right">Actions</TableCell>
+                       </TableRow>
+                     </TableHead>
+                     <TableBody>
+                       {sources.map((source) => (
+                         <TableRow key={source.id} hover>
+                           <TableCell>
+                             <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                               {source.name}
+                             </Typography>
+                           </TableCell>
+                           <TableCell>
+                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                               <Avatar
+                                 sx={{
+                                   width: 24,
+                                   height: 24,
+                                   bgcolor: getPlatformColor(getPlatformName(source))
+                                 }}
+                               >
+                                 {getPlatformIcon(getPlatformName(source))}
+                               </Avatar>
+                               <Typography variant="body2">
+                                 {getPlatformName(source)}
+                               </Typography>
+                             </Box>
+                           </TableCell>
+                           <TableCell>
+                             <Typography variant="body2">
+                               {getServiceType(source)}
+                             </Typography>
+                           </TableCell>
+                           <TableCell>
+                             <Typography variant="body2" sx={{ 
+                               maxWidth: 300, 
+                               overflow: 'hidden', 
+                               textOverflow: 'ellipsis', 
+                               whiteSpace: 'nowrap' 
+                             }}>
+                               {getFirstUrl(source)}
+                             </Typography>
+                           </TableCell>
+                           <TableCell align="right">
+                             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                               <IconButton
+                                 size="small"
+                                 onClick={() => navigate(getNavigationPath(`/source-tracking/edit/${source.id}`))}
+                                 sx={{ 
+                                   color: theme.palette.primary.main,
+                                   '&:hover': { 
+                                     bgcolor: theme.palette.primary.main + '1A'
+                                   }
+                                 }}
+                               >
+                                 <EditIcon fontSize="small" />
+                               </IconButton>
+                               <IconButton
+                                 size="small"
+                                 onClick={() => handleDeleteSource(source.id, source.name)}
+                                 sx={{ 
+                                   color: '#dc2626',
+                                   '&:hover': { 
+                                     bgcolor: '#dc2626',
+                                     color: 'white'
+                                   }
+                                 }}
+                               >
+                                 <DeleteIcon fontSize="small" />
+                               </IconButton>
+                             </Box>
+                           </TableCell>
+                         </TableRow>
+                       ))}
+                     </TableBody>
+                   </Table>
+                 </TableContainer>
                 <TablePagination
                   rowsPerPageOptions={[10, 25, 50, 100]}
                   component="div"

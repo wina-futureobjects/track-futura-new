@@ -1095,8 +1095,8 @@ const SuperAdminDashboard = () => {
                   { value: 'instagram_posts', label: 'Instagram Posts', icon: <InstagramIcon />, color: '#E4405F', description: 'Scrape Instagram posts and images' },
                   { value: 'instagram_reels', label: 'Instagram Reels', icon: <InstagramIcon />, color: '#E4405F', description: 'Collect Instagram video content' },
                   { value: 'instagram_comments', label: 'Instagram Comments', icon: <InstagramIcon />, color: '#E4405F', description: 'Extract comment data from posts' },
-                  { value: 'linkedin', label: 'LinkedIn', icon: <LinkedInIcon />, color: '#0A66C2', description: 'Scrape LinkedIn posts and articles' },
-                  { value: 'tiktok', label: 'TikTok', icon: <MusicVideoIcon />, color: '#000000', description: 'Collect TikTok video content' },
+                  { value: 'linkedin_posts', label: 'LinkedIn Posts', icon: <LinkedInIcon />, color: '#0A66C2', description: 'Scrape LinkedIn posts and articles' },
+                  { value: 'tiktok_posts', label: 'TikTok Posts', icon: <MusicVideoIcon />, color: '#000000', description: 'Collect TikTok video content' },
                 ].map((platform) => {
                   const hasConfig = brightdataConfigs.some(c => c.platform === platform.value);
                   return (
@@ -1238,8 +1238,8 @@ const SuperAdminDashboard = () => {
                             </TableCell>
                             <TableCell>
                               <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                {config.platform === 'linkedin' && <LinkedInIcon />}
-                                {config.platform === 'tiktok' && <MusicVideoIcon />}
+                                {config.platform === 'linkedin_posts' && <LinkedInIcon />}
+                                {config.platform === 'tiktok_posts' && <MusicVideoIcon />}
                                 {config.platform.includes('instagram') && <InstagramIcon />}
                                 {config.platform.includes('facebook') && <FacebookIcon />}
                                 <Typography sx={{ ml: 1 }}>
@@ -1411,10 +1411,10 @@ const SuperAdminDashboard = () => {
                 
                 // Set dataset ID based on platform selection
                 switch (selectedPlatform) {
-                  case 'linkedin':
+                  case 'linkedin_posts':
                     datasetId = 'gd_lyy3tktm25m4avu764';
                     break;
-                  case 'tiktok':
+                  case 'tiktok_posts':
                     datasetId = 'gd_lu702nij2f790tmv9h';
                     break;
                   case 'instagram_posts':
@@ -1447,13 +1447,13 @@ const SuperAdminDashboard = () => {
               }}
               label="Platform"
             >
-              <MenuItem value="linkedin">
+              <MenuItem value="linkedin_posts">
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <LinkedInIcon />
                   <Typography sx={{ ml: 1 }}>LinkedIn Posts</Typography>
                 </Box>
               </MenuItem>
-              <MenuItem value="tiktok">
+              <MenuItem value="tiktok_posts">
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <MusicVideoIcon />
                   <Typography sx={{ ml: 1 }}>TikTok Posts</Typography>

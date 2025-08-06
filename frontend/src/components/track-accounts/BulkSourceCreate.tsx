@@ -65,8 +65,8 @@ const validateServiceUrl = (service: string | null | undefined, url: string | un
       return /^(https?:\/\/)?(www\.)?linkedin\.com\/(in|company)\/[^/?#]+(?:\/)?(?:\?.*)?$/i.test(url);
     
     case 'tiktok_posts':
-      // TikTok posts: URL of the TikTok Discover page with something after /discover/
-      return /^(https?:\/\/)?(www\.)?tiktok\.com\/discover\/[^/?#]+/i.test(url);
+      // TikTok posts: Accepts TikTok profile URLs with @username format
+      return /^(https?:\/\/)?(www\.)?tiktok\.com\/@[a-zA-Z0-9._-]+\/?$/i.test(url);
     
     case 'instagram_posts':
       // Instagram posts: Accepts only valid Instagram profile URLs (1-30 chars, alphanumeric, dot, underscore)
@@ -81,7 +81,7 @@ const validateServiceUrl = (service: string | null | undefined, url: string | un
     
     case 'facebook_comments':
       // Facebook comments: post URL (strict match for post URLs)
-      return /^https?:\/\/(www\.)?facebook\.com\/(?:(?:[a-zA-Z0-9.-]+\/posts\/\d+)|(?:groups\/\d+\/posts\/\d+)|(?:permalink\.php\?story_fbid=\d+&id=\d+)|(?:profile\.php\?id=\d+&[^ ]*story_fbid=\d+)|(?:share\/p\/[a-zA-Z0-9]+))\/?$/i.test(url);
+      return /^https?:\/\/(www\.)?facebook\.com\/(?:(?:[a-zA-Z0-9.-]+\/posts\/[a-zA-Z0-9]+)|(?:groups\/\d+\/posts\/[a-zA-Z0-9]+)|(?:permalink\.php\?story_fbid=\d+&id=\d+)|(?:profile\.php\?id=\d+&[^ ]*story_fbid=\d+)|(?:share\/p\/[a-zA-Z0-9]+))\/?$/i.test(url);
     
     case 'facebook_reels_profile':
       // Facebook reels: profile URL, profile.php?id=, or group URL
@@ -107,7 +107,7 @@ const getServiceValidationMessage = (service: string | null | undefined, url: st
       return 'Please enter a valid LinkedIn profile URL';
     
     case 'tiktok_posts':
-      return 'Please enter the TikTok Discover page URL';
+      return 'Please enter a valid TikTok profile URL (e.g., https://tiktok.com/@username)';
     
     case 'instagram_posts':
       return 'Please enter a valid Instagram profile URL';
@@ -165,7 +165,7 @@ const getServicesForPlatform = (platform: string | null | undefined) => {
 const getServiceLabel = (service: string | null | undefined) => {
   switch (service) {
     case 'linkedin_posts': return 'LinkedIn Profile';
-    case 'tiktok_posts': return 'TikTok Discover';
+    case 'tiktok_posts': return 'TikTok Profile';
     case 'instagram_posts': return 'Instagram Profile';
     case 'instagram_reels': return 'Instagram Profile';
     case 'instagram_comments': return 'Instagram Post';
@@ -179,11 +179,11 @@ const getServiceLabel = (service: string | null | undefined) => {
 const getUrlPlaceholder = (platform: string | null | undefined, service: string | null | undefined) => {
   switch (service) {
     case 'linkedin_posts': return 'https://linkedin.com/in/username';
-    case 'tiktok_posts': return 'https://tiktok.com/discover/...';
+    case 'tiktok_posts': return 'https://tiktok.com/@username';
     case 'instagram_posts': return 'https://instagram.com/username';
     case 'instagram_reels': return 'https://instagram.com/username/';
     case 'instagram_comments': return 'https://instagram.com/p/ABC123xyz/';
-    case 'facebook_comments': return 'https://facebook.com/post-url';
+    case 'facebook_comments': return 'https://facebook.com/username/posts/pfbid...';
     case 'facebook_reels_profile': return 'https://facebook.com/profile-username';
     case 'facebook_pages_posts': return 'https://facebook.com/page-username';
     default: return 'Enter URL...';
@@ -547,7 +547,7 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
                       'Example Source,linkedin,linkedin_posts,https://linkedin.com/company/example\n' +
                       'Facebook Page,facebook,facebook_pages_posts,https://facebook.com/examplepage\n' +
                       'Instagram Profile,instagram,instagram_posts,https://instagram.com/example\n' +
-                      'TikTok Discover,tiktok,tiktok_posts,https://tiktok.com/discover/example\n' +
+                      'TikTok Profile,tiktok,tiktok_posts,https://tiktok.com/@example\n' +
                       'Facebook Comments,facebook,facebook_comments,https://facebook.com/example/posts/123\n' +
                       'Instagram Reels,instagram,instagram_reels,https://instagram.com/example\n' +
                       'Instagram Comments,instagram,instagram_comments,https://instagram.com/p/ABC123xyz/';
@@ -778,6 +778,11 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
                       key={service.key}
                       variant={draftSources[0]?.selectedService === service.key ? "contained" : "outlined"}
                       onClick={() => {
+                        // Clear the URL field when service changes to prevent confusion
+                        const currentField = getUrlFieldForService(draftSources[0]?.selectedService);
+                        if (currentField) {
+                          handleFieldChange(draftSources[0].id, currentField as keyof DraftSource, null);
+                        }
                         handleFieldChange(draftSources[0].id, 'selectedService' as keyof DraftSource, service.key);
                       }}
                       sx={{
@@ -832,21 +837,21 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
                   error={hasUrlValidationError()}
                   helperText={getUrlValidationMessage()}
                   sx={{
-                    '& .MuiFormHelperText-root': {
-                      color: hasUrlValidationError() ? '#d32f2f !important' : 'inherit'
+                                      '& .MuiFormHelperText-root': {
+                    color: hasUrlValidationError() ? theme.palette.error.main + ' !important' : 'inherit'
+                  },
+                  '& .MuiOutlinedInput-root': {
+                    '&.Mui-error': {
+                      '& fieldset': {
+                        borderColor: theme.palette.error.main + ' !important'
+                      }
                     },
-                    '& .MuiOutlinedInput-root': {
-                      '&.Mui-error': {
-                        '& fieldset': {
-                          borderColor: '#d32f2f !important'
-                        }
-                      },
-                      '&:not(.Mui-error)': {
-                        '& fieldset': {
-                          borderColor: '#d0d7de !important'
-                        }
+                    '&:not(.Mui-error)': {
+                      '& fieldset': {
+                        borderColor: '#d0d7de !important'
                       }
                     }
+                  }
                   }}
                 />
               </Box>
@@ -1008,21 +1013,21 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
                             error={!source.name.trim()}
                             helperText={!source.name.trim() ? 'Required' : ''}
                             sx={{
-                              '& .MuiFormHelperText-root': {
-                                color: !source.name.trim() ? '#d32f2f !important' : 'inherit'
+                                                          '& .MuiFormHelperText-root': {
+                              color: !source.name.trim() ? theme.palette.error.main + ' !important' : 'inherit'
+                            },
+                            '& .MuiOutlinedInput-root': {
+                              '&.Mui-error': {
+                                '& fieldset': {
+                                  borderColor: theme.palette.error.main + ' !important'
+                                }
                               },
-                              '& .MuiOutlinedInput-root': {
-                                '&.Mui-error': {
-                                  '& fieldset': {
-                                    borderColor: '#d32f2f !important'
-                                  }
-                                },
-                                '&:not(.Mui-error)': {
-                                  '& fieldset': {
-                                    borderColor: '#d0d7de !important'
-                                  }
+                              '&:not(.Mui-error)': {
+                                '& fieldset': {
+                                  borderColor: '#d0d7de !important'
                                 }
                               }
+                            }
                             }}
                           />
                         </TableCell>
@@ -1050,7 +1055,14 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
                             fullWidth
                             size="small"
                             value={source.selectedService || ''}
-                            onChange={(e) => handleFieldChange(source.id, 'selectedService' as keyof DraftSource, e.target.value)}
+                            onChange={(e) => {
+                              // Clear the URL field when service changes to prevent confusion
+                              const currentField = getUrlFieldForService(source.selectedService);
+                              if (currentField) {
+                                handleFieldChange(source.id, currentField as keyof DraftSource, null);
+                              }
+                              handleFieldChange(source.id, 'selectedService' as keyof DraftSource, e.target.value);
+                            }}
                             disabled={!source.selectedPlatform}
                             placeholder="Select service"
                           >
@@ -1076,21 +1088,21 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
                             helperText={getUrlValidationMessageForSource(source)}
                             disabled={!source.selectedService}
                             sx={{
-                              '& .MuiFormHelperText-root': {
-                                color: hasUrlValidationErrorForSource(source) ? '#d32f2f !important' : 'inherit'
+                                                          '& .MuiFormHelperText-root': {
+                              color: hasUrlValidationErrorForSource(source) ? theme.palette.error.main + ' !important' : 'inherit'
+                            },
+                            '& .MuiOutlinedInput-root': {
+                              '&.Mui-error': {
+                                '& fieldset': {
+                                  borderColor: theme.palette.error.main + ' !important'
+                                }
                               },
-                              '& .MuiOutlinedInput-root': {
-                                '&.Mui-error': {
-                                  '& fieldset': {
-                                    borderColor: '#d32f2f !important'
-                                  }
-                                },
-                                '&:not(.Mui-error)': {
-                                  '& fieldset': {
-                                    borderColor: '#d0d7de !important'
-                                  }
+                              '&:not(.Mui-error)': {
+                                '& fieldset': {
+                                  borderColor: '#d0d7de !important'
                                 }
                               }
+                            }
                             }}
                           />
                         </TableCell>

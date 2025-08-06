@@ -1167,22 +1167,41 @@ def brightdata_webhook(request):
 
             # Update workflow task statuses if this is part of a workflow
             workflow_tasks_updated = 0
+            scraping_jobs_updated = 0
             for scraper_request in scraper_requests:
                 if scraper_request.batch_job:
                     try:
+                        # Update WorkflowTask statuses (legacy)
                         from workflow.models import WorkflowTask
                         workflow_tasks = WorkflowTask.objects.filter(batch_job=scraper_request.batch_job)
                         for workflow_task in workflow_tasks:
                             workflow_task.status = 'completed'
                             workflow_task.save()
                             workflow_tasks_updated += 1
+                        
+                        # Update specific ScrapingJob statuses (new workflow system)
+                        # Match by URL and platform to ensure we update the correct job
+                        from workflow.models import ScrapingJob
+                        matching_scraping_jobs = ScrapingJob.objects.filter(
+                            batch_job=scraper_request.batch_job,
+                            url=scraper_request.target_url
+                        )
+                        for scraping_job in matching_scraping_jobs:
+                            scraping_job.status = 'completed'
+                            scraping_job.completed_at = timezone.now()
+                            scraping_job.save()
+                            scraping_jobs_updated += 1
+                            logger.info(f"Updated ScrapingJob {scraping_job.id} to completed for URL: {scraper_request.target_url}")
+                            
                     except Exception as e:
-                        logger.error(f"Error updating workflow task status: {str(e)}")
+                        logger.error(f"Error updating workflow statuses: {str(e)}")
 
             if scraper_requests:
                 logger.info(f"Updated {len(scraper_requests)} scraper request statuses to completed")
             if workflow_tasks_updated > 0:
                 logger.info(f"Updated {workflow_tasks_updated} workflow task statuses to completed")
+            if scraping_jobs_updated > 0:
+                logger.info(f"Updated {scraping_jobs_updated} scraping job statuses to completed")
 
             processing_time = round(time.time() - start_time, 3)
             logger.info(f"Webhook processed successfully: {snapshot_id} in {processing_time}s")
@@ -1194,7 +1213,8 @@ def brightdata_webhook(request):
                 'processing_time': processing_time,
                 'items_processed': len(data) if isinstance(data, list) else 1,
                 'scraper_requests_updated': len(scraper_requests),
-                'workflow_tasks_updated': workflow_tasks_updated
+                'workflow_tasks_updated': workflow_tasks_updated,
+                'scraping_jobs_updated': scraping_jobs_updated
             })
         else:
             # Update all scraper request statuses to failed
@@ -1205,20 +1225,40 @@ def brightdata_webhook(request):
 
             # Update workflow task statuses to failed if this is part of a workflow
             workflow_tasks_failed = 0
+            scraping_jobs_failed = 0
             for scraper_request in scraper_requests:
                 if scraper_request.batch_job:
                     try:
+                        # Update WorkflowTask statuses to failed (legacy)
                         from workflow.models import WorkflowTask
                         workflow_tasks = WorkflowTask.objects.filter(batch_job=scraper_request.batch_job)
                         for workflow_task in workflow_tasks:
                             workflow_task.status = 'failed'
                             workflow_task.save()
                             workflow_tasks_failed += 1
+                        
+                        # Update specific ScrapingJob statuses to failed (new workflow system)
+                        # Match by URL and platform to ensure we update the correct job
+                        from workflow.models import ScrapingJob
+                        matching_scraping_jobs = ScrapingJob.objects.filter(
+                            batch_job=scraper_request.batch_job,
+                            url=scraper_request.target_url
+                        )
+                        for scraping_job in matching_scraping_jobs:
+                            scraping_job.status = 'failed'
+                            scraping_job.error_message = 'Failed to process webhook data'
+                            scraping_job.completed_at = timezone.now()
+                            scraping_job.save()
+                            scraping_jobs_failed += 1
+                            logger.info(f"Updated ScrapingJob {scraping_job.id} to failed for URL: {scraper_request.target_url}")
+                            
                     except Exception as e:
-                        logger.error(f"Error updating workflow task status to failed: {str(e)}")
+                        logger.error(f"Error updating workflow statuses to failed: {str(e)}")
 
             if workflow_tasks_failed > 0:
                 logger.info(f"Updated {workflow_tasks_failed} workflow task statuses to failed")
+            if scraping_jobs_failed > 0:
+                logger.info(f"Updated {scraping_jobs_failed} scraping job statuses to failed")
 
             logger.error(f"Failed to process webhook data for snapshot_id: {snapshot_id}")
             return JsonResponse({

@@ -15,23 +15,24 @@ class WorkflowService:
     # Dataset ID mapping based on platform and service
     DATASET_MAPPING = {
         'facebook': {
-            'posts': 'gd_lk5ns7kz21pck8jpis',
-            'comments': 'gd_lk5ns7kz21pck8jpis',
-            'pages_posts': 'gd_lk5ns7kz21pck8jpis'
+            'posts': 'gd_lkaxegm826bjpoo9m5',
+            'comments': 'gd_lkay758p1eanlolqw8',
+            'reels': 'gd_lyclm3ey2q6rww027t',
+            'pages_posts': 'gd_lkaxegm826bjpoo9m5',
         },
         'instagram': {
             'posts': 'gd_lk5ns7kz21pck8jpis',
-            'comments': 'gd_lk5ns7kz21pck8jpis',
-            'reels': 'gd_lk5ns7kz21pck8jpis'
+            'comments': 'gd_ltppn085pokosxh13',
+            'reels': 'gd_lyclm20il4r5helnj',
         },
         'linkedin': {
-            'posts': 'gd_lk5ns7kz21pck8jpis',
-            'comments': 'gd_lk5ns7kz21pck8jpis'
+            'posts': 'gd_lyy3tktm25m4avu764',
+            'comments': 'gd_lyy3tktm25m4avu764',
         },
         'tiktok': {
-            'posts': 'gd_lk5ns7kz21pck8jpis',
-            'comments': 'gd_lk5ns7kz21pck8jpis'
-        }
+            'posts': 'gd_lu702nij2f790tmv9h',
+            'comments': 'gd_lu702nij2f790tmv9h',
+        },
     }
     
     @transaction.atomic
@@ -555,6 +556,32 @@ class WorkflowService:
                 logger.error(f"No BrightData config found for platform service {input_collection.platform_service}")
                 return None
             
+            # Convert ISO date strings to YYYY-MM-DD format for Django DateField
+            start_date = None
+            end_date = None
+            
+            if configuration.get('start_date'):
+                try:
+                    # Parse ISO date string and convert to YYYY-MM-DD
+                    from datetime import datetime
+                    start_date_obj = datetime.fromisoformat(configuration['start_date'].replace('Z', '+00:00'))
+                    start_date = start_date_obj.strftime('%Y-%m-%d')
+                except (ValueError, AttributeError):
+                    logger.warning(f"Invalid start_date format: {configuration.get('start_date')}")
+            
+            if configuration.get('end_date'):
+                try:
+                    # Parse ISO date string and convert to YYYY-MM-DD
+                    from datetime import datetime
+                    end_date_obj = datetime.fromisoformat(configuration['end_date'].replace('Z', '+00:00'))
+                    end_date = end_date_obj.strftime('%Y-%m-%d')
+                except (ValueError, AttributeError):
+                    logger.warning(f"Invalid end_date format: {configuration.get('end_date')}")
+            
+            # Map service name to content type for BrightData
+            service_name = input_collection.platform_service.service.name.lower()
+            content_type = self._map_service_to_content_type(service_name)
+            
             # Create batch scraper job with global configuration
             batch_job = BatchScraperJob.objects.create(
                 name=f"Batch Job - {input_collection.platform_service.platform.name} - {input_collection.platform_service.service.name}",
@@ -562,11 +589,11 @@ class WorkflowService:
                 source_folder_ids=[],  # Will be populated by BrightData integration
                 platforms_to_scrape=[input_collection.platform_service.platform.name],
                 content_types_to_scrape={
-                    input_collection.platform_service.platform.name: [input_collection.platform_service.service.name]
+                    input_collection.platform_service.platform.name: [content_type]
                 },
                 num_of_posts=configuration.get('num_of_posts', 10),
-                start_date=configuration.get('start_date'),
-                end_date=configuration.get('end_date'),
+                start_date=start_date,
+                end_date=end_date,
                 auto_create_folders=configuration.get('auto_create_folders', True),
                 output_folder_pattern=configuration.get('output_folder_pattern', 'scraped_data'),
                 platform_params={
@@ -633,30 +660,7 @@ class WorkflowService:
         """
         try:
             run = ScrapingRun.objects.get(id=run_id)
-            jobs = run.scraping_jobs.all()
-            
-            total_jobs = jobs.count()
-            completed_jobs = jobs.filter(status__in=['completed', 'failed']).count()
-            successful_jobs = jobs.filter(status='completed').count()
-            failed_jobs = jobs.filter(status='failed').count()
-            
-            # Update run statistics
-            run.total_jobs = total_jobs
-            run.completed_jobs = completed_jobs
-            run.successful_jobs = successful_jobs
-            run.failed_jobs = failed_jobs
-            
-            # Update run status
-            if completed_jobs == total_jobs:
-                if failed_jobs == 0:
-                    run.status = 'completed'
-                elif successful_jobs == 0:
-                    run.status = 'failed'
-                else:
-                    run.status = 'completed'  # Partial success
-                run.completed_at = timezone.now()
-            
-            run.save()
+            run.update_status_from_jobs()
             return True
             
         except ScrapingRun.DoesNotExist:
@@ -735,72 +739,164 @@ class WorkflowService:
                 logger.warning(f"No PlatformService found for {platform_name} - {service_name}")
                 continue
             
-            # Extract URLs from TrackSource
-            urls = []
-            if track_source.facebook_link:
-                urls.append(track_source.facebook_link)
-            if track_source.instagram_link:
-                urls.append(track_source.instagram_link)
-            if track_source.linkedin_link:
-                urls.append(track_source.linkedin_link)
-            if track_source.tiktok_link:
-                urls.append(track_source.tiktok_link)
-            if track_source.other_social_media:
-                urls.append(track_source.other_social_media)
+            # Extract URL for the specific platform
+            url = None
+            if platform_name == 'facebook' and track_source.facebook_link:
+                url = track_source.facebook_link
+            elif platform_name == 'instagram' and track_source.instagram_link:
+                url = track_source.instagram_link
+            elif platform_name == 'linkedin' and track_source.linkedin_link:
+                url = track_source.linkedin_link
+            elif platform_name == 'tiktok' and track_source.tiktok_link:
+                url = track_source.tiktok_link
+            elif track_source.other_social_media:
+                url = track_source.other_social_media
             
-            # Create a job for each URL
-            for url in urls:
-                try:
-                    # Get dataset ID
-                    dataset_id = self._get_dataset_id(platform_name, service_name)
-                    
-                    # Get or create BrightData config
-                    config = self._get_or_create_brightdata_config(platform_service)
-                    
-                    if not config:
-                        logger.error(f"No BrightData config found for platform service {platform_service}")
-                        continue
-                    
-                    # Create batch scraper job
-                    batch_job = BatchScraperJob.objects.create(
-                        name=f"Batch Job - {platform_name} - {service_name}",
-                        project=scraping_run.project,
-                        source_folder_ids=[],
-                        platforms_to_scrape=[platform_name],
-                        content_types_to_scrape={
-                            platform_name: [service_name]
-                        },
-                        num_of_posts=configuration.get('num_of_posts', 10),
-                        start_date=configuration.get('start_date'),
-                        end_date=configuration.get('end_date'),
-                        auto_create_folders=configuration.get('auto_create_folders', True),
-                        output_folder_pattern=configuration.get('output_folder_pattern', 'scraped_data'),
-                        platform_params={
-                            'track_source_id': track_source.id,
-                            'dataset_id': dataset_id,
-                            'brightdata_config_id': config.id,
-                            'platform_name': platform_name,
-                            'service_name': service_name
-                        }
-                    )
-                    
-                    # Create scraping job (without InputCollection)
-                    ScrapingJob.objects.create(
-                        scraping_run=scraping_run,
-                        input_collection=None,  # No InputCollection needed
-                        batch_job=batch_job,
-                        status='pending',
-                        dataset_id=dataset_id,
-                        platform=platform_name,
-                        service_type=service_name,
-                        url=url
-                    )
-                    
-                    logger.info(f"Created scraping job for TrackSource {track_source.id} - {url}")
-                    
-                except Exception as e:
-                    logger.error(f"Error creating scraping job for TrackSource {track_source.id}: {str(e)}")
+            if not url:
+                logger.warning(f"No URL found for {platform_name} - {service_name}")
+                continue
+            
+            try:
+                # Get dataset ID
+                dataset_id = self._get_dataset_id(platform_name, service_name)
+                
+                # Get or create BrightData config
+                config = self._get_or_create_brightdata_config(platform_service)
+                
+                if not config:
+                    logger.error(f"No BrightData config found for platform service {platform_service}")
+                    continue
+                
+                # Convert ISO date strings to YYYY-MM-DD format for Django DateField
+                start_date = None
+                end_date = None
+                
+                if configuration.get('start_date'):
+                    try:
+                        # Parse ISO date string and convert to YYYY-MM-DD
+                        from datetime import datetime
+                        start_date_obj = datetime.fromisoformat(configuration['start_date'].replace('Z', '+00:00'))
+                        start_date = start_date_obj.strftime('%Y-%m-%d')
+                    except (ValueError, AttributeError):
+                        logger.warning(f"Invalid start_date format: {configuration.get('start_date')}")
+                
+                if configuration.get('end_date'):
+                    try:
+                        # Parse ISO date string and convert to YYYY-MM-DD
+                        from datetime import datetime
+                        end_date_obj = datetime.fromisoformat(configuration['end_date'].replace('Z', '+00:00'))
+                        end_date = end_date_obj.strftime('%Y-%m-%d')
+                    except (ValueError, AttributeError):
+                        logger.warning(f"Invalid end_date format: {configuration.get('end_date')}")
+                
+                # Map service name to content type for BrightData
+                content_type = self._map_service_to_content_type(service_name)
+                
+                # Create batch scraper job
+                batch_job = BatchScraperJob.objects.create(
+                    name=f"Batch Job - {platform_name} - {service_name}",
+                    project=scraping_run.project,
+                    source_folder_ids=[],
+                    platforms_to_scrape=[platform_name],
+                    content_types_to_scrape={
+                        platform_name: [content_type]
+                    },
+                    num_of_posts=configuration.get('num_of_posts', 10),
+                    start_date=start_date,
+                    end_date=end_date,
+                    auto_create_folders=configuration.get('auto_create_folders', True),
+                    output_folder_pattern=configuration.get('output_folder_pattern', 'scraped_data'),
+                    platform_params={
+                        'track_source_id': track_source.id,
+                        'dataset_id': dataset_id,
+                        'brightdata_config_id': config.id,
+                        'platform_name': platform_name,
+                        'service_name': service_name
+                    }
+                )
+                
+                # Create scraping job (without InputCollection)
+                ScrapingJob.objects.create(
+                    scraping_run=scraping_run,
+                    input_collection=None,  # No InputCollection needed
+                    batch_job=batch_job,
+                    status='pending',
+                    dataset_id=dataset_id,
+                    platform=platform_name,
+                    service_type=service_name,
+                    url=url
+                )
+                
+                logger.info(f"Created scraping job for TrackSource {track_source.id} - {url}")
+                
+            except Exception as e:
+                logger.error(f"Error creating scraping job for TrackSource {track_source.id}: {str(e)}")
         
         # Update run statistics
         scraping_run.total_jobs = scraping_run.scraping_jobs.count()
         scraping_run.save() 
+
+def update_scraping_jobs_from_batch_job(batch_job_id: int) -> bool:
+    """
+    Update ScrapingJob statuses based on the completion of a BatchScraperJob.
+    This method should be called when a BatchScraperJob completes to ensure
+    ScrapingJob statuses are properly updated even if ScraperRequests fail.
+    """
+    try:
+        from brightdata_integration.models import BatchScraperJob, ScraperRequest
+        
+        batch_job = BatchScraperJob.objects.get(id=batch_job_id)
+        
+        # Get all ScrapingJobs associated with this BatchScraperJob
+        scraping_jobs = ScrapingJob.objects.filter(batch_job=batch_job)
+        
+        # Get all ScraperRequests associated with this BatchScraperJob
+        scraper_requests = ScraperRequest.objects.filter(batch_job=batch_job)
+        
+        # Create a mapping of ScraperRequest to ScrapingJob
+        request_to_job = {}
+        for scraping_job in scraping_jobs:
+            # Find the corresponding ScraperRequest by URL and platform
+            matching_request = None
+            for request in scraper_requests:
+                if (request.target_url == scraping_job.url and 
+                    request.platform.split('_')[0] == scraping_job.platform):
+                    matching_request = request
+                    break
+            
+            if matching_request:
+                request_to_job[matching_request.id] = scraping_job
+        
+        # Update ScrapingJob statuses based on ScraperRequest statuses
+        updated_count = 0
+        for request in scraper_requests:
+            if request.id in request_to_job:
+                scraping_job = request_to_job[request.id]
+                
+                # Update status based on ScraperRequest status
+                if request.status == 'completed':
+                    scraping_job.status = 'completed'
+                    scraping_job.completed_at = timezone.now()
+                elif request.status == 'failed':
+                    scraping_job.status = 'failed'
+                    scraping_job.error_message = request.error_message or 'Scraper request failed'
+                    scraping_job.completed_at = timezone.now()
+                elif request.status == 'pending':
+                    # Keep as processing if still pending
+                    scraping_job.status = 'processing'
+                else:
+                    # For any other status, keep as processing
+                    scraping_job.status = 'processing'
+                
+                scraping_job.save()
+                updated_count += 1
+        
+        logger.info(f"Updated {updated_count} ScrapingJob statuses for BatchScraperJob {batch_job_id}")
+        return True
+        
+    except BatchScraperJob.DoesNotExist:
+        logger.error(f"BatchScraperJob with ID {batch_job_id} does not exist")
+        return False
+    except Exception as e:
+        logger.error(f"Error updating ScrapingJob statuses for BatchScraperJob {batch_job_id}: {str(e)}")
+        return False 

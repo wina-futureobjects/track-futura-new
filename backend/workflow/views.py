@@ -477,15 +477,19 @@ class ScrapingRunViewSet(viewsets.ModelViewSet):
                         
                         if success:
                             successful_executions += 1
-                            logger.info(f"Successfully executed batch job {job.batch_job.id} for scraping job {job.id}")
+                            # Job is now processing (sent to BrightData)
+                            # Status will be updated to 'completed' or 'failed' via webhook
+                            logger.info(f"Successfully sent batch job {job.batch_job.id} to BrightData for scraping job {job.id}")
                         else:
                             job.status = 'failed'
                             job.error_message = 'Failed to execute batch job'
+                            job.completed_at = timezone.now()
                             job.save()
                             logger.error(f"Failed to execute batch job {job.batch_job.id} for scraping job {job.id}")
                     else:
                         job.status = 'failed'
                         job.error_message = 'No batch job associated with this scraping job'
+                        job.completed_at = timezone.now()
                         job.save()
                         logger.error(f"No batch job found for scraping job {job.id}")
                         
@@ -495,19 +499,12 @@ class ScrapingRunViewSet(viewsets.ModelViewSet):
                     job.save()
                     logger.error(f"Error executing scraping job {job.id}: {str(e)}")
             
-            # Update run status based on results
-            if successful_executions == 0:
-                scraping_run.status = 'failed'
-            elif successful_executions < pending_jobs.count():
-                scraping_run.status = 'completed'  # Partial success
-            else:
-                scraping_run.status = 'completed'
-            
-            scraping_run.completed_at = timezone.now()
-            scraping_run.save()
+            # Run status will be automatically updated by the ScrapingJob.save() method
+            # based on the status of individual jobs
+            logger.info(f"Scraping run {scraping_run.id} started. Jobs sent to BrightData for processing.")
             
             return Response({
-                'message': f'Scraping run started successfully. {successful_executions}/{pending_jobs.count()} jobs executed.',
+                'message': f'Scraping run started successfully. {successful_executions}/{pending_jobs.count()} jobs sent to BrightData for processing.',
                 'total_jobs': pending_jobs.count(),
                 'successful_executions': successful_executions
             }, status=status.HTTP_200_OK)

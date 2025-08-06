@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 from users.models import Project, PlatformService
 from brightdata_integration.models import BatchScraperJob
 
@@ -68,6 +69,60 @@ class ScrapingRun(models.Model):
         if self.total_jobs == 0:
             return 0
         return int((self.completed_jobs / self.total_jobs) * 100)
+    
+    def update_status_from_jobs(self):
+        """
+        Update the run status based on the status of all jobs in this run
+        """
+        jobs = self.scraping_jobs.all()
+        total_jobs = jobs.count()
+        
+        if total_jobs == 0:
+            self.status = 'pending'
+            return
+        
+        # Count jobs by status
+        pending_jobs = jobs.filter(status='pending').count()
+        processing_jobs = jobs.filter(status='processing').count()
+        completed_jobs = jobs.filter(status='completed').count()
+        failed_jobs = jobs.filter(status='failed').count()
+        cancelled_jobs = jobs.filter(status='cancelled').count()
+        
+        # Update job counts
+        self.total_jobs = total_jobs
+        self.completed_jobs = completed_jobs + failed_jobs + cancelled_jobs
+        self.successful_jobs = completed_jobs
+        self.failed_jobs = failed_jobs
+        
+        # Determine run status based on job statuses
+        if processing_jobs > 0:
+            # If any job is still running, status is 'processing' (in progress)
+            self.status = 'processing'
+        elif pending_jobs > 0:
+            # If any job is still pending, status is 'pending'
+            self.status = 'pending'
+        elif completed_jobs == total_jobs:
+            # All jobs completed successfully
+            self.status = 'completed'
+            if not self.completed_at:
+                self.completed_at = timezone.now()
+        elif failed_jobs == total_jobs:
+            # All jobs failed
+            self.status = 'failed'
+            if not self.completed_at:
+                self.completed_at = timezone.now()
+        elif failed_jobs > 0 and completed_jobs > 0:
+            # Mixed results - some succeeded, some failed
+            self.status = 'completed'  # Partial success
+            if not self.completed_at:
+                self.completed_at = timezone.now()
+        elif cancelled_jobs == total_jobs:
+            # All jobs cancelled
+            self.status = 'cancelled'
+            if not self.completed_at:
+                self.completed_at = timezone.now()
+        
+        self.save()
 
 class ScrapingJob(models.Model):
     """Individual scraping job for each input entry"""
@@ -96,6 +151,15 @@ class ScrapingJob(models.Model):
 
     def __str__(self):
         return f"Job {self.id} - {self.platform} {self.service_type} ({self.status})"
+    
+    def save(self, *args, **kwargs):
+        """Override save to automatically update parent run status"""
+        # Save the job first
+        super().save(*args, **kwargs)
+        
+        # Update the parent run status
+        if self.scraping_run:
+            self.scraping_run.update_status_from_jobs()
 
 class WorkflowTask(models.Model):
     """Model for workflow tasks that manage scraping jobs"""

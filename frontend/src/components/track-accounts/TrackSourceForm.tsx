@@ -34,8 +34,8 @@ const validateServiceUrl = (service: string | null | undefined, url: string | un
       return /^(https?:\/\/)?(www\.)?linkedin\.com\/(in|company)\/[^/?#]+(?:\/)?(?:\?.*)?$/i.test(url);
     
     case 'tiktok_posts':
-      // TikTok posts: URL of the TikTok Discover page with something after /discover/
-      return /^(https?:\/\/)?(www\.)?tiktok\.com\/discover\/[^/?#]+/i.test(url);
+      // TikTok posts: Accepts TikTok profile URLs with @username format
+      return /^(https?:\/\/)?(www\.)?tiktok\.com\/@[a-zA-Z0-9._-]+\/?$/i.test(url);
     
     case 'instagram_posts':
       // Instagram posts: Accepts only valid Instagram profile URLs (1-30 chars, alphanumeric, dot, underscore)
@@ -50,7 +50,7 @@ const validateServiceUrl = (service: string | null | undefined, url: string | un
     
     case 'facebook_comments':
       // Facebook comments: post URL (strict match for post URLs)
-      return /^https?:\/\/(www\.)?facebook\.com\/(?:(?:[a-zA-Z0-9.-]+\/posts\/\d+)|(?:groups\/\d+\/posts\/\d+)|(?:permalink\.php\?story_fbid=\d+&id=\d+)|(?:profile\.php\?id=\d+&[^ ]*story_fbid=\d+)|(?:share\/p\/[a-zA-Z0-9]+))\/?$/i.test(url);
+      return /^https?:\/\/(www\.)?facebook\.com\/(?:(?:[a-zA-Z0-9.-]+\/posts\/[a-zA-Z0-9]+)|(?:groups\/\d+\/posts\/[a-zA-Z0-9]+)|(?:permalink\.php\?story_fbid=\d+&id=\d+)|(?:profile\.php\?id=\d+&[^ ]*story_fbid=\d+)|(?:share\/p\/[a-zA-Z0-9]+))\/?$/i.test(url);
     
     case 'facebook_reels_profile':
       // Facebook reels: profile URL, profile.php?id=, or group URL
@@ -76,7 +76,7 @@ const getServiceValidationMessage = (service: string | null | undefined, url: st
       return 'Please enter a valid LinkedIn profile URL';
     
     case 'tiktok_posts':
-      return 'Please enter the TikTok Discover page URL';
+      return 'Please enter a valid TikTok profile URL (e.g., https://tiktok.com/@username)';
     
     case 'instagram_posts':
       return 'Please enter a valid Instagram profile URL';
@@ -132,7 +132,7 @@ const getServicesForPlatform = (platform: string | null | undefined) => {
 const getServiceLabel = (service: string | null | undefined) => {
   switch (service) {
     case 'linkedin_posts': return 'LinkedIn Profile';
-    case 'tiktok_posts': return 'TikTok Discover';
+    case 'tiktok_posts': return 'TikTok Profile';
     case 'instagram_posts': return 'Instagram Profile';
     case 'instagram_reels': return 'Instagram Profile';
     case 'instagram_comments': return 'Instagram Post';
@@ -146,11 +146,11 @@ const getServiceLabel = (service: string | null | undefined) => {
 const getUrlPlaceholder = (platform: string | null | undefined, service: string | null | undefined) => {
   switch (service) {
     case 'linkedin_posts': return 'https://linkedin.com/in/username';
-    case 'tiktok_posts': return 'https://tiktok.com/discover/...';
+    case 'tiktok_posts': return 'https://tiktok.com/@username';
     case 'instagram_posts': return 'https://instagram.com/username';
     case 'instagram_reels': return 'https://instagram.com/username/';
     case 'instagram_comments': return 'https://instagram.com/p/ABC123xyz/';
-    case 'facebook_comments': return 'https://facebook.com/post-url';
+    case 'facebook_comments': return 'https://facebook.com/username/posts/pfbid...';
     case 'facebook_reels_profile': return 'https://facebook.com/profile-username';
     case 'facebook_pages_posts': return 'https://facebook.com/page-username';
     default: return 'Enter URL...';
@@ -484,12 +484,12 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
               helperText={!formData.name.trim() ? 'Name is required' : ''}
               sx={{
                 '& .MuiFormHelperText-root': {
-                  color: !formData.name.trim() ? '#d32f2f !important' : 'inherit'
+                  color: !formData.name.trim() ? theme.palette.error.main + ' !important' : 'inherit'
                 },
                 '& .MuiOutlinedInput-root': {
                   '&.Mui-error': {
                     '& fieldset': {
-                      borderColor: '#d32f2f !important'
+                      borderColor: theme.palette.error.main + ' !important'
                     }
                   },
                   '&:not(.Mui-error)': {
@@ -560,6 +560,11 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
                     key={service.key}
                     variant={formData.selectedService === service.key ? "contained" : "outlined"}
                     onClick={() => {
+                      // Clear the URL field when service changes to prevent confusion
+                      const currentField = getUrlFieldForService(formData.selectedService);
+                      if (currentField) {
+                        handleFieldChange(currentField as keyof TrackSource, null);
+                      }
                       handleFieldChange('selectedService', service.key);
                     }}
                     sx={{
@@ -605,7 +610,7 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
                 fullWidth
                 label={`${getServiceLabel(formData.selectedService)} URL`}
                 placeholder={getUrlPlaceholder(formData.selectedPlatform, formData.selectedService)}
-                value={getCurrentUrlValue()}
+                value={getCurrentUrlValue() || ''}
                 onChange={(e) => {
                   const value = e.target.value || null;
                   const field = getUrlFieldForService(formData.selectedService);
@@ -614,21 +619,21 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
                 error={hasUrlValidationError()}
                 helperText={getUrlValidationMessage()}
                 sx={{
-                  '& .MuiFormHelperText-root': {
-                    color: hasUrlValidationError() ? '#d32f2f !important' : 'inherit'
+                                  '& .MuiFormHelperText-root': {
+                  color: hasUrlValidationError() ? theme.palette.error.main + ' !important' : 'inherit'
+                },
+                '& .MuiOutlinedInput-root': {
+                  '&.Mui-error': {
+                    '& fieldset': {
+                      borderColor: theme.palette.error.main + ' !important'
+                    }
                   },
-                  '& .MuiOutlinedInput-root': {
-                    '&.Mui-error': {
-                      '& fieldset': {
-                        borderColor: '#d32f2f !important'
-                      }
-                    },
-                    '&:not(.Mui-error)': {
-                      '& fieldset': {
-                        borderColor: '#d0d7de !important'
-                      }
+                  '&:not(.Mui-error)': {
+                    '& fieldset': {
+                      borderColor: '#d0d7de !important'
                     }
                   }
+                }
                 }}
               />
             </Box>

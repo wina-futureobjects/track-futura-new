@@ -746,8 +746,8 @@ const AutomatedBatchScraper = () => {
                               </Tooltip>
                             {run.status === 'pending' && (
                               <Tooltip title="Start Run">
-                                <IconButton
-                                  size="small"
+                                  <IconButton
+                                    size="small"
                                   color="primary"
                                   onClick={async () => {
                                     try {
@@ -759,11 +759,11 @@ const AutomatedBatchScraper = () => {
                                       showSnackbar('Failed to start scraping run', 'error');
                                     }
                                   }}
-                                >
-                                  <PlayArrowIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            )}
+                                  >
+                                    <PlayArrowIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
                               <Tooltip title="Delete">
                                 <IconButton
                                   size="small"
@@ -824,7 +824,7 @@ const AutomatedBatchScraper = () => {
                     onChange={(date) => setConfigForm({ ...configForm, endDate: date })}
                     slotProps={{ textField: { fullWidth: true } }}
                   />
-                </Box>
+                            </Box>
 
                 <FormControlLabel
                   control={
@@ -884,7 +884,7 @@ const AutomatedBatchScraper = () => {
                     onChange={(date) => setGlobalConfigForm({ ...globalConfigForm, endDate: date })}
                     slotProps={{ textField: { fullWidth: true } }}
                   />
-              </Box>
+                            </Box>
 
                 <FormControlLabel
                   control={
@@ -900,14 +900,14 @@ const AutomatedBatchScraper = () => {
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setGlobalConfigDialogOpen(false)}>Cancel</Button>
-            <Button
+                <Button
               onClick={handleGlobalRun}
               variant="contained"
               disabled={creatingGlobalRun || !globalConfigForm.numOfPosts}
               startIcon={creatingGlobalRun ? <CircularProgress size={16} /> : <PlayArrowIcon />}
             >
               {creatingGlobalRun ? 'Creating...' : 'Create Global Run'}
-            </Button>
+                </Button>
           </DialogActions>
         </Dialog>
 
@@ -932,9 +932,10 @@ const AutomatedBatchScraper = () => {
           <Dialog open={!!selectedRun} onClose={() => setSelectedRun(null)} maxWidth="md" fullWidth>
             <DialogTitle>Scraping Run Details: {selectedRun.name}</DialogTitle>
             <DialogContent>
-              <Typography variant="body1" sx={{ mt: 2 }}>
-                Status: <Chip label={selectedRun.status} color={getStatusColor(selectedRun.status)} />
-              </Typography>
+              <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="body1">Status:</Typography>
+                <Chip label={selectedRun.status} color={getStatusColor(selectedRun.status)} />
+              </Box>
               <Typography variant="body1" sx={{ mt: 1 }}>
                 Created At: {new Date(selectedRun.created_at).toLocaleDateString()}
               </Typography>

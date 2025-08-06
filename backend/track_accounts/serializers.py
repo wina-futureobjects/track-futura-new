@@ -14,16 +14,51 @@ class TrackSourceSerializer(serializers.ModelSerializer):
             'project', 'created_at', 'updated_at'
         ]
     
+    def _normalize_service_name(self, service_name):
+        """
+        Normalize service name from frontend format to backend format
+        Frontend sends: instagram_posts, facebook_pages_posts, linkedin_posts, tiktok_posts
+        Backend expects: posts, reels, comments
+        """
+        if not service_name:
+            return service_name
+            
+        # Remove platform prefix and normalize
+        if service_name.startswith('instagram_'):
+            return service_name.replace('instagram_', '')
+        elif service_name.startswith('facebook_'):
+            # Handle facebook_pages_posts -> posts
+            if service_name == 'facebook_pages_posts':
+                return 'posts'
+            elif service_name == 'facebook_reels_profile':
+                return 'reels'
+            else:
+                return service_name.replace('facebook_', '')
+        elif service_name.startswith('linkedin_'):
+            return service_name.replace('linkedin_', '')
+        elif service_name.startswith('tiktok_'):
+            return service_name.replace('tiktok_', '')
+        else:
+            return service_name
+    
     def create(self, validated_data):
         """
-        Custom create method to ensure project ID is properly handled
+        Custom create method to ensure project ID is properly handled and service_name is normalized
         """
+        # Normalize service_name if provided
+        if 'service_name' in validated_data:
+            validated_data['service_name'] = self._normalize_service_name(validated_data['service_name'])
+        
         return super().create(validated_data)
     
     def update(self, instance, validated_data):
         """
-        Custom update method to handle project ID updates
+        Custom update method to handle project ID updates and service_name normalization
         """
+        # Normalize service_name if provided
+        if 'service_name' in validated_data:
+            validated_data['service_name'] = self._normalize_service_name(validated_data['service_name'])
+        
         return super().update(instance, validated_data)
 
 # Keep backward compatibility alias
