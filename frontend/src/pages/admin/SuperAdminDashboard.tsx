@@ -55,6 +55,7 @@ import {
   Cancel as CancelIcon
 } from '@mui/icons-material';
 import { apiFetch } from '../../utils/api';
+import { getCurrentUser } from '../../utils/auth';
 
 interface User {
   id: number;
@@ -69,16 +70,7 @@ interface User {
   };
 }
 
-interface Organization {
-  id: number;
-  name: string;
-  description: string | null;
-  owner: number;
-  owner_name: string;
-  members_count: number;
-  created_at: string;
-  updated_at: string;
-}
+
 
 interface Company {
   id: number;
@@ -126,27 +118,19 @@ interface BrightdataConfigPayload {
 const SuperAdminDashboard = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [users, setUsers] = useState<User[]>([]);
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [openUserDialog, setOpenUserDialog] = useState(false);
-  const [openOrgDialog, setOpenOrgDialog] = useState(false);
   const [openCompanyDialog, setOpenCompanyDialog] = useState(false);
   const [newUser, setNewUser] = useState({
     username: '',
     email: '',
-    role: 'tenant_admin', //Keep default set to user
+    role: 'user',
     company_id: null as number | null,
   });
 
-
-  const [newOrg, setNewOrg] = useState({
-    name: '',
-    description: '',
-    owner_id: 0,
-  });
   const [newCompany, setNewCompany] = useState({
     name: '',
     email: '',
@@ -155,7 +139,7 @@ const SuperAdminDashboard = () => {
   });
   const [error, setError] = useState<string | null>(null);
   
-  // Brightdata configuration dialog state
+  // Scraper configuration dialog state
   const [brightdataDialogOpen, setBrightdataDialogOpen] = useState(false);
   const [brightdataForm, setBrightdataForm] = useState({
     name: '',
@@ -173,8 +157,6 @@ const SuperAdminDashboard = () => {
   const [configToDelete, setConfigToDelete] = useState<number | null>(null);
   const [deleteUserDialogOpen, setDeleteUserDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<number | null>(null);
-  const [deleteOrgDialogOpen, setDeleteOrgDialogOpen] = useState(false);
-  const [orgToDelete, setOrgToDelete] = useState<number | null>(null);
   const [deleteCompanyDialogOpen, setDeleteCompanyDialogOpen] = useState(false);
   const [companyToDelete, setCompanyToDelete] = useState<number | null>(null);
   const [editCompanyDialogOpen, setEditCompanyDialogOpen] = useState(false);
@@ -196,7 +178,6 @@ const SuperAdminDashboard = () => {
     regularUsers: 0,
   });
 
-
   // User edit state
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editUserDialogOpen, setEditUserDialogOpen] = useState(false);
@@ -212,9 +193,9 @@ const SuperAdminDashboard = () => {
     fetchDashboardData();
   }, []);
 
-  // Fetch Brightdata configurations when Brightdata tab is active
+  // Fetch Brightdata configurations when Scrapper Configuration tab is active
   useEffect(() => {
-    if (activeTab === 4) {
+    if (activeTab === 2) {
       fetchBrightdataConfigs();
     }
   }, [activeTab]);
@@ -231,7 +212,7 @@ const SuperAdminDashboard = () => {
       const configsArray = Array.isArray(data) ? data : [];
       setBrightdataConfigs(configsArray);
     } catch (error) {
-      console.error('Error fetching brightdata configs:', error);
+      console.error('Error fetching scraper configs:', error);
     } finally {
       setBrightdataLoading(false);
     }
@@ -358,13 +339,12 @@ const SuperAdminDashboard = () => {
       setLoading(true);
       await Promise.all([
         fetchUsers(),
-        fetchOrganizations(),
         fetchCompanies(),
         fetchStats(),
       ]);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-      setError('Failed to load dashboard data. Please try again.');
+      setError('Failed to load dashboard data.');
     } finally {
       setLoading(false);
     }
@@ -382,21 +362,6 @@ const SuperAdminDashboard = () => {
     } catch (error) {
       console.error('Error fetching users:', error);
       setError('Failed to load users.');
-    }
-  };
-
-  const fetchOrganizations = async () => {
-    try {
-      const response = await apiFetch('/api/admin/organizations/');
-      if (response.ok) {
-        const data = await response.json();
-        setOrganizations(Array.isArray(data) ? data : data.results || []);
-      } else {
-        throw new Error('Failed to fetch organizations');
-      }
-    } catch (error) {
-      console.error('Error fetching organizations:', error);
-      setError('Failed to load organizations.');
     }
   };
 
@@ -501,63 +466,6 @@ const SuperAdminDashboard = () => {
     } catch (error) {
       console.error('Error creating user:', error);
       setError(error instanceof Error ? error.message : 'Failed to create user');
-    }
-  };
-
-  const handleCreateOrganization = async () => {
-    try {
-      const response = await apiFetch('/api/admin/organizations/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newOrg),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        
-        // Handle different types of error responses
-        let errorMessage = 'Failed to create organization';
-        
-        if (errorData.error) {
-          errorMessage = errorData.error;
-        } else if (errorData.detail) {
-          errorMessage = errorData.detail;
-        } else if (errorData.message) {
-          errorMessage = errorData.message;
-        } else if (errorData.non_field_errors) {
-          errorMessage = errorData.non_field_errors.join(', ');
-        } else if (typeof errorData === 'object') {
-          // Handle field-specific validation errors
-          const fieldErrors = Object.entries(errorData)
-            .map(([field, errors]) => {
-              if (Array.isArray(errors)) {
-                return `${field}: ${errors.join(', ')}`;
-              }
-              return `${field}: ${errors}`;
-            })
-            .join('; ');
-          
-          if (fieldErrors) {
-            errorMessage = fieldErrors;
-          }
-        }
-        
-        throw new Error(errorMessage);
-      }
-
-      setOpenOrgDialog(false);
-      fetchOrganizations();
-      fetchStats(); // Refresh stats after creating organization
-      setNewOrg({
-        name: '',
-        description: '',
-        owner_id: 0,
-      });
-    } catch (error) {
-      console.error('Error creating organization:', error);
-      setError(error instanceof Error ? error.message : 'Failed to create organization');
     }
   };
 
@@ -675,39 +583,6 @@ const SuperAdminDashboard = () => {
     setUserToDelete(null);
   };
 
-  const handleDeleteOrganizationClick = (orgId: number) => {
-    setOrgToDelete(orgId);
-    setDeleteOrgDialogOpen(true);
-  };
-
-  const handleConfirmDeleteOrganization = async () => {
-    if (orgToDelete === null) return;
-    
-    try {
-      const response = await apiFetch(`/api/admin/organizations/${orgToDelete}/`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete organization');
-      }
-
-      fetchOrganizations();
-      setSuccessMessage('Organization deleted successfully');
-    } catch (error) {
-      console.error('Error deleting organization:', error);
-      setError('Failed to delete organization');
-    } finally {
-      setDeleteOrgDialogOpen(false);
-      setOrgToDelete(null);
-    }
-  };
-
-  const handleCancelDeleteOrganization = () => {
-    setDeleteOrgDialogOpen(false);
-    setOrgToDelete(null);
-  };
-
   const handleDeleteCompanyClick = (companyId: number) => {
     setCompanyToDelete(companyId);
     setDeleteCompanyDialogOpen(true);
@@ -795,6 +670,16 @@ const SuperAdminDashboard = () => {
 
   const handleConfirmRoleChange = async () => {
     if (pendingRoleChange) {
+      const currentUser = getCurrentUser();
+      
+      // Check if the user is trying to change their own role
+      if (currentUser && currentUser.id === pendingRoleChange.userId) {
+        setError('You cannot change your own role.');
+        setRoleChangeDialogOpen(false);
+        setPendingRoleChange(null);
+        return;
+      }
+      
       await handleChangeUserRole(pendingRoleChange.userId, pendingRoleChange.newRole);
       setRoleChangeDialogOpen(false);
       setPendingRoleChange(null);
@@ -843,6 +728,16 @@ const SuperAdminDashboard = () => {
 
   const handleConfirmStatusChange = async () => {
     if (pendingStatusChange) {
+      const currentUser = getCurrentUser();
+      
+      // Check if the user is trying to change their own status
+      if (currentUser && currentUser.id === pendingStatusChange.userId) {
+        setError('You cannot change your own status.');
+        setStatusChangeDialogOpen(false);
+        setPendingStatusChange(null);
+        return;
+      }
+      
       await handleChangeUserStatus(pendingStatusChange.userId, pendingStatusChange.newStatus);
       setStatusChangeDialogOpen(false);
       setPendingStatusChange(null);
@@ -858,7 +753,7 @@ const SuperAdminDashboard = () => {
     setNewUser({
       username: '',
       email: '',
-      role: 'tenant_admin',
+      role: 'user',
       company_id: null,
     });
   };
@@ -873,12 +768,6 @@ const SuperAdminDashboard = () => {
     
     return matchesSearch && matchesRoleFilter;
   });
-
-  const filteredOrganizations = organizations.filter(org => 
-    org.name.toLowerCase().includes(search.toLowerCase()) ||
-    (org.description && org.description.toLowerCase().includes(search.toLowerCase())) ||
-    org.owner_name.toLowerCase().includes(search.toLowerCase())
-  );
 
   const filteredCompanies = companies.filter(company => 
     company.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -1120,7 +1009,7 @@ const SuperAdminDashboard = () => {
         <Typography variant="h3" component="h1" fontWeight="500">
           Super Admin Dashboard
         </Typography>
-        <Box sx={{ width: 200 }} /> {/* Spacer to match the button width in OrganizationsList */}
+        <Box sx={{ width: 200 }} />
       </Box>
 
       {/* Stats Cards */}
@@ -1223,14 +1112,13 @@ const SuperAdminDashboard = () => {
         <Tabs value={activeTab} onChange={handleTabChange} centered>
           <Tab label="Company" />
           <Tab label="Users" />
-          <Tab label="Organizations" />
+          <Tab label="Scraper Configuration" />
           <Tab label="System Settings" />
-          <Tab label="Brightdata Configuration" />
         </Tabs>
       </Paper>
 
-      {/* Search and Add Button - Only for Companies, Users, and Organizations tabs */}
-      {(activeTab === 0 || activeTab === 1 || activeTab === 2) && (
+      {/* Search and Add Button - Only for Companies and Users tabs */}
+      {(activeTab === 0 || activeTab === 1) && (
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
             {activeTab === 1 && (
@@ -1283,15 +1171,6 @@ const SuperAdminDashboard = () => {
             }}
             >
               Add User
-            </Button>
-          )}
-          {activeTab === 2 && (
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => setOpenOrgDialog(true)}
-            >
-              Add Organization
             </Button>
           )}
         </Box>
@@ -1473,87 +1352,14 @@ const SuperAdminDashboard = () => {
         </TableContainer>
       )}
 
-      {/* Organizations Tab */}
+      {/* Scrapper Configuration Tab */}
       {activeTab === 2 && (
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>ID</TableCell>
-                <TableCell>Name</TableCell>
-                <TableCell>Description</TableCell>
-                <TableCell>Owner</TableCell>
-                <TableCell>Members</TableCell>
-                <TableCell>Created</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredOrganizations.length > 0 ? (
-                filteredOrganizations.map((org) => (
-                  <TableRow key={org.id}>
-                    <TableCell>{org.id}</TableCell>
-                    <TableCell>{org.name}</TableCell>
-                    <TableCell>{org.description || 'N/A'}</TableCell>
-                    <TableCell>{org.owner_name}</TableCell>
-                    <TableCell>{org.members_count}</TableCell>
-                    <TableCell>{new Date(org.created_at).toLocaleDateString()}</TableCell>
-                    <TableCell align="right">
-                      <IconButton 
-                        sx={{ 
-                          color: '#d32f2f',
-                          '&:hover': {
-                            backgroundColor: '#f44336',
-                            color: 'white'
-                          }
-                        }}
-                        onClick={() => handleDeleteOrganizationClick(org.id)}
-                        size="small"
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={7} align="center">
-                    No organizations found
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      )}
-
-
-
-      {/* System Settings Tab */}
-      {activeTab === 3 && (
-        <Paper sx={{ p: 3 }}>
-          <Typography variant="h6" gutterBottom>System Settings</Typography>
-          <Typography variant="body1" color="text.secondary" paragraph>
-            This section is under development. It will include settings for:
-          </Typography>
-          <ul>
-            <li>Email configuration</li>
-            <li>Storage settings</li>
-            <li>Security policies</li>
-            <li>API rate limits</li>
-            <li>Backup and maintenance</li>
-          </ul>
-        </Paper>
-      )}
-
-      {/* Brightdata API Tab */}
-      {activeTab === 4 && (
         <Box>
           <Typography variant="h4" gutterBottom component="h1">
-            Brightdata API Configuration
+            Scrapper Configuration
           </Typography>
           <Typography variant="body1" color="text.secondary" paragraph sx={{ mb: 3 }}>
-            Manage your platform-specific Brightdata API configurations for automated data scraping. Each platform requires its own configuration with a unique dataset ID.
+            Manage your platform-specific Scraper configurations for automated data scraping. Each platform requires its own configuration with a unique dataset ID.
           </Typography>
 
           {/* Platform Overview Cards */}
@@ -1569,7 +1375,7 @@ const SuperAdminDashboard = () => {
                 Platform-Specific Configurations
               </Typography>
               <Typography variant="body1" sx={{ mb: 3, color: '#6c757d', lineHeight: 1.6 }}>
-                The automated batch scraper requires separate Brightdata configurations for each social media platform. 
+                The automated batch scraper requires separate Scraper configurations for each social media platform. 
                 Each platform uses different dataset structures and may require different API tokens.
               </Typography>
               
@@ -1661,7 +1467,7 @@ const SuperAdminDashboard = () => {
               <Box sx={{ mt: 3, p: 2, backgroundColor: '#f8f9fa', borderRadius: 1, border: '1px solid #e9ecef' }}>
                 <Typography variant="body2" sx={{ color: '#6c757d', textAlign: 'center' }}>
                   💡 <strong>Tip:</strong> Configure at least one platform to enable automated data scraping. 
-                  Each platform requires a unique Brightdata dataset ID and API token.
+                  Each platform requires a unique Scraper dataset ID and API token.
                 </Typography>
               </Box>
             </CardContent>
@@ -1767,6 +1573,23 @@ const SuperAdminDashboard = () => {
         </Box>
       )}
 
+      {/* System Settings Tab */}
+      {activeTab === 3 && (
+        <Paper sx={{ p: 3 }}>
+          <Typography variant="h6" gutterBottom>System Settings</Typography>
+          <Typography variant="body1" color="text.secondary" paragraph>
+            This section is under development. It will include settings for:
+          </Typography>
+          <ul>
+            <li>Email configuration</li>
+            <li>Storage settings</li>
+            <li>Security policies</li>
+            <li>API rate limits</li>
+            <li>Backup and maintenance</li>
+          </ul>
+        </Paper>
+      )}
+
              {/* Create User Dialog */}
        <Dialog open={openUserDialog} onClose={() => setOpenUserDialog(false)} maxWidth="sm" fullWidth>
          <DialogTitle>Create New User</DialogTitle>
@@ -1838,52 +1661,6 @@ const SuperAdminDashboard = () => {
             setOpenUserDialog(false);
           }}>Cancel</Button>
           <Button onClick={handleCreateUser} variant="contained" color="primary">
-            Create
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Create Organization Dialog */}
-      <Dialog open={openOrgDialog} onClose={() => setOpenOrgDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Create New Organization</DialogTitle>
-        <DialogContent>
-          <TextField
-            label="Organization Name"
-            fullWidth
-            margin="normal"
-            value={newOrg.name}
-            onChange={(e) => setNewOrg({ ...newOrg, name: e.target.value })}
-            required
-          />
-          <TextField
-            label="Description"
-            fullWidth
-            margin="normal"
-            multiline
-            rows={3}
-            value={newOrg.description}
-            onChange={(e) => setNewOrg({ ...newOrg, description: e.target.value })}
-          />
-          <FormControl fullWidth margin="normal">
-            <InputLabel>Owner</InputLabel>
-            <Select
-              value={newOrg.owner_id || ''}
-              label="Owner"
-              onChange={(e) => setNewOrg({ ...newOrg, owner_id: Number(e.target.value) })}
-            >
-              {users
-                .filter(user => user.global_role?.role === 'tenant_admin' || user.global_role?.role === 'super_admin')
-                .map(user => (
-                  <MenuItem key={user.id} value={user.id}>
-                    {user.username} ({user.email}) - {user.global_role?.role_display}
-                  </MenuItem>
-                ))}
-            </Select>
-          </FormControl>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenOrgDialog(false)}>Cancel</Button>
-          <Button onClick={handleCreateOrganization} variant="contained" color="primary">
             Create
           </Button>
         </DialogActions>
@@ -1989,14 +1766,14 @@ const SuperAdminDashboard = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Brightdata Configuration Dialog */}
+      {/* Scraper Configuration Dialog */}
       <Dialog open={brightdataDialogOpen} onClose={() => setBrightdataDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{editConfigId !== null ? 'Edit Configuration' : 'Add New Brightdata Configuration'}</DialogTitle>
+        <DialogTitle>{editConfigId !== null ? 'Edit Configuration' : 'Add New Scraper Configuration'}</DialogTitle>
         <DialogContent>
           <DialogContentText sx={{ mb: 2 }}>
             {editConfigId !== null 
-              ? 'Edit your Brightdata API configuration. API tokens are securely stored and will not be displayed.'
-              : 'Create a new Brightdata API configuration for data scraping. API tokens are securely stored and encrypted.'
+              ? 'Edit your Scraper configuration. API tokens are securely stored and will not be displayed.'
+              : 'Create a new Scraper configuration for data scraping. API tokens are securely stored and encrypted.'
             }
           </DialogContentText>
           <TextField
@@ -2125,7 +1902,7 @@ const SuperAdminDashboard = () => {
           />
           <TextField
             margin="dense"
-            label="Brightdata API Token"
+            label="API Token"
             type="password"
             fullWidth
             value={brightdataForm.apiToken}
@@ -2217,7 +1994,7 @@ const SuperAdminDashboard = () => {
          </Snackbar>
        )}
 
-             {/* Delete Confirmation Dialog for Brightdata Configurations */}
+             {/* Delete Confirmation Dialog for Scraper Configurations */}
        <Dialog
          open={deleteDialogOpen}
          onClose={handleCancelDelete}
@@ -2262,25 +2039,6 @@ const SuperAdminDashboard = () => {
              }}
            >
              Delete User
-           </Button>
-         </DialogActions>
-       </Dialog>
-
-       {/* Delete Organization Confirmation Dialog */}
-       <Dialog
-         open={deleteOrgDialogOpen}
-         onClose={handleCancelDeleteOrganization}
-       >
-         <DialogTitle>Confirm Organization Deletion</DialogTitle>
-         <DialogContent>
-           <DialogContentText>
-             Are you sure you want to delete this organization? This action cannot be undone and will permanently remove the organization and all associated data.
-           </DialogContentText>
-         </DialogContent>
-         <DialogActions>
-           <Button onClick={handleCancelDeleteOrganization}>Cancel</Button>
-           <Button onClick={handleConfirmDeleteOrganization} color="error" variant="contained">
-             Delete Organization
            </Button>
          </DialogActions>
        </Dialog>
