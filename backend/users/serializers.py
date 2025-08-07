@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
-from .models import UserProfile, Project, Organization, OrganizationMembership, UserRole, Platform, Service, PlatformService, Company
+from .models import UserProfile, Project, Organization, OrganizationMembership, UserRole, Platform, Service, PlatformService, Company, UnifiedUserRecord
 
 class UserRoleSerializer(serializers.ModelSerializer):
     role_display = serializers.CharField(source='get_role_display', read_only=True)
@@ -18,17 +18,28 @@ class UserSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'global_role', 'is_active', 'company_name', 'company_id']
-        read_only_fields = ['id', 'global_role', 'company_name', 'company_id']
+        fields = ['id', 'username', 'email', 'global_role', 'is_active', 'company_name', 'company_id', 'date_joined']
+        read_only_fields = ['id', 'global_role', 'company_name', 'company_id', 'date_joined']
+        # Explicitly exclude first_name and last_name fields
+        extra_kwargs = {
+            'first_name': {'write_only': False, 'read_only': True},
+            'last_name': {'write_only': False, 'read_only': True}
+        }
     
     def get_company_name(self, obj):
-        if hasattr(obj, 'profile') and obj.profile.company:
-            return obj.profile.company.name
+        try:
+            if hasattr(obj, 'profile') and obj.profile and obj.profile.company:
+                return obj.profile.company.name
+        except Exception:
+            pass
         return None
     
     def get_company_id(self, obj):
-        if hasattr(obj, 'profile') and obj.profile.company:
-            return obj.profile.company.id
+        try:
+            if hasattr(obj, 'profile') and obj.profile and obj.profile.company:
+                return obj.profile.company.id
+        except Exception:
+            pass
         return None
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -51,6 +62,11 @@ class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ('username', 'password', 'password2', 'email', 'role')
+        # Explicitly exclude first_name and last_name fields
+        extra_kwargs = {
+            'first_name': {'write_only': False, 'read_only': True},
+            'last_name': {'write_only': False, 'read_only': True}
+        }
 
     def validate(self, attrs):
         if attrs['password'] != attrs['password2']:
@@ -60,18 +76,29 @@ class RegisterSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         role = validated_data.pop('role', 'user')
         
+        # Only create user with required fields (username, email)
         user = User.objects.create(
             username=validated_data['username'],
-            email=validated_data['email']
+            email=validated_data['email'],
+            # Explicitly set first_name and last_name to empty strings to avoid any issues
+            first_name='',
+            last_name=''
         )
         user.set_password(validated_data['password'])
         user.save()
         
-        # Create profile for user
-        UserProfile.objects.create(user=user)
+        # Create or update profile for user
+        UserProfile.objects.get_or_create(user=user)
         
-        # Create global role for user
-        UserRole.objects.create(user=user, role=role)
+        # Create or update global role for user
+        user_role, created = UserRole.objects.get_or_create(
+            user=user,
+            defaults={'role': role}
+        )
+        if not created:
+            # Update existing role
+            user_role.role = role
+            user_role.save()
         
         return user
 
@@ -89,19 +116,24 @@ class AdminUserCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ('username', 'email', 'role', 'company_id')
+        # Explicitly exclude first_name and last_name fields
+        extra_kwargs = {
+            'first_name': {'write_only': False, 'read_only': True},
+            'last_name': {'write_only': False, 'read_only': True}
+        }
     
     def validate(self, attrs):
         role = attrs.get('role', 'user')
         company = attrs.get('company')
         
-        # Super admin role must be assigned to futureobjects company
+        # Super admin role must be assigned to Future Objects company
         if role == 'super_admin':
             try:
-                futureobjects_company = Company.objects.get(name__iexact='futureobjects', status='active')
+                futureobjects_company = Company.objects.get(name__iexact='Future Objects', status='active')
                 attrs['company'] = futureobjects_company
             except Company.DoesNotExist:
                 raise serializers.ValidationError({
-                    'company_id': 'Super admin users must be assigned to the FutureObjects company. Please create the FutureObjects company first.'
+                    'company_id': 'Super admin users must be assigned to the Future Objects company. Please create the Future Objects company first.'
                 })
         elif not company:
             raise serializers.ValidationError({
@@ -118,18 +150,36 @@ class AdminUserCreateSerializer(serializers.ModelSerializer):
         from django.utils.crypto import get_random_string
         password = get_random_string(16, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*')
         
+        # Only create user with required fields (username, email)
         user = User.objects.create(
             username=validated_data['username'],
-            email=validated_data['email']
+            email=validated_data['email'],
+            # Explicitly set first_name and last_name to empty strings to avoid any issues
+            first_name='',
+            last_name=''
         )
         user.set_password(password)
         user.save()
         
-        # Create profile for user with company assignment
-        UserProfile.objects.create(user=user, company=company)
+        # Create or update profile for user with company assignment
+        user_profile, created = UserProfile.objects.get_or_create(
+            user=user,
+            defaults={'company': company}
+        )
+        if not created:
+            # Update existing profile with company
+            user_profile.company = company
+            user_profile.save()
         
-        # Create global role for user
-        UserRole.objects.create(user=user, role=role)
+        # Create or update global role for user
+        user_role, created = UserRole.objects.get_or_create(
+            user=user,
+            defaults={'role': role}
+        )
+        if not created:
+            # Update existing role
+            user_role.role = role
+            user_role.save()
         
         # Store password for email notification
         user._generated_password = password
@@ -150,6 +200,11 @@ class AdminUserUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ('username', 'email', 'role', 'is_active', 'company_id')
+        # Explicitly exclude first_name and last_name fields
+        extra_kwargs = {
+            'first_name': {'write_only': False, 'read_only': True},
+            'last_name': {'write_only': False, 'read_only': True}
+        }
     
     def validate(self, attrs):
         # Check if username is being changed and if it's already taken
@@ -176,15 +231,52 @@ class AdminUserUpdateSerializer(serializers.ModelSerializer):
                     'role': 'You cannot change your own role'
                 })
         
+        # Enforce super admin company assignment rules
+        role = attrs.get('role')
+        company = attrs.get('company')
+        
+        # If role is being changed to super_admin, enforce Future Objects company
+        if role == 'super_admin':
+            try:
+                futureobjects_company = Company.objects.get(name__iexact='Future Objects', status='active')
+                attrs['company'] = futureobjects_company
+            except Company.DoesNotExist:
+                raise serializers.ValidationError({
+                    'role': 'Super admin users must be assigned to the Future Objects company. Please create the Future Objects company first.'
+                })
+        # If role is being changed from super_admin to something else, allow company change
+        elif role is not None and hasattr(self.instance, 'global_role') and self.instance.global_role.role == 'super_admin':
+            # User is being changed from super_admin to another role, allow company assignment
+            pass
+        # If company is being changed for a super_admin user, enforce Future Objects
+        elif company is not None and hasattr(self.instance, 'global_role') and self.instance.global_role.role == 'super_admin':
+            try:
+                futureobjects_company = Company.objects.get(name__iexact='Future Objects', status='active')
+                if company.id != futureobjects_company.id:
+                    raise serializers.ValidationError({
+                        'company_id': 'Super admin users can only be assigned to the Future Objects company.'
+                    })
+            except Company.DoesNotExist:
+                raise serializers.ValidationError({
+                    'company_id': 'Super admin users must be assigned to the Future Objects company. Please create the Future Objects company first.'
+                })
+        
         return attrs
     
     def update(self, instance, validated_data):
-        company = validated_data.pop('company', None)
+        # Only pop company if it's actually in the validated_data
+        company = None
+        if 'company' in validated_data:
+            company = validated_data.pop('company')
+        
         role = validated_data.pop('role', None)
         
-        # Update user fields
+        # Update only the required user fields (username, email, is_active)
+        # Explicitly exclude first_name and last_name from updates
+        allowed_fields = ['username', 'email', 'is_active']
         for attr, value in validated_data.items():
-            setattr(instance, attr, value)
+            if attr in allowed_fields:
+                setattr(instance, attr, value)
         instance.save()
         
         # Update user role if provided
@@ -193,12 +285,16 @@ class AdminUserUpdateSerializer(serializers.ModelSerializer):
             user_role.role = role
             user_role.save()
         
-        # Update user profile company
-        if hasattr(instance, 'profile'):
-            instance.profile.company = company
-            instance.profile.save()
-        else:
-            UserProfile.objects.create(user=instance, company=company)
+        # Update user profile company ONLY if company was explicitly provided in the request
+        if company is not None:
+            user_profile, created = UserProfile.objects.get_or_create(
+                user=instance,
+                defaults={'company': company}
+            )
+            if not created:
+                # Update existing profile with company
+                user_profile.company = company
+                user_profile.save()
         
         return instance
 
@@ -337,17 +433,33 @@ class PlatformServiceCreateSerializer(serializers.ModelSerializer):
 
 class CompanySerializer(serializers.ModelSerializer):
     """Serializer for Company model"""
-    created_by_name = serializers.SerializerMethodField()
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     
     class Meta:
         model = Company
         fields = [
-            'id', 'name', 'email', 'status', 'status_display', 'phone', 'address', 'website',
-            'industry', 'size', 'description', 'notes', 'contact_person', 'contact_email',
-            'contact_phone', 'created_at', 'updated_at', 'created_by', 'created_by_name'
+            'id', 'name', 'status', 'status_display', 'description', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'created_by', 'created_by_name']
+        read_only_fields = ['id', 'created_at', 'updated_at'] 
+
+class UnifiedUserRecordSerializer(serializers.ModelSerializer):
+    """Serializer for UnifiedUserRecord model"""
+    company_name = serializers.CharField(source='company.name', read_only=True)
+    role_display = serializers.CharField(source='get_role_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    username = serializers.CharField(source='user.username', read_only=True)
     
-    def get_created_by_name(self, obj):
-        return obj.created_by.username if obj.created_by else None 
+    class Meta:
+        model = UnifiedUserRecord
+        fields = [
+            'id', 'name', 'email', 'company', 'company_name', 
+            'role', 'role_display', 'status', 'status_display',
+            'username', 'created_date', 'updated_date'
+        ]
+        read_only_fields = ['id', 'created_date', 'updated_date', 'company_name', 'role_display', 'status_display', 'username']
+    
+    def to_representation(self, instance):
+        """Custom representation to include additional computed fields"""
+        data = super().to_representation(instance)
+        data['display_name'] = instance.display_name
+        return data 

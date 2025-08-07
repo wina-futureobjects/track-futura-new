@@ -28,19 +28,21 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import (
     UserProfile, Project, Organization, OrganizationMembership, 
-    UserRole, Platform, Service, PlatformService, Company
+    UserRole, Platform, Service, PlatformService, Company, UnifiedUserRecord
 )
 from .serializers import (
     UserProfileSerializer, ProjectSerializer, OrganizationSerializer,
     OrganizationMembershipSerializer, UserRoleSerializer,
     PlatformSerializer, ServiceSerializer, PlatformServiceSerializer,
-    PlatformServiceCreateSerializer, CompanySerializer, AdminUserCreateSerializer
+    PlatformServiceCreateSerializer, CompanySerializer, AdminUserCreateSerializer,
+    UnifiedUserRecordSerializer
 )
 from .permissions import IsSuperAdmin
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.crypto import get_random_string
 from django.conf import settings
+from django.db.models import Count
 
 # Create your views here.
 
@@ -666,7 +668,7 @@ class AdminUserViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsSuperAdmin]
     
     def get_queryset(self):
-        return User.objects.all().order_by('-date_joined')
+        return User.objects.select_related('profile__company', 'global_role').order_by('-date_joined')
     
     def get_serializer_class(self):
         if self.action == 'create':
@@ -745,7 +747,10 @@ class AdminUserViewSet(viewsets.ModelViewSet):
             user_role.role = new_role
             user_role.save()
         
-        return Response({'message': 'User role updated successfully'})
+        # Return the updated user data with role and company information
+        # Force a fresh query to get the updated user with all related data
+        updated_user = User.objects.select_related('profile__company', 'global_role').get(id=user.id)
+        return Response(UserSerializer(updated_user).data)
     
     def update(self, request, *args, **kwargs):
         """Update user with protection against self-deactivation and self-role-change"""
@@ -765,7 +770,12 @@ class AdminUserViewSet(viewsets.ModelViewSet):
                     'error': 'You cannot change your own role'
                 }, status=status.HTTP_400_BAD_REQUEST)
         
-        return super().update(request, *args, **kwargs)
+        response = super().update(request, *args, **kwargs)
+        
+        # Return the updated user data with role and company information
+        # Force a fresh query to get the updated user with all related data
+        updated_user = User.objects.select_related('profile__company', 'global_role').get(id=user.id)
+        return Response(UserSerializer(updated_user).data)
     
     def partial_update(self, request, *args, **kwargs):
         """Partial update user with protection against self-deactivation and self-role-change"""
@@ -785,7 +795,12 @@ class AdminUserViewSet(viewsets.ModelViewSet):
                     'error': 'You cannot change your own role'
                 }, status=status.HTTP_400_BAD_REQUEST)
         
-        return super().partial_update(request, *args, **kwargs)
+        response = super().partial_update(request, *args, **kwargs)
+        
+        # Return the updated user data with role and company information
+        # Force a fresh query to get the updated user with all related data
+        updated_user = User.objects.select_related('profile__company', 'global_role').get(id=user.id)
+        return Response(UserSerializer(updated_user).data)
     
     def destroy(self, request, *args, **kwargs):
         """Delete user"""
@@ -884,6 +899,227 @@ class AdminCompanyViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         return Company.objects.all().order_by('-created_at')
+
+
+class UnifiedUserRecordViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for UnifiedUserRecord model.
+    Provides a unified view of user information from User, UserRole, and UserProfile models.
+    """
+    queryset = UnifiedUserRecord.objects.select_related('user', 'company').all()
+    serializer_class = UnifiedUserRecordSerializer
+    permission_classes = [IsAuthenticated]
+    filterset_fields = ['role', 'status', 'company']
+    search_fields = ['name', 'email', 'user__username', 'company__name']
+    ordering_fields = ['name', 'email', 'role', 'status', 'created_date', 'updated_date']
+    ordering = ['-created_date']
+    
+    def get_queryset(self):
+        """Filter queryset based on user permissions"""
+        queryset = super().get_queryset()
+        
+        # Super admins can see all records
+        if self.request.user.is_superuser:
+            return queryset
+        
+        # Tenant admins can see users in their organization
+        try:
+            user_role = self.request.user.global_role
+            if user_role.role == 'tenant_admin':
+                # Filter by organization/company if needed
+                return queryset
+        except UserRole.DoesNotExist:
+            pass
+        
+        # Regular users can only see their own record
+        return queryset.filter(user=self.request.user)
     
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        """Create unified record and sync with related models"""
+        unified_record = serializer.save()
+        
+        # Sync with User model
+        user = unified_record.user
+        if unified_record.name:
+            name_parts = unified_record.name.split()
+            user.first_name = name_parts[0] if name_parts else ''
+            user.last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ''
+        
+        if unified_record.email:
+            user.email = unified_record.email
+        
+        # Sync status with User.is_active
+        if unified_record.status == 'active':
+            user.is_active = True
+        elif unified_record.status == 'inactive':
+            user.is_active = False
+        
+        user.save()
+        
+        # Create/update UserRole
+        user_role, created = UserRole.objects.get_or_create(user=user)
+        user_role.role = unified_record.role
+        user_role.save()
+        
+        # Create/update UserProfile
+        user_profile, created = UserProfile.objects.get_or_create(user=user)
+        user_profile.company = unified_record.company
+        user_profile.save()
+        
+        print(f"Created unified record for user {user.username} and synced with related models")
+    
+    def update(self, request, *args, **kwargs):
+        """Override update to ensure proper synchronization"""
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        
+        # Save the unified record
+        unified_record = serializer.save()
+        
+        # Sync with related models
+        self._sync_with_related_models(unified_record)
+        
+        if getattr(instance, '_prefetched_objects_cache', None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+        
+        return Response(serializer.data)
+    
+    def partial_update(self, request, *args, **kwargs):
+        """Override partial_update to ensure proper synchronization"""
+        kwargs['partial'] = True
+        return self.update(request, *args, **kwargs)
+    
+    def _sync_with_related_models(self, unified_record):
+        """Helper method to sync unified record with related models"""
+        user = unified_record.user
+        
+        # Sync with User model
+        if unified_record.name:
+            name_parts = unified_record.name.split()
+            user.first_name = name_parts[0] if name_parts else ''
+            user.last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ''
+        
+        if unified_record.email:
+            user.email = unified_record.email
+        
+        # Sync status with User.is_active
+        if unified_record.status == 'active':
+            user.is_active = True
+        elif unified_record.status == 'inactive':
+            user.is_active = False
+        
+        user.save()
+        
+        # Update UserRole
+        try:
+            user_role = user.global_role
+            user_role.role = unified_record.role
+            user_role.save()
+        except UserRole.DoesNotExist:
+            UserRole.objects.create(user=user, role=unified_record.role)
+        
+        # Update UserProfile
+        try:
+            user_profile = user.profile
+            user_profile.company = unified_record.company
+            user_profile.save()
+        except UserProfile.DoesNotExist:
+            UserProfile.objects.create(user=user, company=unified_record.company)
+        
+        print(f"Synced unified record for user {user.username} with related models")
+    
+    def perform_update(self, serializer):
+        """Update unified record and sync with related models"""
+        unified_record = serializer.save()
+        
+        # Sync with related models
+        self._sync_with_related_models(unified_record)
+    
+    def perform_destroy(self, instance):
+        """Delete unified record and handle related models"""
+        user = instance.user
+        username = user.username
+        
+        # Delete the unified record
+        instance.delete()
+        
+        # Note: We don't delete the User, UserRole, or UserProfile here
+        # as they might be needed for other purposes
+        # The unified record is just a view, not the source of truth
+        
+        print(f"Deleted unified record for user {username}")
+    
+    @action(detail=False, methods=['get'])
+    def statistics(self, request):
+        """Get statistics about unified user records"""
+        queryset = self.get_queryset()
+        
+        stats = {
+            'total_users': queryset.count(),
+            'active_users': queryset.filter(status='active').count(),
+            'inactive_users': queryset.filter(status='inactive').count(),
+            'role_distribution': queryset.values('role').annotate(
+                count=Count('id')
+            ),
+            'status_distribution': queryset.values('status').annotate(
+                count=Count('id')
+            ),
+            'company_distribution': queryset.values('company__name').annotate(
+                count=Count('id')
+            ).exclude(company__name__isnull=True)
+        }
+        
+        return Response(stats)
+    
+    @action(detail=True, methods=['post'])
+    def sync_with_related_models(self, request, pk=None):
+        """Manually sync unified record with related models"""
+        try:
+            unified_record = self.get_object()
+            
+            # Sync with related models
+            self._sync_with_related_models(unified_record)
+            
+            return Response({
+                'message': f'Successfully synced unified record for user {unified_record.user.username}',
+                'user_id': unified_record.user.id,
+                'username': unified_record.user.username
+            })
+            
+        except Exception as e:
+            return Response({
+                'error': f'Failed to sync: {str(e)}'
+            }, status=400)
+    
+    @action(detail=False, methods=['post'])
+    def sync_all_records(self, request):
+        """Sync all unified records with their related models"""
+        try:
+            unified_records = self.get_queryset()
+            synced_count = 0
+            errors = []
+            
+            for unified_record in unified_records:
+                try:
+                    self._sync_with_related_models(unified_record)
+                    synced_count += 1
+                except Exception as e:
+                    errors.append(f"User {unified_record.user.username}: {str(e)}")
+            
+            return Response({
+                'message': f'Successfully synced {synced_count} unified records',
+                'synced_count': synced_count,
+                'total_records': unified_records.count(),
+                'errors': errors if errors else None
+            })
+            
+        except Exception as e:
+            return Response({
+                'error': f'Failed to sync all records: {str(e)}'
+            }, status=400)
+    
+

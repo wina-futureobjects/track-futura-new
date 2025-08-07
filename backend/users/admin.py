@@ -11,7 +11,8 @@ from .models import (
     Platform,
     Service,
     PlatformService,
-    Company
+    Company,
+    UnifiedUserRecord
 )
 
 # UserRole Admin
@@ -158,33 +159,114 @@ class PlatformServiceAdmin(admin.ModelAdmin):
 
 @admin.register(Company)
 class CompanyAdmin(admin.ModelAdmin):
-    list_display = ['name', 'email', 'status', 'contact_person', 'industry', 'created_at']
-    list_filter = ['status', 'industry', 'size', 'created_at']
-    search_fields = ['name', 'email', 'contact_person', 'contact_email', 'description']
+    list_display = ['name', 'status', 'description', 'created_at']
+    list_filter = ['status', 'created_at']
+    search_fields = ['name', 'description']
     readonly_fields = ['created_at', 'updated_at']
     ordering = ['-created_at']
     
     fieldsets = (
         ('Basic Information', {
-            'fields': ('name', 'email', 'status', 'description')
-        }),
-        ('Contact Information', {
-            'fields': ('phone', 'contact_person', 'contact_email', 'contact_phone')
-        }),
-        ('Company Details', {
-            'fields': ('industry', 'size', 'website', 'address')
-        }),
-        ('Additional Information', {
-            'fields': ('notes',),
-            'classes': ('collapse',)
+            'fields': ('name', 'status', 'description')
         }),
         ('Timestamps', {
-            'fields': ('created_at', 'updated_at', 'created_by'),
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(UnifiedUserRecord)
+class UnifiedUserRecordAdmin(admin.ModelAdmin):
+    list_display = ['id', 'name', 'email', 'company', 'role', 'status', 'created_date', 'updated_date']
+    list_filter = ['role', 'status', 'company', 'created_date']
+    search_fields = ['name', 'email', 'user__username', 'company__name']
+    readonly_fields = ['created_date', 'updated_date']
+    ordering = ['-created_date']
+    raw_id_fields = ['user', 'company']
+    
+    fieldsets = (
+        ('User Information', {
+            'fields': ('user', 'name', 'email')
+        }),
+        ('Organization', {
+            'fields': ('company',)
+        }),
+        ('Access Control', {
+            'fields': ('role', 'status')
+        }),
+        ('Timestamps', {
+            'fields': ('created_date', 'updated_date'),
             'classes': ('collapse',)
         }),
     )
     
+    def get_queryset(self, request):
+        """Optimize queryset with select_related for better performance"""
+        return super().get_queryset(request).select_related('user', 'company')
+    
     def save_model(self, request, obj, form, change):
-        if not change:  # Only set created_by for new objects
-            obj.created_by = request.user
+        """Auto-sync with related models when saving"""
         super().save_model(request, obj, form, change)
+        
+        # Update related models if needed
+        if obj.user:
+            # Update User model if name/email changed
+            if obj.name and (obj.user.first_name != obj.name.split()[0] if obj.name.split() else ''):
+                name_parts = obj.name.split()
+                obj.user.first_name = name_parts[0] if name_parts else ''
+                obj.user.last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ''
+                obj.user.save()
+            
+            if obj.email and obj.user.email != obj.email:
+                obj.user.email = obj.email
+                obj.user.save()
+            
+            # Update UserRole if role changed
+            try:
+                user_role = obj.user.global_role
+                if user_role.role != obj.role:
+                    user_role.role = obj.role
+                    user_role.save()
+            except UserRole.DoesNotExist:
+                UserRole.objects.create(user=obj.user, role=obj.role)
+            
+            # Update UserProfile if company changed
+            try:
+                user_profile = obj.user.profile
+                if user_profile.company != obj.company:
+                    user_profile.company = obj.company
+                    user_profile.save()
+            except UserProfile.DoesNotExist:
+                UserProfile.objects.create(user=obj.user, company=obj.company)
+    
+    def delete_model(self, request, obj):
+        """Handle deletion of unified record"""
+        try:
+            # Delete the unified record
+            obj.delete()
+            self.message_user(request, f'Successfully deleted unified record for user: {obj.user.username}')
+        except Exception as e:
+            self.message_user(request, f'Error deleting unified record: {str(e)}', level='ERROR')
+    
+    def delete_queryset(self, request, queryset):
+        """Handle bulk deletion of unified records"""
+        deleted_count = 0
+        for obj in queryset:
+            try:
+                obj.delete()
+                deleted_count += 1
+            except Exception as e:
+                self.message_user(request, f'Error deleting unified record for {obj.user.username}: {str(e)}', level='ERROR')
+        
+        if deleted_count > 0:
+            self.message_user(request, f'Successfully deleted {deleted_count} unified record(s)')
+    
+    actions = ['delete_selected']
+    
+    def get_actions(self, request):
+        """Customize available actions"""
+        actions = super().get_actions(request)
+        if 'delete_selected' in actions:
+            actions['delete_selected'] = self.get_action('delete_selected')
+        return actions

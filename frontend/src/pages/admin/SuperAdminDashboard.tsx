@@ -36,7 +36,7 @@ import {
   Menu,
   Autocomplete,
 } from '@mui/material';
-import Grid from '@mui/material/Grid';
+
 
 
 import {
@@ -64,6 +64,7 @@ interface User {
   is_active: boolean;
   company_name?: string | null;
   company_id?: number | null;
+  date_joined: string;
   global_role?: {
     role: string;
     role_display: string;
@@ -75,23 +76,11 @@ interface User {
 interface Company {
   id: number;
   name: string;
-  email: string;
   status: string;
   status_display: string;
-  phone: string | null;
-  address: string | null;
-  website: string | null;
-  industry: string | null;
-  size: string | null;
   description: string | null;
-  notes: string | null;
-  contact_person: string | null;
-  contact_email: string | null;
-  contact_phone: string | null;
   created_at: string;
   updated_at: string;
-  created_by: number | null;
-  created_by_name: string | null;
 }
 
 interface BrightdataConfig {
@@ -115,6 +104,20 @@ interface BrightdataConfigPayload {
   api_token?: string;
 }
 
+interface UserUpdateFields {
+  username?: string;
+  email?: string;
+  role?: string;
+  is_active?: boolean;
+  company_id?: number | null;
+}
+
+interface CompanyUpdateFields {
+  name?: string;
+  status?: string;
+  description?: string | null;
+}
+
 const SuperAdminDashboard = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [users, setUsers] = useState<User[]>([]);
@@ -133,7 +136,6 @@ const SuperAdminDashboard = () => {
 
   const [newCompany, setNewCompany] = useState({
     name: '',
-    email: '',
     status: 'active',
     description: '',
   });
@@ -161,6 +163,7 @@ const SuperAdminDashboard = () => {
   const [companyToDelete, setCompanyToDelete] = useState<number | null>(null);
   const [editCompanyDialogOpen, setEditCompanyDialogOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [originalCompany, setOriginalCompany] = useState<Company | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [roleMenuAnchor, setRoleMenuAnchor] = useState<null | HTMLElement>(null);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
@@ -168,6 +171,8 @@ const SuperAdminDashboard = () => {
   const [pendingRoleChange, setPendingRoleChange] = useState<{ userId: number; newRole: string } | null>(null);
   const [statusChangeDialogOpen, setStatusChangeDialogOpen] = useState(false);
   const [pendingStatusChange, setPendingStatusChange] = useState<{ userId: number; newStatus: boolean } | null>(null);
+  const [companyStatusChangeDialogOpen, setCompanyStatusChangeDialogOpen] = useState(false);
+  const [pendingCompanyStatusChange, setPendingCompanyStatusChange] = useState<{ companyId: number; oldStatus: string; newStatus: string } | null>(null);
   const [stats, setStats] = useState({
     totalUsers: 0,
     totalOrgs: 0,
@@ -517,7 +522,6 @@ const SuperAdminDashboard = () => {
       fetchStats(); // Refresh stats after creating company
       setNewCompany({
         name: '',
-        email: '',
         status: 'active',
         description: '',
       });
@@ -542,7 +546,27 @@ const SuperAdminDashboard = () => {
         throw new Error('Failed to update user role');
       }
 
-      fetchUsers();
+      // Get the updated user data from the response
+      const updatedUser = await response.json();
+      
+      // Update the user in the local state with the complete updated data
+      setUsers(users.map(user => 
+        user.id === userId 
+          ? { 
+              ...user, 
+              username: updatedUser.username,
+              email: updatedUser.email,
+              is_active: updatedUser.is_active,
+              // Use the company info from the response (could be null if user has no company)
+              company_name: updatedUser.company_name,
+              company_id: updatedUser.company_id,
+              date_joined: updatedUser.date_joined,
+              global_role: updatedUser.global_role
+            }
+          : user
+      ));
+
+      setSuccessMessage('User role updated successfully');
     } catch (error) {
       console.error('Error updating user role:', error);
       setError('Failed to update user role');
@@ -568,6 +592,7 @@ const SuperAdminDashboard = () => {
       }
 
       fetchUsers();
+      fetchStats(); // Refresh stats after deleting user
       setSuccessMessage('User deleted successfully');
     } catch (error) {
       console.error('Error deleting user:', error);
@@ -601,6 +626,7 @@ const SuperAdminDashboard = () => {
       }
 
       fetchCompanies();
+      fetchStats(); // Refresh stats after deleting company
       setSuccessMessage('Company deleted successfully');
     } catch (error) {
       console.error('Error deleting company:', error);
@@ -618,11 +644,53 @@ const SuperAdminDashboard = () => {
 
   const handleEditCompanyClick = (company: Company) => {
     setEditingCompany(company);
+    setOriginalCompany(company);
     setEditCompanyDialogOpen(true);
   };
 
   const handleUpdateCompany = async () => {
-    if (!editingCompany) return;
+    if (!editingCompany || !originalCompany) return;
+
+    // Check if status has changed
+    if (editingCompany.status !== originalCompany.status) {
+      // Show confirmation dialog for status change
+      setPendingCompanyStatusChange({ 
+        companyId: editingCompany.id, 
+        oldStatus: originalCompany.status, 
+        newStatus: editingCompany.status 
+      });
+      setCompanyStatusChangeDialogOpen(true);
+      return;
+    }
+
+    // If no status change, proceed with normal update
+    await performCompanyUpdate();
+  };
+
+  const performCompanyUpdate = async () => {
+    if (!editingCompany || !originalCompany) return;
+
+    // Create an object with only the fields that have changed
+    const changedFields: CompanyUpdateFields = {};
+    
+    // Compare each field with the original company data
+    if (editingCompany.name !== originalCompany.name) {
+      changedFields.name = editingCompany.name;
+    }
+    
+    if (editingCompany.status !== originalCompany.status) {
+      changedFields.status = editingCompany.status;
+    }
+    
+    if (editingCompany.description !== originalCompany.description) {
+      changedFields.description = editingCompany.description;
+    }
+
+    // If no fields have changed, show a message and return early
+    if (Object.keys(changedFields).length === 0) {
+      setSuccessMessage('No changes detected');
+      return;
+    }
 
     try {
       const response = await apiFetch(`/api/admin/companies/${editingCompany.id}/`, {
@@ -630,12 +698,7 @@ const SuperAdminDashboard = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name: editingCompany.name,
-          email: editingCompany.email,
-          status: editingCompany.status,
-          description: editingCompany.description,
-        }),
+        body: JSON.stringify(changedFields),
       });
 
       if (!response.ok) {
@@ -656,6 +719,7 @@ const SuperAdminDashboard = () => {
 
       setEditCompanyDialogOpen(false);
       setEditingCompany(null);
+      setOriginalCompany(null);
       setSuccessMessage('Company updated successfully');
     } catch (error) {
       console.error('Error updating company:', error);
@@ -666,6 +730,7 @@ const SuperAdminDashboard = () => {
   const handleCancelEditCompany = () => {
     setEditCompanyDialogOpen(false);
     setEditingCompany(null);
+    setOriginalCompany(null);
   };
 
   const handleConfirmRoleChange = async () => {
@@ -680,9 +745,16 @@ const SuperAdminDashboard = () => {
         return;
       }
       
-      await handleChangeUserRole(pendingRoleChange.userId, pendingRoleChange.newRole);
-      setRoleChangeDialogOpen(false);
-      setPendingRoleChange(null);
+      try {
+        // Use the role-specific endpoint for all role changes
+        await handleChangeUserRole(pendingRoleChange.userId, pendingRoleChange.newRole);
+        
+        setRoleChangeDialogOpen(false);
+        setPendingRoleChange(null);
+      } catch (error) {
+        console.error('Error updating user role:', error);
+        setError('Failed to update user role');
+      }
     }
   };
 
@@ -705,11 +777,25 @@ const SuperAdminDashboard = () => {
         throw new Error('Failed to update user status');
       }
 
-      // Update the user in the local state
+      // Get the updated user data from the response
+      const updatedUser = await response.json();
+      console.log('Status update response:', updatedUser); // Debug log
+      
+      // Update the user in the local state with the complete updated data
       setUsers(prevUsers => 
         prevUsers.map(user => 
           user.id === userId 
-            ? { ...user, is_active: newStatus }
+            ? { 
+                ...user, 
+                username: updatedUser.username,
+                email: updatedUser.email,
+                is_active: updatedUser.is_active,
+                // Use the company info from the response (could be null if user has no company)
+                company_name: updatedUser.company_name,
+                company_id: updatedUser.company_id,
+                date_joined: updatedUser.date_joined,
+                global_role: updatedUser.global_role
+              }
             : user
         )
       );
@@ -749,6 +835,24 @@ const SuperAdminDashboard = () => {
     setPendingStatusChange(null);
   };
 
+
+
+  const handleConfirmCompanyStatusChange = async () => {
+    if (pendingCompanyStatusChange && editingCompany) {
+      // Update the editing company with the new status
+      setEditingCompany({ ...editingCompany, status: pendingCompanyStatusChange.newStatus });
+      setCompanyStatusChangeDialogOpen(false);
+      setPendingCompanyStatusChange(null);
+      // Perform the actual update
+      await performCompanyUpdate();
+    }
+  };
+
+  const handleCancelCompanyStatusChange = () => {
+    setCompanyStatusChangeDialogOpen(false);
+    setPendingCompanyStatusChange(null);
+  };
+
   const resetNewUser = () => {
     setNewUser({
       username: '',
@@ -771,9 +875,7 @@ const SuperAdminDashboard = () => {
 
   const filteredCompanies = companies.filter(company => 
     company.name.toLowerCase().includes(search.toLowerCase()) ||
-    company.email.toLowerCase().includes(search.toLowerCase()) ||
-    (company.contact_person && company.contact_person.toLowerCase().includes(search.toLowerCase())) ||
-    (company.industry && company.industry.toLowerCase().includes(search.toLowerCase()))
+    (company.description && company.description.toLowerCase().includes(search.toLowerCase()))
   );
 
   const getRoleChip = (role: string | undefined, userId: number) => {
@@ -791,7 +893,36 @@ const SuperAdminDashboard = () => {
     
     const handleRoleChange = (newRole: string) => {
       if (selectedUserId) {
-        setPendingRoleChange({ userId: selectedUserId, newRole });
+        // If changing to super_admin, check if user is already in Future Objects company
+        if (newRole === 'super_admin') {
+          const futureObjectsCompany = companies.find(company => 
+            company.name.toLowerCase() === 'future objects' && company.status === 'active'
+          );
+          
+          if (!futureObjectsCompany) {
+            setError('Future Objects company not found. Please create the Future Objects company first.');
+            handleClose();
+            return;
+          }
+          
+          // Find the current user to check their company
+          const currentUser = users.find(user => user.id === selectedUserId);
+          if (currentUser && currentUser.company_id !== futureObjectsCompany.id) {
+            // User is not in Future Objects company, show warning and require company change first
+            setError('To assign Super Admin role, the user must first be assigned to the Future Objects company. Please change the user\'s company to Future Objects first, then change the role.');
+            handleClose();
+            return;
+          }
+          
+          // User is already in Future Objects company, proceed with role change
+          setPendingRoleChange({ 
+            userId: selectedUserId, 
+            newRole
+          });
+        } else {
+          // For other role changes, just update the role
+          setPendingRoleChange({ userId: selectedUserId, newRole });
+        }
         setRoleChangeDialogOpen(true);
       }
       handleClose();
@@ -916,16 +1047,49 @@ const SuperAdminDashboard = () => {
   const handleUpdateUser = async () => {
     if (!editingUser) return;
 
+    // Create an object with only the fields that have changed
+    const changedFields: UserUpdateFields = {};
+    
+    // Compare each field with the original user data
+    if (editUserForm.username !== editingUser.username) {
+      changedFields.username = editUserForm.username;
+    }
+    
+    if (editUserForm.email !== editingUser.email) {
+      changedFields.email = editUserForm.email;
+    }
+    
+    if (editUserForm.role !== (editingUser.global_role?.role || '')) {
+      changedFields.role = editUserForm.role;
+    }
+    
+    if (editUserForm.is_active !== editingUser.is_active) {
+      changedFields.is_active = editUserForm.is_active;
+    }
+    
+    if (editUserForm.company_id !== editingUser.company_id) {
+      changedFields.company_id = editUserForm.company_id;
+    }
+
+    // If no fields have changed, show a message and return early
+    if (Object.keys(changedFields).length === 0) {
+      setSuccessMessage('No changes detected');
+      return;
+    }
+
     try {
       const response = await apiFetch(`/api/admin/users/${editingUser.id}/`, {
         method: 'PATCH',
-        body: JSON.stringify(editUserForm),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(changedFields),
       });
 
       if (response.ok) {
         const updatedUser = await response.json();
         
-        // Update the user in the local state
+        // Update the user in the local state with all the updated information
         setUsers(users.map(user => 
           user.id === editingUser.id 
             ? { 
@@ -935,6 +1099,7 @@ const SuperAdminDashboard = () => {
                 is_active: updatedUser.is_active,
                 company_name: updatedUser.company_name,
                 company_id: updatedUser.company_id,
+                date_joined: updatedUser.date_joined,
                 global_role: updatedUser.global_role
               }
             : user
@@ -1014,98 +1179,95 @@ const SuperAdminDashboard = () => {
 
       {/* Stats Cards */}
       <Box sx={{ mb: 4, width: '100%', overflow: 'hidden' }}>
-        <Grid container spacing={3} sx={{ width: '100%', margin: 0 }}>
-          <Grid item xs={12} sm={6} lg={3} sx={{ padding: '12px !important', minWidth: '280px' }}>
-            <Card sx={{ height: '100%', overflow: 'hidden', width: '100%', minWidth: '260px' }}>
-              <CardContent sx={{ p: 3, '&:last-child': { pb: 3 }, height: '100%' }}>
-                <Typography variant="h6" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
-                  Total Company
+        <Box sx={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
+          gap: 3, 
+          width: '100%' 
+        }}>
+          <Card sx={{ height: '100%', overflow: 'hidden', width: '100%', minWidth: '260px' }}>
+            <CardContent sx={{ p: 3, '&:last-child': { pb: 3 }, height: '100%' }}>
+              <Typography variant="h6" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+                Total Company
+              </Typography>
+              <Typography 
+                variant="h3" 
+                sx={{ 
+                  fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' },
+                  fontWeight: 600,
+                  wordBreak: 'break-word',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}
+              >
+                {stats.totalCompanies}
+              </Typography>
+            </CardContent>
+          </Card>
+          <Card sx={{ height: '100%', overflow: 'hidden', width: '100%', minWidth: '260px' }}>
+            <CardContent sx={{ p: 3, '&:last-child': { pb: 3 }, height: '100%' }}>
+              <Typography variant="h6" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+                Total Users
+              </Typography>
+              <Typography 
+                variant="h3" 
+                sx={{ 
+                  fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' },
+                  fontWeight: 600,
+                  wordBreak: 'break-word',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}
+              >
+                {stats.totalUsers}
+              </Typography>
+            </CardContent>
+          </Card>
+          <Card sx={{ height: '100%', overflow: 'hidden', width: '100%', minWidth: '260px' }}>
+            <CardContent sx={{ p: 3, '&:last-child': { pb: 3 }, height: '100%' }}>
+              <Typography variant="h6" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+                Projects
+              </Typography>
+              <Typography 
+                variant="h3" 
+                sx={{ 
+                  fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' },
+                  fontWeight: 600,
+                  wordBreak: 'break-word',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}
+              >
+                {stats.totalProjects}
+              </Typography>
+            </CardContent>
+          </Card>
+          <Card sx={{ height: '100%', overflow: 'hidden', width: '100%', minWidth: '260px' }}>
+            <CardContent sx={{ p: 3, '&:last-child': { pb: 3 }, height: '100%' }}>
+              <Typography variant="h6" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+                User Distribution
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                <AdminIcon color="primary" sx={{ mr: 1, fontSize: { xs: '1rem', sm: '1.25rem' } }} />
+                <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                  Super Admins: {stats.superAdmins}
                 </Typography>
-                <Typography 
-                  variant="h3" 
-                  sx={{ 
-                    fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' },
-                    fontWeight: 600,
-                    wordBreak: 'break-word',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}
-                >
-                  {stats.totalCompanies}
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
+                <BusinessIcon color="secondary" sx={{ mr: 1, fontSize: { xs: '1rem', sm: '1.25rem' } }} />
+                <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                  Tenant Admins: {stats.tenantAdmins}
                 </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} lg={3} sx={{ padding: '12px !important', minWidth: '280px' }}>
-            <Card sx={{ height: '100%', overflow: 'hidden', width: '100%', minWidth: '260px' }}>
-              <CardContent sx={{ p: 3, '&:last-child': { pb: 3 }, height: '100%' }}>
-                <Typography variant="h6" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
-                  Total Users
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
+                <PersonIcon sx={{ mr: 1, fontSize: { xs: '1rem', sm: '1.25rem' } }} />
+                <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                  Users: {stats.regularUsers}
                 </Typography>
-                <Typography 
-                  variant="h3" 
-                  sx={{ 
-                    fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' },
-                    fontWeight: 600,
-                    wordBreak: 'break-word',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}
-                >
-                  {stats.totalUsers}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} lg={3} sx={{ padding: '12px !important', minWidth: '280px' }}>
-            <Card sx={{ height: '100%', overflow: 'hidden', width: '100%', minWidth: '260px' }}>
-              <CardContent sx={{ p: 3, '&:last-child': { pb: 3 }, height: '100%' }}>
-                <Typography variant="h6" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
-                  Projects
-                </Typography>
-                <Typography 
-                  variant="h3" 
-                  sx={{ 
-                    fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' },
-                    fontWeight: 600,
-                    wordBreak: 'break-word',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}
-                >
-                  {stats.totalProjects}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} lg={3} sx={{ padding: '12px !important', minWidth: '280px' }}>
-            <Card sx={{ height: '100%', overflow: 'hidden', width: '100%', minWidth: '260px' }}>
-              <CardContent sx={{ p: 3, '&:last-child': { pb: 3 }, height: '100%' }}>
-                <Typography variant="h6" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
-                  User Distribution
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                  <AdminIcon color="primary" sx={{ mr: 1, fontSize: { xs: '1rem', sm: '1.25rem' } }} />
-                  <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
-                    Super Admins: {stats.superAdmins}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
-                  <BusinessIcon color="secondary" sx={{ mr: 1, fontSize: { xs: '1rem', sm: '1.25rem' } }} />
-                  <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
-                    Tenant Admins: {stats.tenantAdmins}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
-                  <PersonIcon sx={{ mr: 1, fontSize: { xs: '1rem', sm: '1.25rem' } }} />
-                  <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
-                    Users: {stats.regularUsers}
-                  </Typography>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
       </Box>
 
       <Paper sx={{ mb: 3 }}>
@@ -1186,7 +1348,6 @@ const SuperAdminDashboard = () => {
               <TableRow>
                 <TableCell>ID</TableCell>
                 <TableCell>Name</TableCell>
-                <TableCell>Email</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Description</TableCell>
                 <TableCell>Created</TableCell>
@@ -1199,7 +1360,6 @@ const SuperAdminDashboard = () => {
                   <TableRow key={company.id}>
                     <TableCell>{company.id}</TableCell>
                     <TableCell>{company.name}</TableCell>
-                    <TableCell>{company.email}</TableCell>
                     <TableCell>
                       <Chip
                         label={company.status_display}
@@ -1242,7 +1402,7 @@ const SuperAdminDashboard = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} align="center">
+                  <TableCell colSpan={6} align="center">
                     No companies found
                   </TableCell>
                 </TableRow>
@@ -1259,11 +1419,12 @@ const SuperAdminDashboard = () => {
             <TableHead>
               <TableRow>
                 <TableCell>ID</TableCell>
-                <TableCell>Username</TableCell>
+                <TableCell>Name</TableCell>
                 <TableCell>Email</TableCell>
                 <TableCell>Company</TableCell>
                 <TableCell>Role</TableCell>
                 <TableCell>Status</TableCell>
+                <TableCell>Created Date</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -1313,6 +1474,7 @@ const SuperAdminDashboard = () => {
                         }}
                       />
                     </TableCell>
+                    <TableCell>{new Date(user.date_joined).toLocaleDateString()}</TableCell>
                     <TableCell align="right">
                       <IconButton 
                         size="small" 
@@ -1342,7 +1504,7 @@ const SuperAdminDashboard = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} align="center">
+                  <TableCell colSpan={8} align="center">
                     No users found
                   </TableCell>
                 </TableRow>
@@ -1387,8 +1549,8 @@ const SuperAdminDashboard = () => {
                   { value: 'instagram_posts', label: 'Instagram Posts', icon: <InstagramIcon />, color: '#E4405F', description: 'Scrape Instagram posts and images' },
                   { value: 'instagram_reels', label: 'Instagram Reels', icon: <InstagramIcon />, color: '#E4405F', description: 'Collect Instagram video content' },
                   { value: 'instagram_comments', label: 'Instagram Comments', icon: <InstagramIcon />, color: '#E4405F', description: 'Extract comment data from posts' },
-                  { value: 'linkedin', label: 'LinkedIn', icon: <LinkedInIcon />, color: '#0A66C2', description: 'Scrape LinkedIn posts and articles' },
-                  { value: 'tiktok', label: 'TikTok', icon: <MusicVideoIcon />, color: '#000000', description: 'Collect TikTok video content' },
+                  { value: 'linkedin_posts', label: 'LinkedIn Posts', icon: <LinkedInIcon />, color: '#0A66C2', description: 'Scrape LinkedIn posts and articles' },
+                  { value: 'tiktok_posts', label: 'TikTok Posts', icon: <MusicVideoIcon />, color: '#000000', description: 'Collect TikTok video content' },
                 ].map((platform) => {
                   const hasConfig = brightdataConfigs.some(c => c.platform === platform.value);
                   return (
@@ -1530,8 +1692,8 @@ const SuperAdminDashboard = () => {
                             </TableCell>
                             <TableCell>
                               <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                {config.platform === 'linkedin' && <LinkedInIcon />}
-                                {config.platform === 'tiktok' && <MusicVideoIcon />}
+                                {config.platform === 'linkedin_posts' && <LinkedInIcon />}
+                                {config.platform === 'tiktok_posts' && <MusicVideoIcon />}
                                 {config.platform.includes('instagram') && <InstagramIcon />}
                                 {config.platform.includes('facebook') && <FacebookIcon />}
                                 <Typography sx={{ ml: 1 }}>
@@ -1598,7 +1760,7 @@ const SuperAdminDashboard = () => {
              Enter the user's information below. A secure password will be automatically generated and sent to their email address.
            </DialogContentText>
           <TextField
-            label="Username"
+            label="Name"
             fullWidth
             margin="normal"
             value={newUser.username}
@@ -1632,6 +1794,8 @@ const SuperAdminDashboard = () => {
                      margin="normal"
                      fullWidth
                      required
+                                      disabled={newUser.role === 'super_admin'}
+                 helperText={newUser.role === 'super_admin' ? 'Super admins are automatically assigned to Future Objects company' : ''}
                    />
                  )}
                  filterOptions={(options, { inputValue }) => {
@@ -1641,6 +1805,7 @@ const SuperAdminDashboard = () => {
                  }}
                  isOptionEqualToValue={(option, value) => option.id === value.id}
                  noOptionsText="no companies found"
+                 disabled={newUser.role === 'super_admin'}
                />
 
           <FormControl fullWidth margin="normal">
@@ -1648,7 +1813,29 @@ const SuperAdminDashboard = () => {
             <Select
               value={newUser.role}
               label="Role"
-              onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+              onChange={(e) => {
+                const newRole = e.target.value;
+                
+                // If changing to super_admin, check if Future Objects company is selected
+                if (newRole === 'super_admin') {
+                  const futureObjectsCompany = companies.find(company => 
+                    company.name.toLowerCase() === 'future objects' && company.status === 'active'
+                  );
+                  if (!futureObjectsCompany) {
+                    setError('Future Objects company not found. Please create the Future Objects company first.');
+                    return;
+                  }
+                  if (newUser.company_id !== futureObjectsCompany.id) {
+                    setError('To assign Super Admin role, the user must be assigned to the Future Objects company. Please select Future Objects as the company first.');
+                    return;
+                  }
+                }
+                
+                setNewUser({ 
+                  ...newUser, 
+                  role: newRole
+                });
+              }}
             >
               <MenuItem value="super_admin">Super Admin</MenuItem>
               <MenuItem value="tenant_admin">Tenant Admin</MenuItem>
@@ -1678,15 +1865,7 @@ const SuperAdminDashboard = () => {
             onChange={(e) => setNewCompany({ ...newCompany, name: e.target.value })}
             required
           />
-          <TextField
-            label="Email"
-            type="email"
-            fullWidth
-            margin="normal"
-            value={newCompany.email}
-            onChange={(e) => setNewCompany({ ...newCompany, email: e.target.value })}
-            required
-          />
+
           <FormControl fullWidth margin="normal">
             <InputLabel>Status</InputLabel>
                     <Select
@@ -1728,15 +1907,7 @@ const SuperAdminDashboard = () => {
             onChange={(e) => setEditingCompany(editingCompany ? { ...editingCompany, name: e.target.value } : null)}
             required
           />
-          <TextField
-            label="Email"
-            type="email"
-            fullWidth
-            margin="normal"
-            value={editingCompany?.email || ''}
-            onChange={(e) => setEditingCompany(editingCompany ? { ...editingCompany, email: e.target.value } : null)}
-            required
-          />
+
           <FormControl fullWidth margin="normal">
             <InputLabel>Status</InputLabel>
             <Select
@@ -1803,10 +1974,10 @@ const SuperAdminDashboard = () => {
                 
                 // Set dataset ID based on platform selection
                 switch (selectedPlatform) {
-                  case 'linkedin':
+                  case 'linkedin_posts':
                     datasetId = 'gd_lyy3tktm25m4avu764';
                     break;
-                  case 'tiktok':
+                  case 'tiktok_posts':
                     datasetId = 'gd_lu702nij2f790tmv9h';
                     break;
                   case 'instagram_posts':
@@ -1839,13 +2010,13 @@ const SuperAdminDashboard = () => {
               }}
               label="Platform"
             >
-              <MenuItem value="linkedin">
+              <MenuItem value="linkedin_posts">
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <LinkedInIcon />
                   <Typography sx={{ ml: 1 }}>LinkedIn Posts</Typography>
                 </Box>
               </MenuItem>
-              <MenuItem value="tiktok">
+              <MenuItem value="tiktok_posts">
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <MusicVideoIcon />
                   <Typography sx={{ ml: 1 }}>TikTok Posts</Typography>
@@ -2088,6 +2259,12 @@ const SuperAdminDashboard = () => {
              </strong>?
              <br></br>
              This action will immediately update the user's permissions and access levels.
+             {pendingRoleChange?.newRole === 'super_admin' && (
+               <>
+                 <br></br>
+                 <strong>Note:</strong> This user is already assigned to the Future Objects company, so the role change can proceed.
+               </>
+             )}
            </DialogContentText>
          </DialogContent>
          <DialogActions>
@@ -2147,12 +2324,54 @@ const SuperAdminDashboard = () => {
          </DialogActions>
        </Dialog>
 
+       {/* Company Status Change Confirmation Dialog */}
+       <Dialog
+         open={companyStatusChangeDialogOpen}
+         onClose={handleCancelCompanyStatusChange}
+       >
+         <DialogTitle>Confirm Company Status Change</DialogTitle>
+         <DialogContent>
+           <DialogContentText>
+             Are you sure you want to change this company's status from{' '}
+             <strong>
+               {pendingCompanyStatusChange?.oldStatus === 'active' ? 'Active' : 'Inactive'}
+             </strong>{' '}
+             to{' '}
+             <strong>
+               {pendingCompanyStatusChange?.newStatus === 'active' ? 'Active' : 'Inactive'}
+             </strong>?
+             <br></br>
+             {pendingCompanyStatusChange?.newStatus === 'active'
+               ? 'This will allow the company to be used for user assignments and to carry out data studies.'
+               : 'This will prevent the company from being used for new user assignments and may affect existing users.'
+             }
+           </DialogContentText>
+         </DialogContent>
+         <DialogActions>
+           <Button onClick={handleCancelCompanyStatusChange}>Cancel</Button>
+           <Button 
+             onClick={handleConfirmCompanyStatusChange} 
+             variant="contained"
+             sx={{
+               backgroundColor: '#d32f2f',
+               color: '#fff',
+               '&:hover': {
+                 backgroundColor: '#b71c1c',
+                 color: '#fff',
+               },
+             }}
+           >
+             Confirm Status Change
+           </Button>
+         </DialogActions>
+       </Dialog>
+
        {/* Edit User Dialog */}
        <Dialog open={editUserDialogOpen} onClose={handleCancelEditUser}>
          <DialogTitle>Edit User</DialogTitle>
          <DialogContent>
            <TextField
-             label="Username"
+             label="Name"
              fullWidth
              margin="normal"
              value={editUserForm.username}
@@ -2184,6 +2403,8 @@ const SuperAdminDashboard = () => {
                  label="Company"
                  margin="normal"
                  fullWidth
+                 disabled={editUserForm.role === 'super_admin'}
+                 helperText={editUserForm.role === 'super_admin' ? 'Super admins are automatically assigned to Future Objects company' : ''}
                />
              )}
              filterOptions={(options, { inputValue }) => {
@@ -2193,13 +2414,36 @@ const SuperAdminDashboard = () => {
              }}
              isOptionEqualToValue={(option, value) => option.id === value.id}
              noOptionsText="No Companies Found"
+             disabled={editUserForm.role === 'super_admin'}
            />
            <FormControl fullWidth margin="normal">
              <InputLabel>Role</InputLabel>
              <Select
                value={editUserForm.role}
                label="Role"
-               onChange={(e) => setEditUserForm({ ...editUserForm, role: e.target.value })}
+                             onChange={(e) => {
+                const newRole = e.target.value;
+                
+                // If changing to super_admin, check if Future Objects company is selected
+                if (newRole === 'super_admin') {
+                  const futureObjectsCompany = companies.find(company => 
+                    company.name.toLowerCase() === 'future objects' && company.status === 'active'
+                  );
+                  if (!futureObjectsCompany) {
+                    setError('Future Objects company not found. Please create the Future Objects company first.');
+                    return;
+                  }
+                  if (editUserForm.company_id !== futureObjectsCompany.id) {
+                    setError('To assign Super Admin role, the user must be assigned to the Future Objects company. Please select Future Objects as the company first.');
+                    return;
+                  }
+                }
+                
+                setEditUserForm({ 
+                  ...editUserForm, 
+                  role: newRole
+                });
+              }}
              >
                <MenuItem value="super_admin">Super Admin</MenuItem>
                <MenuItem value="tenant_admin">Tenant Admin</MenuItem>
