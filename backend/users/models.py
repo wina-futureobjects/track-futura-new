@@ -133,6 +133,7 @@ class OrganizationMembership(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='member')
+    display_name = models.CharField(max_length=255, blank=True, null=True, help_text="Display name for this user in this organization")
     date_joined = models.DateTimeField(auto_now_add=True)
     
     class Meta:

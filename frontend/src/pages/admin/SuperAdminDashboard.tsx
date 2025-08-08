@@ -154,6 +154,8 @@ const SuperAdminDashboard = () => {
   const [brightdataConfigs, setBrightdataConfigs] = useState<BrightdataConfig[]>([]);
   const [brightdataLoading, setBrightdataLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [isCreatingCompany, setIsCreatingCompany] = useState(false);
   const [editConfigId, setEditConfigId] = useState<number | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [configToDelete, setConfigToDelete] = useState<number | null>(null);
@@ -407,6 +409,9 @@ const SuperAdminDashboard = () => {
 
   const handleCreateUser = async () => {
     try {
+      setIsCreatingUser(true);
+      setError(null);
+      
       // Validate required fields
       if (!newUser.username || !newUser.email) {
         setError('Username and email are required');
@@ -471,11 +476,16 @@ const SuperAdminDashboard = () => {
     } catch (error) {
       console.error('Error creating user:', error);
       setError(error instanceof Error ? error.message : 'Failed to create user');
+    } finally {
+      setIsCreatingUser(false);
     }
   };
 
   const handleCreateCompany = async () => {
     try {
+      setIsCreatingCompany(true);
+      setError(null);
+      
       const response = await apiFetch('/api/admin/companies/', {
         method: 'POST',
         headers: {
@@ -529,6 +539,8 @@ const SuperAdminDashboard = () => {
     } catch (error) {
       console.error('Error creating company:', error);
       setError(error instanceof Error ? error.message : 'Failed to create company');
+    } finally {
+      setIsCreatingCompany(false);
     }
   };
 
@@ -1846,9 +1858,15 @@ const SuperAdminDashboard = () => {
         <DialogActions>
           <Button onClick={() => {
             setOpenUserDialog(false);
-          }}>Cancel</Button>
-          <Button onClick={handleCreateUser} variant="contained" color="primary">
-            Create
+          }} disabled={isCreatingUser}>Cancel</Button>
+          <Button 
+            onClick={handleCreateUser} 
+            variant="contained" 
+            color="primary"
+            disabled={isCreatingUser}
+            startIcon={isCreatingUser ? <CircularProgress size={20} /> : null}
+          >
+            {isCreatingUser ? 'Creating...' : 'Create'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1888,9 +1906,15 @@ const SuperAdminDashboard = () => {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenCompanyDialog(false)}>Cancel</Button>
-          <Button onClick={handleCreateCompany} variant="contained" color="primary">
-            Create
+          <Button onClick={() => setOpenCompanyDialog(false)} disabled={isCreatingCompany}>Cancel</Button>
+          <Button 
+            onClick={handleCreateCompany} 
+            variant="contained" 
+            color="primary"
+            disabled={isCreatingCompany}
+            startIcon={isCreatingCompany ? <CircularProgress size={20} /> : null}
+          >
+            {isCreatingCompany ? 'Creating...' : 'Create'}
           </Button>
         </DialogActions>
       </Dialog>

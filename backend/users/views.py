@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
-from rest_framework import generics, status, permissions
+from rest_framework import generics, status, permissions, serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
@@ -12,7 +12,7 @@ from .serializers import (
     OrganizationSerializer, OrganizationDetailSerializer,
     OrganizationMembershipSerializer, AdminUserCreateSerializer, AdminUserUpdateSerializer,
     PlatformSerializer, ServiceSerializer, PlatformServiceSerializer,
-    PlatformServiceCreateSerializer, CompanySerializer
+    PlatformServiceCreateSerializer, CompanySerializer, OrganizationMemberCreateSerializer
 )
 from .models import UserProfile, Project, Organization, OrganizationMembership
 from rest_framework.authtoken.views import ObtainAuthToken
@@ -322,9 +322,36 @@ class OrganizationMembershipView(generics.ListCreateAPIView):
             ).exists():
                 raise PermissionDenied("You don't have access to this organization")
 
-            return OrganizationMembership.objects.filter(organization=organization)
+            # Get all memberships for this organization with debugging
+            memberships = OrganizationMembership.objects.filter(organization=organization)
+            
+            # Add debugging information
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"Found {memberships.count()} memberships for organization {organization.id}")
+            for membership in memberships:
+                logger.info(f"Membership: User {membership.user.username} (ID: {membership.user.id}), Role: {membership.role}")
+            
+            return memberships
         except Organization.DoesNotExist:
             raise NotFound("Organization not found")
+
+    def get_serializer_class(self):
+        """Use different serializer for POST requests"""
+        if self.request.method == 'POST':
+            return OrganizationMemberCreateSerializer
+        return OrganizationMembershipSerializer
+
+    def get_serializer_context(self):
+        """Add organization to serializer context"""
+        context = super().get_serializer_context()
+        organization_id = self.kwargs.get('organization_id')
+        try:
+            organization = Organization.objects.get(id=organization_id)
+            context['organization'] = organization
+        except Organization.DoesNotExist:
+            pass
+        return context
 
     def perform_create(self, serializer):
         """Add member to organization"""
@@ -341,9 +368,90 @@ class OrganizationMembershipView(generics.ListCreateAPIView):
             if organization.owner != self.request.user and (not membership or membership.role != 'admin'):
                 raise PermissionDenied("Only organization owners and admins can add members")
 
-            serializer.save(organization=organization)
+            # Add debugging information
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"perform_create called for organization {organization.id}")
+            logger.info(f"Serializer type: {type(serializer).__name__}")
+
+            # For the new serializer, the create method handles everything
+            if isinstance(serializer, OrganizationMemberCreateSerializer):
+                result = serializer.save()
+                logger.info(f"OrganizationMemberCreateSerializer.save() returned: {result}")
+            else:
+                # For existing users, just create membership
+                result = serializer.save(organization=organization)
+                logger.info(f"Regular serializer.save() returned: {result}")
+                
+            # Verify the membership was created
+            if hasattr(result, 'user'):
+                logger.info(f"Membership created for user {result.user.username} (ID: {result.user.id}) in organization {result.organization.id}")
+            else:
+                logger.warning(f"Unexpected result from serializer.save(): {result}")
+                
         except Organization.DoesNotExist:
             raise NotFound("Organization not found")
+
+    def create(self, request, *args, **kwargs):
+        """Override create method to handle errors properly"""
+        try:
+            return super().create(request, *args, **kwargs)
+        except Exception as e:
+            from django.db import IntegrityError
+            if isinstance(e, IntegrityError):
+                # Provide more specific error message based on the constraint
+                error_msg = str(e).lower()
+                if 'unique_together' in error_msg or 'organizationmembership' in error_msg:
+                    return Response({
+                        'error': 'This user is already a member of this organization.',
+                        'detail': 'A user can only be added to an organization once.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                elif 'email' in error_msg and ('unique' in error_msg or 'duplicate' in error_msg):
+                    return Response({
+                        'error': 'A user with this email address already exists.',
+                        'detail': 'Please use a different email address or add the existing user to the organization.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                elif 'username' in error_msg and ('unique' in error_msg or 'duplicate' in error_msg):
+                    return Response({
+                        'error': 'Username generation failed due to duplicate.',
+                        'detail': 'Please try again with a different email address.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    return Response({
+                        'error': 'Database error occurred. This might be due to a duplicate entry.',
+                        'detail': str(e)
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            elif isinstance(e, serializers.ValidationError):
+                # Handle validation errors from the serializer
+                return Response({
+                    'error': 'Validation error',
+                    'detail': str(e)
+                }, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                # Log the unexpected error for debugging
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Unexpected error in OrganizationMembershipView.create: {str(e)}")
+                logger.error(f"Error type: {type(e).__name__}")
+                logger.error(f"Error args: {e.args}")
+                
+                # Provide more specific error information
+                error_detail = str(e)
+                if "company" in error_detail.lower():
+                    return Response({
+                        'error': 'Company assignment error',
+                        'detail': 'There was an issue assigning the user to the company. Please ensure the organization owner has a valid company.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                elif "profile" in error_detail.lower():
+                    return Response({
+                        'error': 'User profile error',
+                        'detail': 'There was an issue with the user profile. Please try again.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    return Response({
+                        'error': 'An unexpected error occurred while adding the member.',
+                        'detail': f'Error: {error_detail}'
+                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class OrganizationMembershipDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
@@ -361,20 +469,97 @@ class OrganizationMembershipDetailView(generics.RetrieveUpdateDestroyAPIView):
 
         # Check if user has permission (owner or admin)
         if self.request.method != 'GET':
+            import logging
+            logger = logging.getLogger(__name__)
+            
+            # Check if user is organization owner
+            is_owner = obj.organization.owner == self.request.user
+            logger.info(f"User {self.request.user.username} is owner: {is_owner}")
+            
+            # Check if user is admin in the organization
             membership = OrganizationMembership.objects.filter(
                 user=self.request.user,
                 organization=obj.organization,
                 role='admin'
             ).first()
+            
+            is_admin = membership is not None
+            logger.info(f"User {self.request.user.username} is admin: {is_admin}")
+            logger.info(f"Target user {obj.user.username} is owner: {obj.user == obj.organization.owner}")
+            logger.info(f"Request method: {self.request.method}")
 
-            if obj.organization.owner != self.request.user and not membership:
+            if not is_owner and not is_admin:
+                logger.warning(f"Permission denied for user {self.request.user.username}")
                 raise PermissionDenied("Only organization owners and admins can modify memberships")
 
-            # Don't allow removing the owner's admin role
+            # Don't allow removing the organization owner
             if obj.user == obj.organization.owner and self.request.method == 'DELETE':
+                logger.warning(f"Cannot remove organization owner {obj.user.username}")
                 raise PermissionDenied("Cannot remove the organization owner")
 
         return obj
+
+    def partial_update(self, request, *args, **kwargs):
+        """Override partial_update method to provide better error handling"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        try:
+            instance = self.get_object()
+            logger.info(f"Attempting to update membership {instance.id} for user {instance.user.username}")
+            logger.info(f"Update data: {request.data}")
+            
+            # Perform the update
+            serializer = self.get_serializer(instance, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
+            
+            logger.info(f"Successfully updated membership {instance.id}")
+            
+            return Response(serializer.data)
+            
+        except PermissionDenied as e:
+            logger.warning(f"Permission denied for membership update: {str(e)}")
+            return Response({
+                'error': 'Permission denied',
+                'detail': str(e)
+            }, status=status.HTTP_403_FORBIDDEN)
+            
+        except Exception as e:
+            logger.error(f"Error updating membership: {str(e)}")
+            return Response({
+                'error': 'Failed to update membership',
+                'detail': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def destroy(self, request, *args, **kwargs):
+        """Override destroy method to provide better error handling"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        try:
+            instance = self.get_object()
+            logger.info(f"Attempting to delete membership {instance.id} for user {instance.user.username}")
+            
+            # Perform the deletion
+            self.perform_destroy(instance)
+            logger.info(f"Successfully deleted membership {instance.id}")
+            
+            return Response(status=status.HTTP_204_NO_CONTENT)
+            
+        except PermissionDenied as e:
+            logger.warning(f"Permission denied for membership deletion: {str(e)}")
+            return Response({
+                'error': 'Permission denied',
+                'detail': str(e)
+            }, status=status.HTTP_403_FORBIDDEN)
+            
+        except Exception as e:
+            logger.error(f"Error deleting membership: {str(e)}")
+            return Response({
+                'error': 'Failed to delete membership',
+                'detail': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class UserSearchView(generics.ListAPIView):
     """
@@ -518,6 +703,48 @@ class ProjectDetailView(generics.RetrieveUpdateDestroyAPIView):
                 raise PermissionDenied("You don't have permission to modify this project")
 
         return obj
+
+    def update(self, request, *args, **kwargs):
+        """Override update method to add logging"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        try:
+            instance = self.get_object()
+            logger.info(f"Attempting to update project {instance.id} '{instance.name}'")
+            logger.info(f"Update data: {request.data}")
+            
+            # Perform the update
+            serializer = self.get_serializer(instance, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
+            
+            logger.info(f"Successfully updated project {instance.id}")
+            
+            return Response(serializer.data)
+            
+        except Exception as e:
+            logger.error(f"Error updating project: {str(e)}")
+            raise
+
+    def destroy(self, request, *args, **kwargs):
+        """Override destroy method to add logging"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        try:
+            instance = self.get_object()
+            logger.info(f"Attempting to delete project {instance.id} '{instance.name}'")
+            
+            # Perform the deletion
+            self.perform_destroy(instance)
+            logger.info(f"Successfully deleted project {instance.id}")
+            
+            return Response(status=status.HTTP_204_NO_CONTENT)
+            
+        except Exception as e:
+            logger.error(f"Error deleting project: {str(e)}")
+            raise
 
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 @method_decorator(never_cache, name='dispatch')
@@ -685,6 +912,15 @@ class AdminUserViewSet(viewsets.ModelViewSet):
         try:
             user = serializer.save()
             
+            # Debug: Print user role information
+            try:
+                if hasattr(user, 'global_role') and user.global_role:
+                    print(f"User {user.username} created with role: {user.global_role.role} ({user.global_role.get_role_display()})")
+                else:
+                    print(f"User {user.username} created but no role found")
+            except Exception as e:
+                print(f"Error checking role for user {user.username}: {str(e)}")
+            
             # Send email notification with the generated password
             try:
                 self.send_welcome_email(request, user, user._generated_password)
@@ -706,11 +942,50 @@ class AdminUserViewSet(viewsets.ModelViewSet):
         """Send welcome email with login credentials"""
         subject = 'Welcome to Track-Futura - Your Account Details'
         
+        # Get user role information - refresh from database to ensure we have the latest data
+        role_display = 'User'  # Default role
+        company_name = 'N/A'  # Default company name
+        try:
+            # Refresh the user object to get the latest role information
+            user.refresh_from_db()
+            print(f"Debug: Checking role for user {user.username}")
+            
+            if hasattr(user, 'global_role') and user.global_role:
+                role_display = user.global_role.get_role_display()
+                print(f"Debug: Found role via global_role: {role_display}")
+            else:
+                print(f"Debug: No global_role found for user {user.username}")
+                # Try to get role directly from UserRole model
+                try:
+                    user_role = UserRole.objects.get(user=user)
+                    role_display = user_role.get_role_display()
+                    print(f"Debug: Found role via direct query: {role_display}")
+                except UserRole.DoesNotExist:
+                    print(f"Debug: No UserRole found for user {user.username}")
+                    pass
+            
+            # Get company information
+            try:
+                if hasattr(user, 'profile') and user.profile and user.profile.company:
+                    company_name = user.profile.company.name
+                    print(f"Debug: Found company for user {user.username}: {company_name}")
+                else:
+                    print(f"Debug: No company found for user {user.username}")
+            except Exception as e:
+                print(f"Error getting company for user {user.username}: {str(e)}")
+                pass
+                
+        except Exception as e:
+            print(f"Error getting role for user {user.username}: {str(e)}")
+            pass
+        
         # Create email content
         context = {
             'username': user.username,
             'email': user.email,
             'password': password,
+            'role': role_display,
+            'company': company_name,
             'login_url': request.build_absolute_uri('/login/'),
             'site_name': 'Track-Futura'
         }

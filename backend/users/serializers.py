@@ -1,7 +1,62 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.conf import settings
 from .models import UserProfile, Project, Organization, OrganizationMembership, UserRole, Platform, Service, PlatformService, Company, UnifiedUserRecord
+
+def send_welcome_email_utility(request, user, password):
+    """Utility function to send welcome email with login credentials"""
+    subject = 'Welcome to Track-Futura - Your Account Details'
+    
+    # Get user role information
+    role_display = 'User'  # Default role
+    company_name = 'N/A'  # Default company name
+    try:
+        # Refresh the user object to get the latest role information
+        user.refresh_from_db()
+        
+        if hasattr(user, 'global_role') and user.global_role:
+            role_display = user.global_role.get_role_display()
+        else:
+            try:
+                user_role = UserRole.objects.get(user=user)
+                role_display = user_role.get_role_display()
+            except UserRole.DoesNotExist:
+                pass
+        
+        # Get company information
+        try:
+            if hasattr(user, 'profile') and user.profile and user.profile.company:
+                company_name = user.profile.company.name
+        except Exception:
+            pass
+                
+    except Exception:
+        pass
+    
+    # Create email content
+    context = {
+        'username': user.username,
+        'email': user.email,
+        'password': password,
+        'role': role_display,
+        'company': company_name,
+        'login_url': request.build_absolute_uri('/login/'),
+        'site_name': 'Track-Futura'
+    }
+    
+    # Use the email template
+    message = render_to_string('emails/welcome_email.txt', context)
+    
+    send_mail(
+        subject=subject,
+        message=message,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[user.email],
+        fail_silently=False,
+    )
 
 class UserRoleSerializer(serializers.ModelSerializer):
     role_display = serializers.CharField(source='get_role_display', read_only=True)
@@ -15,11 +70,12 @@ class UserSerializer(serializers.ModelSerializer):
     global_role = UserRoleSerializer(read_only=True)
     company_name = serializers.SerializerMethodField()
     company_id = serializers.SerializerMethodField()
+    display_name = serializers.SerializerMethodField()
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'global_role', 'is_active', 'company_name', 'company_id', 'date_joined']
-        read_only_fields = ['id', 'global_role', 'company_name', 'company_id', 'date_joined']
+        fields = ['id', 'username', 'email', 'display_name', 'global_role', 'is_active', 'company_name', 'company_id', 'date_joined']
+        read_only_fields = ['id', 'global_role', 'company_name', 'company_id', 'date_joined', 'display_name']
         # Explicitly exclude first_name and last_name fields
         extra_kwargs = {
             'first_name': {'write_only': False, 'read_only': True},
@@ -30,17 +86,32 @@ class UserSerializer(serializers.ModelSerializer):
         try:
             if hasattr(obj, 'profile') and obj.profile and obj.profile.company:
                 return obj.profile.company.name
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error getting company name for user {obj.id}: {str(e)}")
         return None
     
     def get_company_id(self, obj):
         try:
             if hasattr(obj, 'profile') and obj.profile and obj.profile.company:
                 return obj.profile.company.id
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error getting company id for user {obj.id}: {str(e)}")
         return None
+    
+    def get_display_name(self, obj):
+        """Get the display name from UnifiedUserRecord, fallback to username"""
+        try:
+            if hasattr(obj, 'unified_record') and obj.unified_record and obj.unified_record.name:
+                return obj.unified_record.name
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error getting display name for user {obj.id}: {str(e)}")
+        return obj.username
 
 class UserProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
@@ -305,11 +376,360 @@ class OrganizationMembershipSerializer(serializers.ModelSerializer):
         queryset=User.objects.all(),
         write_only=True
     )
+    display_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
     
     class Meta:
         model = OrganizationMembership
-        fields = ['id', 'user', 'user_id', 'role', 'date_joined']
+        fields = ['id', 'user', 'user_id', 'role', 'display_name', 'date_joined']
         read_only_fields = ['id', 'date_joined']
+    
+    def validate_role(self, value):
+        """Validate role field"""
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Validating role: {value}")
+        
+        # Check if the role is a valid choice
+        valid_roles = [choice[0] for choice in OrganizationMembership.ROLE_CHOICES]
+        if value not in valid_roles:
+            raise serializers.ValidationError(f"Invalid role. Must be one of: {valid_roles}")
+        
+        return value
+    
+    def to_representation(self, instance):
+        """Add debugging to see what's happening during serialization"""
+        try:
+            result = super().to_representation(instance)
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"OrganizationMembershipSerializer.to_representation for membership {instance.id}: {result}")
+            return result
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error in OrganizationMembershipSerializer.to_representation: {str(e)}")
+            # Return a fallback representation
+            return {
+                'id': instance.id,
+                'user': {
+                    'id': instance.user.id if instance.user else None,
+                    'username': instance.user.username if instance.user else 'Unknown',
+                    'email': instance.user.email if instance.user else '',
+                },
+                'role': instance.role,
+                'date_joined': instance.date_joined,
+            }
+
+class OrganizationMemberCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating new users and adding them to organization"""
+    name = serializers.CharField(max_length=255, help_text="Full name of the user")
+    email = serializers.EmailField(help_text="User's email address")
+    role = serializers.ChoiceField(choices=OrganizationMembership.ROLE_CHOICES, default='member')
+    
+    class Meta:
+        model = OrganizationMembership
+        fields = ['name', 'email', 'role']
+    
+    def to_representation(self, instance):
+        """Return a representation that includes user information"""
+        # Handle the case where instance is a dict (from create method)
+        if isinstance(instance, dict):
+            membership = instance['membership']
+            return {
+                'id': membership.id,
+                'user': {
+                    'id': instance['user_id'],
+                    'username': instance['username'],
+                    'email': instance['email'],
+                },
+                'role': membership.role,
+                'display_name': instance['display_name'],
+                'date_joined': membership.date_joined,
+                'organization': {
+                    'id': membership.organization.id,
+                    'name': membership.organization.name,
+                },
+                'user_created': instance['user_created']
+            }
+        
+        # Handle the normal case where instance is an OrganizationMembership object
+        if hasattr(instance, 'user'):
+            return {
+                'id': instance.id,
+                'user': {
+                    'id': instance.user.id,
+                    'username': instance.user.username,
+                    'email': instance.user.email,
+                },
+                'role': instance.role,
+                'display_name': instance.display_name,
+                'date_joined': instance.date_joined,
+                'organization': {
+                    'id': instance.organization.id,
+                    'name': instance.organization.name,
+                }
+            }
+        else:
+            # Fallback if no user is associated
+            return {
+                'id': instance.id,
+                'role': instance.role,
+                'date_joined': instance.date_joined,
+            }
+    
+    def validate_email(self, value):
+        """Check that the email is valid and user can be added to this organization"""
+        organization = self.context.get('organization')
+        if not organization:
+            raise serializers.ValidationError("Organization context is missing.")
+        
+        # Check if organization owner has a company (for new user creation)
+        try:
+            if hasattr(organization.owner, 'profile') and organization.owner.profile:
+                owner_company = organization.owner.profile.company
+                if not owner_company:
+                    raise serializers.ValidationError(
+                        "Organization owner does not have a company assigned. Please contact the administrator to assign a company to the organization owner."
+                    )
+            else:
+                raise serializers.ValidationError(
+                    "Organization owner does not have a profile. Please contact the administrator to set up the organization owner's profile."
+                )
+        except Exception as e:
+            raise serializers.ValidationError(
+                "Unable to verify organization owner's company. Please contact the administrator."
+            )
+        
+        # Check if user exists
+        existing_user = User.objects.filter(email__iexact=value).first()
+        if existing_user:
+            # User exists, check if they can be added to this organization
+            try:
+                # Get the organization owner's company
+                owner_company = organization.owner.profile.company if hasattr(organization.owner, 'profile') and organization.owner.profile else None
+                
+                # Get the existing user's company
+                user_company = existing_user.profile.company if hasattr(existing_user, 'profile') and existing_user.profile else None
+                
+                # If organization owner has no company, allow the addition
+                if not owner_company:
+                    return value
+                
+                # If user has no company, allow the addition (they'll be assigned to owner's company)
+                if not user_company:
+                    return value
+                
+                # Check if user is in the same company as the organization owner
+                if user_company.id != owner_company.id:
+                    raise serializers.ValidationError(
+                        f"User with email {value} belongs to company '{user_company.name}' but this organization belongs to company '{owner_company.name}'. Users can only be added to organizations within the same company."
+                    )
+                
+                # Check if user is already a member of this organization
+                existing_membership = OrganizationMembership.objects.filter(
+                    user=existing_user,
+                    organization=organization
+                ).first()
+                
+                if existing_membership:
+                    raise serializers.ValidationError(
+                        f"User with email {value} is already a member of this organization."
+                    )
+                
+            except (UserProfile.DoesNotExist, AttributeError):
+                # If there are profile issues, allow the addition
+                return value
+        
+        return value
+    
+    def validate_role(self, value):
+        """Check that the role is valid"""
+        valid_roles = [choice[0] for choice in OrganizationMembership.ROLE_CHOICES]
+        if value not in valid_roles:
+            raise serializers.ValidationError(f"Invalid role '{value}'. Valid roles are: {valid_roles}")
+        return value
+    
+    def create(self, validated_data):
+        """Create a new user and add them to the organization"""
+        name = validated_data.pop('name')
+        email = validated_data.pop('email')
+        role = validated_data.pop('role')
+        organization = self.context.get('organization')
+        
+        if not organization:
+            raise serializers.ValidationError("Organization context is missing. Please try again.")
+        
+        # Add some debugging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Creating user with email: {email}, name: {name}, role: {role}")
+        logger.info(f"Available role choices: {OrganizationMembership.ROLE_CHOICES}")
+        
+        # Check if user already exists with this email (case-insensitive)
+        existing_user = User.objects.filter(email__iexact=email).first()
+        if existing_user:
+            # User exists - validation has already checked company compatibility and existing membership
+            user = existing_user
+            logger.info(f"Using existing user {user.id} for organization membership")
+            
+            # Ensure user has a profile and role (they might not if created through other means)
+            user_profile, profile_created = UserProfile.objects.get_or_create(user=user)
+            
+            # If user has no company, assign them to the organization owner's company
+            if not user_profile.company and organization.owner:
+                try:
+                    owner_company = organization.owner.profile.company
+                    if owner_company:
+                        user_profile.company = owner_company
+                        user_profile.save()
+                        logger.info(f"Assigned user {user.id} to company {owner_company.name}")
+                except (UserProfile.DoesNotExist, AttributeError):
+                    logger.warning(f"Organization owner has no company, user {user.id} remains without company")
+            
+            UserRole.objects.get_or_create(user=user, defaults={'role': 'user'})
+            
+            # Create or update UnifiedUserRecord with the name for existing users too
+            from .models import UnifiedUserRecord
+            unified_record, created = UnifiedUserRecord.objects.get_or_create(
+                user=user,
+                defaults={
+                    'name': name,
+                    'email': user.email,
+                    'role': 'user',
+                    'status': 'active' if user.is_active else 'inactive'
+                }
+            )
+            if not created:
+                # Update existing record with the name
+                unified_record.name = name
+                unified_record.save()
+        else:
+            # Check if username (name) already exists
+            if User.objects.filter(username=name).exists():
+                raise serializers.ValidationError(
+                    f"A user with name '{name}' already exists. Please use a different name."
+                )
+            
+            # Double-check that the email doesn't exist (case-insensitive)
+            if User.objects.filter(email__iexact=email).exists():
+                raise serializers.ValidationError(
+                    f"A user with email {email} already exists."
+                )
+            
+            # Generate a random password
+            import secrets
+            import string
+            password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
+            
+            # Create the user
+            user = User.objects.create(
+                username=name,  # Store the full name directly in username
+                email=email,
+                is_active=True
+            )
+            user.set_password(password)
+            user.save()
+            
+            # Create user profile and assign to organization owner's company
+            owner_company = None
+            try:
+                if hasattr(organization.owner, 'profile') and organization.owner.profile:
+                    owner_company = organization.owner.profile.company
+                    logger.info(f"Found owner company: {owner_company.name if owner_company else 'None'}")
+                else:
+                    logger.warning(f"Organization owner {organization.owner.username} has no profile")
+            except Exception as e:
+                logger.error(f"Error getting owner company: {str(e)}")
+            
+            # Create user profile with company assignment
+            if owner_company:
+                user_profile, created = UserProfile.objects.get_or_create(user=user, defaults={'company': owner_company})
+                if not created:
+                    # Profile already exists, update the company
+                    user_profile.company = owner_company
+                    user_profile.save()
+                logger.info(f"Assigned new user {user.id} to company {owner_company.name}")
+            else:
+                # Create profile without company if owner has no company
+                user_profile, created = UserProfile.objects.get_or_create(user=user)
+                logger.warning(f"Created user profile for {user.id} without company (owner has no company)")
+            
+            # Create global role for user
+            UserRole.objects.get_or_create(user=user, defaults={'role': 'user'})
+            
+            # Create or update UnifiedUserRecord with the name
+            from .models import UnifiedUserRecord
+            unified_record, created = UnifiedUserRecord.objects.get_or_create(
+                user=user,
+                defaults={
+                    'name': name,
+                    'email': user.email,
+                    'role': 'user',
+                    'status': 'active' if user.is_active else 'inactive'
+                }
+            )
+            if not created:
+                # Update existing record with the name
+                unified_record.name = name
+                unified_record.save()
+            
+            # Send welcome email with credentials
+            send_welcome_email_utility(
+                self.context['request'], 
+                user, 
+                password
+            )
+        
+        # Validation has already checked for existing membership, so we can proceed
+        
+        # Create organization membership
+        logger.info(f"Creating organization membership for user {user.id} in organization {organization.id} with role {role}")
+        try:
+            membership = OrganizationMembership.objects.create(
+                user=user,
+                organization=organization,
+                role=role,
+                display_name=name  # Store the name input in the membership display_name field
+            )
+            logger.info(f"Successfully created membership {membership.id}")
+            
+            # Verify company assignment
+            try:
+                user.refresh_from_db()
+                if hasattr(user, 'profile') and user.profile:
+                    company_name = user.profile.company.name if user.profile.company else "No company"
+                    logger.info(f"Final verification: User {user.id} is assigned to company: {company_name}")
+                else:
+                    logger.warning(f"Final verification: User {user.id} has no profile")
+            except Exception as e:
+                logger.error(f"Error verifying company assignment: {str(e)}")
+            
+            # Return membership with additional context about whether user was created or existing
+            return {
+                'membership': membership,
+                'user_created': not existing_user,
+                'user_id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'display_name': membership.display_name  # Use the display_name from the membership
+            }
+        except Exception as e:
+            logger.error(f"Failed to create organization membership: {str(e)}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            logger.error(f"Exception args: {e.args}")
+            
+            # If membership creation fails, we should clean up the user we just created
+            # But only if this is a new user (not an existing one)
+            if not existing_user:
+                try:
+                    user.delete()
+                    logger.info(f"Cleaned up user {user.id} after membership creation failure")
+                except:
+                    logger.error(f"Failed to clean up user {user.id} after membership creation failure")
+                    pass  # If user deletion fails, we can't do much about it
+            
+            # Re-raise the exception to be handled by the view
+            raise e
 
 class OrganizationSerializer(serializers.ModelSerializer):
     owner_name = serializers.SerializerMethodField()

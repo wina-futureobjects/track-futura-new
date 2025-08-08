@@ -12,8 +12,6 @@ import {
   DialogActions,
   IconButton,
   CircularProgress,
-  Breadcrumbs,
-  Link,
   TableContainer,
   Table,
   TableHead,
@@ -24,18 +22,18 @@ import {
   Tab,
   Select,
   MenuItem,
-  InputAdornment,
   FormControl,
   InputLabel,
   SelectChangeEvent,
-  Grid,
   Card,
-  CardContent,
   CardActionArea,
   Chip,
   ToggleButtonGroup,
   ToggleButton,
   Tooltip,
+  Menu,
+  ListItemIcon,
+  ListItemText,
 } from '@mui/material';
 import { useNavigate, useParams } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
@@ -84,6 +82,7 @@ interface Member {
     is_active: boolean;
   };
   role: string;
+  display_name?: string;
   date_joined: string;
 }
 
@@ -186,6 +185,7 @@ const OrganizationProjects = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState('last viewed');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
@@ -197,10 +197,40 @@ const OrganizationProjects = () => {
     is_public: false
   });
   const [newMemberEmail, setNewMemberEmail] = useState('');
+  const [newMemberName, setNewMemberName] = useState('');
   const [newMemberRole, setNewMemberRole] = useState('member');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [statusChangeDialogOpen, setStatusChangeDialogOpen] = useState(false);
   const [pendingStatusChange, setPendingStatusChange] = useState<{ userId: number; newStatus: boolean } | null>(null);
+  const [memberActionMenuAnchor, setMemberActionMenuAnchor] = useState<null | HTMLElement>(null);
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [projectActionMenuAnchor, setProjectActionMenuAnchor] = useState<null | HTMLElement>(null);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  
+  // Member edit dialog states
+  const [editMemberDialogOpen, setEditMemberDialogOpen] = useState(false);
+  const [editMemberForm, setEditMemberForm] = useState({
+    name: '',
+    role: 'member'
+  });
+  const [isEditingMember, setIsEditingMember] = useState(false);
+  
+  // Project edit dialog states
+  const [editProjectDialogOpen, setEditProjectDialogOpen] = useState(false);
+  const [editProjectForm, setEditProjectForm] = useState({
+    name: '',
+    description: '',
+    is_public: false
+  });
+  const [isEditingProject, setIsEditingProject] = useState(false);
+  
+  // Delete confirmation dialogs
+  const [deleteMemberDialogOpen, setDeleteMemberDialogOpen] = useState(false);
+  const [deleteProjectDialogOpen, setDeleteProjectDialogOpen] = useState(false);
+  const [isDeletingMember, setIsDeletingMember] = useState(false);
+  const [isDeletingProject, setIsDeletingProject] = useState(false);
 
   useEffect(() => {
     if (organizationId) {
@@ -266,7 +296,13 @@ const OrganizationProjects = () => {
       }
       
       const data = await response.json();
-      setMembers(Array.isArray(data) ? data : []);
+      console.log('Raw API response:', data);
+      
+      // Handle paginated response from Django REST Framework
+      const membersData = data.results || data;
+      console.log('Members data:', membersData);
+      
+      setMembers(Array.isArray(membersData) ? membersData : []);
     } catch (error) {
       console.error('Error fetching members:', error);
       setMembers([]);
@@ -299,7 +335,10 @@ const OrganizationProjects = () => {
 
   const handleAddMember = () => {
     setNewMemberEmail('');
+    setNewMemberName('');
     setNewMemberRole('member');
+    setError('');
+    setIsSubmitting(false);
     setOpenAddMemberDialog(true);
   };
 
@@ -353,49 +392,88 @@ const OrganizationProjects = () => {
       return;
     }
 
+    if (!newMemberName.trim()) {
+      setError('Name is required');
+      return;
+    }
+
+    if (isSubmitting) {
+      return; // Prevent double submission
+    }
+
+    setIsSubmitting(true);
+    setError('');
+
     try {
-      // First, try to find the user by email
-      const userResponse = await apiFetch(`/api/users/search/?email=${encodeURIComponent(newMemberEmail)}`);
-      
-      if (!userResponse.ok) {
-        throw new Error('Failed to find user with this email');
-      }
-      
-      const userData = await userResponse.json();
-      
-      if (!userData || !userData.id) {
-        throw new Error('User not found with this email');
-      }
-      
-      // Now add the user to the organization
+      // Create new user and add to organization
       const response = await apiFetch(`/api/users/organizations/${organizationId}/members/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          user_id: userData.id,
+          name: newMemberName.trim(),
+          email: newMemberEmail.trim(),
           role: newMemberRole
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to add member to organization');
+        const errorData = await response.json();
+        let errorMessage = 'Failed to add member to organization';
+        
+        if (errorData.detail) {
+          errorMessage = errorData.detail;
+        } else if (typeof errorData === 'object') {
+          errorMessage = Object.entries(errorData)
+            .map(([field, errors]) => `${field}: ${errors}`)
+            .join(', ');
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      const responseData = await response.json();
+      console.log('Member added successfully:', responseData);
+
+      // Show success message based on whether user was created or existing
+      if (responseData.user_created) {
+        // New user was created
+        setSuccessMessage(`New user "${responseData.user.display_name || responseData.user.username}" created and added to organization. Login credentials have been sent to ${responseData.user.email}.`);
+      } else {
+        // Existing user was added
+        setSuccessMessage(`Existing user "${responseData.user.display_name || responseData.user.username}" added to organization.`);
       }
 
       fetchMembers();
       setOpenAddMemberDialog(false);
+      setError('');
+      // Reset form
+      setNewMemberEmail('');
+      setNewMemberName('');
+      setNewMemberRole('member');
+      
+      // Clear success message after 5 seconds
+      setTimeout(() => setSuccessMessage(''), 5000);
     } catch (error) {
       console.error('Error adding member:', error);
       setError(error instanceof Error ? error.message : 'Failed to add member. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
+    // Clear member search when switching away from members tab
+    if (newValue !== 1) {
+      setMemberSearchQuery('');
+      setRoleFilter('all');
+    }
   };
 
   const handleSortChange = (event: SelectChangeEvent) => {
+    console.log('Sort changed to:', event.target.value);
     setSortBy(event.target.value);
   };
 
@@ -419,7 +497,8 @@ const OrganizationProjects = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update user status');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to update user status');
       }
 
       // Update the user in the local state
@@ -431,10 +510,10 @@ const OrganizationProjects = () => {
         )
       );
 
-      setError(null);
+      setError('');
     } catch (error) {
       console.error('Error updating user status:', error);
-      setError('Failed to update user status');
+      setError(error instanceof Error ? error.message : 'Failed to update user status');
     }
   };
 
@@ -456,14 +535,302 @@ const OrganizationProjects = () => {
     setPendingStatusChange(null);
   };
 
-  // Filter projects based on search query
-  const filteredProjects = projects.filter(project => 
-    project.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleMemberActionClick = (event: React.MouseEvent<HTMLElement>, member: Member) => {
+    event.stopPropagation();
+    console.log('handleMemberActionClick called with member:', member);
+    console.log('member.user:', member.user);
+    setMemberActionMenuAnchor(event.currentTarget);
+    setSelectedMember(member);
+  };
+
+  const handleMemberActionClose = () => {
+    setMemberActionMenuAnchor(null);
+    setSelectedMember(null);
+  };
+
+  const handleEditMemberRole = () => {
+    console.log('handleEditMemberRole called');
+    console.log('selectedMember:', selectedMember);
+    if (selectedMember) {
+      setEditMemberForm({ 
+        name: selectedMember.display_name || selectedMember.user.username,
+        role: selectedMember.role 
+      });
+      setEditMemberDialogOpen(true);
+    }
+    // Don't clear selectedMember here - only close the menu
+    setMemberActionMenuAnchor(null);
+  };
+
+  const handleRemoveMember = () => {
+    console.log('handleRemoveMember called');
+    console.log('selectedMember:', selectedMember);
+    console.log('selectedMember?.user:', selectedMember?.user);
+    setDeleteMemberDialogOpen(true);
+    // Don't clear selectedMember here - only close the menu
+    setMemberActionMenuAnchor(null);
+  };
+
+  const handleProjectActionClick = (event: React.MouseEvent<HTMLElement>, project: Project) => {
+    event.stopPropagation();
+    setProjectActionMenuAnchor(event.currentTarget);
+    setSelectedProject(project);
+  };
+
+  const handleProjectActionClose = () => {
+    setProjectActionMenuAnchor(null);
+    setSelectedProject(null);
+  };
+
+  const handleEditProject = () => {
+    console.log('handleEditProject called');
+    console.log('selectedProject:', selectedProject);
+    if (selectedProject) {
+      setEditProjectForm({
+        name: selectedProject.name,
+        description: selectedProject.description || '',
+        is_public: selectedProject.is_public
+      });
+      setEditProjectDialogOpen(true);
+    }
+    setProjectActionMenuAnchor(null); // Only close the menu, don't clear selectedProject
+  };
+
+  const handleDeleteProject = () => {
+    setDeleteProjectDialogOpen(true);
+    setProjectActionMenuAnchor(null); // Only close the menu, don't clear selectedProject
+  };
+
+  // API functions for member operations
+  const handleUpdateMember = async () => {
+    if (!selectedMember || !organizationId) return;
+
+    // Validate form data
+    if (!editMemberForm.name.trim()) {
+      setError('Name is required');
+      return;
+    }
+
+    console.log('handleUpdateMember called');
+    console.log('selectedMember:', selectedMember);
+    console.log('editMemberForm:', editMemberForm);
+    console.log('organizationId:', organizationId);
+
+    setIsEditingMember(true);
+    setError('');
+
+    try {
+      // Update the member's display_name and role
+      const memberResponse = await apiFetch(`/api/users/organizations/${organizationId}/members/${selectedMember.id}/`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          display_name: editMemberForm.name,
+          role: editMemberForm.role 
+        }),
+      });
+
+      console.log('Member update response status:', memberResponse.status);
+      console.log('Member update response ok:', memberResponse.ok);
+
+      if (!memberResponse.ok) {
+        const errorData = await memberResponse.json().catch(() => ({}));
+        console.log('Member update error data:', errorData);
+        throw new Error(errorData.detail || errorData.error || 'Failed to update member role');
+      }
+
+      console.log('Member updated successfully');
+
+      // Update the member in local state
+      setMembers(prevMembers => 
+        prevMembers.map(member => 
+          member.id === selectedMember.id 
+            ? { 
+                ...member, 
+                role: editMemberForm.role,
+                display_name: editMemberForm.name
+              }
+            : member
+        )
+      );
+
+      setEditMemberDialogOpen(false);
+      setSelectedMember(null);
+      setMemberActionMenuAnchor(null);
+    } catch (error) {
+      console.error('Error updating member:', error);
+      setError(error instanceof Error ? error.message : 'Failed to update member');
+      // Clear selectedMember on error too
+      setSelectedMember(null);
+      setMemberActionMenuAnchor(null);
+    } finally {
+      setIsEditingMember(false);
+    }
+  };
+
+  const handleDeleteMember = async () => {
+    if (!selectedMember || !organizationId) return;
+
+    setIsDeletingMember(true);
+    setError('');
+
+    try {
+      console.log('Attempting to delete member:', selectedMember);
+      console.log('Organization ID:', organizationId);
+      console.log('Member ID:', selectedMember.id);
+      
+      const response = await apiFetch(`/api/users/organizations/${organizationId}/members/${selectedMember.id}/`, {
+        method: 'DELETE',
+      });
+
+      console.log('Delete response status:', response.status);
+      console.log('Delete response ok:', response.ok);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.log('Error data:', errorData);
+        throw new Error(errorData.detail || errorData.error || 'Failed to remove member');
+      }
+
+      console.log('Member deleted successfully');
+
+      // Remove the member from local state
+      setMembers(prevMembers => 
+        prevMembers.filter(member => member.id !== selectedMember.id)
+      );
+
+      setDeleteMemberDialogOpen(false);
+      setSelectedMember(null);
+      setMemberActionMenuAnchor(null);
+    } catch (error) {
+      console.error('Error removing member:', error);
+      setError(error instanceof Error ? error.message : 'Failed to remove member');
+      // Clear selectedMember on error too
+      setSelectedMember(null);
+      setMemberActionMenuAnchor(null);
+    } finally {
+      setIsDeletingMember(false);
+    }
+  };
+
+  // API functions for project operations
+  const handleUpdateProject = async () => {
+    if (!selectedProject) return;
+
+    console.log('handleUpdateProject called');
+    console.log('selectedProject:', selectedProject);
+    console.log('editProjectForm:', editProjectForm);
+
+    setIsEditingProject(true);
+    setError('');
+
+    try {
+      const response = await apiFetch(`/api/users/projects/${selectedProject.id}/`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: editProjectForm.name,
+          description: editProjectForm.description || null,
+          is_public: editProjectForm.is_public
+        }),
+      });
+
+      console.log('Project update response status:', response.status);
+      console.log('Project update response ok:', response.ok);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.log('Project update error data:', errorData);
+        throw new Error(errorData.detail || 'Failed to update project');
+      }
+
+      console.log('Project updated successfully');
+
+      // Update the project in local state
+      setProjects(prevProjects => 
+        prevProjects.map(project => 
+          project.id === selectedProject.id 
+            ? { 
+                ...project, 
+                name: editProjectForm.name,
+                description: editProjectForm.description || null,
+                is_public: editProjectForm.is_public
+              }
+            : project
+        )
+      );
+
+      setEditProjectDialogOpen(false);
+      setSelectedProject(null);
+    } catch (error) {
+      console.error('Error updating project:', error);
+      setError(error instanceof Error ? error.message : 'Failed to update project');
+      setSelectedProject(null); // Clear selectedProject on error too
+    } finally {
+      setIsEditingProject(false);
+    }
+  };
+
+  const handleDeleteProjectConfirm = async () => {
+    if (!selectedProject) return;
+
+    setIsDeletingProject(true);
+    setError('');
+
+    try {
+      const response = await apiFetch(`/api/users/projects/${selectedProject.id}/`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to delete project');
+      }
+
+      // Remove the project from local state
+      setProjects(prevProjects => 
+        prevProjects.filter(project => project.id !== selectedProject.id)
+      );
+
+      setDeleteProjectDialogOpen(false);
+      setSelectedProject(null);
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      setError(error instanceof Error ? error.message : 'Failed to delete project');
+      setSelectedProject(null); // Clear selectedProject on error too
+    } finally {
+      setIsDeletingProject(false);
+    }
+  };
+
+  // Filter and sort projects
+  const filteredAndSortedProjects = projects
+    .filter(project => 
+      project.name.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
+      console.log(`Sorting projects: ${a.name} vs ${b.name} by ${sortBy}`);
+      switch (sortBy) {
+        case 'name':
+          return a.name.localeCompare(b.name);
+        case 'newest':
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        case 'oldest':
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        case 'last viewed':
+        default:
+          // For "last viewed", we'll use updated_at as a proxy since we don't have view tracking
+          return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+      }
+    });
 
   // Return either grid or list view of projects
   const renderProjects = () => {
-    if (filteredProjects.length === 0) {
+    if (filteredAndSortedProjects.length === 0) {
       return (
         <Paper sx={{ p: 4, textAlign: 'center', mt: 2, borderRadius: 8, border: '1px solid rgba(0,0,0,0.08)' }}>
           <Typography variant="h6" gutterBottom>No projects found</Typography>
@@ -499,7 +866,7 @@ const OrganizationProjects = () => {
     if (viewMode === 'grid') {
       return (
         <Box sx={{ display: 'flex', flexWrap: 'wrap', mx: -1 }}>
-          {filteredProjects.map((project) => (
+          {filteredAndSortedProjects.map((project) => (
             <Box 
               key={project.id} 
               sx={{ 
@@ -528,10 +895,7 @@ const OrganizationProjects = () => {
                 {/* Action button outside CardActionArea */}
                 <IconButton 
                   size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // Project actions menu
-                  }}
+                  onClick={(e) => handleProjectActionClick(e, project)}
                   sx={{ 
                     position: 'absolute', 
                     top: 8, 
@@ -647,7 +1011,7 @@ const OrganizationProjects = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredProjects.map((project) => (
+            {filteredAndSortedProjects.map((project) => (
               <TableRow 
                 key={project.id}
                 hover
@@ -682,10 +1046,7 @@ const OrganizationProjects = () => {
                 <TableCell align="center">
                   <IconButton 
                     size="small"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // Project actions menu
-                    }}
+                    onClick={(e) => handleProjectActionClick(e, project)}
                   >
                     <MoreVertIcon fontSize="small" />
                   </IconButton>
@@ -700,11 +1061,15 @@ const OrganizationProjects = () => {
 
   // Filter members based on search query and role filter
   const filteredMembers = members.filter(member => {
-    const matchesSearch = member.user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         member.user.email.toLowerCase().includes(searchQuery.toLowerCase());
+    console.log('Filtering member:', member);
+    
+            const matchesSearch = (member.display_name || member.user.username).toLowerCase().includes(memberSearchQuery.toLowerCase()) ||
+                              member.user.email.toLowerCase().includes(memberSearchQuery.toLowerCase());
     
     const matchesRoleFilter = roleFilter === 'all' || 
                              member.role === roleFilter;
+    
+    console.log('Search match:', matchesSearch, 'Role match:', matchesRoleFilter);
     
     return matchesSearch && matchesRoleFilter;
   });
@@ -895,7 +1260,7 @@ const OrganizationProjects = () => {
 
             {/* Projects Count */}
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Showing {filteredProjects.length} project{filteredProjects.length !== 1 ? 's' : ''}
+              Showing {filteredAndSortedProjects.length} project{filteredAndSortedProjects.length !== 1 ? 's' : ''}
             </Typography>
 
             {/* Projects Display */}
@@ -972,9 +1337,8 @@ const OrganizationProjects = () => {
                     onChange={(e) => setRoleFilter(e.target.value)}
                   >
                     <MenuItem value="all">All Roles</MenuItem>
+                    <MenuItem value="member">User</MenuItem>
                     <MenuItem value="admin">Admin</MenuItem>
-                    <MenuItem value="member">Member</MenuItem>
-                    <MenuItem value="viewer">Viewer</MenuItem>
                   </Select>
                 </FormControl>
                 <Box sx={{ 
@@ -992,8 +1356,8 @@ const OrganizationProjects = () => {
                     placeholder="Search members by name or email"
                     variant="standard"
                     fullWidth
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    value={memberSearchQuery}
+                    onChange={(e) => setMemberSearchQuery(e.target.value)}
                     sx={{ 
                       '& .MuiInput-root': {
                         '&::before, &::after': {
@@ -1031,6 +1395,7 @@ const OrganizationProjects = () => {
                     <Table>
                       <TableHead sx={{ bgcolor: '#f9fafb' }}>
                         <TableRow>
+                          <TableCell sx={{ fontWeight: 600, color: 'rgba(0, 0, 0, 0.87)', py: 1.5 }}>Name</TableCell>
                           <TableCell sx={{ fontWeight: 600, color: 'rgba(0, 0, 0, 0.87)', py: 1.5 }}>Email</TableCell>
                           <TableCell sx={{ fontWeight: 600, color: 'rgba(0, 0, 0, 0.87)', py: 1.5 }}>Role</TableCell>
                           <TableCell sx={{ fontWeight: 600, color: 'rgba(0, 0, 0, 0.87)', py: 1.5 }}>Status</TableCell>
@@ -1041,19 +1406,26 @@ const OrganizationProjects = () => {
                       <TableBody>
                         {filteredMembers.map((member) => (
                           <TableRow key={member.id} hover>
+                            <TableCell sx={{ fontWeight: 500, color: theme => theme.palette.primary.main }}>
+                              {member.display_name || member.user.username}
+                            </TableCell>
                             <TableCell>{member.user.email}</TableCell>
                             <TableCell>
                               <Chip 
-                                label={member.role} 
+                                label={
+                                  member.role === 'member' ? 'User' : 
+                                  member.role === 'admin' ? 'Admin' : 
+                                  member.role
+                                } 
                                 size="small"
                                 sx={{ 
                                   bgcolor: 
-                                    member.role === 'admin' ? 'rgba(250, 173, 20, 0.1)' : 
                                     member.role === 'member' ? 'rgba(52, 152, 219, 0.1)' : 
+                                    member.role === 'admin' ? 'rgba(231, 76, 60, 0.1)' :
                                     'rgba(149, 165, 166, 0.1)',
                                   color:
-                                    member.role === 'admin' ? 'rgb(250, 173, 20)' : 
                                     member.role === 'member' ? 'rgb(52, 152, 219)' : 
+                                    member.role === 'admin' ? 'rgb(231, 76, 60)' :
                                     'rgb(149, 165, 166)',
                                   borderRadius: '4px',
                                   fontWeight: 500,
@@ -1077,10 +1449,13 @@ const OrganizationProjects = () => {
                                   fontWeight: 600,
                                   fontSize: '0.75rem',
                                   minWidth: '80px',
+                                  bgcolor: member.user.is_active ? '#178a3a' : '#b71c1c',
+                                  color: '#ffffff',
                                   '&:hover': {
                                     transform: 'scale(1.08)',
-                                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                                    filter: 'brightness(1.1)'
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.18)',
+                                    filter: 'brightness(0.95)',
+                                    bgcolor: member.user.is_active ? '#11682b' : '#7f1818'
                                   },
                                   '& .MuiChip-icon': {
                                     fontSize: '1rem',
@@ -1097,9 +1472,7 @@ const OrganizationProjects = () => {
                             <TableCell align="center">
                               <IconButton 
                                 size="small"
-                                onClick={() => {
-                                  // Member actions menu
-                                }}
+                                onClick={(e) => handleMemberActionClick(e, member)}
                               >
                                 <MoreVertIcon fontSize="small" />
                               </IconButton>
@@ -1409,14 +1782,25 @@ const OrganizationProjects = () => {
         }}
       >
         <DialogTitle sx={{ pb: 1 }}>
-          <Typography variant="h5" fontWeight={600}>Invite New Member</Typography>
+          <Typography variant="h5" fontWeight={600}>Add Member</Typography>
         </DialogTitle>
         <DialogContent sx={{ pb: 2, pt: 2 }}>
           <Typography variant="body2" color="text.secondary" paragraph>
-            Invite a new member to join your organization. They will receive an email invitation.
+            Add a member to your organization. If the user doesn't exist, a new account will be created and they will receive login credentials via email. If the user already exists, they will be added to this organization.
           </Typography>
           <TextField
             autoFocus
+            margin="dense"
+            id="name"
+            label="Full Name"
+            type="text"
+            fullWidth
+            variant="outlined"
+            value={newMemberName}
+            onChange={(e) => setNewMemberName(e.target.value)}
+            sx={{ mb: 3, mt: 2 }}
+          />
+          <TextField
             margin="dense"
             id="email"
             label="Email Address"
@@ -1425,7 +1809,7 @@ const OrganizationProjects = () => {
             variant="outlined"
             value={newMemberEmail}
             onChange={(e) => setNewMemberEmail(e.target.value)}
-            sx={{ mb: 3, mt: 2 }}
+            sx={{ mb: 3 }}
           />
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
             <Typography variant="body2" sx={{ mr: 2 }}>
@@ -1438,18 +1822,12 @@ const OrganizationProjects = () => {
                 size="small"
                 sx={{ minWidth: 120 }}
               >
-                <MenuItem value="admin">Admin</MenuItem>
-                <MenuItem value="member">Member</MenuItem>
-                <MenuItem value="viewer">Viewer</MenuItem>
+                <MenuItem value="member">User</MenuItem>
               </Select>
             </FormControl>
           </Box>
           <Typography variant="caption" color="text.secondary">
-            {newMemberRole === 'admin' 
-              ? "Admins can manage members, projects, and organization settings." 
-              : newMemberRole === 'member'
-                ? "Members can create and edit projects, but cannot manage organization settings."
-                : "Viewers can only view projects, but cannot edit them."}
+            Users can create and edit projects, but cannot manage organization settings.
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid rgba(0, 0, 0, 0.05)' }}>
@@ -1462,7 +1840,7 @@ const OrganizationProjects = () => {
                      <Button 
              onClick={handleAddMemberSubmit} 
              variant="contained"
-             disabled={!newMemberEmail.trim()}
+             disabled={!newMemberEmail.trim() || !newMemberName.trim() || isSubmitting}
              sx={{ 
                borderRadius: 2,
                bgcolor: '#62EF83',
@@ -1476,7 +1854,7 @@ const OrganizationProjects = () => {
                }
              }}
            >
-             Send Invitation
+             {isSubmitting ? 'Adding...' : 'Add Member'}
            </Button>
         </DialogActions>
       </Dialog>
@@ -1519,6 +1897,329 @@ const OrganizationProjects = () => {
         </DialogActions>
       </Dialog>
 
+      {/* Edit Member Dialog */}
+      <Dialog 
+        open={editMemberDialogOpen} 
+        onClose={() => {
+          setEditMemberDialogOpen(false);
+          setSelectedMember(null);
+          setMemberActionMenuAnchor(null);
+        }}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{
+          sx: {
+            borderRadius: '12px',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
+          }
+        }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Typography variant="h5" fontWeight={600}>Edit Member</Typography>
+        </DialogTitle>
+        <DialogContent sx={{ pb: 2, pt: 2 }}>
+          <Typography variant="body2" color="text.secondary" paragraph>
+            Update the details for {selectedMember?.display_name || selectedMember?.user.username} ({selectedMember?.user.email})
+          </Typography>
+          
+          <TextField
+            autoFocus
+            margin="dense"
+            id="name"
+            label="Name"
+            type="text"
+            fullWidth
+            variant="outlined"
+            value={editMemberForm.name}
+            onChange={(e) => setEditMemberForm({ ...editMemberForm, name: e.target.value })}
+            sx={{ mb: 3, mt: 2 }}
+          />
+          
+          <Box sx={{ mt: 3 }}>
+            <FormControl fullWidth>
+              <InputLabel>Role</InputLabel>
+              <Select
+                value={editMemberForm.role}
+                label="Role"
+                onChange={(e) => setEditMemberForm({ ...editMemberForm, role: e.target.value })}
+              >
+                <MenuItem value="member">User</MenuItem>
+                <MenuItem value="admin">Admin</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid rgba(0, 0, 0, 0.05)' }}>
+          <Button 
+            onClick={() => {
+              setEditMemberDialogOpen(false);
+              setSelectedMember(null);
+              setMemberActionMenuAnchor(null);
+            }}
+            sx={{ color: 'text.secondary' }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleUpdateMember} 
+            variant="contained"
+            disabled={isEditingMember || !editMemberForm.name.trim()}
+            sx={{ 
+              borderRadius: 2,
+              bgcolor: '#62EF83',
+              color: '#000000',
+              textTransform: 'none',
+              px: 3,
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              '&.Mui-disabled': {
+                bgcolor: 'rgba(26, 115, 232, 0.5)',
+                color: 'white'
+              }
+            }}
+          >
+            {isEditingMember ? 'Updating...' : 'Update Member'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Member Confirmation Dialog */}
+      <Dialog
+        open={deleteMemberDialogOpen}
+        onClose={() => setDeleteMemberDialogOpen(false)}
+        PaperProps={{
+          sx: {
+            borderRadius: '12px',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
+          }
+        }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Typography variant="h5" fontWeight={600} sx={{ color: '#d32f2f' }}>Remove Member</Typography>
+        </DialogTitle>
+        <DialogContent sx={{ pb: 2, pt: 2 }}>
+          <DialogContentText>
+            Are you sure you want to remove <strong>{selectedMember?.display_name || selectedMember?.user?.username || 'Unknown User'}</strong> ({selectedMember?.user?.email || 'No email'}) from this organization?
+            <br></br>
+            This action cannot be undone and the member will lose access to all organization projects.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid rgba(0, 0, 0, 0.05)' }}>
+          <Button 
+            onClick={() => {
+              setDeleteMemberDialogOpen(false);
+              setSelectedMember(null);
+              setMemberActionMenuAnchor(null);
+            }}
+            sx={{ color: 'text.secondary' }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleDeleteMember} 
+            variant="contained"
+            disabled={isDeletingMember}
+            sx={{ 
+              borderRadius: 2,
+              bgcolor: '#d32f2f',
+              color: '#fff',
+              textTransform: 'none',
+              px: 3,
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              '&:hover': {
+                bgcolor: '#b71c1c',
+              },
+              '&.Mui-disabled': {
+                bgcolor: 'rgba(211, 47, 47, 0.5)',
+                color: 'white'
+              }
+            }}
+          >
+            {isDeletingMember ? 'Removing...' : 'Remove Member'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Project Dialog */}
+      <Dialog 
+        open={editProjectDialogOpen} 
+        onClose={() => {
+          setEditProjectDialogOpen(false);
+          setSelectedProject(null);
+        }}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{
+          sx: {
+            borderRadius: '12px',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
+          }
+        }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Typography variant="h5" fontWeight={600}>Edit Project</Typography>
+        </DialogTitle>
+        <DialogContent sx={{ pb: 2, pt: 2 }}>
+          <Typography variant="body2" color="text.secondary" paragraph>
+            Update the project details
+          </Typography>
+          
+          <TextField
+            autoFocus
+            margin="dense"
+            id="name"
+            label="Project Name"
+            type="text"
+            fullWidth
+            variant="outlined"
+            value={editProjectForm.name}
+            onChange={(e) => setEditProjectForm({ ...editProjectForm, name: e.target.value })}
+            sx={{ mb: 3, mt: 2 }}
+          />
+          
+          <TextField
+            margin="dense"
+            id="description"
+            label="Description (Optional)"
+            type="text"
+            fullWidth
+            variant="outlined"
+            multiline
+            rows={3}
+            value={editProjectForm.description}
+            onChange={(e) => setEditProjectForm({ ...editProjectForm, description: e.target.value })}
+            sx={{ mb: 3 }}
+          />
+          
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+            <Typography variant="body2" sx={{ mr: 0.5 }}>
+              Project visibility 
+            </Typography>
+            <Tooltip
+              title={editProjectForm.is_public
+                ? "Public projects can be viewed by anyone with the link."
+                : "Private projects are only visible to organization members."}
+              arrow
+              placement="bottom"
+              componentsProps={{
+                tooltip: {
+                  sx: { 
+                    whiteSpace: 'nowrap',
+                    width: 'fit-content',
+                    maxWidth: 'none',
+                    minWidth: 'unset',
+                    p: 1
+                  }
+                }
+              }}
+            >
+              <IconButton size="small" sx={{ mr: 0.25, p: 0.25, color: 'text.secondary' }}>
+                <HelpOutlineIcon fontSize="inherit" sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Tooltip>
+            <Typography variant="body2" sx={{ mr: 2 }}>
+              :
+            </Typography>
+            <FormControl component="fieldset">
+              <Select
+                value={editProjectForm.is_public ? "public" : "private"}
+                onChange={(e) => setEditProjectForm({ ...editProjectForm, is_public: e.target.value === "public" })}
+                size="small"
+                sx={{ minWidth: 120 }}
+              >
+                <MenuItem value="private">Private</MenuItem>
+                <MenuItem value="public">Public</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid rgba(0, 0, 0, 0.05)' }}>
+          <Button 
+            onClick={() => {
+              setEditProjectDialogOpen(false);
+              setSelectedProject(null);
+            }}
+            sx={{ color: 'text.secondary' }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleUpdateProject} 
+            variant="contained"
+            disabled={!editProjectForm.name.trim() || isEditingProject}
+            sx={{ 
+              borderRadius: 2,
+              bgcolor: '#62EF83',
+              color: '#000000',
+              textTransform: 'none',
+              px: 3,
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              '&.Mui-disabled': {
+                bgcolor: 'rgba(26, 115, 232, 0.5)',
+                color: 'white'
+              }
+            }}
+          >
+            {isEditingProject ? 'Updating...' : 'Update Project'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Project Confirmation Dialog */}
+      <Dialog
+        open={deleteProjectDialogOpen}
+        onClose={() => setDeleteProjectDialogOpen(false)}
+        PaperProps={{
+          sx: {
+            borderRadius: '12px',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
+          }
+        }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Typography variant="h5" fontWeight={600} sx={{ color: '#d32f2f' }}>Delete Project</Typography>
+        </DialogTitle>
+        <DialogContent sx={{ pb: 2, pt: 2 }}>
+          <DialogContentText>
+            Are you sure you want to delete the project <strong>"{selectedProject?.name || 'Unknown Project'}"</strong>?
+            <br></br>
+            This action cannot be undone and all project data will be permanently lost.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid rgba(0, 0, 0, 0.05)' }}>
+          <Button 
+            onClick={() => {
+              setDeleteProjectDialogOpen(false);
+              setSelectedProject(null);
+            }}
+            sx={{ color: 'text.secondary' }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleDeleteProjectConfirm} 
+            variant="contained"
+            disabled={isDeletingProject}
+            sx={{ 
+              borderRadius: 2,
+              bgcolor: '#d32f2f',
+              color: '#fff',
+              textTransform: 'none',
+              px: 3,
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              '&:hover': {
+                bgcolor: '#b71c1c',
+              },
+              '&.Mui-disabled': {
+                bgcolor: 'rgba(211, 47, 47, 0.5)',
+                color: 'white'
+              }
+            }}
+          >
+            {isDeletingProject ? 'Deleting...' : 'Delete Project'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Error message */}
       {error && (
         <Paper sx={{ 
@@ -1535,6 +2236,80 @@ const OrganizationProjects = () => {
           <Typography variant="body2" fontWeight={500}>{error}</Typography>
         </Paper>
       )}
+
+      {/* Success message */}
+      {successMessage && (
+        <Paper sx={{ 
+          mt: 3,
+          p: 2, 
+          bgcolor: 'rgba(98, 239, 131, 0.1)',
+          color: 'success.main',
+          borderRadius: 3,
+          border: '1px solid rgba(98, 239, 131, 0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1
+        }}>
+          <CheckCircleIcon sx={{ color: 'success.main', fontSize: 20 }} />
+          <Typography variant="body2" fontWeight={500}>{successMessage}</Typography>
+        </Paper>
+      )}
+
+      {/* Member Action Menu */}
+      <Menu
+        anchorEl={memberActionMenuAnchor}
+        open={Boolean(memberActionMenuAnchor)}
+        onClose={handleMemberActionClose}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'right',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'right',
+        }}
+      >
+        <MenuItem onClick={handleEditMemberRole}>
+          <ListItemIcon>
+            <SettingsIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Edit Role</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleRemoveMember} sx={{ color: 'error.main' }}>
+          <ListItemIcon>
+            <CancelIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Remove from Organization</ListItemText>
+        </MenuItem>
+      </Menu>
+
+      {/* Project Action Menu */}
+      <Menu
+        anchorEl={projectActionMenuAnchor}
+        open={Boolean(projectActionMenuAnchor)}
+        onClose={handleProjectActionClose}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'right',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'right',
+        }}
+      >
+        <MenuItem onClick={handleEditProject}>
+          <ListItemIcon>
+            <SettingsIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Edit Project</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleDeleteProject} sx={{ color: 'error.main' }}>
+          <ListItemIcon>
+            <CancelIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Delete Project</ListItemText>
+        </MenuItem>
+      </Menu>
     </Box>
   );
 };
