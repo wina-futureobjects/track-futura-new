@@ -68,6 +68,30 @@ class ScrapingRunSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'started_at', 'completed_at',
                            'project_name', 'created_by_name', 'progress_percentage',
                            'total_jobs', 'completed_jobs', 'successful_jobs', 'failed_jobs']
+    
+    def validate(self, data):
+        """Validate that start_date and end_date are provided in configuration"""
+        configuration = data.get('configuration', {})
+        
+        # Validate that start_date and end_date are provided
+        if not configuration.get('start_date'):
+            raise serializers.ValidationError("Start date is required in configuration")
+        
+        if not configuration.get('end_date'):
+            raise serializers.ValidationError("End date is required in configuration")
+        
+        # Validate that end_date is not before start_date
+        try:
+            from datetime import datetime
+            start_date = datetime.fromisoformat(configuration['start_date'].replace('Z', '+00:00'))
+            end_date = datetime.fromisoformat(configuration['end_date'].replace('Z', '+00:00'))
+            
+            if end_date < start_date:
+                raise serializers.ValidationError("End date cannot be before start date")
+        except (ValueError, AttributeError):
+            raise serializers.ValidationError("Invalid date format in configuration")
+        
+        return data
 
 class WorkflowTaskSerializer(serializers.ModelSerializer):
     input_collection_details = InputCollectionSerializer(source='input_collection', read_only=True)
@@ -92,7 +116,7 @@ class ScheduledScrapingTaskSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'project', 'project_name', 'track_source', 'track_source_name',
             'platform', 'service_type', 'is_active', 'schedule_type', 'schedule_interval',
-            'last_run', 'next_run', 'num_of_posts', 'auto_create_folders',
+            'last_run', 'next_run', 'num_of_posts', 'start_date', 'end_date', 'auto_create_folders',
             'brightdata_dataset_id', 'brightdata_api_key', 'status', 'total_runs',
             'successful_runs', 'failed_runs', 'platform_url', 'created_by', 'created_at', 'updated_at'
         ]
@@ -104,7 +128,7 @@ class ScheduledScrapingTaskSerializer(serializers.ModelSerializer):
         return obj.get_platform_url()
     
     def validate(self, data):
-        """Validate that the TrackSource has a URL for the specified platform"""
+        """Validate that the TrackSource has a URL for the specified platform and dates are provided"""
         import logging
         logger = logging.getLogger(__name__)
         
@@ -112,9 +136,24 @@ class ScheduledScrapingTaskSerializer(serializers.ModelSerializer):
         
         track_source = data.get('track_source')
         platform = data.get('platform')
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
         
         logger.info(f"Track source: {track_source}")
         logger.info(f"Platform: {platform}")
+        logger.info(f"Start date: {start_date}")
+        logger.info(f"End date: {end_date}")
+        
+        # Validate that start_date and end_date are provided
+        if not start_date:
+            raise serializers.ValidationError("Start date is required")
+        
+        if not end_date:
+            raise serializers.ValidationError("End date is required")
+        
+        # Validate that end_date is not before start_date
+        if end_date < start_date:
+            raise serializers.ValidationError("End date cannot be before start date")
         
         if track_source and platform:
             # Check if the TrackSource has a URL for the specified platform

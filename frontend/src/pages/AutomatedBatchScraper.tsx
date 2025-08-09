@@ -2,7 +2,6 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import FacebookIcon from '@mui/icons-material/Facebook';
-import HomeIcon from '@mui/icons-material/Home';
 import InstagramIcon from '@mui/icons-material/Instagram';
 import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import MusicVideoIcon from '@mui/icons-material/MusicVideo';
@@ -18,10 +17,11 @@ import {
     Alert,
     AlertTitle,
     Box,
-    Breadcrumbs,
+    // Breadcrumbs,
     Button,
     Card,
     CardContent,
+    CardActionArea,
     Checkbox,
     Chip,
     CircularProgress,
@@ -33,6 +33,7 @@ import {
     DialogTitle,
     FormControl,
     FormControlLabel,
+    FormHelperText,
     IconButton,
     InputLabel,
     LinearProgress,
@@ -54,7 +55,7 @@ import {
     Tab,
     Avatar,
     Divider,
-    Grid,
+    // Grid,
     Accordion,
     AccordionSummary,
     AccordionDetails,
@@ -156,6 +157,7 @@ const AutomatedBatchScraper = () => {
   
   // Scraping Runs and Jobs
   const [scrapingRuns, setScrapingRuns] = useState<ScrapingRun[]>([]);
+  const [periodicRuns, setPeriodicRuns] = useState<ScrapingRun[]>([]);
   const [selectedRun, setSelectedRun] = useState<ScrapingRun | null>(null);
   const [scrapingJobs, setScrapingJobs] = useState<ScrapingJob[]>([]);
   
@@ -163,13 +165,15 @@ const AutomatedBatchScraper = () => {
   const [selectedInputCollection, setSelectedInputCollection] = useState<TrackSourceCollection | null>(null);
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
   const [globalConfigDialogOpen, setGlobalConfigDialogOpen] = useState(false);
+  const [periodicConfigDialogOpen, setPeriodicConfigDialogOpen] = useState(false);
   const [creatingWorkflow, setCreatingWorkflow] = useState<number | null>(null);
   const [creatingGlobalRun, setCreatingGlobalRun] = useState(false);
+  const [creatingPeriodicRun, setCreatingPeriodicRun] = useState(false);
   
   // Configuration forms
   const [configForm, setConfigForm] = useState({
     jobName: '',
-    numOfPosts: 10,
+    numOfPosts: null as number | null,
     startDate: null as Dayjs | null,
     endDate: null as Dayjs | null,
     autoCreateFolders: true,
@@ -177,9 +181,19 @@ const AutomatedBatchScraper = () => {
   });
   
   const [globalConfigForm, setGlobalConfigForm] = useState({
-    numOfPosts: 10,
+    numOfPosts: null as number | null,
     startDate: null as Dayjs | null,
     endDate: null as Dayjs | null,
+    autoCreateFolders: true,
+    outputFolderPattern: 'scraped_data'
+  });
+  
+  const [periodicConfigForm, setPeriodicConfigForm] = useState({
+    jobName: '',
+    numOfPosts: null as number | null,
+    startDate: null as Dayjs | null,
+    endDate: null as Dayjs | null,
+    period: 'daily' as 'daily' | 'weekly' | 'monthly',
     autoCreateFolders: true,
     outputFolderPattern: 'scraped_data'
   });
@@ -214,7 +228,13 @@ const AutomatedBatchScraper = () => {
       
       setTrackSourceCollections(collections);
       setWorkflowTasks(tasks);
-      setScrapingRuns(runs);
+      
+      // Separate regular runs from periodic runs
+      const regularRuns = runs.filter(run => !run.configuration.period);
+      const periodicRunsList = runs.filter(run => run.configuration.period);
+      
+      setScrapingRuns(regularRuns);
+      setPeriodicRuns(periodicRunsList);
       
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -284,7 +304,7 @@ const AutomatedBatchScraper = () => {
     setSelectedInputCollection(null);
     setConfigForm({
       jobName: '',
-      numOfPosts: 10,
+      numOfPosts: null,
       startDate: null,
       endDate: null,
       autoCreateFolders: true,
@@ -294,6 +314,17 @@ const AutomatedBatchScraper = () => {
 
   const handleSubmitConfig = async () => {
     if (!selectedInputCollection) return;
+
+    // Validate required fields
+    if (!configForm.startDate || !configForm.endDate) {
+      showSnackbar('Start date and end date are required', 'error');
+      return;
+    }
+
+    if (configForm.endDate.isBefore(configForm.startDate)) {
+      showSnackbar('End date cannot be before start date', 'error');
+      return;
+    }
 
     try {
       setCreatingWorkflow(selectedInputCollection.id);
@@ -339,6 +370,17 @@ const AutomatedBatchScraper = () => {
   const handleGlobalRun = async () => {
     if (!projectId) return;
     
+    // Validate required fields
+    if (!globalConfigForm.startDate || !globalConfigForm.endDate) {
+      showSnackbar('Start date and end date are required', 'error');
+      return;
+    }
+
+    if (globalConfigForm.endDate.isBefore(globalConfigForm.startDate)) {
+      showSnackbar('End date cannot be before start date', 'error');
+      return;
+    }
+    
     try {
       setCreatingGlobalRun(true);
       
@@ -375,6 +417,67 @@ const AutomatedBatchScraper = () => {
       showSnackbar('Failed to create scraping run', 'error');
     } finally {
       setCreatingGlobalRun(false);
+    }
+  };
+
+  const handlePeriodicRun = async () => {
+    if (!projectId) return;
+    
+    // Validate required fields
+    if (!periodicConfigForm.jobName || !periodicConfigForm.startDate || !periodicConfigForm.endDate) {
+      showSnackbar('Job name, start date and end date are required', 'error');
+      return;
+    }
+
+    if (periodicConfigForm.endDate.isBefore(periodicConfigForm.startDate)) {
+      showSnackbar('End date cannot be before start date', 'error');
+      return;
+    }
+    
+    try {
+      setCreatingPeriodicRun(true);
+      
+      const runData: CreateScrapingRunRequest = {
+        project: parseInt(projectId),
+        name: periodicConfigForm.jobName,
+        configuration: {
+          num_of_posts: periodicConfigForm.numOfPosts,
+          start_date: periodicConfigForm.startDate?.toISOString(),
+          end_date: periodicConfigForm.endDate?.toISOString(),
+          auto_create_folders: periodicConfigForm.autoCreateFolders,
+          output_folder_pattern: periodicConfigForm.outputFolderPattern,
+          period: periodicConfigForm.period // Add period to configuration
+        }
+      };
+      
+      const newRun = await workflowService.createScrapingRun(runData);
+      console.log('Created periodic run:', newRun);
+      setPeriodicRuns(prev => [newRun, ...prev]);
+      showSnackbar('Periodic scraping run created successfully!', 'success');
+      setPeriodicConfigDialogOpen(false);
+      
+      // Switch to Scheduled Runs tab
+      setActiveTab(2);
+      
+      // Reset form
+      setPeriodicConfigForm({
+        jobName: '',
+        numOfPosts: null,
+        startDate: null,
+        endDate: null,
+        period: 'daily',
+        autoCreateFolders: true,
+        outputFolderPattern: 'scraped_data'
+      });
+      
+      // Refresh data
+      fetchData();
+      
+    } catch (err) {
+      console.error('Error creating periodic run:', err);
+      showSnackbar('Failed to create periodic scraping run', 'error');
+    } finally {
+      setCreatingPeriodicRun(false);
     }
   };
 
@@ -549,38 +652,58 @@ const AutomatedBatchScraper = () => {
   return (
     <Container maxWidth="xl" sx={{ mt: 4 }}>
       <Box sx={{ mb: 4 }}>
-        <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
-          <Link to={getNavigationPath('/organizations/:projectId')} style={{ textDecoration: 'none', color: 'inherit' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <HomeIcon sx={{ mr: 0.5 }} fontSize="small" />
-              <Typography variant="body2">Home</Typography>
-                    </Box>
-          </Link>
-          <Typography variant="body2" color="text.primary">
-            Workflow Management
-                      </Typography>
-        </Breadcrumbs>
-
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="h4" component="h1" sx={{ fontWeight: 600 }}>
             Workflow Management
-                      </Typography>
-          <Button
-            variant="contained"
-            startIcon={<PlayArrowIcon />}
-            onClick={() => setGlobalConfigDialogOpen(true)}
-            sx={{ minWidth: 120 }}
-          >
-            Run All
-          </Button>
+          </Typography>
+        </Box>
+
+        {/* Quick Actions */}
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 2, mb: 3, alignItems: 'stretch' }}>
+          <Box sx={{ height: '100%' }}>
+            <Card sx={{ height: '100%', bgcolor: 'background.paper' }}>
+              <CardActionArea sx={{ height: '100%' }} onClick={() => setGlobalConfigDialogOpen(true)}>
+                <CardContent sx={{ minHeight: 100 }}>
+                  <Box display="flex" alignItems="center" gap={2}>
+                    <Avatar sx={{ bgcolor: 'primary.main', width: 40, height: 40 }}>
+                      <PlayArrowIcon />
+                    </Avatar>
+                    <Box>
+                      <Typography variant="subtitle1" fontWeight={600}>Instant Run</Typography>
+                      <Typography variant="body2" color="text.secondary">Start a one-time scraping run with all input sources now</Typography>
                     </Box>
+                  </Box>
+                </CardContent>
+              </CardActionArea>
+            </Card>
+          </Box>
+
+          <Box sx={{ height: '100%' }}>
+                      <Card sx={{ height: '100%', bgcolor: 'background.paper' }}>
+            <CardActionArea sx={{ height: '100%' }} onClick={() => setPeriodicConfigDialogOpen(true)}>
+                <CardContent sx={{ minHeight: 100 }}>
+                  <Box display="flex" alignItems="center" gap={2}>
+                    <Avatar sx={{ bgcolor: 'secondary.main', width: 40, height: 40 }}>
+                      <HistoryIcon />
+                    </Avatar>
+                    <Box>
+                      <Typography variant="subtitle1" fontWeight={600}>Schedule Periodic Run</Typography>
+                      <Typography variant="body2" color="text.secondary">Set up recurring scraping on a schedule</Typography>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </CardActionArea>
+            </Card>
+          </Box>
+        </Box>
 
         {/* Main Content */}
           <Card>
             <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
               <Tabs value={activeTab} onChange={handleTabChange} aria-label="workflow tabs">
                 <Tab label="Input Collections" />
-              <Tab label="History" />
+                <Tab label="Instant Runs" />
+                <Tab label="Periodic Runs" />
               </Tabs>
             </Box>
 
@@ -665,7 +788,7 @@ const AutomatedBatchScraper = () => {
             <TabPanel value={activeTab} index={1}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Typography variant="h6">
-                Scraping History ({scrapingRuns.length})
+                  Instant Scraping Run List ({scrapingRuns.length})
                 </Typography>
                 <Button
                   variant="outlined"
@@ -782,6 +905,137 @@ const AutomatedBatchScraper = () => {
                 </TableContainer>
               )}
             </TabPanel>
+
+          {/* Scheduled Runs Tab */}
+            <TabPanel value={activeTab} index={2}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6">
+                  Periodic Scraping Run List ({periodicRuns.length})
+                </Typography>
+                <Button
+                  variant="outlined"
+                  startIcon={<RefreshIcon />}
+                  onClick={fetchData}
+                >
+                  Refresh
+                </Button>
+              </Box>
+
+            {periodicRuns.length === 0 ? (
+                <Alert severity="info">
+                No scheduled periodic runs found. Create a new periodic run to start scheduled scraping.
+                </Alert>
+              ) : (
+                <TableContainer component={Paper}>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Run Name</TableCell>
+                        <TableCell>Period</TableCell>
+                        <TableCell>Status</TableCell>
+                        <TableCell>Progress</TableCell>
+                        <TableCell>Created</TableCell>
+                        <TableCell>Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                    {periodicRuns.map((run) => (
+                      <TableRow key={run.id} hover>
+                          <TableCell>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {run.name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                            {run.configuration.num_of_posts} posts per run
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={run.configuration.period?.toUpperCase() || 'Unknown'}
+                              color="info"
+                              size="small"
+                              variant="outlined"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                            label={run.status}
+                            color={getStatusColor(run.status)}
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <LinearProgress
+                              variant="determinate"
+                              value={run.progress_percentage}
+                              sx={{ width: 100, height: 8, borderRadius: 4 }}
+                            />
+                            <Typography variant="caption">
+                              {run.progress_percentage}%
+                            </Typography>
+                          </Box>
+                          <Typography variant="caption" color="text.secondary">
+                            {run.completed_jobs}/{run.total_jobs} jobs
+                          </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2">
+                            {new Date(run.created_at).toLocaleDateString()}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                            {new Date(run.created_at).toLocaleTimeString()}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                              <Tooltip title="View Details">
+                                <IconButton
+                                  size="small"
+                                  color="info"
+                                onClick={() => handleViewRunDetails(run)}
+                                >
+                                <HistoryIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            {run.status === 'pending' && (
+                              <Tooltip title="Start Run">
+                                  <IconButton
+                                    size="small"
+                                  color="primary"
+                                  onClick={async () => {
+                                    try {
+                                      await workflowService.startScrapingRun(run.id);
+                                      showSnackbar('Scraping run started!', 'success');
+                                      fetchData();
+                                    } catch (error) {
+                                      console.error('Error starting scraping run:', error);
+                                      showSnackbar('Failed to start scraping run', 'error');
+                                    }
+                                  }}
+                                  >
+                                    <PlayArrowIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
+                              <Tooltip title="Delete">
+                                <IconButton
+                                  size="small"
+                                onClick={() => handleDeleteItem(run.id, run.name, 'run')}
+                                  sx={{ color: '#dc2626' }}
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </TabPanel>
         </Card>
 
         {/* Configuration Dialog */}
@@ -806,23 +1060,24 @@ const AutomatedBatchScraper = () => {
                   label="Number of Posts"
                   type="number"
                   fullWidth
-                  value={configForm.numOfPosts}
-                  onChange={(e) => setConfigForm({ ...configForm, numOfPosts: parseInt(e.target.value) || 10 })}
+                  value={configForm.numOfPosts || ''}
+                  onChange={(e) => setConfigForm({ ...configForm, numOfPosts: parseInt(e.target.value) || null })}
                   inputProps={{ min: 1, max: 1000 }}
+                  helperText="Number of posts to scrape per run (optional)"
                 />
 
                 <Box sx={{ display: 'flex', gap: 2 }}>
                   <DatePicker
-                    label="Start Date"
+                    label="Start Date *"
                     value={configForm.startDate}
-                    onChange={(date) => setConfigForm({ ...configForm, startDate: date })}
-                    slotProps={{ textField: { fullWidth: true } }}
+                    onChange={(date) => setConfigForm({ ...configForm, startDate: date as Dayjs | null })}
+                    slotProps={{ textField: { fullWidth: true, required: true } }}
                   />
                   <DatePicker
-                    label="End Date"
+                    label="End Date *"
                     value={configForm.endDate}
-                    onChange={(date) => setConfigForm({ ...configForm, endDate: date })}
-                    slotProps={{ textField: { fullWidth: true } }}
+                    onChange={(date) => setConfigForm({ ...configForm, endDate: date as Dayjs | null })}
+                    slotProps={{ textField: { fullWidth: true, required: true } }}
                   />
                             </Box>
 
@@ -843,7 +1098,7 @@ const AutomatedBatchScraper = () => {
                 <Button
               onClick={handleSubmitConfig}
               variant="contained"
-              disabled={creatingWorkflow === selectedInputCollection?.id || !configForm.jobName}
+              disabled={creatingWorkflow === selectedInputCollection?.id || !configForm.jobName || !configForm.startDate || !configForm.endDate}
               startIcon={creatingWorkflow === selectedInputCollection?.id ? <CircularProgress size={16} /> : <PlayArrowIcon />}
             >
               {creatingWorkflow === selectedInputCollection?.id ? 'Creating...' : 'Create Scheduled Task'}
@@ -861,39 +1116,29 @@ const AutomatedBatchScraper = () => {
 
             <LocalizationProvider dateAdapter={AdapterDayjs}>
               <Stack spacing={3} sx={{ mt: 2 }}>
-                <TextField
-                  label="Number of Posts"
-                  type="number"
-                  fullWidth
-                  value={globalConfigForm.numOfPosts}
-                  onChange={(e) => setGlobalConfigForm({ ...globalConfigForm, numOfPosts: parseInt(e.target.value) || 10 })}
-                  inputProps={{ min: 1, max: 1000 }}
-                  helperText="Number of posts to scrape per run for all new tasks"
-                />
-
                 <Box sx={{ display: 'flex', gap: 2 }}>
                   <DatePicker
                     label="Start Date"
                     value={globalConfigForm.startDate}
-                    onChange={(date) => setGlobalConfigForm({ ...globalConfigForm, startDate: date })}
-                    slotProps={{ textField: { fullWidth: true } }}
+                    onChange={(date) => setGlobalConfigForm({ ...globalConfigForm, startDate: date as Dayjs | null })}
+                    slotProps={{ textField: { fullWidth: true, required: true, helperText: 'Start date for the scraping window (required)' } }}
                   />
                   <DatePicker
                     label="End Date"
                     value={globalConfigForm.endDate}
-                    onChange={(date) => setGlobalConfigForm({ ...globalConfigForm, endDate: date })}
-                    slotProps={{ textField: { fullWidth: true } }}
+                    onChange={(date) => setGlobalConfigForm({ ...globalConfigForm, endDate: date as Dayjs | null })}
+                    slotProps={{ textField: { fullWidth: true, required: true, helperText: 'End date for the scraping window (required)' } }}
                   />
                             </Box>
 
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={globalConfigForm.autoCreateFolders}
-                      onChange={(e) => setGlobalConfigForm({ ...globalConfigForm, autoCreateFolders: e.target.checked })}
-                    />
-                  }
-                  label="Automatically organize scraped data by platform and service for all new tasks"
+                <TextField
+                  label="Number of Posts"
+                  type="number"
+                  fullWidth
+                  value={globalConfigForm.numOfPosts || ''}
+                  onChange={(e) => setGlobalConfigForm({ ...globalConfigForm, numOfPosts: parseInt(e.target.value) || null })}
+                  inputProps={{ min: 1, max: 1000 }}
+                  helperText="Number of posts to scrape per run for all new tasks (optional)"
                 />
               </Stack>
             </LocalizationProvider>
@@ -903,11 +1148,84 @@ const AutomatedBatchScraper = () => {
                 <Button
               onClick={handleGlobalRun}
               variant="contained"
-              disabled={creatingGlobalRun || !globalConfigForm.numOfPosts}
+              disabled={creatingGlobalRun || !globalConfigForm.startDate || !globalConfigForm.endDate}
               startIcon={creatingGlobalRun ? <CircularProgress size={16} /> : <PlayArrowIcon />}
             >
               {creatingGlobalRun ? 'Creating...' : 'Create Global Run'}
                 </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Periodic Configuration Dialog */}
+        <Dialog open={periodicConfigDialogOpen} onClose={() => setPeriodicConfigDialogOpen(false)} maxWidth="md" fullWidth>
+          <DialogTitle>Configure Periodic Scraping Settings</DialogTitle>
+          <DialogContent>
+            <DialogContentText sx={{ mb: 3 }}>
+              Configure the settings for periodic scraping runs that will execute automatically on a schedule.
+            </DialogContentText>
+
+            <LocalizationProvider dateAdapter={AdapterDayjs}>
+              <Stack spacing={3} sx={{ mt: 2 }}>
+                <TextField
+                  label="Job Name"
+                  fullWidth
+                  value={periodicConfigForm.jobName}
+                  onChange={(e) => setPeriodicConfigForm({ ...periodicConfigForm, jobName: e.target.value })}
+                  placeholder="Enter a name for this periodic scraping job"
+                  helperText="A descriptive name for this periodic scraping task"
+                />
+
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  <DatePicker
+                    label="Start Date"
+                    value={periodicConfigForm.startDate}
+                    onChange={(date) => setPeriodicConfigForm({ ...periodicConfigForm, startDate: date as Dayjs | null })}
+                    slotProps={{ textField: { fullWidth: true, required: true, helperText: 'Start date for the scraping window (required)' } }}
+                  />
+                  <DatePicker
+                    label="End Date"
+                    value={periodicConfigForm.endDate}
+                    onChange={(date) => setPeriodicConfigForm({ ...periodicConfigForm, endDate: date as Dayjs | null })}
+                    slotProps={{ textField: { fullWidth: true, required: true, helperText: 'End date for the scraping window (required)' } }}
+                  />
+                </Box>
+
+                <TextField
+                  label="Number of Posts"
+                  type="number"
+                  fullWidth
+                  value={periodicConfigForm.numOfPosts || ''}
+                  onChange={(e) => setPeriodicConfigForm({ ...periodicConfigForm, numOfPosts: parseInt(e.target.value) || null })}
+                  inputProps={{ min: 1, max: 1000 }}
+                  helperText="Number of posts to scrape per run (optional)"
+                />
+
+                <FormControl fullWidth>
+                  <InputLabel>Period</InputLabel>
+                  <Select
+                    value={periodicConfigForm.period}
+                    label="Period"
+                    onChange={(e) => setPeriodicConfigForm({ ...periodicConfigForm, period: e.target.value as 'daily' | 'weekly' | 'monthly' })}
+                  >
+                    <MenuItem value="daily">Daily</MenuItem>
+                    <MenuItem value="weekly">Weekly</MenuItem>
+                    <MenuItem value="monthly">Monthly</MenuItem>
+                  </Select>
+                  <FormHelperText>How often should this scraping job run automatically</FormHelperText>
+                </FormControl>
+              </Stack>
+            </LocalizationProvider>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setPeriodicConfigDialogOpen(false)}>Cancel</Button>
+            <Button
+              onClick={handlePeriodicRun}
+              variant="contained"
+              disabled={creatingPeriodicRun || !periodicConfigForm.jobName || !periodicConfigForm.startDate || !periodicConfigForm.endDate}
+              startIcon={creatingPeriodicRun ? <CircularProgress size={16} /> : <PlayArrowIcon />}
+            >
+              {creatingPeriodicRun ? 'Creating...' : 'Create Periodic Run'}
+            </Button>
           </DialogActions>
         </Dialog>
 

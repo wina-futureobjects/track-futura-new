@@ -211,7 +211,9 @@ class ScheduledScrapingTask(models.Model):
     next_run = models.DateTimeField(null=True, blank=True)
     
     # Scraping configuration
-    num_of_posts = models.IntegerField(default=10)
+    num_of_posts = models.IntegerField(default=10, null=True, blank=True)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
     auto_create_folders = models.BooleanField(default=True)
     
     # BrightData configuration (preset)

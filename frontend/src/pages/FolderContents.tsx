@@ -74,6 +74,7 @@ const FolderContents = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [jobCount, setJobCount] = useState<number | null>(null);
 
   const platforms = [
     { key: 'instagram', label: 'Instagram', icon: <InstagramIcon />, color: '#E4405F' },
@@ -96,32 +97,18 @@ const FolderContents = () => {
     try {
       // Fetch the current folder details
       let folderResponse;
-      if (folderType === 'run') {
-        // For unified run folders, fetch from track_accounts
+      if (['run','platform','service','job','content'].includes(folderType)) {
+        // Unified or legacy unified folder
         try {
           const response = await apiFetch(`/api/track-accounts/report-folders/${folderId}/?project=${projectId}`);
           if (response.ok) {
             folderResponse = await response.json();
           }
         } catch (e) {
-          console.error('Error fetching run folder:', e);
-        }
-      } else if (folderType === 'service') {
-        // For service folders, we need to check all platforms
-        const allPlatforms = ['instagram', 'facebook', 'linkedin', 'tiktok'];
-        for (const platform of allPlatforms) {
-          try {
-            const response = await apiFetch(`/api/${platform}-data/folders/${folderId}/?project=${projectId}`);
-            if (response.ok) {
-              folderResponse = await response.json();
-              break;
-            }
-          } catch (e) {
-            continue;
-          }
+          console.error('Error fetching unified folder:', e);
         }
       } else {
-        // For content folders, use the platform from the URL
+        // Platform-specific (legacy): use the platform from the URL
         const platform = folderType;
         const response = await apiFetch(`/api/${platform}-data/folders/${folderId}/?project=${projectId}`);
         if (response.ok) {
@@ -133,31 +120,108 @@ const FolderContents = () => {
         setCurrentFolder(folderResponse);
         
         // Fetch subfolders based on folder type
-        if (folderType === 'run') {
-          // For run folders, fetch all service folders with the same scraping_run
-          const allPlatforms = ['instagram', 'facebook', 'linkedin', 'tiktok'];
-          const allSubfolders = [];
-          
-          for (const platform of allPlatforms) {
+        if (['run','platform','service','job'].includes(folderType)) {
+          // For unified folders, fetch subfolders from unified API
+          if (folderType === 'run') {
             try {
-              const response = await apiFetch(`/api/${platform}-data/folders/?project=${projectId}&scraping_run=${folderResponse.scraping_run}&folder_type=service&include_hierarchy=true`);
+              // Show Platform folders directly under run
+              let response = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&parent_folder=${folderId}&folder_type=platform&include_hierarchy=true`);
               if (response.ok) {
                 const data = await response.json();
-                const platformSubfolders = data.results || data;
-                allSubfolders.push(...platformSubfolders);
+                const items = (data.results || data) as any[];
+                if (items.length > 0) {
+                  setSubfolders(items as any);
+                  setJobCount(null);
+                  return;
+                }
               }
+              // Fallback for old runs: service directly under run
+              const resp2 = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&parent_folder=${folderId}&folder_type=service&include_hierarchy=true`);
+              if (resp2.ok) {
+                const d2 = await resp2.json();
+                setSubfolders((d2.results || d2) as any);
+              } else {
+                setSubfolders([]);
+              }
+              setJobCount(null);
             } catch (e) {
-              console.error(`Error fetching ${platform} service folders:`, e);
+              console.error('Error fetching unified platform/service folders:', e);
+              setSubfolders([]);
+              setJobCount(null);
             }
+            return;
           }
-          
-          setSubfolders(allSubfolders);
+
+          // Unified non-run children
+          try {
+            let desiredType = '';
+            if (folderType === 'platform') desiredType = 'service';
+            else if (folderType === 'service') desiredType = 'job';
+            else desiredType = 'content';
+
+            if (desiredType === 'job') {
+              const jobsResp = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&parent_folder=${folderId}&folder_type=job&include_hierarchy=true`);
+              if (jobsResp.ok) {
+                const jobs = await jobsResp.json();
+                const jobItems = (jobs.results || jobs) as any[];
+                if (jobItems.length > 0) {
+                  setSubfolders(jobItems as any);
+                  setJobCount(jobItems.length);
+                } else {
+                  const legacyResp = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&parent_folder=${folderId}&folder_type=content&include_hierarchy=true`);
+                  if (legacyResp.ok) {
+                    const legacy = await legacyResp.json();
+                    setSubfolders((legacy.results || legacy) as any);
+                    const legacyArr = (legacy.results || legacy) as any[];
+                    setJobCount(legacyArr.length);
+                  } else setSubfolders([]);
+                }
+              } else setSubfolders([]);
+            } else {
+              const resp = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&parent_folder=${folderId}&folder_type=${desiredType}&include_hierarchy=true`);
+              if (resp.ok) {
+                const data = await resp.json();
+                setSubfolders((data.results || data) as any);
+                // If current is platform and we just fetched services, compute total job count under these services
+                if (folderType === 'platform') {
+                  const services = (data.results || data) as any[];
+                  const jobCounts = await Promise.all(
+                    services.map(async (svc: any) => {
+                      const jr = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&parent_folder=${svc.id}&folder_type=job`);
+                      if (jr.ok) {
+                        const jd = await jr.json();
+                        const arr = (jd.results || jd) as any[];
+                        if (arr.length > 0) return arr.length;
+                        // fallback to legacy content
+                        const cr = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&parent_folder=${svc.id}&folder_type=content`);
+                        if (cr.ok) {
+                          const cd = await cr.json();
+                          return ((cd.results || cd) as any[]).length || 0;
+                        }
+                        return 0;
+                      }
+                      return 0;
+                    })
+                  );
+                  const totalJobs = jobCounts.reduce((a, b) => a + b, 0);
+                  setJobCount(totalJobs);
+                } else {
+                  setJobCount(null);
+                }
+              } else setSubfolders([]);
+            }
+          } catch (e) {
+            console.error('Error fetching unified subfolders:', e);
+            setSubfolders([]);
+            setJobCount(null);
+          }
         } else {
-          // For other folder types, fetch subfolders normally
+          // Platform-specific fallback (legacy)
           const subfoldersResponse = await apiFetch(`/api/${folderResponse.platform}-data/folders/?project=${projectId}&parent_folder=${folderId}&include_hierarchy=true`);
           if (subfoldersResponse.ok) {
             const data = await subfoldersResponse.json();
             setSubfolders(data.results || data);
+            setJobCount(null);
           }
         }
       } else {
@@ -196,13 +260,18 @@ const FolderContents = () => {
   };
 
   const handleFolderClick = (folder: Folder) => {
+    // Unified hierarchy: run -> platform -> service -> job; platform-specific "content" is legacy
     if (folder.folder_type === 'content') {
-      // Navigate to content folder (existing data page)
       navigate(`/organizations/${organizationId}/projects/${projectId}/data/${folder.platform}/${folder.id}`);
-    } else {
-      // Navigate to folder contents page
-      navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage/${folder.folder_type}/${folder.id}`);
+      return;
     }
+    if (folder.folder_type === 'job') {
+      // Navigate to unified job view (from there, UI can resolve items or provide actions)
+      navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage/job/${folder.id}`);
+      return;
+    }
+    // run/platform/service continue browsing unified tree
+    navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage/${folder.folder_type}/${folder.id}`);
   };
 
   const handleBackClick = () => {

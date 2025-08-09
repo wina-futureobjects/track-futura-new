@@ -675,9 +675,8 @@ class AutomatedBatchScraper:
         try:
             config = scraper_request.config
 
-            # Import Django settings to get base URL and webhook token
-            base_url = getattr(settings, 'BRIGHTDATA_BASE_URL', 'http://localhost:8000')
-            webhook_token = getattr(settings, 'BRIGHTDATA_WEBHOOK_TOKEN', 'your-webhook-secret-token')
+            # Import Django settings to get webhook base URL
+            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://6ca2c7c8ca5e.ngrok-free.app')
 
             url = "https://api.brightdata.com/datasets/v3/trigger"
             headers = {
@@ -688,7 +687,8 @@ class AutomatedBatchScraper:
             # Base parameters - simplified to match working independent code
             params = {
                 "dataset_id": config.dataset_id,
-                "endpoint": f"{base_url}/api/brightdata/webhook/",
+                "endpoint": f"{webhook_base_url}/api/brightdata/webhook/",
+                "notify": f"{webhook_base_url}/api/brightdata/notify/",
                 "format": "json",
                 "uncompressed_webhook": "true",
                 "include_errors": "true",
@@ -708,8 +708,7 @@ class AutomatedBatchScraper:
             print(f"Platform: {scraper_request.platform}")
             print(f"Config Name: {config.name}")
             print(f"Config ID: {config.id}")
-            print(f"Base URL: {base_url}")
-            print(f"Webhook Token: {webhook_token}")
+            print(f"Webhook Base URL: {webhook_base_url}")
             print()
             print("📡 REQUEST DETAILS:")
             print(f"URL: {url}")
@@ -721,7 +720,7 @@ class AutomatedBatchScraper:
             print("Working script uses:")
             print('  Authorization: Bearer c20a28d5-5c6c-43c3-9567-a6d7c193e727')
             print('  dataset_id: gd_lk5ns7kz21pck8jpis')
-            print('  endpoint: https://api.upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site/api/brightdata/webhook/')
+            print(f'  endpoint: {webhook_base_url}/api/brightdata/webhook/')
             print()
             print("This request uses:")
             print(f'  Authorization: {headers["Authorization"]}')
@@ -732,7 +731,7 @@ class AutomatedBatchScraper:
             # Check for differences
             working_token = "c20a28d5-5c6c-43c3-9567-a6d7c193e727"
             working_dataset = "gd_lk5ns7kz21pck8jpis"
-            working_endpoint = "https://api.upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site/api/brightdata/webhook/"
+            working_endpoint = f"{webhook_base_url}/api/brightdata/webhook/"
 
             if headers["Authorization"] != f"Bearer {working_token}":
                 print("❌ API TOKEN MISMATCH!")
@@ -888,15 +887,27 @@ class AutomatedBatchScraper:
 
             # Add platform-specific parameters for Facebook Posts
             if request.platform == 'facebook_posts':
-                # Add num_of_posts to limit the output
-                item['num_of_posts'] = request.num_of_posts
-                # Add date parameters if available
-                if request.start_date:
-                    item['start_date'] = request.start_date.strftime('%m-%d-%Y')
-                if request.end_date:
-                    item['end_date'] = request.end_date.strftime('%m-%d-%Y')
-                # Add posts_to_not_include (empty array as default)
-                item['posts_to_not_include'] = []
+                # For Facebook with user_name discovery, extract username from URL
+                # and send only user_name field (other fields are configured at dataset level)
+                item = {}  # Reset to only include user_name
+                
+                # Extract username from Facebook URL (e.g., "madeline.ong.10" from "https://www.facebook.com/madeline.ong.10")
+                if request.target_url and 'facebook.com/' in request.target_url:
+                    # Handle URLs like https://www.facebook.com/madeline.ong.10
+                    url_parts = request.target_url.split('facebook.com/')
+                    if len(url_parts) > 1:
+                        username = url_parts[1].split('/')[0].split('?')[0]
+                        item['user_name'] = username
+                    else:
+                        # Fallback: use the full URL
+                        item['user_name'] = request.target_url
+                else:
+                    # If no facebook.com in URL, use the URL as is
+                    item['user_name'] = request.target_url
+                
+                # Note: num_of_posts, start_date, end_date, posts_to_not_include are configured
+                # at the dataset level when using user_name discovery
+                
                 if 'include_profile_data' in platform_params:
                     item['include_profile_data'] = platform_params['include_profile_data']
 
@@ -979,10 +990,18 @@ class AutomatedBatchScraper:
         # Create batch payload with all sources
         payload = []
         for request in requests:
-            # Base payload for LinkedIn batch API (simplified - no num_of_posts, start_date, end_date)
+            # LinkedIn batch API format - following the expected curl format
             item = {
                 "url": request.target_url,
             }
+
+            # Add date parameters in ISO format if available
+            if request.start_date:
+                # Convert to ISO format: YYYY-MM-DDTHH:MM:SS.000Z
+                item['start_date'] = request.start_date.strftime('%Y-%m-%dT00:00:00.000Z')
+            if request.end_date:
+                # Convert to ISO format: YYYY-MM-DDTHH:MM:SS.000Z
+                item['end_date'] = request.end_date.strftime('%Y-%m-%dT00:00:00.000Z')
 
             # Add platform-specific parameters for LinkedIn Posts
             if 'limit' in platform_params:
@@ -1026,9 +1045,8 @@ class AutomatedBatchScraper:
 
             config = primary_request.config
 
-            # Import Django settings to get base URL and webhook token
-            base_url = getattr(settings, 'BRIGHTDATA_BASE_URL', 'http://localhost:8000')
-            webhook_token = getattr(settings, 'BRIGHTDATA_WEBHOOK_TOKEN', 'your-webhook-secret-token')
+            # Import Django settings to get webhook base URL
+            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://6ca2c7c8ca5e.ngrok-free.app')
 
             url = "https://api.brightdata.com/datasets/v3/trigger"
             headers = {
@@ -1039,9 +1057,8 @@ class AutomatedBatchScraper:
             # Base parameters - simplified to match working independent code
             params = {
                 "dataset_id": config.dataset_id,
-                "endpoint": f"{base_url}/api/brightdata/webhook/",
-                "auth_header": f"Bearer {webhook_token}",
-                "notify": f"{base_url}/api/brightdata/notify/",
+                "endpoint": f"{webhook_base_url}/api/brightdata/webhook/",
+                "notify": f"{webhook_base_url}/api/brightdata/notify/",
                 "format": "json",
                 "uncompressed_webhook": "true",
                 "include_errors": "true",
@@ -1054,16 +1071,16 @@ class AutomatedBatchScraper:
                     "discover_by": "url",
                 })
             elif primary_request.platform.startswith('facebook'):
-                # Facebook-specific parameters
+                # Facebook-specific parameters - using user_name discovery (required by current dataset)
                 params.update({
                     "type": "discover_new",
                     "discover_by": "user_name",
                 })
             elif primary_request.platform.startswith('linkedin'):
-                # LinkedIn-specific parameters
+                # LinkedIn-specific parameters - using profile_url discovery like the curl example
                 params.update({
                     "type": "discover_new",
-                    "discover_by": "url",
+                    "discover_by": "profile_url",
                 })
             elif primary_request.platform.startswith('tiktok'):
                 # TikTok-specific parameters
@@ -1079,8 +1096,7 @@ class AutomatedBatchScraper:
             print(f"Platform: {primary_request.platform}")
             print(f"Config Name: {config.name}")
             print(f"Config ID: {config.id}")
-            print(f"Base URL: {base_url}")
-            print(f"Webhook Token: {webhook_token}")
+            print(f"Webhook Base URL: {webhook_base_url}")
             print(f"Batch Size: {len(scraper_requests)} requests, {len(payload)} sources")
             print()
             print("📡 REQUEST DETAILS:")

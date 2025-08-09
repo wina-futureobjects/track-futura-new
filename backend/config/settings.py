@@ -510,6 +510,9 @@ def get_webhook_base_url():
 
 BRIGHTDATA_BASE_URL = get_webhook_base_url()
 
+# BrightData webhook configuration
+BRIGHTDATA_WEBHOOK_BASE_URL = os.environ.get('BRIGHTDATA_WEBHOOK_BASE_URL', 'https://6ca2c7c8ca5e.ngrok-free.app')
+
 # Ngrok support for local development
 NGROK_ENABLED = os.environ.get('NGROK_ENABLED', 'False').lower() == 'true'
 NGROK_AUTH_TOKEN = os.environ.get('NGROK_AUTH_TOKEN', '')

@@ -537,6 +537,11 @@ class UnifiedRunFolderViewSet(viewsets.ModelViewSet):
         else:
             queryset = UnifiedRunFolder.objects.all()
         
+        # Filter by folder type if specified (for run folders)
+        folder_type = self.request.query_params.get('folder_type')
+        if folder_type:
+            queryset = queryset.filter(folder_type=folder_type)
+        
         # Filter by parent folder if specified
         parent_folder = self.request.query_params.get('parent_folder')
         if parent_folder:

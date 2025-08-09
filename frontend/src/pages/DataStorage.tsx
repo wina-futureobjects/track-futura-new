@@ -21,6 +21,8 @@ import {
   DialogContent,
   DialogActions,
   Snackbar,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import {
   Folder as FolderIcon,
@@ -60,6 +62,32 @@ interface FolderStats {
   };
 }
 
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`simple-tabpanel-${index}`}
+      aria-labelledby={`simple-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ pt: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
+
 
 
 const DataStorage = () => {
@@ -72,6 +100,7 @@ const DataStorage = () => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [activeTab, setActiveTab] = useState(0);
   const [stats, setStats] = useState<FolderStats>({
     totalFolders: 0,
     platforms: { instagram: 0, facebook: 0, linkedin: 0, tiktok: 0 }
@@ -121,6 +150,19 @@ const DataStorage = () => {
     }
   };
 
+  const fetchUnifiedChildren = async (parentId: number, type: string) => {
+    try {
+      const resp = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&parent_folder=${parentId}&folder_type=${type}&include_hierarchy=true`);
+      if (resp.ok) {
+        const data = await resp.json();
+        return data.results || data || [];
+      }
+    } catch (e) {
+      console.warn('Failed to fetch unified children', parentId, type, e);
+    }
+    return [];
+  };
+
   const fetchAllFolders = async () => {
     setLoading(true);
     setError(null);
@@ -129,7 +171,7 @@ const DataStorage = () => {
       // Fetch run folders from track_accounts (unified run folders)
       let runFolders: any[] = [];
       try {
-        const runFoldersResponse = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&include_hierarchy=true`);
+        const runFoldersResponse = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&folder_type=run&include_hierarchy=true`);
         if (runFoldersResponse.ok) {
           const runData = await runFoldersResponse.json();
           runFolders = (runData.results || runData).map((folder: any) => ({
@@ -141,22 +183,36 @@ const DataStorage = () => {
         console.warn('Could not fetch run folders from track_accounts:', error);
       }
 
-      // Fetch folders from all platforms (Instagram, Facebook, LinkedIn, TikTok)
-      const allPlatforms = ['instagram', 'facebook', 'linkedin', 'tiktok'];
-      const folderPromises = allPlatforms.map(async (platform) => {
-        const platformFolders = await fetchFolders(platform);
-        // Add platform information to each folder
-        return platformFolders.map((folder: any) => ({
-          ...folder,
-          platform: platform
-        }));
-      });
+      // Fetch Unified hierarchy: platform -> service -> job
+      const platformLevelResults = await Promise.all(
+        runFolders.map((rf: any) => fetchUnifiedChildren(rf.id, 'platform').then(arr => arr.map((f: any) => ({ ...f, platform: 'unified' }))))
+      );
+      const platformFoldersUnified = platformLevelResults.flat();
 
-      const results = await Promise.all(folderPromises);
-      const platformFolders = results.flat(); // Combine all platform folders into a single array
+      const serviceLevelResults = await Promise.all(
+        platformFoldersUnified.map((pf: any) => fetchUnifiedChildren(pf.id, 'service').then(arr => arr.map((f: any) => ({ ...f, platform: 'unified' }))))
+      );
+      const serviceFoldersUnified = serviceLevelResults.flat();
 
-      // Combine run folders with platform folders
-      const allFolders = [...runFolders, ...platformFolders];
+      // Prefer job; if none, fall back to legacy content
+      const jobLevelJobResults = await Promise.all(
+        serviceFoldersUnified.map((sf: any) => fetchUnifiedChildren(sf.id, 'job').then(arr => arr.map((f: any) => ({ ...f, platform: 'unified' }))))
+      );
+      const jobFoldersUnified = jobLevelJobResults.flat();
+      const needLegacy = serviceFoldersUnified.filter(sf => !jobFoldersUnified.some((jf: any) => jf.parent_folder === sf.id));
+      const legacyContentResults = await Promise.all(
+        needLegacy.map((sf: any) => fetchUnifiedChildren(sf.id, 'content').then(arr => arr.map((f: any) => ({ ...f, platform: 'unified' }))))
+      );
+      const legacyContentFoldersUnified = legacyContentResults.flat();
+
+      // Combine all unified levels; keep platform-specific folders if needed for other parts of the page
+      const allFolders = [
+        ...runFolders,
+        ...platformFoldersUnified,
+        ...serviceFoldersUnified,
+        ...jobFoldersUnified,
+        ...legacyContentFoldersUnified,
+      ];
 
       setFolders(allFolders);
       
@@ -197,6 +253,10 @@ const DataStorage = () => {
     setCategoryFilter(event.target.value);
   };
 
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setActiveTab(newValue);
+  };
+
   const getFilteredFolders = () => {
     return folders.filter(folder => {
       const matchesSearch = folder.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -207,40 +267,24 @@ const DataStorage = () => {
   };
 
   const getHierarchicalFolders = () => {
-    // Group folders by platform and type
-    const foldersByPlatform = {
-      facebook: folders.filter(f => f.platform === 'facebook'),
-      instagram: folders.filter(f => f.platform === 'instagram'),
-      linkedin: folders.filter(f => f.platform === 'linkedin'),
-      tiktok: folders.filter(f => f.platform === 'tiktok')
-    };
-    
-    // Get unified run folders (from track_accounts)
-    const runFolders = folders.filter(folder => folder.folder_type === 'run' && folder.platform === 'unified');
-    
-    // Build hierarchy for each run folder
-    const hierarchy = runFolders.map(runFolder => {
-      const runServices: Folder[] = [];
-      
-      // Find ALL service folders that belong to this run (across all platforms)
-      const allServiceFolders = folders.filter(f => f.folder_type === 'service' && f.scraping_run === runFolder.scraping_run);
-      
-      allServiceFolders.forEach((serviceFolder: Folder) => {
-        // Find content folder for this service (in the same platform)
-        const platformFolders = foldersByPlatform[serviceFolder.platform as keyof typeof foldersByPlatform] || [];
-        const contentFolder = platformFolders.find((f: Folder) => f.folder_type === 'content' && f.parent_folder === serviceFolder.id);
-        runServices.push({
-          ...serviceFolder,
-          subfolders: contentFolder ? [contentFolder] : []
+    // Use unified-only hierarchy: run -> platform -> service -> job/content
+    const runFoldersUnified = folders.filter(folder => folder.platform === 'unified' && folder.folder_type === 'run');
+
+    const hierarchy = runFoldersUnified.map(runFolder => {
+      const platformChildren = folders.filter(f => f.platform === 'unified' && f.folder_type === 'platform' && f.parent_folder === runFolder.id);
+      const platformNodes = platformChildren.map(platformFolder => {
+        const serviceChildren = folders.filter(f => f.platform === 'unified' && f.folder_type === 'service' && f.parent_folder === platformFolder.id);
+        const serviceNodes = serviceChildren.map(serviceFolder => {
+          // Prefer job folders; fallback to legacy content
+          const jobChildren = folders.filter(f => f.platform === 'unified' && f.folder_type === 'job' && f.parent_folder === serviceFolder.id);
+          const legacyChildren = jobChildren.length ? [] : folders.filter(f => f.platform === 'unified' && f.folder_type === 'content' && f.parent_folder === serviceFolder.id);
+          return { ...serviceFolder, subfolders: jobChildren.length ? jobChildren : legacyChildren } as Folder;
         });
+        return { ...platformFolder, subfolders: serviceNodes } as Folder;
       });
-      
-      return {
-        ...runFolder,
-        subfolders: runServices
-      };
+      return { ...runFolder, subfolders: platformNodes } as Folder;
     });
-    
+
     return hierarchy;
   };
 
@@ -475,216 +519,172 @@ const DataStorage = () => {
     }}>
 
       
-      {/* Header and actions */}
+            {/* Header */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4" component="h1" fontWeight="500">
+        <Typography variant="h4" component="h1" fontWeight="500" mt={2}>
           Data Storage
         </Typography>
-        <Box sx={{ display: 'flex', gap: 2 }}>
-          <Button 
-            variant="contained" 
-            startIcon={<AddIcon />}
-            onClick={handleNewFolder}
-            sx={{ 
-              borderRadius: 1,
-              bgcolor: '#e5e8eb', 
-              color: '#000000', 
-              textTransform: 'none',
-              fontWeight: 500,
-              boxShadow: 'none',
-              '&:hover': {
-                bgcolor: '#d5d8db',
-                boxShadow: 'none'
-              }
-            }}
-          >
-            Create Folder
-          </Button>
-          <Button 
-            variant="contained" 
-            startIcon={<RefreshIcon />}
-            onClick={fetchAllFolders}
-            sx={{ 
-              borderRadius: 1,
-              bgcolor: '#e5e8eb', 
-              color: '#000000', 
-              textTransform: 'none',
-              fontWeight: 500,
-              boxShadow: 'none',
-              '&:hover': {
-                bgcolor: '#d5d8db',
-                boxShadow: 'none'
-              }
-            }}
-          >
-            Refresh
-          </Button>
-        </Box>
       </Box>
 
-      {/* Search and filters bar */}
-      <Box
-        display="flex" 
-        justifyContent="space-between" 
-        alignItems="center" 
-        sx={{
-          mb: 1,
-        }}
-      >
-        <TextField
-          placeholder="Search folders"
-          variant="outlined"
-          size="small"
-          value={searchTerm}
-          onChange={handleSearchChange}
-          sx={{ 
-            width: '300px',
-            '& .MuiOutlinedInput-root': {
-              backgroundColor: 'white',
-              '& fieldset': {
-                borderColor: 'rgba(0, 0, 0, 0.23)',
+      {/* Tabs */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        <Tabs value={activeTab} onChange={handleTabChange} aria-label="data storage tabs">
+          <Tab label="Instant Run" />
+          <Tab label="Periodic Run" />
+        </Tabs>
+      </Box>
+
+      {/* Instant Run Tab */}
+      <TabPanel value={activeTab} index={0}>
+        {/* Search and filters bar */}
+        <Box
+          display="flex" 
+          justifyContent="space-between" 
+          alignItems="center" 
+          sx={{
+            mb: 1,
+          }}
+        >
+          <TextField
+            placeholder="Search folders"
+            variant="outlined"
+            size="small"
+            value={searchTerm}
+            onChange={handleSearchChange}
+            sx={{ 
+              width: '300px',
+              '& .MuiOutlinedInput-root': {
+                backgroundColor: 'white',
+                '& fieldset': {
+                  borderColor: 'rgba(0, 0, 0, 0.23)',
+                },
               },
-            },
-          }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            ),
-          }}
-        />
-        <FormControl size="small" sx={{ minWidth: 180, backgroundColor: 'white' }}>
-          <InputLabel id="category-select-label">Category</InputLabel>
-          <Select
-            labelId="category-select-label"
-            id="category-select"
-            value={categoryFilter}
-            label="Category"
-            onChange={handleCategoryFilterChange}
-          >
-            {categories.map((category) => (
-              <MenuItem key={category.value} value={category.value}>
-                {category.label}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      </Box>
-
-      {/* Folders Count */}
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Showing {getFilteredFolders().length} folder{getFilteredFolders().length !== 1 ? 's' : ''}
-      </Typography>
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {error}
-        </Alert>
-      )}
-
-      {/* Folders Table */}
-      {loading ? (
-        <Box display="flex" justifyContent="center" mt={4}>
-          <CircularProgress />
+            }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
+          />
+          <FormControl size="small" sx={{ minWidth: 180, backgroundColor: 'white' }}>
+            <InputLabel id="category-select-label">Category</InputLabel>
+            <Select
+              labelId="category-select-label"
+              id="category-select"
+              value={categoryFilter}
+              label="Category"
+              onChange={handleCategoryFilterChange}
+            >
+              {categories.map((category) => (
+                <MenuItem key={category.value} value={category.value}>
+                  {category.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         </Box>
-      ) : (
-        <>
-                {/* File Explorer Style Folder Display */}
-      {getHierarchicalFolders().length > 0 && (
-            <Box sx={{ mb: 4 }}>
-              <Typography variant="h6" sx={{ mb: 2, fontWeight: 500 }}>
-                Scraping Runs
-              </Typography>
-              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 2 }}>
-                {getHierarchicalFolders().map((runFolder) => (
-                  <Paper 
-                    key={`${runFolder.platform}-${runFolder.id}`}
-                    sx={{ 
-                      p: 2, 
-                      border: '1px solid #e0e0e0',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease-in-out',
-                      '&:hover': { 
-                        boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-                        transform: 'translateY(-2px)'
-                      }
-                    }}
-                    onClick={() => handleRunFolderClick(runFolder)}
-                  >
-                    <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
-                      <Box display="flex" alignItems="center">
-                        <StorageIcon sx={{ mr: 1, color: 'primary.main' }} />
-                        <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                          {runFolder.name}
-                        </Typography>
-                      </Box>
-                      <Chip 
-                        label={`${runFolder.post_count || 0} items`} 
-                        size="small" 
-                        color="primary" 
-                        variant="outlined"
-                      />
-                    </Box>
-                    
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                      Click to view contents
-                    </Typography>
-                    
-                    {runFolder.subfolders && runFolder.subfolders.length > 0 && (
-                      <Box>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                          Contains {runFolder.subfolders.length} service folder{runFolder.subfolders.length !== 1 ? 's' : ''}:
-                        </Typography>
-                        {runFolder.subfolders.slice(0, 3).map((serviceFolder) => (
-                          <Chip 
-                            key={`${serviceFolder.platform}-${serviceFolder.id}`}
-                            label={serviceFolder.name}
-                            size="small"
-                            variant="outlined"
-                            sx={{ mr: 0.5, mb: 0.5 }}
-                          />
-                        ))}
-                        {runFolder.subfolders.length > 3 && (
-                          <Typography variant="caption" color="text.secondary">
-                            +{runFolder.subfolders.length - 3} more
-                          </Typography>
-                        )}
-                      </Box>
-                    )}
-                  </Paper>
-                ))}
-              </Box>
-            </Box>
-          )}
 
-          {/* Fallback: Show if no hierarchical folders but regular folders exist */}
-          {getHierarchicalFolders().length === 0 && getFilteredFolders().length > 0 && (
-            <Paper sx={{ p: 4, textAlign: 'center', mt: 2, borderRadius: 2 }}>
-              <Typography variant="h6" gutterBottom>No hierarchical folders found</Typography>
-              <Typography variant="body2" color="text.secondary" paragraph>
-                Found {getFilteredFolders().length} folders but they are not organized in a hierarchical structure.
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                This might indicate an issue with the folder structure or data.
-              </Typography>
-            </Paper>
-          )}
+        {/* Folders Count */}
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          Showing {getHierarchicalFolders().length} run folder{getHierarchicalFolders().length !== 1 ? 's' : ''}
+        </Typography>
 
-          {/* No folders at all */}
-          {getHierarchicalFolders().length === 0 && getFilteredFolders().length === 0 && (
-            <Paper sx={{ p: 4, textAlign: 'center', mt: 2, borderRadius: 2 }}>
-              <Typography variant="h6" gutterBottom>No folders found</Typography>
-              <Typography variant="body2" color="text.secondary" paragraph>
-                {searchTerm || categoryFilter !== 'all' 
-                  ? 'Try adjusting your search or filters'
-                  : 'No folders have been created yet.'
-                }
-              </Typography>
-            </Paper>
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
+
+        {/* Folders Table */}
+        {loading ? (
+          <Box display="flex" justifyContent="center" mt={4}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <>
+           {/* File Explorer Style Folder Display */}
+             {getHierarchicalFolders().length > 0 && (
+                <Box sx={{ mb: 4 }}>
+                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 500 }}>
+                    Scraping Runs
+                  </Typography>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 2 }}>
+                    {getHierarchicalFolders().map((runFolder) => (
+                      <Paper 
+                        key={`${runFolder.platform}-${runFolder.id}`}
+                        sx={{ 
+                          p: 2, 
+                          border: '1px solid #e0e0e0',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease-in-out',
+                          '&:hover': { 
+                            boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+                            transform: 'translateY(-2px)'
+                          }
+                        }}
+                        onClick={() => handleRunFolderClick(runFolder)}
+                      >
+                        <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+                          <Box display="flex" alignItems="center">
+                            <StorageIcon sx={{ mr: 1, color: 'primary.main' }} />
+                            <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                              {runFolder.name}
+                            </Typography>
+                          </Box>
+                        </Box>
+                        
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                          {`${runFolder.post_count || 0} folders`} 
+                        </Typography>
+                        
+                      </Paper>
+                    ))}
+                  </Box>
+                </Box>
+              )}
+
+            {/* Fallback: Show if no hierarchical folders but regular folders exist */}
+            {getHierarchicalFolders().length === 0 && getFilteredFolders().length > 0 && (
+              <Paper sx={{ p: 4, textAlign: 'center', mt: 2, borderRadius: 2 }}>
+                <Typography variant="h6" gutterBottom>No hierarchical folders found</Typography>
+                <Typography variant="body2" color="text.secondary" paragraph>
+                  Found {getFilteredFolders().length} folders but they are not organized in a hierarchical structure.
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  This might indicate an issue with the folder structure or data.
+                </Typography>
+              </Paper>
+            )}
+
+            {/* No folders at all */}
+            {getHierarchicalFolders().length === 0 && getFilteredFolders().length === 0 && (
+              <Paper sx={{ p: 4, textAlign: 'center', mt: 2, borderRadius: 2 }}>
+                <Typography variant="h6" gutterBottom>No folders found</Typography>
+                <Typography variant="body2" color="text.secondary" paragraph>
+                  {searchTerm || categoryFilter !== 'all' 
+                    ? 'Try adjusting your search or filters'
+                    : 'No folders have been created yet.'
+                  }
+                </Typography>
+              </Paper>
+            )}
+           </>
           )}
-                 </>
-       )}
+      </TabPanel>
+
+      {/* Periodic Run Tab */}
+      <TabPanel value={activeTab} index={1}>
+        <Box sx={{ p: 4, textAlign: 'center' }}>
+          <Typography variant="h6" gutterBottom>
+            Periodic Run Data
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            This tab will display periodic run data when available.
+          </Typography>
+        </Box>
+      </TabPanel>
 
              {/* New Folder Dialog */}
        <Dialog 

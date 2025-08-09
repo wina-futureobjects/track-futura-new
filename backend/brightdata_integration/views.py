@@ -12,7 +12,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from .models import BrightdataConfig, ScraperRequest, BatchScraperJob, BrightdataNotification
+from .models import BrightdataConfig, ScraperRequest, BatchScraperJob, BrightdataNotification, WebhookEvent
 from .serializers import (
     BrightdataConfigSerializer, ScraperRequestSerializer, ScraperRequestCreateSerializer,
     BatchScraperJobSerializer, BatchScraperJobCreateSerializer, BrightdataNotificationSerializer
@@ -148,8 +148,16 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
                 "Authorization": f"Bearer {config.api_token}",
                 "Content-Type": "application/json",
             }
+            # Get webhook base URL from settings or use ngrok URL
+            from django.conf import settings
+            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://6ca2c7c8ca5e.ngrok-free.app')
+            
             params = {
                 "dataset_id": config.dataset_id,
+                "endpoint": f"{webhook_base_url}/api/brightdata/webhook/",
+                "notify": f"{webhook_base_url}/api/brightdata/notify/",
+                "format": "json",
+                "uncompressed_webhook": "true",
                 "include_errors": "true",
             }
 
@@ -360,9 +368,14 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
                 "Authorization": f"Bearer {config.api_token}",
                 "Content-Type": "application/json",
             }
+            # Get webhook base URL from settings or use ngrok URL
+            from django.conf import settings
+            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://6ca2c7c8ca5e.ngrok-free.app')
+            
             params = {
                 "dataset_id": config.dataset_id,
-                "endpoint": "https://api.upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site/api/brightdata/webhook/",
+                "endpoint": f"{webhook_base_url}/api/brightdata/webhook/",
+                "notify": f"{webhook_base_url}/api/brightdata/notify/",
                 "format": "json",
                 "uncompressed_webhook": "true",
                 "include_errors": "true",
@@ -448,7 +461,7 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
                 print("Working script uses:")
                 print('  Authorization: Bearer c20a28d5-5c6c-43c3-9567-a6d7c193e727')
                 print('  dataset_id: gd_lk5ns7kz21pck8jpis')
-                print('  endpoint: https://api.upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site/api/brightdata/webhook/')
+                print(f'  endpoint: {webhook_base_url}/api/brightdata/webhook/')
                 print()
                 print("This request uses:")
                 print(f'  Authorization: {headers["Authorization"]}')
@@ -459,7 +472,7 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
                 # Check for differences
                 working_token = "c20a28d5-5c6c-43c3-9567-a6d7c193e727"
                 working_dataset = "gd_lk5ns7kz21pck8jpis"
-                working_endpoint = "https://api.upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site/api/brightdata/webhook/"
+                working_endpoint = f"{webhook_base_url}/api/brightdata/webhook/"
 
                 if headers["Authorization"] != f"Bearer {working_token}":
                     print("❌ API TOKEN MISMATCH!")
@@ -641,8 +654,16 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
                 "Authorization": f"Bearer {config.api_token}",
                 "Content-Type": "application/json",
             }
+            # Get webhook base URL from settings or use ngrok URL
+            from django.conf import settings
+            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://6ca2c7c8ca5e.ngrok-free.app')
+            
             params = {
                 "dataset_id": config.dataset_id,
+                "endpoint": f"{webhook_base_url}/api/brightdata/webhook/",
+                "notify": f"{webhook_base_url}/api/brightdata/notify/",
+                "format": "json",
+                "uncompressed_webhook": "true",
                 "include_errors": "true",
             }
 
@@ -856,8 +877,16 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
                 "Authorization": f"Bearer {config.api_token}",
                 "Content-Type": "application/json",
             }
+            # Get webhook base URL from settings or use ngrok URL
+            from django.conf import settings
+            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://6ca2c7c8ca5e.ngrok-free.app')
+            
             params = {
                 "dataset_id": config.dataset_id,
+                "endpoint": f"{webhook_base_url}/api/brightdata/webhook/",
+                "notify": f"{webhook_base_url}/api/brightdata/notify/",
+                "format": "json",
+                "uncompressed_webhook": "true",
                 "include_errors": "true",
             }
 
@@ -1118,249 +1147,607 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
 @require_http_methods(["POST"])
 def brightdata_webhook(request):
     """
-    Simplified webhook endpoint for reliable data processing
+    Safe webhook handler that always captures raw payload first, then validates
     """
     import time
+    import traceback
+    import requests
+    import logging
+    from datetime import datetime
+    
+    logger = logging.getLogger(__name__)
+    
+    # 1. CONFIRM DJANGO RECEIVES THE REQUEST
+    logger.info("="*80)
+    logger.info(f"🎯 WEBHOOK RECEIVED AT {datetime.now()}")
+    logger.info("="*80)
+    logger.info(f"📡 Method: {request.method}")
+    logger.info(f"🌐 Client IP: {request.META.get('REMOTE_ADDR', 'unknown')}")
+    logger.info(f"🔗 URL: {request.build_absolute_uri()}")
+    logger.info(f"📋 Content-Type: {request.content_type}")
+    logger.info(f"📏 Content-Length: {request.META.get('CONTENT_LENGTH', 'unknown')}")
+    logger.info(f"📨 Headers: {dict(request.headers)}")
+    logger.info(f"🔍 Query Params: {dict(request.GET)}")
+    
+    # 2. CHECK HTTP METHOD
+    if request.method != 'POST':
+        logger.error(f"❌ Invalid method: {request.method}. Expected POST")
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
 
     start_time = time.time()
     client_ip = request.META.get('REMOTE_ADDR', 'unknown')
+    webhook_event = None
 
     try:
-        # Parse the incoming data
-        if request.content_type == 'application/json':
-            data = json.loads(request.body)
-        else:
-            logger.error(f"Unsupported content type: {request.content_type}")
-            return JsonResponse({'error': 'Unsupported content type'}, status=400)
+        # 3. ALWAYS SAVE RAW PAYLOAD FIRST (for debugging)
+        logger.info("📦 CAPTURING RAW PAYLOAD:")
+        try:
+            raw_body = request.body.decode("utf-8")
+            logger.info(f"Raw body: {raw_body[:1000]}...")  # First 1000 chars
+        except UnicodeDecodeError as e:
+            logger.error(f"❌ Unicode decode error: {e}")
+            raw_body = str(request.body)
+            logger.info(f"Raw body (bytes): {raw_body[:1000]}...")
 
-        # Extract metadata from headers or query params
+        # 4. PARSE JSON (but don't fail yet)
+        logger.info("🔍 PARSING JSON PAYLOAD:")
+        data = None
+        json_error = None
+        
+        if request.content_type == 'application/json':
+            try:
+                data = json.loads(request.body)
+                logger.info(f"✅ JSON parsed successfully")
+                logger.info(f"📊 Data type: {type(data)}")
+                
+                # 🔧 FIX 4: Add robust type checks
+                if not isinstance(data, (list, dict)):
+                    logger.warning(f"⚠️  JSON is not list/dict, wrapping as list: {type(data)}")
+                    data = [data]  # Wrap single items in list
+                
+                if isinstance(data, dict):
+                    logger.info(f"📋 Data keys: {list(data.keys())}")
+                elif isinstance(data, list):
+                    logger.info(f"📋 List length: {len(data)}")
+                logger.info(f"📄 Parsed JSON: {str(data)[:500]}...")  # First 500 chars
+            except json.JSONDecodeError as e:
+                json_error = str(e)
+                logger.error(f"❌ JSON decode error: {e}")
+                logger.error(f"❌ Raw body that failed: {raw_body}")
+                # Don't return error yet - save the raw payload first
+        else:
+            logger.error(f"❌ Unsupported content type: {request.content_type}")
+            logger.error(f"❌ Expected: application/json")
+            # Still save the raw payload for debugging
+
+        # 5. EXTRACT METADATA
+        logger.info("🏷️ EXTRACTING METADATA:")
         snapshot_id = (request.headers.get('X-Snapshot-Id') or
                       request.headers.get('X-Brightdata-Snapshot-Id') or
+                      request.headers.get('x-snapshot-id') or
                       request.GET.get('snapshot_id'))
+        
+        # 🔧 FIX 1: Improved platform detection
         platform = (request.headers.get('X-Platform') or
-                   request.GET.get('platform', 'instagram'))
+                   request.headers.get('x-platform') or
+                   request.GET.get('platform'))
+        
+        # If no platform specified, try to detect from data content with better logic
+        if not platform and data:
+            platform = _detect_platform_from_data(data)
+        
+        logger.info(f"📱 Platform detected: {platform}")
+        logger.info(f"📸 Snapshot ID: {snapshot_id}")
 
-        logger.info(f"Received webhook data for snapshot_id: {snapshot_id}, platform: {platform}")
+        # 6. ALWAYS SAVE TO DATABASE FIRST (even if validation fails)
+        logger.info("💾 SAVING RAW PAYLOAD TO DATABASE:")
+        try:
+            # 🔧 FIX 3: Better test webhook detection
+            is_test_webhook = (request.headers.get('X-Brightdata-Test') or 
+                             request.headers.get('x-brightdata-test') or
+                             not snapshot_id)
+            
+            # Determine status based on what we have
+            if json_error:
+                status = 'json_error'
+            elif is_test_webhook:
+                status = 'test_webhook'
+            else:
+                status = 'pending'
+            
+            webhook_event = WebhookEvent.objects.create(
+                platform=platform,
+                snapshot_id=snapshot_id,
+                raw_payload=data if data else {'raw_body': raw_body, 'json_error': json_error},
+                status=status,
+                error_message=json_error if json_error else None
+            )
+            logger.info(f"✅ WebhookEvent created: ID {webhook_event.id}")
+            logger.info(f"✅ Platform: {webhook_event.platform}")
+            logger.info(f"✅ Snapshot ID: {webhook_event.snapshot_id}")
+            logger.info(f"✅ Status: {webhook_event.status}")
+            logger.info(f"✅ Created at: {webhook_event.received_at}")
+            if json_error:
+                logger.info(f"✅ Error message: {webhook_event.error_message}")
+        except Exception as e:
+            logger.error(f"❌ Failed to save webhook event to database: {str(e)}")
+            logger.error(f"❌ Exception type: {type(e).__name__}")
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
+            # Even if we can't save to DB, we should still try to process
 
-        # Find ALL corresponding scraper requests (for batch jobs, multiple requests share the same snapshot_id)
-        scraper_requests = []
-        if snapshot_id:
-            try:
-                scraper_requests = list(ScraperRequest.objects.filter(request_id=snapshot_id))
-                if scraper_requests:
-                    logger.info(f"Found {len(scraper_requests)} scraper requests for snapshot_id: {snapshot_id}")
-                    for req in scraper_requests:
-                        logger.info(f"  - Request {req.id}: {req.target_url} -> folder_id: {req.folder_id}")
-                else:
-                    logger.warning(f"No scraper requests found for snapshot_id: {snapshot_id}")
-            except Exception as e:
-                logger.error(f"Error finding scraper requests for snapshot_id {snapshot_id}: {str(e)}")
+        # 7. NOW VALIDATE AND PROCESS
+        if json_error:
+            logger.error(f"❌ JSON validation failed: {json_error}")
+            processing_time = round(time.time() - start_time, 3)
+            logger.info("="*80)
+            return JsonResponse({
+                'status': 'json_error',
+                'message': 'Invalid JSON payload',
+                'details': json_error,
+                'webhook_event_id': webhook_event.id if webhook_event else None,
+                'processing_time': processing_time
+            }, status=400)
 
-        # Process the data based on platform
-        success = _process_webhook_data_with_batch_support(data, platform, scraper_requests)
-
-        if success:
-            # Update all scraper request statuses
-            for scraper_request in scraper_requests:
-                scraper_request.status = 'completed'
-                scraper_request.save()
-
-            # Update workflow task statuses if this is part of a workflow
-            workflow_tasks_updated = 0
-            scraping_jobs_updated = 0
-            for scraper_request in scraper_requests:
-                if scraper_request.batch_job:
-                    try:
-                        # Update WorkflowTask statuses (legacy)
-                        from workflow.models import WorkflowTask
-                        workflow_tasks = WorkflowTask.objects.filter(batch_job=scraper_request.batch_job)
-                        for workflow_task in workflow_tasks:
-                            workflow_task.status = 'completed'
-                            workflow_task.save()
-                            workflow_tasks_updated += 1
-                        
-                        # Update specific ScrapingJob statuses (new workflow system)
-                        # Match by URL and platform to ensure we update the correct job
-                        from workflow.models import ScrapingJob
-                        matching_scraping_jobs = ScrapingJob.objects.filter(
-                            batch_job=scraper_request.batch_job,
-                            url=scraper_request.target_url
-                        )
-                        for scraping_job in matching_scraping_jobs:
-                            scraping_job.status = 'completed'
-                            scraping_job.completed_at = timezone.now()
-                            scraping_job.save()
-                            scraping_jobs_updated += 1
-                            logger.info(f"Updated ScrapingJob {scraping_job.id} to completed for URL: {scraper_request.target_url}")
-                            
-                    except Exception as e:
-                        logger.error(f"Error updating workflow statuses: {str(e)}")
-
-            if scraper_requests:
-                logger.info(f"Updated {len(scraper_requests)} scraper request statuses to completed")
-            if workflow_tasks_updated > 0:
-                logger.info(f"Updated {workflow_tasks_updated} workflow task statuses to completed")
-            if scraping_jobs_updated > 0:
-                logger.info(f"Updated {scraping_jobs_updated} scraping job statuses to completed")
+        # Check if this is a test payload
+        if is_test_webhook:
+            logger.warning(f"🧪 TEST WEBHOOK DETECTED")
+            logger.warning(f"📋 Test payload data: {data}")
+            logger.warning(f"📨 Headers: {dict(request.headers)}")
+            logger.warning(f"🔍 Query params: {dict(request.GET)}")
+            
+            # Update status to indicate it was processed
+            if webhook_event:
+                webhook_event.status = 'test_processed'
+                webhook_event.save()
 
             processing_time = round(time.time() - start_time, 3)
-            logger.info(f"Webhook processed successfully: {snapshot_id} in {processing_time}s")
+            logger.info(f"✅ Test webhook received successfully in {processing_time}s")
+            logger.info("="*80)
 
             return JsonResponse({
-                'status': 'success',
-                'message': 'Data processed successfully',
-                'snapshot_id': snapshot_id,
+                'status': 'test_received',
+                'message': 'Test webhook received successfully',
+                'webhook_event_id': webhook_event.id if webhook_event else None,
                 'processing_time': processing_time,
-                'items_processed': len(data) if isinstance(data, list) else 1,
-                'scraper_requests_updated': len(scraper_requests),
-                'workflow_tasks_updated': workflow_tasks_updated,
-                'scraping_jobs_updated': scraping_jobs_updated
+                'note': 'This was a test webhook from BrightData. Real scraping webhooks will contain snapshot_id.'
             })
+
+        logger.info(f"✅ Metadata extracted successfully")
+
+        # 8. PROCESS REAL WEBHOOK DATA
+        # Handle BrightData file_url payload format
+        if isinstance(data, dict) and 'file_url' in data:
+            logger.info(f"BrightData sent file_url: {data['file_url']}")
+            try:
+                response = requests.get(data['file_url'], timeout=30)
+                response.raise_for_status()
+                posts_data = response.json()
+                logger.info(f"Successfully fetched {len(posts_data) if isinstance(posts_data, list) else 1} posts from file_url")
+                # Update the data with the fetched content
+                data['fetched_data'] = posts_data
+            except Exception as e:
+                logger.error(f"Failed to fetch data from file_url: {str(e)}")
+                if webhook_event:
+                    webhook_event.status = 'file_url_error'
+                    webhook_event.error_message = f'Failed to fetch data from file_url: {str(e)}'
+                    webhook_event.save()
+                return JsonResponse({
+                    'status': 'error',
+                    'message': f'Failed to fetch data from file_url: {str(e)}',
+                    'webhook_event_id': webhook_event.id if webhook_event else None,
+                    'snapshot_id': snapshot_id
+                }, status=500)
         else:
-            # Update all scraper request statuses to failed
-            for scraper_request in scraper_requests:
-                scraper_request.status = 'failed'
-                scraper_request.error_message = 'Failed to process webhook data'
-                scraper_request.save()
+            # Direct data format
+            posts_data = data if isinstance(data, list) else data.get('data', [])
+            logger.info(f"Processing direct data format with {len(posts_data) if isinstance(posts_data, list) else 1} items")
 
-            # Update workflow task statuses to failed if this is part of a workflow
-            workflow_tasks_failed = 0
-            scraping_jobs_failed = 0
-            for scraper_request in scraper_requests:
-                if scraper_request.batch_job:
-                    try:
-                        # Update WorkflowTask statuses to failed (legacy)
-                        from workflow.models import WorkflowTask
-                        workflow_tasks = WorkflowTask.objects.filter(batch_job=scraper_request.batch_job)
-                        for workflow_task in workflow_tasks:
-                            workflow_task.status = 'failed'
-                            workflow_task.save()
-                            workflow_tasks_failed += 1
-                        
-                        # Update specific ScrapingJob statuses to failed (new workflow system)
-                        # Match by URL and platform to ensure we update the correct job
-                        from workflow.models import ScrapingJob
-                        matching_scraping_jobs = ScrapingJob.objects.filter(
-                            batch_job=scraper_request.batch_job,
-                            url=scraper_request.target_url
-                        )
-                        for scraping_job in matching_scraping_jobs:
-                            scraping_job.status = 'failed'
-                            scraping_job.error_message = 'Failed to process webhook data'
-                            scraping_job.completed_at = timezone.now()
-                            scraping_job.save()
-                            scraping_jobs_failed += 1
-                            logger.info(f"Updated ScrapingJob {scraping_job.id} to failed for URL: {scraper_request.target_url}")
-                            
-                    except Exception as e:
-                        logger.error(f"Error updating workflow statuses to failed: {str(e)}")
-
-            if workflow_tasks_failed > 0:
-                logger.info(f"Updated {workflow_tasks_failed} workflow task statuses to failed")
-            if scraping_jobs_failed > 0:
-                logger.info(f"Updated {scraping_jobs_failed} scraping job statuses to failed")
-
-            logger.error(f"Failed to process webhook data for snapshot_id: {snapshot_id}")
+        # 9. PROCESS THE ACTUAL DATA
+        logger.info("🔄 PROCESSING WEBHOOK DATA:")
+        
+        # Find associated scraper requests for this snapshot_id
+        scraper_requests = []
+        try:
+            scraper_requests = ScraperRequest.objects.filter(
+                request_id=snapshot_id
+            ).order_by('created_at')
+            logger.info(f"📋 Found {len(scraper_requests)} scraper requests for snapshot_id: {snapshot_id}")
+        except Exception as e:
+            logger.warning(f"⚠️  Error finding scraper requests: {str(e)}")
+        
+        # Process the data
+        try:
+            # 🔧 FIX 2: Ensure processing function exists and works
+            if not callable(_process_webhook_data_with_batch_support):
+                raise Exception("_process_webhook_data_with_batch_support function is not callable")
+            
+            logger.info(f"🔄 Calling _process_webhook_data_with_batch_support with platform: {platform}")
+            success = _process_webhook_data_with_batch_support(posts_data, platform, scraper_requests)
+            
+            if success:
+                logger.info(f"✅ Data processing completed successfully")
+            else:
+                logger.warning(f"⚠️  Data processing completed with warnings")
+                
+        except NameError as e:
+            logger.error(f"❌ _process_webhook_data_with_batch_support function not found: {str(e)}")
+            if webhook_event:
+                webhook_event.status = 'processing_error'
+                webhook_event.error_message = f'Processing function not found: {str(e)}'
+                webhook_event.save()
             return JsonResponse({
-                'status': 'error',
-                'message': 'Failed to process webhook data',
+                'status': 'processing_error',
+                'message': f'Processing function not found: {str(e)}',
+                'webhook_event_id': webhook_event.id if webhook_event else None,
+                'snapshot_id': snapshot_id,
+                'processing_time': round(time.time() - start_time, 3)
+            }, status=500)
+        except Exception as e:
+            logger.error(f"❌ Error processing data: {str(e)}")
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
+            if webhook_event:
+                webhook_event.status = 'processing_error'
+                webhook_event.error_message = f'Data processing error: {str(e)}'
+                webhook_event.save()
+            return JsonResponse({
+                'status': 'processing_error',
+                'message': f'Error processing data: {str(e)}',
+                'webhook_event_id': webhook_event.id if webhook_event else None,
+                'snapshot_id': snapshot_id,
                 'processing_time': round(time.time() - start_time, 3)
             }, status=500)
 
-    except json.JSONDecodeError as e:
-        logger.error(f"Invalid JSON in webhook request: {str(e)}")
-        return JsonResponse({'error': 'Invalid JSON', 'details': str(e)}, status=400)
+        # 10. UPDATE STATUS TO PROCESSED
+        if webhook_event:
+            webhook_event.status = 'processed'
+            webhook_event.save()
+            logger.info(f"✅ WebhookEvent status updated to 'processed'")
+
+        processing_time = round(time.time() - start_time, 3)
+        logger.info(f"✅ Webhook processed successfully: {snapshot_id} in {processing_time}s")
+        logger.info("="*80)
+
+        return JsonResponse({
+            'status': 'processed',
+            'message': 'Webhook data processed successfully',
+            'webhook_event_id': webhook_event.id if webhook_event else None,
+            'snapshot_id': snapshot_id,
+            'processing_time': processing_time
+        })
 
     except Exception as e:
-        logger.error(f"Error processing webhook: {str(e)}")
-        logger.error(f"Traceback: {traceback.format_exc()}")
+        logger.error(f"❌ Error processing webhook: {str(e)}")
+        logger.error(f"❌ Exception type: {type(e).__name__}")
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        
+        # 🔧 FIX 5: Wrap webhook_event references safely
+        if webhook_event:
+            webhook_event.status = 'error'
+            webhook_event.error_message = str(e)
+            webhook_event.save()
+            logger.info(f"✅ WebhookEvent status updated to 'error'")
+        
+        logger.error("="*80)
         return JsonResponse({
             'error': 'Internal server error',
             'details': str(e),
+            'webhook_event_id': webhook_event.id if webhook_event else None,
             'processing_time': round(time.time() - start_time, 3)
         }, status=500)
+
+def _detect_platform_from_data(data):
+    """
+    🔧 FIX 1: Improved platform detection from data content
+    """
+    logger = logging.getLogger(__name__)
+    
+    if not data:
+        return 'instagram'  # Default fallback
+    
+    # If data is a list, check the first item
+    if isinstance(data, list) and len(data) > 0:
+        first_item = data[0]
+    elif isinstance(data, dict):
+        # If data is a dict, check if it has 'data' key
+        if 'data' in data and isinstance(data['data'], list) and len(data['data']) > 0:
+            first_item = data['data'][0]
+        else:
+            first_item = data
+    else:
+        return 'instagram'  # Default fallback
+    
+    if not isinstance(first_item, dict):
+        return 'instagram'  # Default fallback
+    
+    # LinkedIn-specific field detection (more specific)
+    linkedin_fields = [
+        'user_id', 'use_url', 'user_title', 'post_text', 'post_text_html',
+        'num_likes', 'num_shares', 'user_followers', 'user_posts', 'user_articles',
+        'num_connections', 'post_type', 'account_type', 'external_link_data',
+        'embedded_links', 'document_cover_image', 'document_page_count',
+        'tagged_companies', 'tagged_people', 'repost_data', 'author_profile_pic'
+    ]
+    
+    # Facebook-specific field detection
+    facebook_fields = [
+        'facebook_id', 'facebook_url', 'facebook_user', 'page_name', 'profile_id',
+        'page_intro', 'page_category', 'page_logo', 'page_external_website',
+        'page_likes', 'page_followers', 'page_is_verified', 'page_phone',
+        'page_email', 'page_creation_time', 'page_reviews_score',
+        'page_reviewers_amount', 'page_price_range', 'attachments_data',
+        'post_external_image', 'page_url', 'header_image', 'avatar_image_url',
+        'profile_handle', 'is_sponsored', 'shortcode', 'is_page', 'about',
+        'active_ads_urls', 'delegate_page_id', 'post_type', 'timestamp',
+        'input', 'num_likes_type', 'count_reactions_type'
+    ]
+    
+    # Instagram-specific field detection
+    instagram_fields = [
+        'instagram_id', 'instagram_url', 'instagram_user', 'instagram_pk',
+        'content_id', 'content_type', 'platform_type', 'product_type',
+        'user_posted_id', 'followers', 'posts_count', 'following',
+        'profile_image_link', 'user_profile_url', 'profile_url',
+        'is_verified', 'is_paid_partnership', 'partnership_details',
+        'coauthor_producers', 'location', 'latest_comments', 'top_comments',
+        'engagement_score', 'engagement_score_view', 'tagged_users',
+        'audio', 'post_content', 'videos_duration', 'images',
+        'photos_number', 'alt_text', 'discovery_input', 'has_handshake'
+    ]
+    
+    # TikTok-specific field detection
+    tiktok_fields = [
+        'tiktok_id', 'tiktok_url', 'tiktok_user', 'video_play_count',
+        'video_view_count', 'length', 'video_url', 'audio_url'
+    ]
+    
+    # Count matches for each platform
+    linkedin_matches = sum(1 for field in linkedin_fields if field in first_item)
+    facebook_matches = sum(1 for field in facebook_fields if field in first_item)
+    instagram_matches = sum(1 for field in instagram_fields if field in first_item)
+    tiktok_matches = sum(1 for field in tiktok_fields if field in first_item)
+    
+    logger.info(f"Platform detection scores - LinkedIn: {linkedin_matches}, Facebook: {facebook_matches}, Instagram: {instagram_matches}, TikTok: {tiktok_matches}")
+    
+    # Return platform with highest match count, with minimum threshold
+    max_matches = max(linkedin_matches, facebook_matches, instagram_matches, tiktok_matches)
+    
+    if max_matches >= 3:  # Minimum threshold to avoid false positives
+        if linkedin_matches == max_matches:
+            return 'linkedin'
+        elif facebook_matches == max_matches:
+            return 'facebook'
+        elif instagram_matches == max_matches:
+            return 'instagram'
+        elif tiktok_matches == max_matches:
+            return 'tiktok'
+    
+    # Fallback: try to detect from URL patterns
+    url = first_item.get('url', '')
+    if 'linkedin.com' in url:
+        return 'linkedin'
+    elif 'facebook.com' in url:
+        return 'facebook'
+    elif 'instagram.com' in url:
+        return 'instagram'
+    elif 'tiktok.com' in url:
+        return 'tiktok'
+    
+    logger.warning(f"⚠️  Could not detect platform from data, using default: instagram")
+    return 'instagram'  # Default fallback
+
+@csrf_exempt
+def webhook_test(request):
+    """
+    Simple test endpoint to verify webhook accessibility
+    """
+    import logging
+    from datetime import datetime
+    
+    logger = logging.getLogger(__name__)
+    
+    logger.info("="*80)
+    logger.info(f"🧪 WEBHOOK TEST ENDPOINT HIT AT {datetime.now()}")
+    logger.info("="*80)
+    logger.info(f"📡 Method: {request.method}")
+    logger.info(f"🌐 Client IP: {request.META.get('REMOTE_ADDR', 'unknown')}")
+    logger.info(f"🔗 URL: {request.build_absolute_uri()}")
+    logger.info(f"📨 Headers: {dict(request.headers)}")
+    
+    return JsonResponse({
+        'status': 'success',
+        'message': 'Webhook test endpoint is accessible',
+        'timestamp': datetime.now().isoformat(),
+        'method': request.method,
+        'client_ip': request.META.get('REMOTE_ADDR', 'unknown')
+    })
 
 @csrf_exempt
 @require_http_methods(["POST"])
 def brightdata_notify(request):
     """
-    Notification endpoint to receive status updates from BrightData
+    Job status notification endpoint to receive status updates from BrightData
+    This handles the notify_url webhook flow for job execution updates
     """
-    from .models import BrightdataNotification
-
+    import time
+    import traceback
+    from datetime import datetime
+    
+    logger = logging.getLogger(__name__)
+    
+    # 1. CONFIRM DJANGO RECEIVES THE REQUEST
+    logger.info("="*80)
+    logger.info(f"📩 JOB STATUS WEBHOOK RECEIVED AT {datetime.now()}")
+    logger.info("="*80)
+    logger.info(f"📡 Method: {request.method}")
+    logger.info(f"🌐 Client IP: {request.META.get('REMOTE_ADDR', 'unknown')}")
+    logger.info(f"🔗 URL: {request.build_absolute_uri()}")
+    logger.info(f"📋 Content-Type: {request.content_type}")
+    logger.info(f"📏 Content-Length: {request.META.get('CONTENT_LENGTH', 'unknown')}")
+    logger.info(f"📨 Headers: {dict(request.headers)}")
+    
+    start_time = time.time()
+    
     try:
-        # Parse notification data
+        # 2. PARSE NOTIFICATION DATA
+        logger.info("🔍 PARSING JOB STATUS PAYLOAD:")
+        
         if request.content_type == 'application/json':
-            data = json.loads(request.body)
+            try:
+                data = json.loads(request.body.decode("utf-8"))
+                logger.info(f"✅ JSON parsed successfully")
+                logger.info(f"📄 Raw payload: {str(data)[:500]}...")
+            except json.JSONDecodeError as e:
+                logger.error(f"❌ JSON decode error: {e}")
+                return JsonResponse({'error': 'Invalid JSON'}, status=400)
         else:
             # Handle form-encoded data
             data = dict(request.POST.items())
+            logger.info(f"✅ Form data parsed: {str(data)[:500]}...")
 
-        # Handle both dict and list data structures
-        if isinstance(data, dict):
-            snapshot_id = data.get('snapshot_id') or data.get('request_id')
-            status_update = data.get('status', 'unknown')
-            message = data.get('message', '')
-        else:
-            # If data is not a dict (e.g., list), try to get from query params
-            snapshot_id = request.GET.get('snapshot_id') or request.GET.get('request_id')
-            status_update = request.GET.get('status', 'unknown')
-            message = request.GET.get('message', '')
+        # 3. EXTRACT JOB STATUS INFORMATION
+        # Handle both snapshot_id/id and status/state field variations
+        snapshot_id = data.get('snapshot_id') or data.get('id') or data.get('request_id')
+        status = data.get('status') or data.get('state', 'unknown')
+        dataset_id = data.get('dataset_id')
+        error_message = data.get('error') or data.get('message', '')
+        created_at = data.get('created_at')
+        finished_at = data.get('finished_at')
+        
+        logger.info(f"📋 Extracted job info:")
+        logger.info(f"   Snapshot ID: {snapshot_id}")
+        logger.info(f"   Status: {status}")
+        logger.info(f"   Dataset ID: {dataset_id}")
+        logger.info(f"   Error: {error_message}")
+        logger.info(f"   Created: {created_at}")
+        logger.info(f"   Finished: {finished_at}")
 
-        logger.info(f"Received notification: snapshot_id={snapshot_id}, status={status_update}, message={message}")
-
-        # Find the corresponding scraper request
-        scraper_request = None
-        if snapshot_id:
-            try:
-                scraper_request = ScraperRequest.objects.get(request_id=snapshot_id)
-                logger.info(f"Found scraper request {scraper_request.id} for snapshot_id: {snapshot_id}")
-            except ScraperRequest.DoesNotExist:
-                logger.warning(f"No scraper request found for snapshot_id: {snapshot_id}")
-
-        # Create notification record
+        # 4. SAVE RAW NOTIFICATION
+        from .models import BrightdataNotification
+        
         notification = BrightdataNotification.objects.create(
             snapshot_id=snapshot_id or 'unknown',
-            status=status_update,
-            message=message,
-            scraper_request=scraper_request,
+            status=status.lower() if status else 'unknown',
+            message=error_message,
             raw_data=data,
             request_ip=request.META.get('REMOTE_ADDR'),
             request_headers=dict(request.headers),
             processed_at=timezone.now()
         )
+        logger.info(f"✅ Saved notification record: ID {notification.id}")
 
-        # Update scraper request status if found
-        if scraper_request:
-            # Update status based on notification
-            if status_update in ['completed', 'finished']:
-                scraper_request.status = 'completed'
-                scraper_request.completed_at = timezone.now()
-            elif status_update in ['failed', 'error']:
-                scraper_request.status = 'failed'
-                scraper_request.error_message = message
-            elif status_update in ['running', 'processing']:
-                scraper_request.status = 'processing'
-                if not scraper_request.started_at:
-                    scraper_request.started_at = timezone.now()
+        # 5. UPDATE SCRAPER REQUEST STATUS
+        scraper_request = None
+        if snapshot_id:
+            try:
+                scraper_request = ScraperRequest.objects.get(request_id=snapshot_id)
+                logger.info(f"✅ Found ScraperRequest {scraper_request.id} for snapshot_id: {snapshot_id}")
 
-            scraper_request.save()
-            logger.info(f"Updated scraper request {scraper_request.id} status to {scraper_request.status}")
+                # Update status based on notification
+                old_status = scraper_request.status
+
+                if status.lower() in ['completed', 'finished', 'done']:
+                    scraper_request.status = 'completed'
+                    scraper_request.completed_at = timezone.now()
+                    logger.info(f"✅ Updated ScraperRequest {scraper_request.id} status: {old_status} → completed")
+
+                elif status.lower() in ['failed', 'error', 'cancelled']:
+                    scraper_request.status = 'failed'
+                    scraper_request.error_message = error_message
+                    scraper_request.completed_at = timezone.now()
+                    logger.info(f"✅ Updated ScraperRequest {scraper_request.id} status: {old_status} → failed")
+
+                elif status.lower() in ['running', 'processing', 'started']:
+                    scraper_request.status = 'processing'
+                    if not scraper_request.started_at:
+                        scraper_request.started_at = timezone.now()
+                    logger.info(f"✅ Updated ScraperRequest {scraper_request.id} status: {old_status} → processing")
+
+                elif status.lower() in ['pending', 'queued']:
+                    scraper_request.status = 'pending'
+                    logger.info(f"✅ Updated ScraperRequest {scraper_request.id} status: {old_status} → pending")
+
+                scraper_request.save()
+
+            except ScraperRequest.DoesNotExist:
+                logger.warning(f"⚠️  No ScraperRequest found for snapshot_id: {snapshot_id}")
+        else:
+            logger.warning(f"⚠️  No snapshot_id provided in notification")
+
+        # 6. UPDATE BATCH JOB STATUS
+        if scraper_request and scraper_request.batch_job:
+            batch_job = scraper_request.batch_job
+            old_batch_status = batch_job.status
+            
+            # Update batch job status based on scraper request status
+            if scraper_request.status == 'completed':
+                batch_job.status = 'completed'
+                batch_job.completed_at = timezone.now()
+            elif scraper_request.status == 'failed':
+                batch_job.status = 'failed'
+                batch_job.error_log = error_message
+                batch_job.completed_at = timezone.now()
+            elif scraper_request.status == 'processing':
+                batch_job.status = 'processing'
+                if not batch_job.started_at:
+                    batch_job.started_at = timezone.now()
+            elif scraper_request.status == 'pending':
+                batch_job.status = 'pending'
+            
+            batch_job.save()
+            logger.info(f"✅ Updated BatchScraperJob {batch_job.id} status: {old_batch_status} → {batch_job.status}")
+
+        # 7. UPDATE WORKFLOW ENTITIES
+        if scraper_request and scraper_request.batch_job:
+            try:
+                # Update WorkflowTask statuses
+                from workflow.models import WorkflowTask
+                workflow_tasks = WorkflowTask.objects.filter(batch_job=scraper_request.batch_job)
+                for workflow_task in workflow_tasks:
+                    if workflow_task.status != scraper_request.status:
+                        workflow_task.status = scraper_request.status
+                        workflow_task.save()
+                        logger.info(f"✅ Updated WorkflowTask {workflow_task.id} status: {workflow_task.status}")
+
+                # Update ScrapingJob statuses
+                from workflow.models import ScrapingJob
+                scraping_jobs = ScrapingJob.objects.filter(batch_job=scraper_request.batch_job)
+                for scraping_job in scraping_jobs:
+                    if scraping_job.status != scraper_request.status:
+                        scraping_job.status = scraper_request.status
+                        if scraper_request.status == 'completed':
+                            scraping_job.completed_at = timezone.now()
+                        elif scraper_request.status == 'failed':
+                            scraping_job.error_message = error_message
+                            scraping_job.completed_at = timezone.now()
+                        scraping_job.save()
+                        logger.info(f"✅ Updated ScrapingJob {scraping_job.id} status: {scraping_job.status}")
+
+            except Exception as e:
+                logger.error(f"❌ Error updating workflow entities: {str(e)}")
+
+        processing_time = round(time.time() - start_time, 3)
+        logger.info(f"✅ Job status webhook processed successfully in {processing_time}s")
+        logger.info("="*80)
 
         return JsonResponse({
             'status': 'success',
-            'message': 'Notification processed successfully',
+            'message': 'Job status notification processed successfully',
             'notification_id': notification.id,
-            'scraper_request_updated': scraper_request is not None
+            'scraper_request_updated': scraper_request is not None,
+            'processing_time': processing_time
         })
 
-    except json.JSONDecodeError:
-        logger.error("Invalid JSON in notification request")
-        return JsonResponse({'error': 'Invalid JSON'}, status=400)
     except Exception as e:
-        logger.error(f"Error processing notification: {str(e)}")
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        return JsonResponse({'error': 'Internal server error'}, status=500)
+        logger.error(f"❌ Error processing job status webhook: {str(e)}")
+        logger.error(f"❌ Exception type: {type(e).__name__}")
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        
+        logger.error("="*80)
+        return JsonResponse({
+            'error': 'Internal server error',
+            'details': str(e),
+            'processing_time': round(time.time() - start_time, 3)
+        }, status=500)
 
 def _verify_webhook_auth(auth_header: str) -> bool:
     """
@@ -1385,6 +1772,8 @@ def _process_webhook_data_with_batch_support(data, platform: str, scraper_reques
     Process incoming webhook data with support for batch jobs (multiple scraper requests)
     All posts from the same job go into the SAME shared folder
     """
+    from datetime import datetime
+    from django.utils import timezone
     try:
         # Import platform-specific models
         from facebook_data.models import FacebookPost
@@ -1470,48 +1859,86 @@ def _process_webhook_data_with_batch_support(data, platform: str, scraper_reques
 
                 # Handle folder assignment for all platforms
                 if folder_id:
-                    if platform.lower() == 'facebook':
-                        from facebook_data.models import Folder
-                        try:
-                            folder = Folder.objects.get(id=folder_id)
-                            post_fields['folder'] = folder
-                        except Folder.DoesNotExist:
-                            logger.warning(f"Facebook folder with ID {folder_id} not found, creating default folder")
-                            folder = Folder.objects.create(name=f"Auto-created folder {folder_id}")
-                            post_fields['folder'] = folder
+                    # Use UnifiedRunFolder instead of platform-specific folders
+                    from track_accounts.models import UnifiedRunFolder, ServiceFolderIndex
+                    try:
+                        unified_folder = UnifiedRunFolder.objects.get(id=folder_id)
+                        logger.info(f"✅ Found UnifiedRunFolder: {unified_folder.name} (ID: {folder_id})")
 
-                    elif platform.lower() == 'instagram':
-                        from instagram_data.models import Folder
+                        # Resolve service folder via index for correctness (no name parsing)
+                        platform_code = (platform or '').lower()
+                        service_code = (unified_folder.service_code or unified_folder.category or 'posts')
                         try:
-                            folder = Folder.objects.get(id=folder_id)
-                            post_fields['folder'] = folder
-                            logger.info(f"✅ Assigned Instagram post to SHARED folder: {folder.name} (ID: {folder_id})")
-                        except Folder.DoesNotExist:
-                            logger.warning(f"Instagram folder with ID {folder_id} not found, creating default folder")
-                            folder = Folder.objects.create(name=f"Auto-created folder {folder_id}")
-                            post_fields['folder'] = folder
+                            sfi = ServiceFolderIndex.objects.get(
+                                scraping_run=unified_folder.scraping_run,
+                                platform_code=platform_code,
+                                service_code=service_code,
+                            )
+                            logger.info(f"✅ Resolved ServiceFolderIndex to service folder {sfi.folder_id}")
+                        except ServiceFolderIndex.DoesNotExist:
+                            logger.warning(f"ServiceFolderIndex missing for run={unified_folder.scraping_run_id}, platform={platform_code}, service={service_code}")
 
-                    elif platform.lower() == 'linkedin':
-                        from linkedin_data.models import Folder
-                        try:
-                            folder = Folder.objects.get(id=folder_id)
-                            post_fields['folder'] = folder
-                        except Folder.DoesNotExist:
-                            logger.warning(f"LinkedIn folder with ID {folder_id} not found, creating default folder")
-                            folder = Folder.objects.create(name=f"Auto-created folder {folder_id}")
-                            post_fields['folder'] = folder
+                        # For each platform, get or create the corresponding platform-specific folder and link unified_job_folder
+                        if platform_code == 'facebook':
+                            from facebook_data.models import Folder
+                        elif platform_code == 'instagram':
+                            from instagram_data.models import Folder
+                        elif platform_code == 'linkedin':
+                            from linkedin_data.models import Folder
+                        elif platform_code == 'tiktok':
+                            from tiktok_data.models import Folder
+                        else:
+                            Folder = None
 
-                    elif platform.lower() == 'tiktok':
-                        from tiktok_data.models import Folder
-                        try:
-                            folder = Folder.objects.get(id=folder_id)
+                        if Folder is not None:
+                            folder, created = Folder.objects.get_or_create(
+                                unified_job_folder=unified_folder,
+                                defaults={'name': unified_folder.name, 'description': f'Created from UnifiedRunFolder {unified_folder.id}'}
+                            )
                             post_fields['folder'] = folder
-                        except Folder.DoesNotExist:
-                            logger.warning(f"TikTok folder with ID {folder_id} not found, creating default folder")
-                            folder = Folder.objects.create(name=f"Auto-created folder {folder_id}")
+                            if created:
+                                logger.info(f"✅ Created {platform_code} folder linked to unified {unified_folder.id}: {folder.id}")
+                            else:
+                                logger.info(f"✅ Using existing {platform_code} folder linked to unified {unified_folder.id}: {folder.id}")
+
+                    except UnifiedRunFolder.DoesNotExist:
+                        logger.error(f"UnifiedRunFolder with ID {folder_id} not found")
+                        # Create a fallback folder for the specific platform
+                        if platform_code == 'facebook':
+                            from facebook_data.models import Folder
+                        elif platform_code == 'instagram':
+                            from instagram_data.models import Folder
+                        elif platform_code == 'linkedin':
+                            from linkedin_data.models import Folder
+                        elif platform_code == 'tiktok':
+                            from tiktok_data.models import Folder
+                        else:
+                            Folder = None
+                        if Folder is not None:
+                            folder = Folder.objects.create(name=f"Fallback folder {folder_id}")
                             post_fields['folder'] = folder
                 else:
                     logger.warning(f"No shared folder_id available for posts")
+                    # For testing purposes, create a default folder if no scraper requests exist
+                    if not scraper_requests:
+                        logger.info(f"Creating default folder for testing (no scraper requests found)")
+                        try:
+                            from linkedin_data.models import Folder
+                            folder, created = Folder.objects.get_or_create(
+                                name=f"Test Folder - {platform} - {datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                                defaults={
+                                    'description': f'Test folder created for webhook testing',
+                                    'category': 'posts',
+                                    'folder_type': 'content'
+                                }
+                            )
+                            post_fields['folder'] = folder
+                            if created:
+                                logger.info(f"✅ Created test folder: {folder.id}")
+                            else:
+                                logger.info(f"✅ Using existing test folder: {folder.id}")
+                        except Exception as e:
+                            logger.error(f"Error creating test folder: {str(e)}")
 
                 # Create or update post
                 post_id = post_data.get('post_id') or post_data.get('id') or post_data.get('pk')
@@ -1535,6 +1962,50 @@ def _process_webhook_data_with_batch_support(data, platform: str, scraper_reques
                         created_count += 1
                         user_posted = post_data.get('user_posted', 'Unknown')
                         logger.info(f"✅ Created new {platform} post: {post_id} from @{user_posted} in SHARED folder: {folder.name if folder else 'No folder'}")
+                        
+                        # Process LinkedIn comments if this is a LinkedIn post
+                        if platform.lower() == 'linkedin':
+                            try:
+                                from linkedin_data.models import LinkedInComment
+                                from datetime import datetime
+                                
+                                comments_data = post_data.get('top_visible_comments', [])
+                                if comments_data:
+                                    logger.info(f"Processing {len(comments_data)} LinkedIn comments for post {post_id}")
+                                    
+                                    for comment_data in comments_data:
+                                        try:
+                                            # Convert comment date
+                                            comment_date = comment_data.get('comment_date')
+                                            if comment_date and isinstance(comment_date, str):
+                                                try:
+                                                    comment_date = datetime.fromisoformat(comment_date.replace('Z', '+00:00'))
+                                                except:
+                                                    comment_date = None
+                                            
+                                            # Create comment
+                                            comment, comment_created = LinkedInComment.objects.get_or_create(
+                                                comment_id=comment_data.get('comment_id', ''),
+                                                post=post,
+                                                defaults={
+                                                    'folder': folder,
+                                                    'comment_text': comment_data.get('comment', ''),
+                                                    'comment_date': comment_date,
+                                                    'user_id': comment_data.get('user_id', ''),
+                                                    'user_name': comment_data.get('user_name', ''),
+                                                    'user_url': comment_data.get('use_url', ''),
+                                                    'user_title': comment_data.get('user_title', ''),
+                                                    'num_reactions': comment_data.get('num_reactions', 0),
+                                                    'tagged_users': comment_data.get('tagged_users', []),
+                                                }
+                                            )
+                                            if comment_created:
+                                                logger.info(f"✅ Created LinkedIn comment: {comment.comment_id}")
+                                        except Exception as e:
+                                            logger.error(f"Error processing LinkedIn comment: {str(e)}")
+                                            continue
+                            except Exception as e:
+                                logger.error(f"Error processing LinkedIn comments: {str(e)}")
                     else:
                         logger.info(f"Updated existing {platform} post: {post_id}")
                 else:
@@ -1550,6 +2021,23 @@ def _process_webhook_data_with_batch_support(data, platform: str, scraper_reques
                 continue
 
         logger.info(f"✅ Successfully processed {created_count} valid posts for platform {platform} into SHARED folder")
+        
+        # 🔧 FIX: Update ScrapingJob status after successful data processing
+        if scraper_requests and created_count > 0:
+            try:
+                from workflow.models import ScrapingJob
+                for scraper_request in scraper_requests:
+                    if scraper_request.batch_job:
+                        scraping_jobs = ScrapingJob.objects.filter(batch_job=scraper_request.batch_job)
+                        for scraping_job in scraping_jobs:
+                            if scraping_job.status != 'completed':
+                                scraping_job.status = 'completed'
+                                scraping_job.completed_at = timezone.now()
+                                scraping_job.save()
+                                logger.info(f"✅ Updated ScrapingJob {scraping_job.id} status to completed after data processing")
+            except Exception as e:
+                logger.error(f"❌ Error updating ScrapingJob status: {str(e)}")
+        
         return True
 
     except Exception as e:
@@ -1667,6 +2155,75 @@ def _map_post_fields(post_data: dict, platform: str) -> dict:
             'input': post_data.get('input'),
             'num_likes_type': post_data.get('num_likes_type'),
             'count_reactions_type': post_data.get('count_reactions_type'),
+        }
+        return mapped_data
+
+    elif platform.lower() == 'linkedin':
+        # Map LinkedIn-specific fields based on actual BrightData structure
+        from datetime import datetime
+        
+        # Convert date string to datetime if needed
+        date_posted = post_data.get('date_posted')
+        if date_posted and isinstance(date_posted, str):
+            try:
+                date_posted = datetime.fromisoformat(date_posted.replace('Z', '+00:00'))
+            except:
+                date_posted = None
+        
+        mapped_data = {
+            # Core post fields
+            'url': post_data.get('url', ''),
+            'post_id': post_data.get('id') or post_data.get('post_id', ''),
+            'user_id': post_data.get('user_id', ''),
+            'user_posted': post_data.get('user_posted', '') or post_data.get('user_name', '') or post_data.get('title', ''),
+            'user_url': post_data.get('use_url') or post_data.get('user_url', ''),
+            'user_title': post_data.get('user_title', ''),
+            'user_headline': post_data.get('headline', ''),
+            'description': post_data.get('description', ''),
+            'hashtags': post_data.get('hashtags', []),
+            'num_comments': post_data.get('num_comments', 0),
+            'date_posted': date_posted,
+            'likes': post_data.get('likes', 0),
+            'photos': post_data.get('photos', ''),
+            'videos': post_data.get('videos', ''),
+            'location': post_data.get('location', ''),
+            'latest_comments': post_data.get('latest_comments', []),
+            'discovery_input': post_data.get('discovery_input', ''),
+            'thumbnail': post_data.get('thumbnail', ''),
+            'content_type': post_data.get('content_type', ''),
+            'platform_type': post_data.get('platform_type', ''),
+            'engagement_score': post_data.get('engagement_score', 0.0),
+            'tagged_users': post_data.get('tagged_users', ''),
+            'followers': post_data.get('followers', 0),
+            'posts_count': post_data.get('posts_count', 0),
+            'profile_image_link': post_data.get('profile_image_link', ''),
+            'is_verified': post_data.get('is_verified', False),
+            'is_paid_partnership': post_data.get('is_paid_partnership', False),
+            
+            # New LinkedIn-specific fields
+            'post_title': post_data.get('title', ''),
+            'post_text': post_data.get('post_text', ''),
+            'post_text_html': post_data.get('post_text_html', ''),
+            'num_likes': post_data.get('num_likes', 0),
+            'num_shares': post_data.get('num_shares', 0),
+            'user_followers': post_data.get('user_followers', 0),
+            'user_posts': post_data.get('user_posts', 0),
+            'user_articles': post_data.get('user_articles', 0),
+            'num_connections': post_data.get('num_connections', 0),
+            'post_type': post_data.get('post_type', ''),
+            'account_type': post_data.get('account_type', ''),
+            'images': post_data.get('images', []),
+            'videos': post_data.get('videos', []),
+            'video_duration': post_data.get('video_duration', 0),
+            'video_thumbnail': post_data.get('video_thumbnail', ''),
+            'external_link_data': post_data.get('external_link_data', []),
+            'embedded_links': post_data.get('embedded_links', []),
+            'document_cover_image': post_data.get('document_cover_image', ''),
+            'document_page_count': post_data.get('document_page_count', 0),
+            'tagged_companies': post_data.get('tagged_companies', []),
+            'tagged_people': post_data.get('tagged_people', []),
+            'repost_data': post_data.get('repost', {}),
+            'author_profile_pic': post_data.get('author_profile_pic', ''),
         }
         return mapped_data
 

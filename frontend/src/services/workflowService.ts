@@ -106,12 +106,14 @@ export interface CreateInputCollectionRequest {
 
 export interface CreateScrapingRunRequest {
   project: number;
+  name?: string;
   configuration: {
-    num_of_posts: number;
+    num_of_posts?: number | null;
     start_date?: string;
     end_date?: string;
     auto_create_folders: boolean;
     output_folder_pattern: string;
+    period?: 'daily' | 'weekly' | 'monthly';
   };
 }
 

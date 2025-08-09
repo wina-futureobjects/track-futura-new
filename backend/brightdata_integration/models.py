@@ -67,7 +67,7 @@ class BatchScraperJob(models.Model):
     content_types_to_scrape = models.JSONField(default=dict, help_text="Dictionary mapping platforms to content types: {'facebook': ['post', 'reel'], 'instagram': ['post', 'comment']}")
 
     # Scraping parameters
-    num_of_posts = models.IntegerField(default=10)
+    num_of_posts = models.IntegerField(default=10, null=True, blank=True)
     start_date = models.DateField(blank=True, null=True)
     end_date = models.DateField(blank=True, null=True)
 
@@ -160,7 +160,7 @@ class ScraperRequest(models.Model):
     content_type = models.CharField(max_length=20, choices=CONTENT_TYPE_CHOICES, default='post')
     target_url = models.URLField(max_length=500)
     source_name = models.CharField(max_length=255, blank=True, null=True, help_text="Name of the tracked source")
-    num_of_posts = models.IntegerField(default=10)
+    num_of_posts = models.IntegerField(default=10, null=True, blank=True)
     posts_to_not_include = models.TextField(blank=True, null=True)
     start_date = models.DateField(blank=True, null=True)
     end_date = models.DateField(blank=True, null=True)
@@ -230,3 +230,37 @@ class BrightdataNotification(models.Model):
         ordering = ['-created_at']
         verbose_name = "BrightData Notification"
         verbose_name_plural = "BrightData Notifications"
+
+class WebhookEvent(models.Model):
+    PLATFORM_CHOICES = [
+        ('facebook', 'Facebook'),
+        ('instagram', 'Instagram'),
+        ('linkedin', 'LinkedIn'),
+        ('tiktok', 'TikTok'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    ]
+    
+    platform = models.CharField(max_length=20, choices=PLATFORM_CHOICES)
+    snapshot_id = models.CharField(max_length=255, null=True, blank=True)
+    raw_payload = models.JSONField()
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='pending')
+    error_message = models.TextField(blank=True, null=True)
+    received_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(blank=True, null=True)
+    
+    class Meta:
+        db_table = 'webhook_events'
+        indexes = [
+            models.Index(fields=['status', 'received_at']),
+            models.Index(fields=['snapshot_id']),
+            models.Index(fields=['platform']),
+        ]
+    
+    def __str__(self):
+        return f"WebhookEvent {self.id}: {self.platform} - {self.snapshot_id} ({self.status})"
