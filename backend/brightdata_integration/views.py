@@ -1222,10 +1222,93 @@ def brightdata_webhook(request):
 
         # 5. EXTRACT METADATA
         logger.info("🏷️ EXTRACTING METADATA:")
-        snapshot_id = (request.headers.get('X-Snapshot-Id') or
-                      request.headers.get('X-Brightdata-Snapshot-Id') or
-                      request.headers.get('x-snapshot-id') or
-                      request.GET.get('snapshot_id'))
+        # More robust snapshot id extraction: headers, query params, JSON body (including nested metadata)
+        def _extract_snapshot_id_from_request_and_data(req, payload):
+            try:
+                import logging as _logging
+                _logger = _logging.getLogger(__name__)
+
+                headers = req.headers or {}
+                # Candidate sources ordered by precedence
+                candidates = [
+                    # New BrightData delivery headers (per S3 delivery)
+                    headers.get('Snapshot-Id'),
+                    headers.get('snapshot-id'),
+                    headers.get('Dca-Collection-Id'),
+                    headers.get('dca-collection-id'),
+                    headers.get('X-Snapshot-Id'),
+                    headers.get('X-Brightdata-Snapshot-Id'),
+                    headers.get('X-BrightData-Snapshot-Id'),
+                    headers.get('X-Request-Id'),
+                    headers.get('X-Brightdata-Request-Id'),
+                    headers.get('X-BrightData-Request-Id'),
+                    headers.get('x-snapshot-id'),
+                    headers.get('x-request-id'),
+                    # Query params fallbacks
+                    req.GET.get('snapshot_id'),
+                    req.GET.get('id'),
+                    req.GET.get('request_id'),
+                    req.GET.get('snapshotId'),
+                    req.GET.get('requestId'),
+                ]
+
+                # From JSON body (top-level)
+                if isinstance(payload, dict):
+                    candidates.extend([
+                        payload.get('snapshot_id'),
+                        payload.get('request_id'),
+                        payload.get('id'),
+                        payload.get('snapshotId'),
+                        payload.get('requestId'),
+                        payload.get('Snapshot-Id'),
+                        payload.get('Request-Id'),
+                        payload.get('Dca-Collection-Id'),
+                        payload.get('job_id'),
+                        payload.get('jobId'),
+                    ])
+
+                    meta = payload.get('metadata') or payload.get('meta') or {}
+                    if isinstance(meta, dict):
+                        candidates.extend([
+                            meta.get('snapshot_id'),
+                            meta.get('request_id'),
+                            meta.get('id'),
+                            meta.get('snapshotId'),
+                            meta.get('requestId'),
+                        ])
+                elif isinstance(payload, list) and payload:
+                    first = payload[0]
+                    if isinstance(first, dict):
+                        candidates.extend([
+                            first.get('snapshot_id'),
+                            first.get('request_id'),
+                            first.get('id'),
+                            first.get('snapshotId'),
+                            first.get('requestId'),
+                            first.get('Snapshot-Id'),
+                            first.get('Request-Id'),
+                            first.get('Dca-Collection-Id'),
+                            first.get('job_id'),
+                            first.get('jobId'),
+                        ])
+                        meta = first.get('metadata') or first.get('meta') or {}
+                        if isinstance(meta, dict):
+                            candidates.extend([
+                                meta.get('snapshot_id'),
+                                meta.get('request_id'),
+                                meta.get('id'),
+                                meta.get('snapshotId'),
+                                meta.get('requestId'),
+                            ])
+
+                for candidate in candidates:
+                    if candidate is not None and str(candidate).strip():
+                        return str(candidate)
+            except Exception as _e:
+                _logger.warning(f"⚠️  Snapshot ID extraction failed: {_e}")
+            return None
+
+        snapshot_id = _extract_snapshot_id_from_request_and_data(request, data)
         
         # 🔧 FIX 1: Improved platform detection
         platform = (request.headers.get('X-Platform') or
