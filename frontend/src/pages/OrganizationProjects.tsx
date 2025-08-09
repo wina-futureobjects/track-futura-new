@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Typography,
   Box,
@@ -46,7 +46,10 @@ import GridViewIcon from '@mui/icons-material/GridView';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import EditIcon from '@mui/icons-material/Edit';
+import SaveIcon from '@mui/icons-material/Save';
 import { apiFetch } from '../utils/api';
+import { getCurrentUser } from '../utils/auth';
 import { useTheme } from '@mui/material/styles';
 
 interface Project {
@@ -231,18 +234,19 @@ const OrganizationProjects = () => {
   const [deleteProjectDialogOpen, setDeleteProjectDialogOpen] = useState(false);
   const [isDeletingMember, setIsDeletingMember] = useState(false);
   const [isDeletingProject, setIsDeletingProject] = useState(false);
+  
+  // State for current user's organization role
+  const [currentUserRole, setCurrentUserRole] = useState<string>('member');
+  
+  // Enhanced settings states
+  const [isEditingOrganization, setIsEditingOrganization] = useState(false);
+  const [orgEditForm, setOrgEditForm] = useState({ name: '', description: '' });
+  
+  // Delete organization states
+  const [deleteOrgDialogOpen, setDeleteOrgDialogOpen] = useState(false);
+  const [isDeletingOrganization, setIsDeletingOrganization] = useState(false);
 
-  useEffect(() => {
-    if (organizationId) {
-      fetchOrganizationDetails();
-      fetchProjects();
-      if (activeTab === 1) {
-        fetchMembers();
-      }
-    }
-  }, [organizationId, activeTab]);
-
-  const fetchOrganizationDetails = async () => {
+  const fetchOrganizationDetails = useCallback(async () => {
     try {
       const response = await apiFetch(`/api/users/organizations/${organizationId}/`);
       if (!response.ok) {
@@ -257,9 +261,9 @@ const OrganizationProjects = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [organizationId]);
 
-  const fetchProjects = async () => {
+  const fetchProjects = useCallback(async () => {
     try {
       setLoading(true);
       const response = await apiFetch(`/api/users/projects/?organization=${organizationId}`);
@@ -285,9 +289,33 @@ const OrganizationProjects = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [organizationId]);
 
-  const fetchMembers = async () => {
+  const fetchCurrentUserRole = useCallback(async () => {
+    try {
+      const response = await apiFetch(`/api/users/organizations/${organizationId}/members/`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch members');
+      }
+      
+      const data = await response.json();
+      const membersData = data.results || data;
+      
+      // Find current user's role in this organization
+      const currentUser = getCurrentUser();
+      if (currentUser && Array.isArray(membersData)) {
+        const currentUserMembership = membersData.find(member => member.user.id === currentUser.id);
+        if (currentUserMembership) {
+          setCurrentUserRole(currentUserMembership.role);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching current user role:', error);
+      // Keep default role as 'member' if fetch fails
+    }
+  }, [organizationId]);
+
+  const fetchMembers = useCallback(async () => {
     try {
       setLoading(true);
       const response = await apiFetch(`/api/users/organizations/${organizationId}/members/`);
@@ -303,6 +331,15 @@ const OrganizationProjects = () => {
       console.log('Members data:', membersData);
       
       setMembers(Array.isArray(membersData) ? membersData : []);
+      
+      // Find current user's role in this organization
+      const currentUser = getCurrentUser();
+      if (currentUser && Array.isArray(membersData)) {
+        const currentUserMembership = membersData.find(member => member.user.id === currentUser.id);
+        if (currentUserMembership) {
+          setCurrentUserRole(currentUserMembership.role);
+        }
+      }
     } catch (error) {
       console.error('Error fetching members:', error);
       setMembers([]);
@@ -310,6 +347,114 @@ const OrganizationProjects = () => {
     } finally {
       setLoading(false);
     }
+  }, [organizationId]);
+
+  useEffect(() => {
+    if (organizationId) {
+      fetchOrganizationDetails();
+      fetchProjects();
+      fetchCurrentUserRole(); // Always fetch user role on load
+      if (activeTab === 1) {
+        fetchMembers();
+      }
+    }
+  }, [organizationId, activeTab, fetchOrganizationDetails, fetchProjects, fetchCurrentUserRole, fetchMembers]);
+
+  // Update edit form when organization data changes
+  useEffect(() => {
+    if (organization) {
+      setOrgEditForm({
+        name: organization.name || '',
+        description: organization.description || ''
+      });
+    }
+  }, [organization]);
+
+  // Organization editing functions
+  const handleEditOrganization = () => {
+    setIsEditingOrganization(true);
+  };
+
+  const handleCancelEditOrganization = () => {
+    setIsEditingOrganization(false);
+    // Reset form to original values
+    if (organization) {
+      setOrgEditForm({
+        name: organization.name || '',
+        description: organization.description || ''
+      });
+    }
+  };
+
+  const handleSaveOrganization = async () => {
+    if (!orgEditForm.name.trim()) {
+      setError('Organization name is required');
+      return;
+    }
+
+    try {
+      const response = await apiFetch(`/api/users/organizations/${organizationId}/`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: orgEditForm.name.trim(),
+          description: orgEditForm.description.trim() || null
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to update organization');
+      }
+
+      const updatedOrganization = await response.json();
+      setOrganization(updatedOrganization);
+      setIsEditingOrganization(false);
+      setSuccessMessage('Organization updated successfully');
+      
+      // Clear success message after 5 seconds
+      setTimeout(() => setSuccessMessage(''), 5000);
+    } catch (error) {
+      console.error('Error updating organization:', error);
+      setError(error instanceof Error ? error.message : 'Failed to update organization');
+    }
+  };
+
+  const handleDeleteOrganization = () => {
+    setDeleteOrgDialogOpen(true);
+  };
+
+  const handleDeleteOrganizationConfirm = async () => {
+    if (!organizationId) return;
+
+    setIsDeletingOrganization(true);
+    setError('');
+
+    try {
+      const response = await apiFetch(`/api/users/organizations/${organizationId}/`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to delete organization');
+      }
+
+      // Navigate back to organizations list after successful deletion
+      navigate('/organizations');
+    } catch (error) {
+      console.error('Error deleting organization:', error);
+      setError(error instanceof Error ? error.message : 'Failed to delete organization');
+      setDeleteOrgDialogOpen(false);
+    } finally {
+      setIsDeletingOrganization(false);
+    }
+  };
+
+  const handleCancelDeleteOrganization = () => {
+    setDeleteOrgDialogOpen(false);
   };
 
   const handleOpenProject = (projectId: number) => {
@@ -464,6 +609,12 @@ const OrganizationProjects = () => {
   };
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    // Prevent non-admin users from accessing Settings tab (tab index 2)
+    if (newValue === 2 && currentUserRole !== 'admin') {
+      console.warn('Access denied: Only admin users can access Settings tab');
+      return; // Don't change tab
+    }
+    
     setActiveTab(newValue);
     // Clear member search when switching away from members tab
     if (newValue !== 1) {
@@ -1108,7 +1259,8 @@ const OrganizationProjects = () => {
         >
           <Tab label="Projects List" id="tab-0" />
           <Tab label="Members" id="tab-1" />
-          <Tab label="Settings" id="tab-2" />
+          {/* Only show Settings tab if user is admin */}
+          {currentUserRole === 'admin' && <Tab label="Settings" id="tab-2" />}
         </Tabs>
       </Box>
       
@@ -1149,27 +1301,33 @@ const OrganizationProjects = () => {
             <Paper
               elevation={0}
               sx={{ 
-                p: 1.5, 
+                p: 2, 
                 mb: 3, 
                 display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
+                flexDirection: { xs: 'column', md: 'row' },
+                gap: { xs: 2, md: 3 },
                 borderRadius: 3,
                 border: '1px solid rgba(0, 0, 0, 0.08)',
-                bgcolor: 'white' 
+                bgcolor: 'white',
+                minWidth: { xs: '100%', md: 1200 }, // Make the bar even longer on desktop
+                width: { xs: '100%', md: '100%' },
+                maxWidth: { xs: '100%', md: '1800px' }, // Allow for a very wide bar
               }}
             >
+              {/* Search Box */}
               <Box sx={{ 
                 display: 'flex', 
                 alignItems: 'center', 
-                width: '100%',
-                maxWidth: 500,
+                flex: { xs: '1', md: '1 1 1200px' },
+                minWidth: { xs: '100%', md: 700 },
+                maxWidth: { xs: '100%', md: 1400 },
                 borderRadius: 2,
                 px: 2,
-                py: 0.5,
-                bgcolor: 'rgba(0, 0, 0, 0.03)'
+                py: 1,
+                bgcolor: 'rgba(0, 0, 0, 0.03)',
+                flexGrow: 1,
               }}>
-                <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />
+                <SearchIcon sx={{ color: 'text.secondary', mr: 1, fontSize: '1.2rem' }} />
                 <TextField
                   placeholder="Search projects"
                   variant="standard"
@@ -1183,23 +1341,49 @@ const OrganizationProjects = () => {
                       }
                     },
                     '& .MuiInputBase-input': {
-                      py: 1
+                      py: 0.5,
+                      fontSize: '0.95rem'
                     }
                   }}
                 />
               </Box>
               
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Box sx={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: 1,
-                  py: 0.75,
-                  px: 2,
-                  borderRadius: 2,
-                  bgcolor: 'rgba(0, 0, 0, 0.03)'
-                }}>
-                  <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+              {/* Controls - Fixed to Right */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 2,
+                  flexShrink: 0,
+                  flexWrap: { xs: 'wrap', md: 'nowrap' },
+                  minWidth: 'fit-content',
+                  ml: { xs: 0, md: 'auto' }, // Push to right in row on md+
+                  justifyContent: { xs: 'center', md: 'flex-end' },
+                  width: { xs: '100%', md: 'auto' }
+                }}
+              >
+                {/* Sort Dropdown */}
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    py: 0.75,
+                    px: 2,
+                    borderRadius: 2,
+                    bgcolor: 'rgba(0, 0, 0, 0.03)',
+                    minWidth: 'fit-content',
+                    flexShrink: 0
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: 'text.secondary',
+                      fontWeight: 500,
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
                     Sort by:
                   </Typography>
                   <Select
@@ -1208,12 +1392,13 @@ const OrganizationProjects = () => {
                     size="small"
                     variant="standard"
                     disableUnderline
-                    sx={{ 
-                      minWidth: 120,
+                    sx={{
+                      minWidth: { xs: 100, md: 120 },
                       '& .MuiSelect-select': {
                         fontWeight: 500,
                         py: 0,
-                        color: theme => theme.palette.primary.main
+                        color: theme => theme.palette.primary.main,
+                        fontSize: '0.9rem'
                       }
                     }}
                   >
@@ -1223,31 +1408,34 @@ const OrganizationProjects = () => {
                     <MenuItem value="name">Name</MenuItem>
                   </Select>
                 </Box>
-                
-                                 <ToggleButtonGroup
-                   value={viewMode}
-                   exclusive
-                   onChange={handleViewModeChange}
-                   aria-label="view mode"
-                   size="small"
-                   sx={{ 
-                     border: 'none',
-                     bgcolor: 'rgba(0, 0, 0, 0.03)',
-                     borderRadius: 2,
-                     '& .MuiToggleButton-root': {
-                       border: 'none',
-                       py: 0.75,
-                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                       '&.Mui-selected': {
-                         bgcolor: 'white',
-                         boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
-                         '&:hover': {
-                           bgcolor: 'white'
-                         }
-                       }
-                     }
-                   }}
-                 >
+
+                {/* View Mode Toggle */}
+                <ToggleButtonGroup
+                  value={viewMode}
+                  exclusive
+                  onChange={handleViewModeChange}
+                  aria-label="view mode"
+                  size="small"
+                  sx={{
+                    border: 'none',
+                    bgcolor: 'rgba(0, 0, 0, 0.03)',
+                    borderRadius: 2,
+                    flexShrink: 0,
+                    ml: { xs: 0, md: 1 },
+                    '& .MuiToggleButton-root': {
+                      border: 'none',
+                      py: 0.75,
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      '&.Mui-selected': {
+                        bgcolor: 'white',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+                        '&:hover': {
+                          bgcolor: 'white'
+                        }
+                      }
+                    }
+                  }}
+                >
                   <ToggleButton value="grid" aria-label="grid view">
                     <GridViewIcon />
                   </ToggleButton>
@@ -1312,60 +1500,88 @@ const OrganizationProjects = () => {
             <Paper
               elevation={0}
               sx={{ 
-                p: 1.5, 
+                p: 2, 
                 mb: 3, 
                 display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
+                flexDirection: { xs: 'column', md: 'row' },
+                gap: { xs: 2, md: 3 },
                 borderRadius: 3,
                 border: '1px solid rgba(0, 0, 0, 0.08)',
                 bgcolor: 'white' 
               }}
             >
+              {/* Filter and Search Controls */}
               <Box sx={{ 
                 display: 'flex', 
-                alignItems: 'center', 
+                flexDirection: { xs: 'column', sm: 'row' },
+                alignItems: { xs: 'stretch', sm: 'center' },
                 gap: 2,
-                width: '100%',
-                maxWidth: 600
+                flex: 1
               }}>
-                <FormControl size="small" sx={{ minWidth: 150 }}>
+                {/* Role Filter */}
+                <FormControl 
+                  size="small" 
+                  sx={{ 
+                    minWidth: { xs: '100%', sm: 150 },
+                    maxWidth: { xs: '100%', sm: 200 }
+                  }}
+                >
                   <InputLabel>Filter by Role</InputLabel>
                   <Select
                     value={roleFilter}
                     label="Filter by Role"
                     onChange={(e) => setRoleFilter(e.target.value)}
+                    sx={{
+                      '& .MuiSelect-select': {
+                        fontSize: '0.9rem'
+                      }
+                    }}
                   >
                     <MenuItem value="all">All Roles</MenuItem>
                     <MenuItem value="member">User</MenuItem>
                     <MenuItem value="admin">Admin</MenuItem>
                   </Select>
                 </FormControl>
-                <Box sx={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  flex: 1,
-                  maxWidth: 400,
-                  borderRadius: 2,
-                  px: 2,
-                  py: 0.5,
-                  bgcolor: 'rgba(0, 0, 0, 0.03)'
-                }}>
-                  <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />
+                
+                {/* Search Box - Longer */}
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    flex: { xs: 1, sm: '1 1 600px' }, // Make the search box much longer on desktop
+                    minWidth: { xs: '100%', sm: '350px', md: '500px' },
+                    maxWidth: { xs: '100%', md: '900px', lg: '1200px' }, // Allow for a very wide search bar
+                    borderRadius: 2,
+                    px: 2,
+                    py: 1,
+                    bgcolor: 'rgba(0, 0, 0, 0.03)',
+                    flexGrow: 1,
+                  }}
+                >
+                  <SearchIcon sx={{ color: 'text.secondary', mr: 1, fontSize: '1.2rem' }} />
                   <TextField
                     placeholder="Search members by name or email"
                     variant="standard"
                     fullWidth
                     value={memberSearchQuery}
                     onChange={(e) => setMemberSearchQuery(e.target.value)}
-                    sx={{ 
+                    sx={{
                       '& .MuiInput-root': {
                         '&::before, &::after': {
                           display: 'none'
                         }
                       },
                       '& .MuiInputBase-input': {
-                        py: 1
+                        py: 0.5,
+                        fontSize: '0.95rem'
+                      }
+                    }}
+                    inputProps={{
+                      style: {
+                        minWidth: '200px',
+                        maxWidth: '1000px',
+                        width: '100%',
+                        transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
                       }
                     }}
                   />
@@ -1520,7 +1736,24 @@ const OrganizationProjects = () => {
       
       {/* Settings Tab */}
       <Box role="tabpanel" hidden={activeTab !== 2}>
-        {activeTab === 2 && (
+        {activeTab === 2 && currentUserRole !== 'admin' && (
+          <Paper sx={{ 
+            p: 4, 
+            textAlign: 'center', 
+            mt: 2, 
+            borderRadius: 8, 
+            border: '1px solid rgba(255, 68, 68, 0.3)',
+            bgcolor: 'rgba(255, 68, 68, 0.08)'
+          }}>
+            <Typography variant="h6" gutterBottom sx={{ color: 'warning.main' }}>
+              Access Denied
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Only organization administrators can access the Settings tab.
+            </Typography>
+          </Paper>
+        )}
+        {activeTab === 2 && currentUserRole === 'admin' && (
           <>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
               <Typography variant="h4" component="h1" fontWeight="600" my={1.5}>
@@ -1528,7 +1761,7 @@ const OrganizationProjects = () => {
               </Typography>
             </Box>
             
-            {/* Organization settings content */}
+                        {/* Organization settings content */}
             <Paper sx={{ 
               p: 4, 
               mb: 4, 
@@ -1536,7 +1769,33 @@ const OrganizationProjects = () => {
               boxShadow: 'none',
               border: '1px solid rgba(0,0,0,0.08)'
             }}>
-              <Typography variant="h6" gutterBottom fontWeight={600}>Organization Information</Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6" gutterBottom fontWeight={600}>Organization Information</Typography>
+                {!isEditingOrganization && (
+                  <Button 
+                    variant="outlined" 
+                    startIcon={<EditIcon />}
+                    onClick={handleEditOrganization}
+                    sx={{
+                      borderRadius: 8,
+                      borderColor: theme.palette.primary.main,
+                      color: theme.palette.primary.main,
+                      textTransform: 'none',
+                      fontWeight: 500,
+                      px: 3,
+                      py: 1,
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      '&:hover': {
+                        backgroundColor: theme => theme.palette.primary.main,
+                        color: '#fff',
+                        borderColor: theme => theme.palette.primary.dark,
+                      }
+                    }}
+                  >
+                    Edit Organization
+                  </Button>
+                )}
+              </Box>
               
               <Box sx={{ mt: 3 }}>
                 <Typography variant="body2" color="text.secondary" gutterBottom fontWeight={500}>
@@ -1546,13 +1805,14 @@ const OrganizationProjects = () => {
                   fullWidth
                   variant="outlined"
                   size="small"
-                  value={organization?.name || ''}
+                  value={isEditingOrganization ? orgEditForm.name : (organization?.name || '')}
+                  onChange={(e) => isEditingOrganization && setOrgEditForm({ ...orgEditForm, name: e.target.value })}
                   InputProps={{
-                    readOnly: true,
+                    readOnly: !isEditingOrganization,
                   }}
                   sx={{
                     '& .MuiOutlinedInput-root': {
-                      backgroundColor: 'white',
+                      backgroundColor: isEditingOrganization ? 'white' : '#f8f9fa',
                       borderRadius: 2
                     }
                   }}
@@ -1569,45 +1829,68 @@ const OrganizationProjects = () => {
                   rows={3}
                   variant="outlined"
                   size="small"
-                  value={organization?.description || ''}
+                  value={isEditingOrganization ? orgEditForm.description : (organization?.description || '')}
+                  onChange={(e) => isEditingOrganization && setOrgEditForm({ ...orgEditForm, description: e.target.value })}
                   InputProps={{
-                    readOnly: true,
+                    readOnly: !isEditingOrganization,
                   }}
                   sx={{
                     '& .MuiOutlinedInput-root': {
-                      backgroundColor: 'white',
+                      backgroundColor: isEditingOrganization ? 'white' : '#f8f9fa',
                       borderRadius: 2
                     }
                   }}
                 />
               </Box>
               
-              <Box mt={3}>
-                                 <Button 
-                   variant="outlined" 
-                   startIcon={<SettingsIcon />}
-                   sx={{
-                     borderRadius: 8,
-                     borderColor: theme.palette.primary.main,
-                     color: theme.palette.primary.main,
-                     textTransform: 'none',
-                     fontWeight: 500,
-                     px: 3,
-                     py: 1,
-                     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                     '&:hover': {
-                       backgroundColor: theme => theme.palette.primary.main,
-                       color: '#fff',
-                       borderColor: theme => theme.palette.primary.dark,
-                     }
-                   }}
-                 >
-                   Edit Organization
-                 </Button>
-              </Box>
+              {isEditingOrganization && (
+                <Box mt={3} sx={{ display: 'flex', gap: 2 }}>
+                  <Button 
+                    variant="contained" 
+                    startIcon={<SaveIcon />}
+                    onClick={handleSaveOrganization}
+                    sx={{
+                      borderRadius: 8,
+                      bgcolor: '#62EF83',
+                      color: '#000000',
+                      textTransform: 'none',
+                      fontWeight: 500,
+                      px: 3,
+                      py: 1,
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      '&:hover': {
+                        bgcolor: '#4FD16C',
+                        boxShadow: '0 2px 8px rgba(98, 239, 131, 0.3)'
+                      }
+                    }}
+                  >
+                    Save Changes
+                  </Button>
+                  <Button 
+                    variant="outlined" 
+                    onClick={handleCancelEditOrganization}
+                    sx={{
+                      borderRadius: 8,
+                      borderColor: 'text.secondary',
+                      color: 'text.secondary',
+                      textTransform: 'none',
+                      fontWeight: 500,
+                      px: 3,
+                      py: 1,
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      '&:hover': {
+                        borderColor: 'text.primary',
+                        color: 'text.primary',
+                      }
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </Box>
+              )}
             </Paper>
             
-            <Paper sx={{ 
+                        <Paper sx={{ 
               p: 4, 
               borderRadius: 3,
               boxShadow: 'none',
@@ -1621,31 +1904,27 @@ const OrganizationProjects = () => {
                 Permanently delete this organization and all its data. This action cannot be undone.
               </Typography>
               <Box mt={2}>
-                                 <Button 
-                   variant="outlined" 
-                   color="warning"
-                   sx={{
-                     borderRadius: 8,
-                     textTransform: 'none',
-                     fontWeight: 500,
-                     px: 3,
-                     py: 1,
-                     borderColor: 'warning.main',
-                     color: 'warning.main',
-                     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                     '&:hover': {
-                       borderColor: 'warning.dark',
-                       backgroundColor: 'rgba(255, 68, 68, 0.08)',
-                     }
-                   }}
-                   onClick={() => {
-                     if (window.confirm('Are you sure you want to delete this organization? This action cannot be undone.')) {
-                       // Delete organization API call
-                     }
-                   }}
-                 >
-                   Delete Organization
-                 </Button>
+                <Button 
+                  variant="outlined" 
+                  color="warning"
+                  onClick={handleDeleteOrganization}
+                  sx={{
+                    borderRadius: 8,
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    px: 3,
+                    py: 1,
+                    borderColor: 'warning.main',
+                    color: 'warning.main',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    '&:hover': {
+                      borderColor: 'warning.dark',
+                      backgroundColor: 'rgba(255, 68, 68, 0.08)',
+                    }
+                  }}
+                >
+                  Delete Organization
+                </Button>
               </Box>
             </Paper>
           </>
@@ -2220,6 +2499,69 @@ const OrganizationProjects = () => {
         </DialogActions>
       </Dialog>
 
+      {/* Delete Organization Confirmation Dialog */}
+      <Dialog
+        open={deleteOrgDialogOpen}
+        onClose={handleCancelDeleteOrganization}
+        PaperProps={{
+          sx: {
+            borderRadius: '12px',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
+          }
+        }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Typography variant="h5" fontWeight={600} sx={{ color: '#d32f2f' }}>Delete Organization</Typography>
+        </DialogTitle>
+        <DialogContent sx={{ pb: 2, pt: 2 }}>
+          <DialogContentText>
+            Are you sure you want to delete the organization <strong>"{organization?.name || 'Unknown Organization'}"</strong>?
+            <br></br>
+            <br></br>
+            This action will:
+            <br></br>
+            • Permanently delete all projects in this organization
+            <br></br>
+            • Remove all organization members
+            <br></br>
+            • Delete all associated data including posts, folders, and reports
+            <br></br>
+            <br></br>
+            <strong>This action cannot be undone.</strong>
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid rgba(0, 0, 0, 0.05)' }}>
+          <Button 
+            onClick={handleCancelDeleteOrganization}
+            sx={{ color: 'text.secondary' }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleDeleteOrganizationConfirm} 
+            variant="contained"
+            disabled={isDeletingOrganization}
+            sx={{ 
+              borderRadius: 2,
+              bgcolor: '#d32f2f',
+              color: '#fff',
+              textTransform: 'none',
+              px: 3,
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              '&:hover': {
+                bgcolor: '#b71c1c',
+              },
+              '&.Mui-disabled': {
+                bgcolor: 'rgba(211, 47, 47, 0.5)',
+                color: 'white'
+              }
+            }}
+          >
+            {isDeletingOrganization ? 'Deleting...' : 'Delete Organization'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Error message */}
       {error && (
         <Paper sx={{ 
@@ -2273,7 +2615,7 @@ const OrganizationProjects = () => {
           <ListItemIcon>
             <SettingsIcon fontSize="small" />
           </ListItemIcon>
-          <ListItemText>Edit Role</ListItemText>
+          <ListItemText>Edit Users</ListItemText>
         </MenuItem>
         <MenuItem onClick={handleRemoveMember} sx={{ color: 'error.main' }}>
           <ListItemIcon>
