@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import TrackSource, TrackAccount, ReportFolder, ReportEntry
+from .models import TrackSource, TrackAccount, ReportFolder, ReportEntry, UnifiedRunFolder, ServiceFolderIndex
 
 @admin.register(TrackSource)
 class TrackSourceAdmin(admin.ModelAdmin):
@@ -37,3 +37,37 @@ class ReportEntryAdmin(admin.ModelAdmin):
     search_fields = ('name', 'username', 'content')
     readonly_fields = ('created_at',)
     ordering = ('-posting_date',)
+
+@admin.register(UnifiedRunFolder)
+class UnifiedRunFolderAdmin(admin.ModelAdmin):
+    list_display = ('name', 'folder_type', 'category', 'platform_code', 'service_code', 'project', 'scraping_run', 'created_at')
+    list_filter = ('folder_type', 'category', 'platform_code', 'service_code', 'project', 'created_at')
+    search_fields = ('name', 'description')
+    readonly_fields = ('created_at', 'updated_at')
+    ordering = ('-created_at',)
+    raw_id_fields = ('project', 'scraping_run', 'parent_folder')
+    list_select_related = ('project', 'scraping_run')
+    
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name', 'description', 'folder_type', 'category')
+        }),
+        ('Platform & Service', {
+            'fields': ('platform_code', 'service_code')
+        }),
+        ('Relationships', {
+            'fields': ('project', 'scraping_run', 'parent_folder')
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+@admin.register(ServiceFolderIndex)
+class ServiceFolderIndexAdmin(admin.ModelAdmin):
+    list_display = ('scraping_run', 'platform_code', 'service_code', 'folder')
+    list_filter = ('platform_code', 'service_code')
+    search_fields = ('scraping_run__name', 'folder__name')
+    raw_id_fields = ('scraping_run', 'folder')
+    list_select_related = ('scraping_run', 'folder')

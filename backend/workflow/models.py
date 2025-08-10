@@ -129,6 +129,7 @@ class ScrapingJob(models.Model):
     scraping_run = models.ForeignKey(ScrapingRun, on_delete=models.CASCADE, related_name='scraping_jobs')
     input_collection = models.ForeignKey(InputCollection, on_delete=models.CASCADE, related_name='scraping_jobs', null=True, blank=True)
     batch_job = models.ForeignKey(BatchScraperJob, on_delete=models.CASCADE, related_name='scraping_jobs')
+    request_id = models.CharField(max_length=255, blank=True, null=True, help_text="BrightData request/snapshot ID for webhook mapping")
     status = models.CharField(max_length=20, choices=[
         ('pending', 'Pending'),
         ('processing', 'Processing'),
@@ -148,6 +149,10 @@ class ScrapingJob(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['request_id']),
+            models.Index(fields=['batch_job', 'url']),
+        ]
 
     def __str__(self):
         return f"Job {self.id} - {self.platform} {self.service_type} ({self.status})"

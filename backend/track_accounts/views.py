@@ -551,6 +551,41 @@ class UnifiedRunFolderViewSet(viewsets.ModelViewSet):
             except (ValueError, TypeError):
                 return UnifiedRunFolder.objects.none()
         
+        # Filter out empty folders (folders with no associated posts)
+        # Only apply this filter for job and content type folders
+        filter_empty = self.request.query_params.get('filter_empty', 'true').lower() == 'true'
+        if filter_empty:
+            from django.db.models import Q, Count
+            from instagram_data.models import InstagramPost
+            from facebook_data.models import FacebookPost
+            from linkedin_data.models import LinkedInPost
+            from tiktok_data.models import TikTokPost
+            
+            # Get folders that have posts in any platform
+            folders_with_posts = set()
+            
+            # Check Instagram posts
+            insta_folders = InstagramPost.objects.values_list('folder__unified_job_folder_id', flat=True).distinct()
+            folders_with_posts.update(insta_folders)
+            
+            # Check Facebook posts
+            fb_folders = FacebookPost.objects.values_list('folder__unified_job_folder_id', flat=True).distinct()
+            folders_with_posts.update(fb_folders)
+            
+            # Check LinkedIn posts
+            linkedin_folders = LinkedInPost.objects.values_list('folder__unified_job_folder_id', flat=True).distinct()
+            folders_with_posts.update(linkedin_folders)
+            
+            # Check TikTok posts
+            tiktok_folders = TikTokPost.objects.values_list('folder__unified_job_folder_id', flat=True).distinct()
+            folders_with_posts.update(tiktok_folders)
+            
+            # Filter to only include folders with posts, or non-job/content folders (run, platform, service)
+            queryset = queryset.filter(
+                Q(id__in=folders_with_posts) | 
+                ~Q(folder_type__in=['job', 'content'])
+            )
+        
         # Check if hierarchical data is requested
         include_hierarchy = self.request.query_params.get('include_hierarchy', 'false').lower() == 'true'
         if include_hierarchy:

@@ -541,7 +541,7 @@ class AutomatedBatchScraper:
 
     def _get_or_create_output_folder(self, job: BatchScraperJob, platform: str, source: TrackSource, content_type: str) -> Optional[int]:
         """
-        Get or create a SINGLE output folder per job for ALL scraped data from all accounts
+        Get or create a UnifiedRunFolder for the job that can be used across all platforms
         """
         if not job.auto_create_folders:
             return None
@@ -562,37 +562,34 @@ class AutomatedBatchScraper:
                 folder_category = 'posts'  # Default fallback
                 content_type_for_name = content_type
 
-            # 🔧 CRITICAL CHANGE: Create ONE folder per job, not per account
-            # Generate folder name using date and job name (NO account_name)
-            folder_name = f"{platform.title()}_{content_type_for_name.upper()}_{timezone.now().strftime('%Y-%m-%d')}_{job.name}"
-
-            # Get the appropriate folder model for this platform
-            FolderModel = self.PLATFORM_FOLDER_MODELS.get(platform)
-            if not FolderModel:
-                self.logger.error(f"No folder model found for platform: {platform}")
-                return None
-
-            # Create or get the folder with the appropriate category
-            folder_defaults = {'project_id': job.project_id}
-
-            # Only set category if the model supports it (Instagram and Facebook do)
-            if hasattr(FolderModel, '_meta') and any(field.name == 'category' for field in FolderModel._meta.fields):
-                folder_defaults['category'] = folder_category
-
-            folder, created = FolderModel.objects.get_or_create(
+            # 🔧 FIXED: Create UnifiedRunFolder instead of platform-specific folder
+            # Generate folder name using date and job name
+            folder_name = f"{platform.title()} {content_type_for_name.title()} - {source.name}"
+            
+            # Import UnifiedRunFolder from track_accounts
+            from track_accounts.models import UnifiedRunFolder
+            
+            # Create or get the UnifiedRunFolder
+            unified_folder, created = UnifiedRunFolder.objects.get_or_create(
                 name=folder_name,
-                defaults=folder_defaults
+                defaults={
+                    'description': f'Created from batch job: {job.name}',
+                    'folder_type': 'content',
+                    'project_id': job.project_id,
+                    'category': folder_category,
+                    'service_code': content_type_for_name
+                }
             )
 
             if created:
-                self.logger.info(f"✅ Created new SHARED {platform} {folder_category} folder: {folder_name}")
+                self.logger.info(f"✅ Created new UnifiedRunFolder: {folder_name} (ID: {unified_folder.id})")
             else:
-                self.logger.info(f"✅ Using existing SHARED {platform} folder: {folder_name}")
+                self.logger.info(f"✅ Using existing UnifiedRunFolder: {folder_name} (ID: {unified_folder.id})")
 
-            return folder.id
+            return unified_folder.id
 
         except Exception as e:
-            self.logger.error(f"Error creating output folder for {platform}: {str(e)}")
+            self.logger.error(f"Error creating UnifiedRunFolder for {platform}: {str(e)}")
             return None
 
     def _create_scraper_request(self, job: BatchScraperJob, source: TrackSource,

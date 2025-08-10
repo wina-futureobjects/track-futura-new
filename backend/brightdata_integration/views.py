@@ -1976,7 +1976,11 @@ def _process_webhook_data_with_batch_support(data, platform: str, scraper_reques
                         if Folder is not None:
                             folder, created = Folder.objects.get_or_create(
                                 unified_job_folder=unified_folder,
-                                defaults={'name': unified_folder.name, 'description': f'Created from UnifiedRunFolder {unified_folder.id}'}
+                                defaults={
+                                    'name': unified_folder.name, 
+                                    'description': f'Created from UnifiedRunFolder {unified_folder.id}',
+                                    'project_id': unified_folder.project_id
+                                }
                             )
                             post_fields['folder'] = folder
                             if created:
@@ -1998,7 +2002,10 @@ def _process_webhook_data_with_batch_support(data, platform: str, scraper_reques
                         else:
                             Folder = None
                         if Folder is not None:
-                            folder = Folder.objects.create(name=f"Fallback folder {folder_id}")
+                            folder = Folder.objects.create(
+                                name=f"Fallback folder {folder_id}",
+                                project_id=unified_folder.project_id if 'unified_folder' in locals() else None
+                            )
                             post_fields['folder'] = folder
                 else:
                     logger.warning(f"No shared folder_id available for posts")

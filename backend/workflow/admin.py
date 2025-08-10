@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import InputCollection, WorkflowTask
+from .models import InputCollection, WorkflowTask, ScrapingRun, ScrapingJob, ScheduledScrapingTask
 
 @admin.register(InputCollection)
 class InputCollectionAdmin(admin.ModelAdmin):
@@ -32,4 +32,47 @@ class WorkflowTaskAdmin(admin.ModelAdmin):
     list_filter = ['status', 'created_at']
     search_fields = ['input_collection__project__name', 'batch_job__name']
     readonly_fields = ['id', 'created_at', 'updated_at']
+    date_hierarchy = 'created_at'
+
+
+class ScrapingJobInline(admin.TabularInline):
+    model = ScrapingJob
+    extra = 0
+    fields = ('id', 'batch_job', 'platform', 'service_type', 'status', 'url', 'created_at')
+    readonly_fields = ('id', 'created_at')
+
+
+@admin.register(ScrapingRun)
+class ScrapingRunAdmin(admin.ModelAdmin):
+    list_display = (
+        'id', 'project', 'name', 'status', 'total_jobs', 'completed_jobs', 'successful_jobs', 'failed_jobs',
+        'created_at', 'started_at', 'completed_at'
+    )
+    list_filter = ('status', 'project', 'created_at')
+    search_fields = ('name', 'project__name')
+    readonly_fields = ('id', 'created_at', 'started_at', 'completed_at')
+    date_hierarchy = 'created_at'
+    inlines = [ScrapingJobInline]
+
+
+@admin.register(ScrapingJob)
+class ScrapingJobAdmin(admin.ModelAdmin):
+    list_display = (
+        'id', 'scraping_run', 'batch_job', 'platform', 'service_type', 'status', 'created_at'
+    )
+    list_filter = ('status', 'platform', 'service_type', 'created_at')
+    search_fields = ('scraping_run__project__name', 'batch_job__name', 'url')
+    readonly_fields = ('id', 'created_at', 'started_at', 'completed_at')
+    date_hierarchy = 'created_at'
+
+
+@admin.register(ScheduledScrapingTask)
+class ScheduledScrapingTaskAdmin(admin.ModelAdmin):
+    list_display = (
+        'id', 'name', 'project', 'track_source', 'platform', 'service_type', 'status', 'is_active',
+        'schedule_type', 'schedule_interval', 'last_run', 'next_run', 'created_at'
+    )
+    list_filter = ('status', 'is_active', 'platform', 'service_type', 'schedule_type', 'created_at')
+    search_fields = ('name', 'project__name', 'track_source__name')
+    readonly_fields = ('id', 'created_at', 'updated_at', 'last_run', 'next_run')
     date_hierarchy = 'created_at'

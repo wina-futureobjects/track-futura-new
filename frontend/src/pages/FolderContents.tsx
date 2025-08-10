@@ -262,11 +262,19 @@ const FolderContents = () => {
   const handleFolderClick = (folder: Folder) => {
     // Unified hierarchy: run -> platform -> service -> job; platform-specific "content" is legacy
     if (folder.folder_type === 'content') {
-      navigate(`/organizations/${organizationId}/projects/${projectId}/data/${folder.platform}/${folder.id}`);
+      const platform = folder.platform || 'instagram'; // Default to instagram if platform is undefined
+      navigate(`/organizations/${organizationId}/projects/${projectId}/data/${platform}/${folder.id}`);
       return;
     }
     if (folder.folder_type === 'job') {
-      // Navigate to unified job view (from there, UI can resolve items or provide actions)
+      // Check if this job folder has content (posts) - if so, display content directly
+      if (folder.category === 'posts' || folder.category === 'reels' || folder.category === 'comments') {
+        // This job folder contains content, navigate to content display
+        const platform = folder.platform || 'instagram'; // Default to instagram if platform is undefined
+        navigate(`/organizations/${organizationId}/projects/${projectId}/data/${platform}/${folder.id}`);
+        return;
+      }
+      // Otherwise, navigate to unified job view (from there, UI can resolve items or provide actions)
       navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage/job/${folder.id}`);
       return;
     }
