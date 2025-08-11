@@ -160,7 +160,8 @@ const FolderContents = () => {
             else desiredType = 'content';
 
             if (desiredType === 'job') {
-              const jobsResp = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&parent_folder=${folderId}&folder_type=job&include_hierarchy=true`);
+              // When viewing service folders, show all job folders including empty ones
+              const jobsResp = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&parent_folder=${folderId}&folder_type=job&include_hierarchy=true&filter_empty=false`);
               if (jobsResp.ok) {
                 const jobs = await jobsResp.json();
                 const jobItems = (jobs.results || jobs) as any[];
@@ -168,7 +169,7 @@ const FolderContents = () => {
                   setSubfolders(jobItems as any);
                   setJobCount(jobItems.length);
                 } else {
-                  const legacyResp = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&parent_folder=${folderId}&folder_type=content&include_hierarchy=true`);
+                  const legacyResp = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&parent_folder=${folderId}&folder_type=content&include_hierarchy=true&filter_empty=false`);
                   if (legacyResp.ok) {
                     const legacy = await legacyResp.json();
                     setSubfolders((legacy.results || legacy) as any);
@@ -187,13 +188,13 @@ const FolderContents = () => {
                   const services = (data.results || data) as any[];
                   const jobCounts = await Promise.all(
                     services.map(async (svc: any) => {
-                      const jr = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&parent_folder=${svc.id}&folder_type=job`);
+                      const jr = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&parent_folder=${svc.id}&folder_type=job&filter_empty=false`);
                       if (jr.ok) {
                         const jd = await jr.json();
                         const arr = (jd.results || jd) as any[];
                         if (arr.length > 0) return arr.length;
                         // fallback to legacy content
-                        const cr = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&parent_folder=${svc.id}&folder_type=content`);
+                        const cr = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&parent_folder=${svc.id}&folder_type=content&filter_empty=false`);
                         if (cr.ok) {
                           const cd = await cr.json();
                           return ((cd.results || cd) as any[]).length || 0;
@@ -267,14 +268,8 @@ const FolderContents = () => {
       return;
     }
     if (folder.folder_type === 'job') {
-      // Check if this job folder has content (posts) - if so, display content directly
-      if (folder.category === 'posts' || folder.category === 'reels' || folder.category === 'comments') {
-        // This job folder contains content, navigate to content display
-        const platform = folder.platform || 'instagram'; // Default to instagram if platform is undefined
-        navigate(`/organizations/${organizationId}/projects/${projectId}/data/${platform}/${folder.id}`);
-        return;
-      }
-      // Otherwise, navigate to unified job view (from there, UI can resolve items or provide actions)
+      // Job folders should always navigate to unified job view, not platform-specific data
+      // This allows the job view to handle both empty jobs and jobs with data
       navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage/job/${folder.id}`);
       return;
     }

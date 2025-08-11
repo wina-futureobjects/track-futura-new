@@ -161,6 +161,10 @@ export interface UniversalDataDisplayProps {
   };
   dataAdapter?: (rawData: any[], category?: string) => UniversalDataItem[];
   statsAdapter?: (rawStats: any, category?: string) => UniversalFolderStats;
+  // New props for direct data display
+  data?: UniversalDataItem[];
+  stats?: UniversalFolderStats;
+  disableApiFetch?: boolean;
 }
 
 interface TabPanelProps {
@@ -199,7 +203,10 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
   onExport,
   customFields = {},
   dataAdapter,
-  statsAdapter
+  statsAdapter,
+  data: propData,
+  stats: propStats,
+  disableApiFetch = false
 }) => {
   // State management
   const [data, setData] = useState<UniversalDataItem[]>([]);
@@ -455,6 +462,12 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
 
   // Fetch folder statistics
   const fetchStats = async () => {
+    // If we have direct stats props, use them
+    if (propStats && disableApiFetch) {
+      setStats(propStats);
+      return;
+    }
+    
     try {
       const folderParam = `folder_id=${folder.id}`;
       const projectParam = folder.id ? `&project=${folder.id}` : '';
@@ -655,15 +668,23 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
 
   // Load data on component mount and when sorting/filtering changes
   useEffect(() => {
-    // Only fetch if we have a valid folder
-    if (folder && folder.id) {
+    // If we have direct data props, use them instead of fetching
+    if (propData && disableApiFetch) {
+      setData(propData);
+      setTotalCount(propData.length);
+      setLoading(false);
+      return;
+    }
+    
+    // Only fetch if we have a valid folder and API fetching is enabled
+    if (folder && folder.id && !disableApiFetch) {
       // Check if there are actual filter values to apply
       const hasFilterValues = Boolean(startDate || endDate || minLikes || maxLikes);
       fetchData(page, rowsPerPage, searchTerm, hasFilterValues);
       fetchStats();
       fetchWebhookStatus();
     }
-  }, [page, rowsPerPage, searchTerm, sortBy, sortOrder, startDate, endDate, minLikes, maxLikes, folder.id, platform]);
+  }, [page, rowsPerPage, searchTerm, sortBy, sortOrder, startDate, endDate, minLikes, maxLikes, folder.id, platform, propData, disableApiFetch]);
 
   // Event handlers
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {

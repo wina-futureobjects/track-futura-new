@@ -150,7 +150,7 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
             }
             # Get webhook base URL from settings or use ngrok URL
             from django.conf import settings
-            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://6ca2c7c8ca5e.ngrok-free.app')
+            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://ae3ed80803d3.ngrok-free.app')
             
             params = {
                 "dataset_id": config.dataset_id,
@@ -370,7 +370,7 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
             }
             # Get webhook base URL from settings or use ngrok URL
             from django.conf import settings
-            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://6ca2c7c8ca5e.ngrok-free.app')
+            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://ae3ed80803d3.ngrok-free.app')
             
             params = {
                 "dataset_id": config.dataset_id,
@@ -656,7 +656,7 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
             }
             # Get webhook base URL from settings or use ngrok URL
             from django.conf import settings
-            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://6ca2c7c8ca5e.ngrok-free.app')
+            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://ae3ed80803d3.ngrok-free.app')
             
             params = {
                 "dataset_id": config.dataset_id,
@@ -879,7 +879,7 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
             }
             # Get webhook base URL from settings or use ngrok URL
             from django.conf import settings
-            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://6ca2c7c8ca5e.ngrok-free.app')
+            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://ae3ed80803d3.ngrok-free.app')
             
             params = {
                 "dataset_id": config.dataset_id,
@@ -1428,13 +1428,37 @@ def brightdata_webhook(request):
         # 9. PROCESS THE ACTUAL DATA
         logger.info("🔄 PROCESSING WEBHOOK DATA:")
         
-        # Find associated scraper requests for this snapshot_id
+        # NEW: Find ScrapingJob directly by snapshot_id
+        scrape_job = None
+        try:
+            from workflow.models import ScrapingJob
+            scrape_job = ScrapingJob.objects.filter(snapshot_id=snapshot_id).first()
+            if scrape_job:
+                logger.info(f"✅ Found ScrapingJob directly by snapshot_id: {scrape_job.id}")
+                # Update job webhook status
+                scrape_job.webhook_received_at = timezone.now()
+                scrape_job.webhook_status = 'received'
+                scrape_job.save()
+            else:
+                logger.warning(f"⚠️  No ScrapingJob found with snapshot_id: {snapshot_id}")
+        except Exception as e:
+            logger.warning(f"⚠️  Error finding ScrapingJob: {str(e)}")
+        
+        # Find associated scraper requests for this snapshot_id (for backward compatibility)
         scraper_requests = []
         try:
             scraper_requests = ScraperRequest.objects.filter(
                 request_id=snapshot_id
             ).order_by('created_at')
             logger.info(f"📋 Found {len(scraper_requests)} scraper requests for snapshot_id: {snapshot_id}")
+            
+            # Update ScraperRequest webhook status
+            for req in scraper_requests:
+                req.webhook_received_at = timezone.now()
+                req.webhook_status = 'received'
+                req.data_webhook_id = snapshot_id
+                req.save()
+                
         except Exception as e:
             logger.warning(f"⚠️  Error finding scraper requests: {str(e)}")
         
@@ -1445,10 +1469,15 @@ def brightdata_webhook(request):
                 raise Exception("_process_webhook_data_with_batch_support function is not callable")
             
             logger.info(f"🔄 Calling _process_webhook_data_with_batch_support with platform: {platform}")
-            success = _process_webhook_data_with_batch_support(posts_data, platform, scraper_requests)
+            success = _process_webhook_data_with_batch_support(posts_data, platform, scraper_requests, scrape_job)
             
             if success:
                 logger.info(f"✅ Data processing completed successfully")
+                # Update job status to completed
+                if scrape_job:
+                    scrape_job.status = 'completed'
+                    scrape_job.webhook_status = 'processed'
+                    scrape_job.save()
             else:
                 logger.warning(f"⚠️  Data processing completed with warnings")
                 
@@ -1462,8 +1491,7 @@ def brightdata_webhook(request):
                 'status': 'processing_error',
                 'message': f'Processing function not found: {str(e)}',
                 'webhook_event_id': webhook_event.id if webhook_event else None,
-                'snapshot_id': snapshot_id,
-                'processing_time': round(time.time() - start_time, 3)
+                'snapshot_id': snapshot_id
             }, status=500)
         except Exception as e:
             logger.error(f"❌ Error processing data: {str(e)}")
@@ -1850,10 +1878,10 @@ def _verify_webhook_auth(auth_header: str) -> bool:
         logger.error(f"Error verifying webhook auth: {str(e)}")
         return False
 
-def _process_webhook_data_with_batch_support(data, platform: str, scraper_requests):
+def _process_webhook_data_with_batch_support(data, platform: str, scraper_requests, scrape_job=None):
     """
     Process incoming webhook data with support for batch jobs (multiple scraper requests)
-    All posts from the same job go into the SAME shared folder
+    Uses pre-created platform-specific folders instead of creating them during webhook processing
     """
     from datetime import datetime
     from django.utils import timezone
@@ -1915,11 +1943,36 @@ def _process_webhook_data_with_batch_support(data, platform: str, scraper_reques
 
         logger.info(f"Processing {len(valid_posts)} valid posts, skipped {skipped_count} invalid entries")
 
-        # 🔧 SIMPLIFIED LOGIC: Use the SAME folder for ALL posts in this batch job
-        # All scraper requests in the same batch job should have the same folder_id
-        shared_folder_id = None
-        if scraper_requests:
-            # Get the folder_id from the first request (all should be the same now)
+        # NEW: Get pre-created platform-specific folder from ScrapingJob
+        platform_folder = None
+        if scrape_job:
+            try:
+                # Get the pre-created folder for this platform
+                if platform.lower() == 'instagram':
+                    from instagram_data.models import Folder
+                    platform_folder = Folder.objects.filter(scrape_job=scrape_job).first()
+                elif platform.lower() == 'facebook':
+                    from facebook_data.models import Folder
+                    platform_folder = Folder.objects.filter(scrape_job=scrape_job).first()
+                elif platform.lower() == 'linkedin':
+                    from linkedin_data.models import Folder
+                    platform_folder = Folder.objects.filter(scrape_job=scrape_job).first()
+                elif platform.lower() == 'tiktok':
+                    from tiktok_data.models import Folder
+                    platform_folder = Folder.objects.filter(scrape_job=scrape_job).first()
+                
+                if platform_folder:
+                    logger.info(f"✅ Found pre-created {platform} folder: {platform_folder.id} for job: {scrape_job.id}")
+                else:
+                    logger.warning(f"⚠️  No pre-created {platform} folder found for job: {scrape_job.id}")
+                    
+            except Exception as e:
+                logger.error(f"Error finding pre-created folder: {str(e)}")
+
+        # Fallback: Use legacy folder creation if no pre-created folder found
+        if not platform_folder and scraper_requests:
+            logger.info(f"Using legacy folder creation as fallback")
+            # Use the folder_id from the first request (all should be the same now)
             shared_folder_id = scraper_requests[0].folder_id
             logger.info(f"✅ Using SHARED folder_id: {shared_folder_id} for ALL posts in this batch")
 
@@ -1930,6 +1983,43 @@ def _process_webhook_data_with_batch_support(data, platform: str, scraper_reques
             else:
                 logger.info(f"✅ All {len(scraper_requests)} requests use the same folder_id: {shared_folder_id}")
 
+            # Legacy folder creation logic (simplified)
+            if shared_folder_id:
+                try:
+                    from track_accounts.models import UnifiedRunFolder
+                    unified_folder = UnifiedRunFolder.objects.get(id=shared_folder_id)
+                    
+                    # Create platform-specific folder as fallback
+                    if platform.lower() == 'instagram':
+                        from instagram_data.models import Folder
+                    elif platform.lower() == 'facebook':
+                        from facebook_data.models import Folder
+                    elif platform.lower() == 'linkedin':
+                        from linkedin_data.models import Folder
+                    elif platform.lower() == 'tiktok':
+                        from tiktok_data.models import Folder
+                    else:
+                        Folder = None
+
+                    if Folder is not None:
+                        platform_folder, created = Folder.objects.get_or_create(
+                            unified_job_folder=unified_folder,
+                            defaults={
+                                'name': unified_folder.name,
+                                'description': f'Created from UnifiedRunFolder {unified_folder.id}',
+                                'project_id': unified_folder.project_id
+                            }
+                        )
+                        if created:
+                            logger.info(f"✅ Created fallback {platform} folder: {platform_folder.id}")
+                        else:
+                            logger.info(f"✅ Using existing fallback {platform} folder: {platform_folder.id}")
+                            
+                except UnifiedRunFolder.DoesNotExist:
+                    logger.error(f"UnifiedRunFolder with ID {shared_folder_id} not found")
+                except Exception as e:
+                    logger.error(f"Error in fallback folder creation: {str(e)}")
+
         created_count = 0
 
         for post_data in valid_posts:
@@ -1937,98 +2027,19 @@ def _process_webhook_data_with_batch_support(data, platform: str, scraper_reques
                 # Map common fields
                 post_fields = _map_post_fields(post_data, platform)
 
-                # 🔧 SIMPLIFIED: ALL posts go to the SAME shared folder
-                folder_id = shared_folder_id
-
-                # Handle folder assignment for all platforms
-                if folder_id:
-                    # Use UnifiedRunFolder instead of platform-specific folders
-                    from track_accounts.models import UnifiedRunFolder, ServiceFolderIndex
-                    try:
-                        unified_folder = UnifiedRunFolder.objects.get(id=folder_id)
-                        logger.info(f"✅ Found UnifiedRunFolder: {unified_folder.name} (ID: {folder_id})")
-
-                        # Resolve service folder via index for correctness (no name parsing)
-                        platform_code = (platform or '').lower()
-                        service_code = (unified_folder.service_code or unified_folder.category or 'posts')
-                        try:
-                            sfi = ServiceFolderIndex.objects.get(
-                                scraping_run=unified_folder.scraping_run,
-                                platform_code=platform_code,
-                                service_code=service_code,
-                            )
-                            logger.info(f"✅ Resolved ServiceFolderIndex to service folder {sfi.folder_id}")
-                        except ServiceFolderIndex.DoesNotExist:
-                            logger.warning(f"ServiceFolderIndex missing for run={unified_folder.scraping_run_id}, platform={platform_code}, service={service_code}")
-
-                        # For each platform, get or create the corresponding platform-specific folder and link unified_job_folder
-                        if platform_code == 'facebook':
-                            from facebook_data.models import Folder
-                        elif platform_code == 'instagram':
-                            from instagram_data.models import Folder
-                        elif platform_code == 'linkedin':
-                            from linkedin_data.models import Folder
-                        elif platform_code == 'tiktok':
-                            from tiktok_data.models import Folder
-                        else:
-                            Folder = None
-
-                        if Folder is not None:
-                            folder, created = Folder.objects.get_or_create(
-                                unified_job_folder=unified_folder,
-                                defaults={
-                                    'name': unified_folder.name, 
-                                    'description': f'Created from UnifiedRunFolder {unified_folder.id}',
-                                    'project_id': unified_folder.project_id
-                                }
-                            )
-                            post_fields['folder'] = folder
-                            if created:
-                                logger.info(f"✅ Created {platform_code} folder linked to unified {unified_folder.id}: {folder.id}")
-                            else:
-                                logger.info(f"✅ Using existing {platform_code} folder linked to unified {unified_folder.id}: {folder.id}")
-
-                    except UnifiedRunFolder.DoesNotExist:
-                        logger.error(f"UnifiedRunFolder with ID {folder_id} not found")
-                        # Create a fallback folder for the specific platform
-                        if platform_code == 'facebook':
-                            from facebook_data.models import Folder
-                        elif platform_code == 'instagram':
-                            from instagram_data.models import Folder
-                        elif platform_code == 'linkedin':
-                            from linkedin_data.models import Folder
-                        elif platform_code == 'tiktok':
-                            from tiktok_data.models import Folder
-                        else:
-                            Folder = None
-                        if Folder is not None:
-                            folder = Folder.objects.create(
-                                name=f"Fallback folder {folder_id}",
-                                project_id=unified_folder.project_id if 'unified_folder' in locals() else None
-                            )
-                            post_fields['folder'] = folder
-                else:
-                    logger.warning(f"No shared folder_id available for posts")
-                    # For testing purposes, create a default folder if no scraper requests exist
-                    if not scraper_requests:
-                        logger.info(f"Creating default folder for testing (no scraper requests found)")
-                        try:
-                            from linkedin_data.models import Folder
-                            folder, created = Folder.objects.get_or_create(
-                                name=f"Test Folder - {platform} - {datetime.now().strftime('%Y%m%d_%H%M%S')}",
-                                defaults={
-                                    'description': f'Test folder created for webhook testing',
-                                    'category': 'posts',
-                                    'folder_type': 'content'
-                                }
-                            )
-                            post_fields['folder'] = folder
-                            if created:
-                                logger.info(f"✅ Created test folder: {folder.id}")
-                            else:
-                                logger.info(f"✅ Using existing test folder: {folder.id}")
-                        except Exception as e:
-                            logger.error(f"Error creating test folder: {str(e)}")
+                # NEW: Use pre-created platform folder
+                if platform_folder:
+                    post_fields['folder'] = platform_folder
+                    
+                    # NEW: Add direct job linking
+                    if scrape_job:
+                        post_fields['scrape_job'] = scrape_job
+                    if scraper_requests:
+                        post_fields['scraper_request'] = scraper_requests[0]  # Use first request
+                    
+                    # NEW: Add webhook tracking
+                    post_fields['webhook_snapshot_id'] = scraper_requests[0].request_id if scraper_requests else None
+                    post_fields['webhook_received_at'] = timezone.now()
 
                 # Create or update post
                 post_id = post_data.get('post_id') or post_data.get('id') or post_data.get('pk')
@@ -2051,7 +2062,7 @@ def _process_webhook_data_with_batch_support(data, platform: str, scraper_reques
                     if created:
                         created_count += 1
                         user_posted = post_data.get('user_posted', 'Unknown')
-                        logger.info(f"✅ Created new {platform} post: {post_id} from @{user_posted} in SHARED folder: {folder.name if folder else 'No folder'}")
+                        logger.info(f"✅ Created new {platform} post: {post_id} from @{user_posted} in folder: {folder.name if folder else 'No folder'}")
                         
                         # Process LinkedIn comments if this is a LinkedIn post
                         if platform.lower() == 'linkedin':
@@ -2098,40 +2109,16 @@ def _process_webhook_data_with_batch_support(data, platform: str, scraper_reques
                                 logger.error(f"Error processing LinkedIn comments: {str(e)}")
                     else:
                         logger.info(f"Updated existing {platform} post: {post_id}")
-                else:
-                    # Create new post without checking for duplicates
-                    post = PostModel.objects.create(**post_fields)
-                    created_count += 1
-                    user_posted = post_data.get('user_posted', 'Unknown')
-                    logger.info(f"Created new {platform} post from @{user_posted} without ID in SHARED folder: {folder.name if post_fields.get('folder') else 'No folder'}")
 
             except Exception as e:
-                logger.error(f"Error processing individual post: {str(e)}")
-                logger.error(f"Post data: {post_data}")
+                logger.error(f"Error processing {platform} post: {str(e)}")
                 continue
 
-        logger.info(f"✅ Successfully processed {created_count} valid posts for platform {platform} into SHARED folder")
-        
-        # 🔧 FIX: Update ScrapingJob status after successful data processing
-        if scraper_requests and created_count > 0:
-            try:
-                from workflow.models import ScrapingJob
-                for scraper_request in scraper_requests:
-                    if scraper_request.batch_job:
-                        scraping_jobs = ScrapingJob.objects.filter(batch_job=scraper_request.batch_job)
-                        for scraping_job in scraping_jobs:
-                            if scraping_job.status != 'completed':
-                                scraping_job.status = 'completed'
-                                scraping_job.completed_at = timezone.now()
-                                scraping_job.save()
-                                logger.info(f"✅ Updated ScrapingJob {scraping_job.id} status to completed after data processing")
-            except Exception as e:
-                logger.error(f"❌ Error updating ScrapingJob status: {str(e)}")
-        
+        logger.info(f"✅ Successfully processed {created_count} new {platform} posts")
         return True
 
     except Exception as e:
-        logger.error(f"Error processing webhook data: {str(e)}")
+        logger.error(f"Error in _process_webhook_data_with_batch_support: {str(e)}")
         return False
 
 def _process_webhook_data(data, platform: str, scraper_request=None):

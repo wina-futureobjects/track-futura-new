@@ -217,14 +217,35 @@ class AutomatedBatchScraper:
 
     def _get_sources_for_job(self, job: BatchScraperJob) -> List[TrackSource]:
         """
-        Get sources for a batch job - either from input collection URLs or from project TrackSources
+        Get sources for a batch job - either from input collection URLs, specific track source, or from project TrackSources
         """
+        # Check if this job is associated with a specific track source
+        if job.platform_params and 'track_source_id' in job.platform_params:
+            return self._get_sources_from_track_source(job)
         # Check if this job is associated with an input collection
-        if job.platform_params and 'input_collection_id' in job.platform_params:
+        elif job.platform_params and 'input_collection_id' in job.platform_params:
             return self._get_sources_from_input_collection(job)
         else:
             # Fall back to getting sources from project (legacy behavior)
             return self._get_accounts_from_folders(job.source_folder_ids)
+
+    def _get_sources_from_track_source(self, job: BatchScraperJob) -> List[TrackSource]:
+        """
+        Get a specific TrackSource by ID from platform_params
+        """
+        try:
+            track_source_id = job.platform_params.get('track_source_id')
+            source = TrackSource.objects.get(id=track_source_id)
+            
+            self.logger.info(f"Found track source {source.id}: {source.name}")
+            return [source]
+            
+        except TrackSource.DoesNotExist:
+            self.logger.error(f"TrackSource with ID {track_source_id} not found")
+            return []
+        except Exception as e:
+            self.logger.error(f"Error getting track source: {str(e)}")
+            return []
 
     def _get_sources_from_input_collection(self, job: BatchScraperJob) -> List[TrackSource]:
         """
@@ -594,14 +615,16 @@ class AutomatedBatchScraper:
 
     def _create_scraper_request(self, job: BatchScraperJob, source: TrackSource,
                               platform: str, url: str, config: BrightdataConfig,
-                              folder_id: Optional[int], content_type: str) -> Optional[ScraperRequest]:
+                              folder_id: Optional[int], content_type: str, 
+                              scrape_job: 'workflow.ScrapingJob' = None) -> Optional[ScraperRequest]:
         """
-        Create a scraper request for the source and platform
+        Create a scraper request for the source and platform with direct job linking
         """
         try:
             # Get the platform config key that includes content type
             platform_config_key = self._get_platform_config_key(platform, content_type)
 
+            # Create ScraperRequest
             scraper_request = ScraperRequest.objects.create(
                 config=config,
                 batch_job=job,
@@ -628,7 +651,7 @@ class AutomatedBatchScraper:
                     }
                     scraper_request.save()
 
-            self.logger.info(f"Created scraper request for {source.name} on {platform} ({content_type})")
+            self.logger.info(f"Created scraper request for {source.name} on {platform} ({content_type}) with direct job link")
             return scraper_request
 
         except Exception as e:
@@ -673,7 +696,7 @@ class AutomatedBatchScraper:
             config = scraper_request.config
 
             # Import Django settings to get webhook base URL
-            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://6ca2c7c8ca5e.ngrok-free.app')
+            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://ae3ed80803d3.ngrok-free.app')
 
             url = "https://api.brightdata.com/datasets/v3/trigger"
             headers = {
@@ -1043,7 +1066,7 @@ class AutomatedBatchScraper:
             config = primary_request.config
 
             # Import Django settings to get webhook base URL
-            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://6ca2c7c8ca5e.ngrok-free.app')
+            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://ae3ed80803d3.ngrok-free.app')
 
             url = "https://api.brightdata.com/datasets/v3/trigger"
             headers = {
@@ -1210,6 +1233,57 @@ class AutomatedBatchScraper:
             print(f"❌ EXCEPTION! Error: {str(e)}")
             print("="*80 + "\n")
             return False
+
+    def _pre_create_platform_folders(self, scrape_job: 'workflow.ScrapingJob', unified_folder_id: int) -> Dict[str, int]:
+        """
+        Pre-create platform-specific folders for a scraping job
+        Returns a dict mapping platform to folder_id
+        """
+        platform_folders = {}
+        
+        try:
+            from track_accounts.models import UnifiedRunFolder
+            unified_folder = UnifiedRunFolder.objects.get(id=unified_folder_id)
+            
+            # Pre-create folders for all platforms
+            platforms = ['instagram', 'facebook', 'linkedin', 'tiktok']
+            
+            for platform in platforms:
+                try:
+                    if platform == 'instagram':
+                        from instagram_data.models import Folder
+                    elif platform == 'facebook':
+                        from facebook_data.models import Folder
+                    elif platform == 'linkedin':
+                        from linkedin_data.models import Folder
+                    elif platform == 'tiktok':
+                        from tiktok_data.models import Folder
+                    else:
+                        continue
+                    
+                    # Create platform-specific folder
+                    platform_folder = Folder.objects.create(
+                        name=f"{platform.title()} - {unified_folder.name}",
+                        description=f"Pre-created folder for {platform} scraping job",
+                        category=unified_folder.category or 'posts',
+                        project_id=unified_folder.project_id,
+                        scraping_run=unified_folder.scraping_run,
+                        scrape_job=scrape_job,  # NEW: Direct link to ScrapingJob
+                        unified_job_folder=unified_folder
+                    )
+                    
+                    platform_folders[platform] = platform_folder.id
+                    self.logger.info(f"✅ Pre-created {platform} folder: {platform_folder.id} for job: {scrape_job.id}")
+                    
+                except Exception as e:
+                    self.logger.error(f"Error creating {platform} folder: {str(e)}")
+                    continue
+            
+            return platform_folders
+            
+        except Exception as e:
+            self.logger.error(f"Error in _pre_create_platform_folders: {str(e)}")
+            return {}
 
 # Convenience function for external use
 def create_and_execute_batch_job(name: str, project_id: int, source_folder_ids: List[int],

@@ -312,6 +312,13 @@ const AutomatedBatchScraper = () => {
     });
   };
 
+  // Helper function to format date in local timezone
+  const formatDateForAPI = (date: Dayjs | null): string | null => {
+    if (!date) return null;
+    // Format as YYYY-MM-DDTHH:mm:ss.sssZ in local timezone
+    return date.format('YYYY-MM-DDTHH:mm:ss.SSS[Z]');
+  };
+
   const handleSubmitConfig = async () => {
     if (!selectedInputCollection) return;
 
@@ -335,8 +342,8 @@ const AutomatedBatchScraper = () => {
         platform: selectedInputCollection.platform_name.toLowerCase(),
         service_type: selectedInputCollection.service_name.toLowerCase().replace(' ', '_'),
         num_of_posts: configForm.numOfPosts,
-        start_date: configForm.startDate?.toISOString(),
-        end_date: configForm.endDate?.toISOString(),
+        start_date: formatDateForAPI(configForm.startDate),
+        end_date: formatDateForAPI(configForm.endDate),
         auto_create_folders: configForm.autoCreateFolders,
         output_folder_pattern: configForm.outputFolderPattern
       };
@@ -388,8 +395,8 @@ const AutomatedBatchScraper = () => {
         project: parseInt(projectId),
         configuration: {
           num_of_posts: globalConfigForm.numOfPosts,
-          start_date: globalConfigForm.startDate?.toISOString(),
-          end_date: globalConfigForm.endDate?.toISOString(),
+          start_date: formatDateForAPI(globalConfigForm.startDate),
+          end_date: formatDateForAPI(globalConfigForm.endDate),
           auto_create_folders: globalConfigForm.autoCreateFolders,
           output_folder_pattern: globalConfigForm.outputFolderPattern
         }
@@ -442,8 +449,8 @@ const AutomatedBatchScraper = () => {
         name: periodicConfigForm.jobName,
         configuration: {
           num_of_posts: periodicConfigForm.numOfPosts,
-          start_date: periodicConfigForm.startDate?.toISOString(),
-          end_date: periodicConfigForm.endDate?.toISOString(),
+          start_date: formatDateForAPI(periodicConfigForm.startDate),
+          end_date: formatDateForAPI(periodicConfigForm.endDate),
           auto_create_folders: periodicConfigForm.autoCreateFolders,
           output_folder_pattern: periodicConfigForm.outputFolderPattern,
           period: periodicConfigForm.period // Add period to configuration

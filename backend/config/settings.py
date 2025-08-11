@@ -506,12 +506,12 @@ def get_webhook_base_url():
         return f"https://{os.environ['HEROKU_APP_NAME']}.herokuapp.com"
 
     # Local development fallback
-    return 'http://localhost:8000'
+    return 'https://7cd5255d8f2b.ngrok-free.app'
 
 BRIGHTDATA_BASE_URL = get_webhook_base_url()
 
 # BrightData webhook configuration
-BRIGHTDATA_WEBHOOK_BASE_URL = os.environ.get('BRIGHTDATA_WEBHOOK_BASE_URL', 'https://31180b8411ef.ngrok-free.app')
+BRIGHTDATA_WEBHOOK_BASE_URL = os.environ.get('BRIGHTDATA_WEBHOOK_BASE_URL', 'https://7cd5255d8f2b.ngrok-free.app')
 
 # Ngrok support for local development
 NGROK_ENABLED = os.environ.get('NGROK_ENABLED', 'False').lower() == 'true'

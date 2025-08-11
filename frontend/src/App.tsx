@@ -19,6 +19,7 @@ import TrackAccountUpload from './pages/TrackAccountUpload';
 // Folder imports
 import DataStorage from './pages/DataStorage';
 import FolderContents from './pages/FolderContents';
+import JobFolderView from './pages/JobFolderView';
 
 // Data upload imports
 import UniversalDataPage from './pages/UniversalDataPage';
@@ -263,6 +264,15 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <FolderContents />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+              
+              {/* Job Folder View - Special handling for job folders */}
+              <Route path="/organizations/:organizationId/projects/:projectId/data-storage/job/:folderId" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <JobFolderView />
                   </Layout>
                 </ProtectedRoute>
               } />
