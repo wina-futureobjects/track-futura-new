@@ -150,12 +150,20 @@ const JobFolderView = () => {
         setScraperRequests(filteredRequests);
       }
 
-             // Fetch posts associated with this job folder
-       const postsResponse = await apiFetch(`/api/instagram-data/posts/?folder__unified_job_folder_id=${folderId}`);
-       if (postsResponse.ok) {
-         const postsData = await postsResponse.json();
-         const fetchedPosts = postsData.results || postsData || [];
+             // Fetch platform-specific data (posts) for this job folder
+       const platformDataResponse = await apiFetch(`/api/track-accounts/report-folders/${folderId}/platform_data/`);
+       if (platformDataResponse.ok) {
+         const platformData = await platformDataResponse.json();
+         const fetchedPosts = platformData.posts || [];
          setPosts(fetchedPosts);
+         
+         // Update universal folder with platform info
+         if (universalFolder) {
+           setUniversalFolder({
+             ...universalFolder,
+             platform: platformData.platform || universalFolder.platform
+           });
+         }
        }
 
     } catch (error) {

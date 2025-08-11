@@ -591,4 +591,116 @@ class UnifiedRunFolderViewSet(viewsets.ModelViewSet):
         if include_hierarchy:
             queryset = queryset.prefetch_related('subfolders')
         
-        return queryset 
+        return queryset
+    
+    @action(detail=True, methods=['GET'])
+    def platform_data(self, request, pk=None):
+        """
+        Get platform-specific data (posts) for a job folder
+        """
+        try:
+            job_folder = self.get_object()
+            
+            if job_folder.folder_type != 'job':
+                return Response(
+                    {'error': 'This endpoint is only for job folders'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Get the platform code from the job folder
+            platform_code = job_folder.platform_code
+            if not platform_code:
+                return Response(
+                    {'error': 'Job folder does not have a platform code'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Find the platform-specific folder linked to this job folder
+            platform_folder = None
+            
+            if platform_code == 'instagram':
+                from instagram_data.models import Folder as InstagramFolder
+                platform_folder = InstagramFolder.objects.filter(
+                    unified_job_folder=job_folder
+                ).first()
+                
+                if platform_folder:
+                    # Get posts from this folder
+                    posts = platform_folder.posts.all()
+                    from instagram_data.serializers import InstagramPostSerializer
+                    serializer = InstagramPostSerializer(posts, many=True)
+                    return Response({
+                        'platform': 'instagram',
+                        'folder_id': platform_folder.id,
+                        'posts': serializer.data,
+                        'total_posts': posts.count()
+                    })
+            
+            elif platform_code == 'facebook':
+                from facebook_data.models import Folder as FacebookFolder
+                platform_folder = FacebookFolder.objects.filter(
+                    unified_job_folder=job_folder
+                ).first()
+                
+                if platform_folder:
+                    # Get posts from this folder
+                    posts = platform_folder.posts.all()
+                    from facebook_data.serializers import FacebookPostSerializer
+                    serializer = FacebookPostSerializer(posts, many=True)
+                    return Response({
+                        'platform': 'facebook',
+                        'folder_id': platform_folder.id,
+                        'posts': serializer.data,
+                        'total_posts': posts.count()
+                    })
+            
+            elif platform_code == 'linkedin':
+                from linkedin_data.models import Folder as LinkedInFolder
+                platform_folder = LinkedInFolder.objects.filter(
+                    unified_job_folder=job_folder
+                ).first()
+                
+                if platform_folder:
+                    # Get posts from this folder
+                    posts = platform_folder.posts.all()
+                    from linkedin_data.serializers import LinkedInPostSerializer
+                    serializer = LinkedInPostSerializer(posts, many=True)
+                    return Response({
+                        'platform': 'linkedin',
+                        'folder_id': platform_folder.id,
+                        'posts': serializer.data,
+                        'total_posts': posts.count()
+                    })
+            
+            elif platform_code == 'tiktok':
+                from tiktok_data.models import Folder as TikTokFolder
+                platform_folder = TikTokFolder.objects.filter(
+                    unified_job_folder=job_folder
+                ).first()
+                
+                if platform_folder:
+                    # Get posts from this folder
+                    posts = platform_folder.posts.all()
+                    from tiktok_data.serializers import TikTokPostSerializer
+                    serializer = TikTokPostSerializer(posts, many=True)
+                    return Response({
+                        'platform': 'tiktok',
+                        'folder_id': platform_folder.id,
+                        'posts': serializer.data,
+                        'total_posts': posts.count()
+                    })
+            
+            if not platform_folder:
+                return Response({
+                    'platform': platform_code,
+                    'folder_id': None,
+                    'posts': [],
+                    'total_posts': 0,
+                    'message': f'No platform-specific folder found for {platform_code}'
+                })
+                
+        except Exception as e:
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
