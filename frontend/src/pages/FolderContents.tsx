@@ -9,7 +9,6 @@ import {
   Chip,
   CircularProgress,
   Alert,
-  Breadcrumbs,
   TextField,
   InputAdornment,
   FormControl,
@@ -36,8 +35,6 @@ import {
   Search as SearchIcon,
   Refresh as RefreshIcon,
   OpenInNew as OpenInNewIcon,
-  Home as HomeIcon,
-  NavigateNext as NavigateNextIcon,
   Storage as StorageIcon,
   ArrowBack as ArrowBackIcon,
   FolderOutlined as FolderOutlinedIcon,
@@ -93,6 +90,13 @@ const FolderContents = () => {
   const fetchFolderContents = async () => {
     setLoading(true);
     setError(null);
+    
+    // Add null checks for required parameters
+    if (!projectId || !folderId || !folderType) {
+      setError('Missing required parameters');
+      setLoading(false);
+      return;
+    }
     
     try {
       // Fetch the current folder details
@@ -261,6 +265,12 @@ const FolderContents = () => {
   };
 
   const handleFolderClick = (folder: Folder) => {
+    // Add null checks for required parameters
+    if (!organizationId || !projectId) {
+      console.error('Missing organizationId or projectId');
+      return;
+    }
+
     // Unified hierarchy: run -> platform -> service -> job; platform-specific "content" is legacy
     if (folder.folder_type === 'content') {
       const platform = folder.platform || 'instagram'; // Default to instagram if platform is undefined
@@ -278,9 +288,32 @@ const FolderContents = () => {
   };
 
   const handleBackClick = () => {
+    // Add null checks for required parameters
+    if (!organizationId || !projectId) {
+      console.error('Missing organizationId or projectId');
+      return;
+    }
+
     if (currentFolder?.parent_folder) {
-      // Navigate back to parent folder
-      navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage/${currentFolder.folder_type === 'service' ? 'run' : 'service'}/${currentFolder.parent_folder}`);
+      // Navigate back to parent folder based on current folder type
+      let parentFolderType;
+      switch (currentFolder.folder_type) {
+        case 'platform':
+          parentFolderType = 'run';
+          break;
+        case 'service':
+          parentFolderType = 'run';
+          break;
+        case 'job':
+          parentFolderType = 'service';
+          break;
+        case 'content':
+          parentFolderType = 'job';
+          break;
+        default:
+          parentFolderType = 'run';
+      }
+      navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage/${parentFolderType}/${currentFolder.parent_folder}`);
     } else {
       // Navigate back to data storage main page
       navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage`);
@@ -319,7 +352,7 @@ const FolderContents = () => {
       minHeight: 'calc(100vh - 56px)',
     }}>
       
-      {/* Header with breadcrumbs */}
+      {/* Header with back button only */}
       <Box display="flex" alignItems="center" mb={3}>
         <Button
           startIcon={<ArrowBackIcon />}
@@ -328,18 +361,6 @@ const FolderContents = () => {
         >
           Back
         </Button>
-        <Breadcrumbs separator={<NavigateNextIcon fontSize="small" />}>
-          <Button
-            startIcon={<HomeIcon />}
-            onClick={() => navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage`)}
-            sx={{ textTransform: 'none' }}
-          >
-            Data Storage
-          </Button>
-          {currentFolder && (
-            <Typography color="text.primary">{currentFolder.name}</Typography>
-          )}
-        </Breadcrumbs>
       </Box>
 
       {/* Folder Header */}
@@ -450,44 +471,18 @@ const FolderContents = () => {
                 }}
                 onClick={() => handleFolderClick(folder)}
               >
-                <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
-                  <Box display="flex" alignItems="center">
-                    <Box sx={{ color: platformConfig.color, mr: 1 }}>
-                      {platformConfig.icon}
-                    </Box>
-                    <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                      {folder.name}
-                    </Typography>
-                  </Box>
-                  <Chip 
-                    label={`${folder.post_count || 0} items`} 
-                    size="small" 
-                    color="primary" 
-                    variant="outlined"
-                  />
-                </Box>
+                                 <Box display="flex" alignItems="center" mb={2}>
+                   <Box sx={{ color: platformConfig.color, mr: 1 }}>
+                     {platformConfig.icon}
+                   </Box>
+                   <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                     {folder.name}
+                   </Typography>
+                 </Box>
                 
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                  Click to view contents
-                </Typography>
-                
-                <Box display="flex" gap={1}>
-                  <Chip
-                    label={platformConfig.label}
-                    size="small"
-                    sx={{ 
-                      bgcolor: platformConfig.color,
-                      color: 'white',
-                      fontWeight: 500
-                    }}
-                  />
-                  <Chip
-                    label={folder.category_display || folder.category}
-                    color={getCategoryColor(folder.category) as any}
-                    size="small"
-                    variant="outlined"
-                  />
-                </Box>
+                                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                   Click to view contents
+                 </Typography>
               </Paper>
             );
           })}

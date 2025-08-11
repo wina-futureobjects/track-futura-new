@@ -676,25 +676,15 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
       return;
     }
     
-    // Only fetch if we have a valid folder
-    if (folder && folder.id) {
-      if (!disableApiFetch) {
-        // Check if there are actual filter values to apply
-        const hasFilterValues = Boolean(startDate || endDate || minLikes || maxLikes);
-        fetchData(page, rowsPerPage, searchTerm, hasFilterValues);
-        fetchWebhookStatus();
-      }
-      // Always call fetchStats to handle propStats when disableApiFetch is true
+    // Only fetch if we have a valid folder and API fetching is enabled
+    if (folder && folder.id && !disableApiFetch) {
+      // Check if there are actual filter values to apply
+      const hasFilterValues = Boolean(startDate || endDate || minLikes || maxLikes);
+      fetchData(page, rowsPerPage, searchTerm, hasFilterValues);
       fetchStats();
+      fetchWebhookStatus();
     }
   }, [page, rowsPerPage, searchTerm, sortBy, sortOrder, startDate, endDate, minLikes, maxLikes, folder.id, platform, propData, disableApiFetch]);
-
-  // Effect to handle propStats when they change
-  useEffect(() => {
-    if (propStats && disableApiFetch) {
-      setStats(propStats);
-    }
-  }, [propStats, disableApiFetch]);
 
   // Event handlers
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -1299,16 +1289,8 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
         </Paper>
       </Box>
 
-      {/* Tabs Section */}
+      {/* Data Overview Section */}
       <Paper sx={{ mb: 3 }}>
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs value={tabValue} onChange={handleTabChange} aria-label="universal data tabs">
-            <Tab label="Data Overview" {...a11yProps(0)} />
-          </Tabs>
-        </Box>
-        
-        {/* Tab Panel 0: Data Overview */}
-        <TabPanel value={tabValue} index={0}>
           {/* Search and Filter Controls */}
           <Box sx={{ display: 'flex', gap: 2, mb: 3, alignItems: 'center' }}>
             <TextField
@@ -1705,7 +1687,7 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
             onPageChange={handleChangePage}
             onRowsPerPageChange={handleChangeRowsPerPage}
           />
-        </TabPanel>
+        </Paper>
 
         {/* Tab Panel 1: Upload & Management */}
         <TabPanel value={tabValue} index={1}>

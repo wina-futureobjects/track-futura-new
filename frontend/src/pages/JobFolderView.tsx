@@ -63,6 +63,7 @@ interface Post {
   num_comments: number;
   date_posted: string;
   created_at: string;
+  is_verified?: boolean;
 }
 
 // Data adapter to convert posts to UniversalDataItem format
@@ -96,6 +97,7 @@ const JobFolderView = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [universalFolder, setUniversalFolder] = useState<UniversalFolder | null>(null);
+  const [calculatedStats, setCalculatedStats] = useState<any>(null);
 
   const fetchJobData = async () => {
     setLoading(true);
@@ -150,21 +152,27 @@ const JobFolderView = () => {
         setScraperRequests(filteredRequests);
       }
 
-             // Fetch platform-specific data (posts) for this job folder
-       const platformDataResponse = await apiFetch(`/api/track-accounts/report-folders/${folderId}/platform_data/`);
-       if (platformDataResponse.ok) {
-         const platformData = await platformDataResponse.json();
-         const fetchedPosts = platformData.posts || [];
-         setPosts(fetchedPosts);
-         
-         // Update universal folder with platform info
-         if (universalFolder) {
-           setUniversalFolder({
-             ...universalFolder,
-             platform: platformData.platform || universalFolder.platform
+                                                       // Fetch platform-specific data (posts) for this job folder
+         const platformDataResponse = await apiFetch(`/api/track-accounts/report-folders/${folderId}/platform_data/`);
+         if (platformDataResponse.ok) {
+           const platformData = await platformDataResponse.json();
+           const fetchedPosts = platformData.posts || [];
+           console.log('Fetched posts:', fetchedPosts.length, fetchedPosts);
+           setPosts(fetchedPosts);
+           
+           // Update universal folder with platform info
+           setUniversalFolder(prevFolder => {
+             if (prevFolder) {
+               return {
+                 ...prevFolder,
+                 platform: platformData.platform || prevFolder.platform
+               };
+             }
+             return prevFolder;
            });
+         } else {
+           console.error('Failed to fetch platform data:', platformDataResponse.status);
          }
-       }
 
     } catch (error) {
       console.error('Error fetching job data:', error);
@@ -179,6 +187,38 @@ const JobFolderView = () => {
       fetchJobData();
     }
   }, [projectId, folderId]);
+
+  // Debug effect to log when posts change
+  useEffect(() => {
+    console.log('Posts changed:', posts.length, posts);
+  }, [posts]);
+
+  // Calculate stats when posts change
+  useEffect(() => {
+    console.log('Stats calculation triggered - posts length:', posts.length, 'universalFolder:', !!universalFolder);
+    if (posts.length > 0 && universalFolder) {
+      console.log('Posts data for stats:', posts.map(p => ({ 
+        user: p.user_posted, 
+        likes: p.likes, 
+        comments: p.num_comments, 
+        verified: p.is_verified 
+      })));
+      
+      const stats = {
+        totalItems: posts.length,
+        uniqueUsers: new Set(posts.map(p => p.user_posted)).size,
+        avgLikes: Math.round(posts.reduce((sum, p) => sum + p.likes, 0) / posts.length),
+        avgComments: Math.round(posts.reduce((sum, p) => sum + p.num_comments, 0) / posts.length),
+        verifiedAccounts: posts.filter(p => p.is_verified).length,
+        platform: universalFolder.platform
+      };
+      console.log('Calculated stats:', stats);
+      setCalculatedStats(stats);
+    } else {
+      console.log('Setting stats to null - posts length:', posts.length, 'universalFolder:', !!universalFolder);
+      setCalculatedStats(null);
+    }
+  }, [posts, universalFolder]);
 
   const handleBackClick = () => {
     if (jobFolder?.parent_folder) {
@@ -245,138 +285,30 @@ const JobFolderView = () => {
         minHeight: 'calc(100vh - 56px)',
       }}>
         
-        {/* Header with breadcrumbs */}
-        <Box display="flex" alignItems="center" mb={3}>
-          <Button
-            startIcon={<ArrowBackIcon />}
-            onClick={handleBackClick}
-            sx={{ mr: 2 }}
-          >
-            Back
-          </Button>
-          <Breadcrumbs separator={<NavigateNextIcon fontSize="small" />}>
-            <Button
-              startIcon={<HomeIcon />}
-              onClick={() => navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage`)}
-              sx={{ textTransform: 'none' }}
-            >
-              Data Storage
-            </Button>
-            {jobFolder && (
-              <Typography color="text.primary">{jobFolder.name}</Typography>
-            )}
-          </Breadcrumbs>
-        </Box>
+                 {error && (
+           <Alert severity="error" sx={{ mb: 3 }}>
+             {error}
+           </Alert>
+         )}
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {error}
-          </Alert>
-        )}
+        
 
-        {/* Job Folder Header */}
-        {jobFolder && (
-          <Paper sx={{ p: 3, mb: 3 }}>
-            <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
-              <Box display="flex" alignItems="center">
-                <WorkIcon sx={{ mr: 1, color: 'primary.main' }} />
-                <Typography variant="h5" sx={{ fontWeight: 500 }}>
-                  {jobFolder.name}
-                </Typography>
-              </Box>
-              <Box display="flex" gap={1}>
-                <Chip 
-                  label={jobFolder.platform_code || jobFolder.platform} 
-                  color="primary" 
-                  variant="outlined"
-                />
-                <Chip 
-                  label={jobFolder.service_code || jobFolder.category} 
-                  color="secondary" 
-                  variant="outlined"
-                />
-              </Box>
-            </Box>
-            {jobFolder.description && (
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                {jobFolder.description}
-              </Typography>
-            )}
-            <Typography variant="caption" color="text.secondary">
-              Created: {formatDate(jobFolder.created_at || '')}
-            </Typography>
-          </Paper>
-        )}
-
-        {/* Job Statistics */}
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid item xs={12} md={3}>
-            <Card>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
-                  Total Posts
-                </Typography>
-                <Typography variant="h4" color="primary.main">
-                  {posts.length}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <Card>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
-                  Total Requests
-                </Typography>
-                <Typography variant="h4">
-                  {scraperRequests.length}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <Card>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
-                  Completed
-                </Typography>
-                <Typography variant="h4" color="success.main">
-                  {scraperRequests.filter(req => req.status === 'completed').length}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <Card>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
-                  Failed
-                </Typography>
-                <Typography variant="h4" color="error.main">
-                  {scraperRequests.filter(req => req.status === 'failed').length}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-
-        {/* Universal Data Display */}
-        <UniversalDataDisplay
-          folder={universalFolder}
-          platform={universalFolder.platform}
-          onBackNavigation={handleBackClick}
-          onRefresh={fetchJobData}
-          data={postToUniversalData(posts)}
-          stats={{
-            totalItems: posts.length,
-            uniqueUsers: new Set(posts.map(p => p.user_posted)).size,
-            avgLikes: posts.length > 0 ? Math.round(posts.reduce((sum, p) => sum + p.likes, 0) / posts.length) : 0,
-            avgComments: posts.length > 0 ? Math.round(posts.reduce((sum, p) => sum + p.num_comments, 0) / posts.length) : 0,
-            verifiedAccounts: 0, // We don't have this data in posts
-            platform: universalFolder.platform
-          }}
-          disableApiFetch={true}
-        />
+                                                                       {/* Universal Data Display */}
+                       {calculatedStats ? (
+              <UniversalDataDisplay
+                folder={universalFolder}
+                platform={universalFolder.platform}
+                onBackNavigation={handleBackClick}
+                onRefresh={fetchJobData}
+                data={postToUniversalData(posts)}
+                stats={calculatedStats}
+                disableApiFetch={true}
+              />
+            ) : (
+             <Box sx={{ p: 3, textAlign: 'center' }}>
+               <Typography>Loading data...</Typography>
+             </Box>
+           )}
 
         {/* Job Details (Collapsible) */}
         {scraperRequests.length > 0 && (
