@@ -22,17 +22,18 @@ pc.create_index_for_model(
     region="us-east-1",
     embed={
         "model":"llama-text-embed-v2",
-        "field_map":{"text": "chunk_text"}
+        "field_map":{"text": "text"}
     }
 )
     
     
 #Upsert records
-index = pc.Index(index_name)  
+# index = pc.Index(index_name)  
 
 import json
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+import time
 
 def clean_text(text: Optional[str]) -> str:
     """Clean and normalize text content."""
@@ -243,7 +244,7 @@ def sanitize_metadata_for_pinecone(metadata: Dict[str, Any]) -> Dict[str, Any]:
     
     # Add standard fields
     sanitized['is_public'] = True
-    sanitized['tags'] = ['linkedin', 'social-media', 'post']
+    sanitized['tags'] = 'linkedin, social-media, post'
     
     return sanitized
 
@@ -256,7 +257,11 @@ with open(json_file_path, "r", encoding="utf-8") as f:
 # Transform the data using the comprehensive transformation functions
 formatted_records = []
 
+print(f"Processing {len(data)} records...")
 for i, record in enumerate(data):
+    if i % 10 == 0:  # Progress indicator every 10 records
+        print(f"Processing record {i+1}/{len(data)}...")
+    
     # Extract content for embedding using the comprehensive function
     content_text = extract_content_text(record)
     
@@ -274,35 +279,44 @@ for i, record in enumerate(data):
     # Create the formatted record for model-based embedding
     formatted_record = {
         "id": str(record.get('id', f"record_{i}")),
-        "chunk_text": content_text,  # This field will be embedded by the model
+        "text": content_text,  # This field will be embedded by the model
         "metadata": sanitized_metadata
     }
     
     formatted_records.append(formatted_record)
+
+print(f"✓ Processed {len(formatted_records)} records successfully!")
 
 
 print("\n" + "="*50)
 print("UPLOADING TO PINECONE")
 print("="*50)
 
-# Use upsert_records method for model-based embeddings
-print("Attempting batch upsert with upsert_records...")
+# Initialize index for upload
+index = pc.Index(index_name)
 
-# try:
-#     index.upsert_records(
-#         namespace="ns1",
-#         records=formatted_records
-#     )
-#     print("✓ Successfully upserted all records!")
-# except Exception as e:
-#     print(f"✗ Error in batch upsert: {e}")
-#     if formatted_records:
-#         print("First record metadata type:", type(formatted_records[0]["metadata"]))
-#         print("First record metadata:", formatted_records[0]["metadata"])
-index.upsert_records(
-    namespace="ns1",
-    records=formatted_records
-)
+# Use upsert_records method for model-based embeddings
+print(f"Attempting to upsert {len(formatted_records)} records...")
+
+# Debug: Print first record structure
+if formatted_records:
+    print("First record structure:")
+    print(f"ID: {formatted_records[0]['id']}")
+    print(f"Text length: {len(formatted_records[0]['text'])}")
+    print(f"Metadata keys: {list(formatted_records[0]['metadata'].keys())}")
+    print(f"Metadata types: {[(k, type(v)) for k, v in formatted_records[0]['metadata'].items()]}")
+
+try:
+    index.upsert_records(
+        namespace="ns1",
+        records=formatted_records
+    )
+    print("✓ Successfully upserted all records!")
+except Exception as e:
+    print(f"✗ Error during upload: {e}")
+    if formatted_records:
+        print("First record metadata type:", type(formatted_records[0]["metadata"]))
+        print("First record metadata:", formatted_records[0]["metadata"])
 
 #Check index stats
 print("Index stats:")
