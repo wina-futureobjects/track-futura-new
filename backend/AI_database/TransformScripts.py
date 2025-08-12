@@ -1,35 +1,3 @@
-from pinecone import Pinecone, ServerlessSpec
-
-pc = Pinecone(api_key="pcsk_78mXZf_N5w38HcHeJD6MniEjw3BBdiEGTpATqAyzhAWKnRZcsWjwASQnXwYkYf5r1hk5hA")
-
-
-#Create index
-index_name = "testing-py"
-
-# Delete existing index if it exists (to recreate with correct field mapping)
-if pc.has_index(index_name):
-    print(f"Deleting existing index: {index_name}")
-    pc.delete_index(index_name)
-    print("Waiting for index deletion to complete...")
-    import time
-    time.sleep(10)  # Wait for deletion to complete
-
-# Create new index with correct configuration
-print(f"Creating new index: {index_name}")
-pc.create_index_for_model(
-    name=index_name,
-    cloud="aws",
-    region="us-east-1",
-    embed={
-        "model":"llama-text-embed-v2",
-        "field_map":{"text": "chunk_text"}
-    }
-)
-    
-    
-#Upsert records
-index = pc.Index(index_name)  
-
 import json
 from typing import List, Dict, Any, Optional
 from datetime import datetime
@@ -165,12 +133,10 @@ def extract_metadata(post: Dict[str, Any]) -> Dict[str, Any]:
     metadata['num_tagged_people'] = len(tagged_people) if tagged_people else 0
     
     if tagged_companies:
-        company_names = [comp.get('name') for comp in tagged_companies if comp.get('name')]
-        metadata['tagged_company_names'] = ', '.join(company_names) if company_names else ''
+        metadata['tagged_company_names'] = [comp.get('name') for comp in tagged_companies if comp.get('name')]
     
     if tagged_people:
-        people_names = [person.get('name') for person in tagged_people if person.get('name')]
-        metadata['tagged_people_names'] = ', '.join(people_names) if people_names else ''
+        metadata['tagged_people_names'] = [person.get('name') for person in tagged_people if person.get('name')]
     
     # Repost information
     repost = post.get('repost', {})
@@ -191,8 +157,7 @@ def extract_metadata(post: Dict[str, Any]) -> Dict[str, Any]:
         
         # Extract unique commenters
         commenters = [comment.get('user_name') for comment in comments if comment.get('user_name')]
-        unique_commenters = list(set(commenters)) if commenters else []
-        metadata['unique_commenters'] = ', '.join(unique_commenters) if unique_commenters else ''
+        metadata['unique_commenters'] = list(set(commenters)) if commenters else []
     
     # Content characteristics
     post_text = post.get('post_text', '')
@@ -205,106 +170,77 @@ def extract_metadata(post: Dict[str, Any]) -> Dict[str, Any]:
     
     return metadata
 
-def sanitize_metadata_for_pinecone(metadata: Dict[str, Any]) -> Dict[str, Any]:
-    """Ensure all metadata values are compatible with Pinecone's requirements."""
-    sanitized = {}
+def transform_linkedin_posts(json_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Transform LinkedIn posts JSON to vector embedding format."""
+    transformed_posts = []
     
-    # Map LinkedIn fields to simple metadata fields
-    field_mapping = {
-        'post_type': 'document_type',
-        'user_id': 'author_id',
-        'date_posted': 'created_date',
-        'num_likes': 'engagement_score',
-        'num_comments': 'comment_count',
-        'url': 'source_url',
-        'has_images': 'has_media',
-        'has_videos': 'has_video',
-        'has_documents': 'has_document',
-        'is_repost': 'is_shared'
-    }
+    for post in json_data:
+        # Extract content for embedding
+        content_text = extract_content_text(post)
+        
+        # Skip posts with no meaningful content
+        if not content_text.strip():
+            print(f"Skipping post {post.get('id', 'unknown')} - no content")
+            continue
+        
+        # Extract metadata
+        metadata = extract_metadata(post)
+        
+        # Create transformed post
+        transformed_post = {
+            "id": post.get('id', ''),
+            "content_text": content_text,
+            "metadata": metadata
+        }
+        
+        transformed_posts.append(transformed_post)
     
-    for old_key, new_key in field_mapping.items():
-        if old_key in metadata:
-            value = metadata[old_key]
-            # Skip null values (Pinecone requirement)
-            if value is not None:
-                # Ensure key doesn't start with $ (Pinecone requirement)
-                clean_key = new_key.lstrip('$')
-                
-                # Convert value to supported type
-                if isinstance(value, (str, int, float, bool)):
-                    sanitized[clean_key] = value
-                elif isinstance(value, list):
-                    # Convert lists to comma-separated strings
-                    sanitized[clean_key] = ', '.join(str(item) for item in value)
-                else:
-                    # Convert any other type to string
-                    sanitized[clean_key] = str(value)
+    return transformed_posts
+
+def main():
+    """Main function to process LinkedIn posts JSON file."""
     
-    # Add standard fields
-    sanitized['is_public'] = True
-    sanitized['tags'] = ['linkedin', 'social-media', 'post']
+    # Example usage - replace with your JSON file path
+    input_file = "linkedin_posts.json"
+    output_file = "transformed_posts.json"
     
-    return sanitized
-
-# Load data from the specified JSON file
-json_file_path = r"S:\FutureObjects\TrackFutura\Sample Data\LinkedIn posts.json"
-
-with open(json_file_path, "r", encoding="utf-8") as f:
-    data = json.load(f)
-
-# Transform the data using the comprehensive transformation functions
-formatted_records = []
-
-for i, record in enumerate(data):
-    # Extract content for embedding using the comprehensive function
-    content_text = extract_content_text(record)
+    try:
+        # Load JSON data
+        with open(input_file, 'r', encoding='utf-8') as f:
+            linkedin_posts = json.load(f)
+        
+        print(f"Loaded {len(linkedin_posts)} posts from {input_file}")
+        
+        # Transform the data
+        transformed_data = transform_linkedin_posts(linkedin_posts)
+        
+        print(f"Successfully transformed {len(transformed_data)} posts")
+        
+        # Save transformed data
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(transformed_data, f, indent=2, ensure_ascii=False)
+        
+        print(f"Saved transformed data to {output_file}")
+        
+        # Print sample output
+        if transformed_data:
+            print("\nSample transformed post:")
+            print(json.dumps(transformed_data[0], indent=2, ensure_ascii=False))
+            
+            print(f"\nContent preview: {transformed_data[0]['content_text'][:200]}...")
+            print(f"Metadata keys: {list(transformed_data[0]['metadata'].keys())}")
     
-    # Skip posts with no meaningful content
-    if not content_text.strip():
-        print(f"Skipping post {record.get('id', 'unknown')} - no content")
-        continue
-    
-    # Extract comprehensive metadata
-    metadata = extract_metadata(record)
-    
-    # Sanitize metadata for Pinecone compatibility
-    sanitized_metadata = sanitize_metadata_for_pinecone(metadata)
-    
-    # Create the formatted record for model-based embedding
-    formatted_record = {
-        "id": str(record.get('id', f"record_{i}")),
-        "chunk_text": content_text,  # This field will be embedded by the model
-        "metadata": sanitized_metadata
-    }
-    
-    formatted_records.append(formatted_record)
+    except FileNotFoundError:
+        print(f"File {input_file} not found. Please provide the correct path.")
+    except json.JSONDecodeError as e:
+        print(f"Error parsing JSON: {e}")
+    except Exception as e:
+        print(f"Error processing data: {e}")
 
+# Function to process data directly from a list (useful for API/memory usage)
+def process_linkedin_data(posts_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Process LinkedIn posts data directly from a list."""
+    return transform_linkedin_posts(posts_data)
 
-print("\n" + "="*50)
-print("UPLOADING TO PINECONE")
-print("="*50)
-
-# Use upsert_records method for model-based embeddings
-print("Attempting batch upsert with upsert_records...")
-
-# try:
-#     index.upsert_records(
-#         namespace="ns1",
-#         records=formatted_records
-#     )
-#     print("✓ Successfully upserted all records!")
-# except Exception as e:
-#     print(f"✗ Error in batch upsert: {e}")
-#     if formatted_records:
-#         print("First record metadata type:", type(formatted_records[0]["metadata"]))
-#         print("First record metadata:", formatted_records[0]["metadata"])
-index.upsert_records(
-    namespace="ns1",
-    records=formatted_records
-)
-
-#Check index stats
-print("Index stats:")
-time.sleep(5)
-print(index.describe_index_stats())
+if __name__ == "__main__":
+    main()
