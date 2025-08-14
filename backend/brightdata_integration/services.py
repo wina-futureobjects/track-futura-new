@@ -696,7 +696,9 @@ class AutomatedBatchScraper:
             config = scraper_request.config
 
             # Import Django settings to get webhook base URL
-            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://d5177adb0315.ngrok-free.app')
+            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL')
+            if not webhook_base_url:
+                raise ValueError("BRIGHTDATA_WEBHOOK_BASE_URL setting is not configured")
 
             url = "https://api.brightdata.com/datasets/v3/trigger"
             headers = {
@@ -720,6 +722,7 @@ class AutomatedBatchScraper:
                     "type": "discover_new",
                     "discover_by": "url",
                 })
+            # Facebook doesn't need discovery parameters - dataset works with URL payload directly
 
             # ===== DETAILED DEBUG LOGGING =====
             print("\n" + "="*80)
@@ -803,7 +806,15 @@ class AutomatedBatchScraper:
             print("="*80 + "\n")
 
             if response.status_code == 200:
-                response_data = response.json()
+                try:
+                    response_data = response.json()
+                except json.JSONDecodeError as json_err:
+                    response_data = {
+                        "error": "Invalid or empty JSON response",
+                        "raw_response": response.text,
+                        "json_error": str(json_err)
+                    }
+                
                 scraper_request.request_id = response_data.get('snapshot_id') or response_data.get('request_id')
                 scraper_request.response_metadata = response_data
                 scraper_request.save()
@@ -894,8 +905,16 @@ class AutomatedBatchScraper:
 
         # Get platform-specific parameters from the first request
         platform_params = {}
-        if requests[0].request_payload and 'platform_params' in requests[0].request_payload:
-            platform_params = requests[0].request_payload['platform_params']
+        if requests[0].request_payload:
+            # Handle both dict and list payload types safely
+            if isinstance(requests[0].request_payload, dict) and 'platform_params' in requests[0].request_payload:
+                platform_params = requests[0].request_payload['platform_params']
+            elif isinstance(requests[0].request_payload, list):
+                # If payload is a list, skip platform_params extraction
+                platform_params = {}
+            else:
+                # For any other type, use empty dict
+                platform_params = {}
 
         # Create batch payload with all sources
         payload = []
@@ -1003,13 +1022,11 @@ class AutomatedBatchScraper:
                 "url": request.target_url,
             }
 
-            # Add date parameters in ISO format if available
+            # Add date parameters in MM-DD-YYYY format (consistent with other platforms)
             if request.start_date:
-                # Convert to ISO format: YYYY-MM-DDTHH:MM:SS.000Z
-                item['start_date'] = request.start_date.strftime('%Y-%m-%dT00:00:00.000Z')
+                item['start_date'] = request.start_date.strftime('%m-%d-%Y')
             if request.end_date:
-                # Convert to ISO format: YYYY-MM-DDTHH:MM:SS.000Z
-                item['end_date'] = request.end_date.strftime('%Y-%m-%dT00:00:00.000Z')
+                item['end_date'] = request.end_date.strftime('%m-%d-%Y')
 
             # Add platform-specific parameters for LinkedIn Posts
             if 'limit' in platform_params:
@@ -1054,7 +1071,9 @@ class AutomatedBatchScraper:
             config = primary_request.config
 
             # Import Django settings to get webhook base URL
-            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://d5177adb0315.ngrok-free.app')
+            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL')
+            if not webhook_base_url:
+                raise ValueError("BRIGHTDATA_WEBHOOK_BASE_URL setting is not configured")
 
             url = "https://api.brightdata.com/datasets/v3/trigger"
             headers = {
@@ -1079,11 +1098,9 @@ class AutomatedBatchScraper:
                     "discover_by": "url",
                 })
             elif primary_request.platform.startswith('facebook'):
-                # Facebook-specific parameters - using URL discovery (Collect by URL mode)
-                params.update({
-                    "type": "discover_new",
-                    "discover_by": "url",
-                })
+                # Facebook-specific parameters - NO discovery parameters needed
+                # The dataset gd_lkaxegm826bjpoo9m5 works with URL payload without discovery params
+                pass
             elif primary_request.platform.startswith('linkedin'):
                 # LinkedIn-specific parameters - using profile_url discovery like the curl example
                 params.update({
@@ -1097,24 +1114,39 @@ class AutomatedBatchScraper:
                     "discover_by": "url",
                 })
 
-            # ===== DETAILED DEBUG LOGGING =====
+            # ===== ENHANCED DEBUG LOGGING FOR FACEBOOK FAILURE INVESTIGATION =====
             print("\n" + "="*80)
-            print("🐛 BRIGHTDATA BATCH API REQUEST DEBUG")
+            print("🔍 FACEBOOK BATCH FAILURE DEBUG INVESTIGATION")
             print("="*80)
             print(f"Platform: {primary_request.platform}")
             print(f"Config Name: {config.name}")
             print(f"Config ID: {config.id}")
+            print(f"Dataset ID: {config.dataset_id}")
+            print(f"API Token: {config.api_token[:10]}...")
             print(f"Webhook Base URL: {webhook_base_url}")
             print(f"Batch Size: {len(scraper_requests)} requests, {len(payload)} sources")
             print()
-            print("📡 REQUEST DETAILS:")
+            
+            # Detailed request information
+            print("📡 FULL REQUEST DETAILS:")
             print(f"URL: {url}")
-            print(f"Headers: {headers}")
-            print(f"Params: {params}")
-            print(f"Payload ({len(payload)} items): {payload}")
+            print(f"Headers: {json.dumps(headers, indent=2)}")
+            print(f"Params: {json.dumps(params, indent=2)}")
+            print(f"Payload: {json.dumps(payload, indent=2)}")
             print()
             
-            # Log platform-specific parameters being sent
+            # Validate payload structure
+            print("🔍 PAYLOAD VALIDATION:")
+            for i, item in enumerate(payload):
+                print(f"Item {i+1}:")
+                print(f"  URL: {item.get('url', 'MISSING')}")
+                print(f"  num_of_posts: {item.get('num_of_posts', 'MISSING')}")
+                print(f"  start_date: {item.get('start_date', 'MISSING')}")
+                print(f"  end_date: {item.get('end_date', 'MISSING')}")
+                print(f"  posts_to_not_include: {item.get('posts_to_not_include', 'MISSING')}")
+                print()
+            
+            # Platform-specific parameter analysis
             if payload and len(payload) > 0:
                 print("🔧 PLATFORM-SPECIFIC PARAMETERS:")
                 sample_item = payload[0]
@@ -1153,7 +1185,15 @@ class AutomatedBatchScraper:
             print("="*80 + "\n")
 
             if response.status_code == 200:
-                response_data = response.json()
+                try:
+                    response_data = response.json()
+                except json.JSONDecodeError as json_err:
+                    response_data = {
+                        "error": "Invalid or empty JSON response",
+                        "raw_response": response.text,
+                        "json_error": str(json_err)
+                    }
+                
                 snapshot_id = response_data.get('snapshot_id') or response_data.get('request_id')
 
                 # 🔧 CRITICAL FIX: Update ALL requests with the same snapshot_id
@@ -1162,33 +1202,10 @@ class AutomatedBatchScraper:
                     request.response_metadata = response_data
                     request.save()
 
-                # 🚀 NEW FIX: Update the webhook endpoint to include snapshot_id
-                # This ensures BrightData sends the snapshot_id as a query parameter
+                # Note: The snapshot_id is already included in the webhook processing
+                # No need for a second API call to update the endpoint
                 if snapshot_id:
-                    try:
-                        updated_endpoint = f"{base_url}/api/brightdata/webhook/?snapshot_id={snapshot_id}"
-
-                        # Make a second API call to update the webhook endpoint
-                        update_params = params.copy()
-                        update_params["endpoint"] = updated_endpoint
-
-                        print(f"🔄 UPDATING WEBHOOK ENDPOINT:")
-                        print(f"   Old: {params['endpoint']}")
-                        print(f"   New: {updated_endpoint}")
-
-                        # Update the webhook endpoint for this job
-                        update_response = requests.post(url, headers=headers, params=update_params, json=payload)
-
-                        if update_response.status_code == 200:
-                            print(f"✅ Successfully updated webhook endpoint with snapshot_id")
-                            self.logger.info(f"✅ Updated webhook endpoint to include snapshot_id: {snapshot_id}")
-                        else:
-                            print(f"⚠️  Failed to update webhook endpoint: {update_response.status_code}")
-                            self.logger.warning(f"Failed to update webhook endpoint: {update_response.text}")
-
-                    except Exception as e:
-                        print(f"⚠️  Error updating webhook endpoint: {str(e)}")
-                        self.logger.warning(f"Error updating webhook endpoint: {str(e)}")
+                    self.logger.info(f"✅ Received snapshot_id: {snapshot_id} for webhook processing")
 
                 self.logger.info(f"✅ Successfully triggered batch scrape for {primary_request.platform} with {len(payload)} sources. Snapshot ID: {snapshot_id}")
                 self.logger.info(f"✅ Updated {len(scraper_requests)} scraper requests with snapshot_id: {snapshot_id}")

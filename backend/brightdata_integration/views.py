@@ -142,57 +142,6 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
 
             folder_id = request.data.get('folder_id')
 
-            # Prepare Brightdata API request
-            url = "https://api.brightdata.com/datasets/v3/trigger"
-            headers = {
-                "Authorization": f"Bearer {config.api_token}",
-                "Content-Type": "application/json",
-            }
-            # Get webhook base URL from settings or use ngrok URL
-            from django.conf import settings
-            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://d5177adb0315.ngrok-free.app')
-            
-            params = {
-                "dataset_id": config.dataset_id,
-                "endpoint": f"{webhook_base_url}/api/brightdata/webhook/",
-                "notify": f"{webhook_base_url}/api/brightdata/notify/",
-                "format": "json",
-                "uncompressed_webhook": "true",
-                "include_errors": "true",
-            }
-
-            # Create request payload as a direct array (not nested)
-            # Use MM-DD-YYYY format for API
-            data = [{
-                "url": target_url,
-                "num_of_posts": num_of_posts,
-                "posts_to_not_include": posts_to_not_include,
-                "start_date": api_start_date,
-                "end_date": api_end_date,
-            }]
-
-            # Log the request payload for debugging
-            print(f"\n\n==== DEBUG: BRIGHTDATA API REQUEST ({platform_config_key.upper()}) ====")
-            print(f"URL: {url}")
-            print(f"Headers: {headers}")
-            print(f"Params: {params}")
-            print(f"Data: {data}")
-            print(f"DB dates: start={db_start_date}, end={db_end_date}")
-            print(f"API dates: start={api_start_date}, end={api_end_date}")
-            print(f"Configuration: {config.name} - {config.get_platform_display()}")
-
-            # Show the actual request that would be made
-            print(f"Final request URL: {url}?{urlencode(params)}")
-            print(f"Final request body: {json.dumps(data)}")
-
-            print("\nSample request from Brightdata documentation:")
-            print("""[
-	{"url":"https://www.facebook.com/LeBron/","num_of_posts":1,"posts_to_not_include":["1029318335225728","1029509225206639"],"start_date":"","end_date":""},
-	{"url":"https://www.facebook.com/SamsungIsrael/","num_of_posts":50,"start_date":"01-01-2025","end_date":"02-28-2025"},
-	{"url":"https://www.facebook.com/gagadaily/","num_of_posts":100,"start_date":"","end_date":""},
-]""")
-            print("=======================================\n")
-
             # Create a scraper request record - use original YYYY-MM-DD for database
             scraper_request = ScraperRequest.objects.create(
                 config=config,
@@ -204,74 +153,35 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
                 start_date=db_start_date if db_start_date else None,
                 end_date=db_end_date if db_end_date else None,
                 folder_id=folder_id,
-                request_payload=data,
+                request_payload=[{
+                    "url": target_url,
+                    "num_of_posts": num_of_posts,
+                    "posts_to_not_include": posts_to_not_include,
+                    "start_date": api_start_date,
+                    "end_date": api_end_date,
+                }],
                 status='pending'
             )
 
             try:
-                # Make the API request to Brightdata
-                print("\n\n==== DEBUG: BRIGHTDATA API REQUEST ====")
-                print(f"URL: {url}")
-                print(f"Headers: {headers}")
-                print(f"Params: {params}")
-                print(f"Data: {data}")
-                print(f"DB dates: start={db_start_date}, end={db_end_date}")
-                print(f"API dates: start={api_start_date}, end={api_end_date}")
-                print("\nSample request from Brightdata documentation:")
-                print("""[
-	{"url":"https://www.facebook.com/LeBron/","num_of_posts":1,"posts_to_not_include":["1029318335225728","1029509225206639"],"start_date":"","end_date":""},
-	{"url":"https://www.facebook.com/SamsungIsrael/","num_of_posts":50,"start_date":"01-01-2025","end_date":"02-28-2025"},
-	{"url":"https://www.facebook.com/gagadaily/","num_of_posts":100,"start_date":"","end_date":""},
-]""")
-                print("=======================================\n")
-
-                response = requests.post(url, headers=headers, params=params, json=data)
-
-                print("\n==== DEBUG: BRIGHTDATA API RESPONSE ====")
-                print(f"Status code: {response.status_code}")
-                print(f"Response text: {response.text}")
-                print("=======================================\n\n")
-
-                # Try to parse the response as JSON
-                try:
-                    if response.text.strip():  # Check if response is not empty
-                        response_data = response.json()
-                    else:
-                        # Handle empty response
-                        response_data = {"error": "Empty response from Brightdata API"}
-                        print("WARNING: Empty response from Brightdata API")
-                except json.JSONDecodeError as json_err:
-                    # Handle invalid JSON
-                    print(f"ERROR: Could not parse Brightdata API response as JSON: {str(json_err)}")
-                    response_data = {
-                        "error": f"Invalid JSON response from Brightdata API: {str(json_err)}",
-                        "raw_response": response.text
-                    }
-
-                # Log the API response for debugging
-                logger.info(f"Brightdata API response: {response_data}")
-
-                # Update the scraper request record
-                scraper_request.response_metadata = response_data
-
-                if response.status_code == 200 and "error" not in response_data:
-                    scraper_request.status = 'processing'
-                    # Try to get request_id safely
-                    scraper_request.request_id = response_data.get('request_id', '') if isinstance(response_data, dict) else ''
+                # Use the service method to make the API request
+                from .services import AutomatedBatchScraper
+                scraper_service = AutomatedBatchScraper()
+                
+                # Trigger the Facebook scrape using the service method
+                success = scraper_service._trigger_facebook_scrape(scraper_request)
+                
+                if success:
                     return Response({
                         'status': 'Scraper request sent successfully',
                         'request_id': scraper_request.request_id,
-                        'brightdata_response': response_data
+                        'brightdata_response': scraper_request.response_metadata
                     })
                 else:
-                    scraper_request.status = 'failed'
-                    error_message = response_data.get('error', 'Unknown error') if isinstance(response_data, dict) else str(response_data)
-                    scraper_request.error_message = error_message
                     return Response({
                         'error': 'Failed to trigger Brightdata scraper',
-                        'brightdata_response': response_data,
-                        'status_code': response.status_code,
-                        'raw_response': response.text
+                        'brightdata_response': scraper_request.response_metadata,
+                        'error_message': scraper_request.error_message
                     }, status=status.HTTP_400_BAD_REQUEST)
 
             except Exception as e:
@@ -287,14 +197,12 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
 
                 scraper_request.status = 'failed'
                 scraper_request.error_message = str(e)
+                scraper_request.save()
                 return Response({
                     'error': 'Error triggering Brightdata scraper',
                     'details': str(e),
                     'error_type': type(e).__name__
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            finally:
-                # Save the scraper request record
-                scraper_request.save()
 
         except Exception as outer_exception:
             # Catch-all for any unexpected errors
@@ -368,9 +276,12 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
                 "Authorization": f"Bearer {config.api_token}",
                 "Content-Type": "application/json",
             }
-            # Get webhook base URL from settings or use ngrok URL
+            # Get webhook base URL from settings
             from django.conf import settings
-            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://d5177adb0315.ngrok-free.app')
+            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL')
+            if not webhook_base_url:
+                return Response({'error': 'BRIGHTDATA_WEBHOOK_BASE_URL setting is not configured'},
+                               status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
             params = {
                 "dataset_id": config.dataset_id,
@@ -654,9 +565,12 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
                 "Authorization": f"Bearer {config.api_token}",
                 "Content-Type": "application/json",
             }
-            # Get webhook base URL from settings or use ngrok URL
+            # Get webhook base URL from settings
             from django.conf import settings
-            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://d5177adb0315.ngrok-free.app')
+            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL')
+            if not webhook_base_url:
+                return Response({'error': 'BRIGHTDATA_WEBHOOK_BASE_URL setting is not configured'},
+                               status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
             params = {
                 "dataset_id": config.dataset_id,
@@ -877,9 +791,12 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
                 "Authorization": f"Bearer {config.api_token}",
                 "Content-Type": "application/json",
             }
-            # Get webhook base URL from settings or use ngrok URL
+            # Get webhook base URL from settings
             from django.conf import settings
-            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://d5177adb0315.ngrok-free.app')
+            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL')
+            if not webhook_base_url:
+                return Response({'error': 'BRIGHTDATA_WEBHOOK_BASE_URL setting is not configured'},
+                               status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
             params = {
                 "dataset_id": config.dataset_id,
