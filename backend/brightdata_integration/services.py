@@ -696,7 +696,7 @@ class AutomatedBatchScraper:
             config = scraper_request.config
 
             # Import Django settings to get webhook base URL
-            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://ae3ed80803d3.ngrok-free.app')
+            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://d5177adb0315.ngrok-free.app')
 
             url = "https://api.brightdata.com/datasets/v3/trigger"
             headers = {
@@ -907,26 +907,14 @@ class AutomatedBatchScraper:
 
             # Add platform-specific parameters for Facebook Posts
             if request.platform == 'facebook_posts':
-                # For Facebook with user_name discovery, extract username from URL
-                # and send only user_name field (other fields are configured at dataset level)
-                item = {}  # Reset to only include user_name
-                
-                # Extract username from Facebook URL (e.g., "madeline.ong.10" from "https://www.facebook.com/madeline.ong.10")
-                if request.target_url and 'facebook.com/' in request.target_url:
-                    # Handle URLs like https://www.facebook.com/madeline.ong.10
-                    url_parts = request.target_url.split('facebook.com/')
-                    if len(url_parts) > 1:
-                        username = url_parts[1].split('/')[0].split('?')[0]
-                        item['user_name'] = username
-                    else:
-                        # Fallback: use the full URL
-                        item['user_name'] = request.target_url
-                else:
-                    # If no facebook.com in URL, use the URL as is
-                    item['user_name'] = request.target_url
-                
-                # Note: num_of_posts, start_date, end_date, posts_to_not_include are configured
-                # at the dataset level when using user_name discovery
+                # For Facebook with URL discovery, use the full target_url directly
+                item = {
+                    "url": request.target_url,
+                    "num_of_posts": request.num_of_posts,
+                    "posts_to_not_include": [],
+                    "start_date": request.start_date.strftime('%m-%d-%Y') if request.start_date else "",
+                    "end_date": request.end_date.strftime('%m-%d-%Y') if request.end_date else "",
+                }
                 
                 if 'include_profile_data' in platform_params:
                     item['include_profile_data'] = platform_params['include_profile_data']
@@ -1066,7 +1054,7 @@ class AutomatedBatchScraper:
             config = primary_request.config
 
             # Import Django settings to get webhook base URL
-            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://ae3ed80803d3.ngrok-free.app')
+            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://d5177adb0315.ngrok-free.app')
 
             url = "https://api.brightdata.com/datasets/v3/trigger"
             headers = {
@@ -1091,10 +1079,10 @@ class AutomatedBatchScraper:
                     "discover_by": "url",
                 })
             elif primary_request.platform.startswith('facebook'):
-                # Facebook-specific parameters - using user_name discovery (required by current dataset)
+                # Facebook-specific parameters - using URL discovery (Collect by URL mode)
                 params.update({
                     "type": "discover_new",
-                    "discover_by": "user_name",
+                    "discover_by": "url",
                 })
             elif primary_request.platform.startswith('linkedin'):
                 # LinkedIn-specific parameters - using profile_url discovery like the curl example

@@ -150,7 +150,7 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
             }
             # Get webhook base URL from settings or use ngrok URL
             from django.conf import settings
-            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://ae3ed80803d3.ngrok-free.app')
+            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://d5177adb0315.ngrok-free.app')
             
             params = {
                 "dataset_id": config.dataset_id,
@@ -370,7 +370,7 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
             }
             # Get webhook base URL from settings or use ngrok URL
             from django.conf import settings
-            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://ae3ed80803d3.ngrok-free.app')
+            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://d5177adb0315.ngrok-free.app')
             
             params = {
                 "dataset_id": config.dataset_id,
@@ -656,7 +656,7 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
             }
             # Get webhook base URL from settings or use ngrok URL
             from django.conf import settings
-            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://ae3ed80803d3.ngrok-free.app')
+            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://d5177adb0315.ngrok-free.app')
             
             params = {
                 "dataset_id": config.dataset_id,
@@ -879,7 +879,7 @@ class ScraperRequestViewSet(viewsets.ModelViewSet):
             }
             # Get webhook base URL from settings or use ngrok URL
             from django.conf import settings
-            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://ae3ed80803d3.ngrok-free.app')
+            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://d5177adb0315.ngrok-free.app')
             
             params = {
                 "dataset_id": config.dataset_id,

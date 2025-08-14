@@ -138,9 +138,9 @@ python manage.py test brightdata_integration.test_configs
 ## Platform-Specific Requirements
 
 ### Facebook Posts
-- **Payload**: `{"user_name": "extracted_username"}`
-- **Discovery**: `{"discover_by": "user_name"}`
-- **URL Extraction**: Extract username from Facebook URL
+- **Payload**: `{"url": "direct_url"}`
+- **Discovery**: `{"discover_by": "url"}`
+- **URL Extraction**: Use Facebook URL directly
 
 ### Instagram Posts
 - **Payload**: `{"username": "extracted_username"}`
