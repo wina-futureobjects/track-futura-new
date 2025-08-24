@@ -23,7 +23,6 @@ import {
   InputLabel,
   FormControl,
   CircularProgress,
-  Grid as MuiGrid,
   Card,
   CardContent,
   IconButton,
@@ -35,10 +34,11 @@ import {
   FormControlLabel,
   Breadcrumbs,
   Menu,
+  Autocomplete,
 } from '@mui/material';
 
-// Create a Grid component that inherits from MuiGrid to fix type issues
-const Grid = (props: any) => <MuiGrid {...props} />;
+
+
 import {
   Add as AddIcon,
   Search as SearchIcon,
@@ -48,7 +48,6 @@ import {
   Business as BusinessIcon,
   SupervisorAccount as AdminIcon,
   CheckCircle as CheckCircleIcon,
-  RadioButtonUnchecked as RadioButtonUncheckedIcon,
   Facebook as FacebookIcon,
   Instagram as InstagramIcon,
   LinkedIn as LinkedInIcon,
@@ -56,52 +55,93 @@ import {
   Cancel as CancelIcon
 } from '@mui/icons-material';
 import { apiFetch } from '../../utils/api';
+import { getCurrentUser } from '../../utils/auth';
 
 interface User {
   id: number;
   username: string;
   email: string;
   is_active: boolean;
+  company_name?: string | null;
+  company_id?: number | null;
+  date_joined: string;
   global_role?: {
     role: string;
     role_display: string;
   };
 }
 
-interface Organization {
+
+
+interface Company {
   id: number;
   name: string;
+  status: string;
+  status_display: string;
   description: string | null;
-  owner: number;
-  owner_name: string;
-  members_count: number;
   created_at: string;
   updated_at: string;
+}
+
+interface BrightdataConfig {
+  id: number;
+  name: string;
+  platform: string;
+  platform_display: string;
+  description: string | null;
+  dataset_id: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+interface BrightdataConfigPayload {
+  name: string;
+  platform: string;
+  dataset_id: string;
+  description: string;
+  is_active: boolean;
+  api_token?: string;
+}
+
+interface UserUpdateFields {
+  username?: string;
+  email?: string;
+  role?: string;
+  is_active?: boolean;
+  company_id?: number | null;
+}
+
+interface CompanyUpdateFields {
+  name?: string;
+  status?: string;
+  description?: string | null;
 }
 
 const SuperAdminDashboard = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [users, setUsers] = useState<User[]>([]);
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [openUserDialog, setOpenUserDialog] = useState(false);
-  const [openOrgDialog, setOpenOrgDialog] = useState(false);
+  const [openCompanyDialog, setOpenCompanyDialog] = useState(false);
   const [newUser, setNewUser] = useState({
     username: '',
     email: '',
-    role: 'tenant_admin',
+    role: 'user',
+    company_id: null as number | null,
   });
 
-  const [newOrg, setNewOrg] = useState({
+  const [newCompany, setNewCompany] = useState({
     name: '',
+    status: 'active',
     description: '',
-    owner_id: 0,
   });
   const [error, setError] = useState<string | null>(null);
   
-  // Brightdata configuration dialog state
+  // Scraper configuration dialog state
   const [brightdataDialogOpen, setBrightdataDialogOpen] = useState(false);
   const [brightdataForm, setBrightdataForm] = useState({
     name: '',
@@ -111,16 +151,21 @@ const SuperAdminDashboard = () => {
     datasetId: '',
     isActive: true,
   });
-  const [brightdataConfigs, setBrightdataConfigs] = useState<any[]>([]);
+  const [brightdataConfigs, setBrightdataConfigs] = useState<BrightdataConfig[]>([]);
   const [brightdataLoading, setBrightdataLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [isCreatingCompany, setIsCreatingCompany] = useState(false);
   const [editConfigId, setEditConfigId] = useState<number | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [configToDelete, setConfigToDelete] = useState<number | null>(null);
   const [deleteUserDialogOpen, setDeleteUserDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<number | null>(null);
-  const [deleteOrgDialogOpen, setDeleteOrgDialogOpen] = useState(false);
-  const [orgToDelete, setOrgToDelete] = useState<number | null>(null);
+  const [deleteCompanyDialogOpen, setDeleteCompanyDialogOpen] = useState(false);
+  const [companyToDelete, setCompanyToDelete] = useState<number | null>(null);
+  const [editCompanyDialogOpen, setEditCompanyDialogOpen] = useState(false);
+  const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [originalCompany, setOriginalCompany] = useState<Company | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [roleMenuAnchor, setRoleMenuAnchor] = useState<null | HTMLElement>(null);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
@@ -128,22 +173,36 @@ const SuperAdminDashboard = () => {
   const [pendingRoleChange, setPendingRoleChange] = useState<{ userId: number; newRole: string } | null>(null);
   const [statusChangeDialogOpen, setStatusChangeDialogOpen] = useState(false);
   const [pendingStatusChange, setPendingStatusChange] = useState<{ userId: number; newStatus: boolean } | null>(null);
+  const [companyStatusChangeDialogOpen, setCompanyStatusChangeDialogOpen] = useState(false);
+  const [pendingCompanyStatusChange, setPendingCompanyStatusChange] = useState<{ companyId: number; oldStatus: string; newStatus: string } | null>(null);
   const [stats, setStats] = useState({
     totalUsers: 0,
     totalOrgs: 0,
     totalProjects: 0,
+    totalCompanies: 0,
     superAdmins: 0,
     tenantAdmins: 0,
     regularUsers: 0,
+  });
+
+  // User edit state
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editUserDialogOpen, setEditUserDialogOpen] = useState(false);
+  const [editUserForm, setEditUserForm] = useState({
+    username: '',
+    email: '',
+    role: '',
+    is_active: true,
+    company_id: null as number | null,
   });
 
   useEffect(() => {
     fetchDashboardData();
   }, []);
 
-  // Fetch Brightdata configurations when Brightdata tab is active
+  // Fetch Brightdata configurations when Scrapper Configuration tab is active
   useEffect(() => {
-    if (activeTab === 3) {
+    if (activeTab === 2) {
       fetchBrightdataConfigs();
     }
   }, [activeTab]);
@@ -160,7 +219,7 @@ const SuperAdminDashboard = () => {
       const configsArray = Array.isArray(data) ? data : [];
       setBrightdataConfigs(configsArray);
     } catch (error) {
-      console.error('Error fetching brightdata configs:', error);
+      console.error('Error fetching scraper configs:', error);
     } finally {
       setBrightdataLoading(false);
     }
@@ -188,7 +247,7 @@ const SuperAdminDashboard = () => {
     try {
       setIsSubmitting(true);
       
-      const payload: any = {
+      const payload: BrightdataConfigPayload = {
         name: brightdataForm.name,
         platform: brightdataForm.platform,
         dataset_id: brightdataForm.datasetId,
@@ -225,15 +284,16 @@ const SuperAdminDashboard = () => {
       setBrightdataForm({ name: '', platform: '', description: '', apiToken: '', datasetId: '', isActive: true });
       setEditConfigId(null);
       fetchBrightdataConfigs(); // Refresh the list
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving config:', error);
-      setSuccessMessage(error.message || 'Error saving configuration. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Error saving configuration. Please try again.';
+      setSuccessMessage(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleEditConfig = (config: any) => {
+  const handleEditConfig = (config: BrightdataConfig) => {
     setEditConfigId(config.id);
     setBrightdataForm({
       name: config.name,
@@ -286,12 +346,12 @@ const SuperAdminDashboard = () => {
       setLoading(true);
       await Promise.all([
         fetchUsers(),
-        fetchOrganizations(),
+        fetchCompanies(),
         fetchStats(),
       ]);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-      setError('Failed to load dashboard data. Please try again.');
+      setError('Failed to load dashboard data.');
     } finally {
       setLoading(false);
     }
@@ -312,18 +372,18 @@ const SuperAdminDashboard = () => {
     }
   };
 
-  const fetchOrganizations = async () => {
+  const fetchCompanies = async () => {
     try {
-      const response = await apiFetch('/api/admin/organizations/');
+      const response = await apiFetch('/api/admin/companies/');
       if (response.ok) {
         const data = await response.json();
-        setOrganizations(Array.isArray(data) ? data : data.results || []);
+        setCompanies(Array.isArray(data) ? data : data.results || []);
       } else {
-        throw new Error('Failed to fetch organizations');
+        throw new Error('Failed to fetch companies');
       }
     } catch (error) {
-      console.error('Error fetching organizations:', error);
-      setError('Failed to load organizations.');
+      console.error('Error fetching companies:', error);
+      setError('Failed to load companies.');
     }
   };
 
@@ -341,15 +401,26 @@ const SuperAdminDashboard = () => {
     }
   };
 
+
+
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
   };
 
   const handleCreateUser = async () => {
     try {
+      setIsCreatingUser(true);
+      setError(null);
+      
       // Validate required fields
       if (!newUser.username || !newUser.email) {
         setError('Username and email are required');
+        return;
+      }
+
+      // Validate company selection for non-super admin users
+      if (newUser.role !== 'super_admin' && !newUser.company_id) {
+        setError('Company is required for non-super admin users');
         return;
       }
 
@@ -363,12 +434,41 @@ const SuperAdminDashboard = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || errorData.message || 'Failed to create user');
+        
+        // Handle different types of error responses
+        let errorMessage = 'Failed to create user';
+        
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        } else if (errorData.detail) {
+          errorMessage = errorData.detail;
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (errorData.non_field_errors) {
+          errorMessage = errorData.non_field_errors.join(', ');
+        } else if (typeof errorData === 'object') {
+          // Handle field-specific validation errors
+          const fieldErrors = Object.entries(errorData)
+            .map(([field, errors]) => {
+              if (Array.isArray(errors)) {
+                return `${field}: ${errors.join(', ')}`;
+              }
+              return `${field}: ${errors}`;
+            })
+            .join('; ');
+          
+          if (fieldErrors) {
+            errorMessage = fieldErrors;
+          }
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
       setOpenUserDialog(false);
       fetchUsers();
+      fetchStats(); // Refresh stats after creating user
       resetNewUser();
       
       // Show success message
@@ -376,34 +476,71 @@ const SuperAdminDashboard = () => {
     } catch (error) {
       console.error('Error creating user:', error);
       setError(error instanceof Error ? error.message : 'Failed to create user');
+    } finally {
+      setIsCreatingUser(false);
     }
   };
 
-  const handleCreateOrganization = async () => {
+  const handleCreateCompany = async () => {
     try {
-      const response = await apiFetch('/api/admin/organizations/', {
+      setIsCreatingCompany(true);
+      setError(null);
+      
+      const response = await apiFetch('/api/admin/companies/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(newOrg),
+        body: JSON.stringify(newCompany),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to create organization');
+        
+        // Handle different types of error responses
+        let errorMessage = 'Failed to create company';
+        
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        } else if (errorData.detail) {
+          errorMessage = errorData.detail;
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (errorData.non_field_errors) {
+          errorMessage = errorData.non_field_errors.join(', ');
+        } else if (typeof errorData === 'object') {
+          // Handle field-specific validation errors
+          const fieldErrors = Object.entries(errorData)
+            .map(([field, errors]) => {
+              if (Array.isArray(errors)) {
+                return `${field}: ${errors.join(', ')}`;
+              }
+              return `${field}: ${errors}`;
+            })
+            .join('; ');
+          
+          if (fieldErrors) {
+            errorMessage = fieldErrors;
+          }
+        }
+        
+        throw new Error(errorMessage);
       }
 
-      setOpenOrgDialog(false);
-      fetchOrganizations();
-      setNewOrg({
+      setOpenCompanyDialog(false);
+      fetchCompanies();
+      fetchStats(); // Refresh stats after creating company
+      setNewCompany({
         name: '',
+        status: 'active',
         description: '',
-        owner_id: 0,
       });
+      setSuccessMessage('Company created successfully!');
     } catch (error) {
-      console.error('Error creating organization:', error);
-      setError(error instanceof Error ? error.message : 'Failed to create organization');
+      console.error('Error creating company:', error);
+      setError(error instanceof Error ? error.message : 'Failed to create company');
+    } finally {
+      setIsCreatingCompany(false);
     }
   };
 
@@ -421,7 +558,27 @@ const SuperAdminDashboard = () => {
         throw new Error('Failed to update user role');
       }
 
-      fetchUsers();
+      // Get the updated user data from the response
+      const updatedUser = await response.json();
+      
+      // Update the user in the local state with the complete updated data
+      setUsers(users.map(user => 
+        user.id === userId 
+          ? { 
+              ...user, 
+              username: updatedUser.username,
+              email: updatedUser.email,
+              is_active: updatedUser.is_active,
+              // Use the company info from the response (could be null if user has no company)
+              company_name: updatedUser.company_name,
+              company_id: updatedUser.company_id,
+              date_joined: updatedUser.date_joined,
+              global_role: updatedUser.global_role
+            }
+          : user
+      ));
+
+      setSuccessMessage('User role updated successfully');
     } catch (error) {
       console.error('Error updating user role:', error);
       setError('Failed to update user role');
@@ -447,6 +604,7 @@ const SuperAdminDashboard = () => {
       }
 
       fetchUsers();
+      fetchStats(); // Refresh stats after deleting user
       setSuccessMessage('User deleted successfully');
     } catch (error) {
       console.error('Error deleting user:', error);
@@ -462,44 +620,153 @@ const SuperAdminDashboard = () => {
     setUserToDelete(null);
   };
 
-  const handleDeleteOrganizationClick = (orgId: number) => {
-    setOrgToDelete(orgId);
-    setDeleteOrgDialogOpen(true);
+  const handleDeleteCompanyClick = (companyId: number) => {
+    setCompanyToDelete(companyId);
+    setDeleteCompanyDialogOpen(true);
   };
 
-  const handleConfirmDeleteOrganization = async () => {
-    if (orgToDelete === null) return;
+  const handleConfirmDeleteCompany = async () => {
+    if (companyToDelete === null) return;
     
     try {
-      const response = await apiFetch(`/api/admin/organizations/${orgToDelete}/`, {
+      const response = await apiFetch(`/api/admin/companies/${companyToDelete}/`, {
         method: 'DELETE',
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete organization');
+        throw new Error('Failed to delete company');
       }
 
-      fetchOrganizations();
-      setSuccessMessage('Organization deleted successfully');
+      fetchCompanies();
+      fetchStats(); // Refresh stats after deleting company
+      setSuccessMessage('Company deleted successfully');
     } catch (error) {
-      console.error('Error deleting organization:', error);
-      setError('Failed to delete organization');
+      console.error('Error deleting company:', error);
+      setError('Failed to delete company');
     } finally {
-      setDeleteOrgDialogOpen(false);
-      setOrgToDelete(null);
+      setDeleteCompanyDialogOpen(false);
+      setCompanyToDelete(null);
     }
   };
 
-  const handleCancelDeleteOrganization = () => {
-    setDeleteOrgDialogOpen(false);
-    setOrgToDelete(null);
+  const handleCancelDeleteCompany = () => {
+    setDeleteCompanyDialogOpen(false);
+    setCompanyToDelete(null);
+  };
+
+  const handleEditCompanyClick = (company: Company) => {
+    setEditingCompany(company);
+    setOriginalCompany(company);
+    setEditCompanyDialogOpen(true);
+  };
+
+  const handleUpdateCompany = async () => {
+    if (!editingCompany || !originalCompany) return;
+
+    // Check if status has changed
+    if (editingCompany.status !== originalCompany.status) {
+      // Show confirmation dialog for status change
+      setPendingCompanyStatusChange({ 
+        companyId: editingCompany.id, 
+        oldStatus: originalCompany.status, 
+        newStatus: editingCompany.status 
+      });
+      setCompanyStatusChangeDialogOpen(true);
+      return;
+    }
+
+    // If no status change, proceed with normal update
+    await performCompanyUpdate();
+  };
+
+  const performCompanyUpdate = async () => {
+    if (!editingCompany || !originalCompany) return;
+
+    // Create an object with only the fields that have changed
+    const changedFields: CompanyUpdateFields = {};
+    
+    // Compare each field with the original company data
+    if (editingCompany.name !== originalCompany.name) {
+      changedFields.name = editingCompany.name;
+    }
+    
+    if (editingCompany.status !== originalCompany.status) {
+      changedFields.status = editingCompany.status;
+    }
+    
+    if (editingCompany.description !== originalCompany.description) {
+      changedFields.description = editingCompany.description;
+    }
+
+    // If no fields have changed, show a message and return early
+    if (Object.keys(changedFields).length === 0) {
+      setSuccessMessage('No changes detected');
+      return;
+    }
+
+    try {
+      const response = await apiFetch(`/api/admin/companies/${editingCompany.id}/`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(changedFields),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update company');
+      }
+
+      // Get the updated company data from the response
+      const updatedCompany = await response.json();
+
+      // Update the company in the local state with the response data
+      setCompanies(prevCompanies => 
+        prevCompanies.map(company => 
+          company.id === editingCompany.id 
+            ? { ...company, ...updatedCompany }
+            : company
+        )
+      );
+
+      setEditCompanyDialogOpen(false);
+      setEditingCompany(null);
+      setOriginalCompany(null);
+      setSuccessMessage('Company updated successfully');
+    } catch (error) {
+      console.error('Error updating company:', error);
+      setError('Failed to update company');
+    }
+  };
+
+  const handleCancelEditCompany = () => {
+    setEditCompanyDialogOpen(false);
+    setEditingCompany(null);
+    setOriginalCompany(null);
   };
 
   const handleConfirmRoleChange = async () => {
     if (pendingRoleChange) {
-      await handleChangeUserRole(pendingRoleChange.userId, pendingRoleChange.newRole);
-      setRoleChangeDialogOpen(false);
-      setPendingRoleChange(null);
+      const currentUser = getCurrentUser();
+      
+      // Check if the user is trying to change their own role
+      if (currentUser && currentUser.id === pendingRoleChange.userId) {
+        setError('You cannot change your own role.');
+        setRoleChangeDialogOpen(false);
+        setPendingRoleChange(null);
+        return;
+      }
+      
+      try {
+        // Use the role-specific endpoint for all role changes
+        await handleChangeUserRole(pendingRoleChange.userId, pendingRoleChange.newRole);
+        
+        setRoleChangeDialogOpen(false);
+        setPendingRoleChange(null);
+      } catch (error) {
+        console.error('Error updating user role:', error);
+        setError('Failed to update user role');
+      }
     }
   };
 
@@ -522,11 +789,25 @@ const SuperAdminDashboard = () => {
         throw new Error('Failed to update user status');
       }
 
-      // Update the user in the local state
+      // Get the updated user data from the response
+      const updatedUser = await response.json();
+      console.log('Status update response:', updatedUser); // Debug log
+      
+      // Update the user in the local state with the complete updated data
       setUsers(prevUsers => 
         prevUsers.map(user => 
           user.id === userId 
-            ? { ...user, is_active: newStatus }
+            ? { 
+                ...user, 
+                username: updatedUser.username,
+                email: updatedUser.email,
+                is_active: updatedUser.is_active,
+                // Use the company info from the response (could be null if user has no company)
+                company_name: updatedUser.company_name,
+                company_id: updatedUser.company_id,
+                date_joined: updatedUser.date_joined,
+                global_role: updatedUser.global_role
+              }
             : user
         )
       );
@@ -545,6 +826,16 @@ const SuperAdminDashboard = () => {
 
   const handleConfirmStatusChange = async () => {
     if (pendingStatusChange) {
+      const currentUser = getCurrentUser();
+      
+      // Check if the user is trying to change their own status
+      if (currentUser && currentUser.id === pendingStatusChange.userId) {
+        setError('You cannot change your own status.');
+        setStatusChangeDialogOpen(false);
+        setPendingStatusChange(null);
+        return;
+      }
+      
       await handleChangeUserStatus(pendingStatusChange.userId, pendingStatusChange.newStatus);
       setStatusChangeDialogOpen(false);
       setPendingStatusChange(null);
@@ -556,17 +847,37 @@ const SuperAdminDashboard = () => {
     setPendingStatusChange(null);
   };
 
+
+
+  const handleConfirmCompanyStatusChange = async () => {
+    if (pendingCompanyStatusChange && editingCompany) {
+      // Update the editing company with the new status
+      setEditingCompany({ ...editingCompany, status: pendingCompanyStatusChange.newStatus });
+      setCompanyStatusChangeDialogOpen(false);
+      setPendingCompanyStatusChange(null);
+      // Perform the actual update
+      await performCompanyUpdate();
+    }
+  };
+
+  const handleCancelCompanyStatusChange = () => {
+    setCompanyStatusChangeDialogOpen(false);
+    setPendingCompanyStatusChange(null);
+  };
+
   const resetNewUser = () => {
     setNewUser({
       username: '',
       email: '',
-      role: 'tenant_admin',
+      role: 'user',
+      company_id: null,
     });
   };
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.username.toLowerCase().includes(search.toLowerCase()) ||
-                         user.email.toLowerCase().includes(search.toLowerCase());
+                         user.email.toLowerCase().includes(search.toLowerCase()) ||
+                         (user.company_name && user.company_name.toLowerCase().includes(search.toLowerCase()));
     
     const matchesRoleFilter = roleFilter === 'all' || 
                              user.global_role?.role === roleFilter;
@@ -574,10 +885,9 @@ const SuperAdminDashboard = () => {
     return matchesSearch && matchesRoleFilter;
   });
 
-  const filteredOrganizations = organizations.filter(org => 
-    org.name.toLowerCase().includes(search.toLowerCase()) ||
-    (org.description && org.description.toLowerCase().includes(search.toLowerCase())) ||
-    org.owner_name.toLowerCase().includes(search.toLowerCase())
+  const filteredCompanies = companies.filter(company => 
+    company.name.toLowerCase().includes(search.toLowerCase()) ||
+    (company.description && company.description.toLowerCase().includes(search.toLowerCase()))
   );
 
   const getRoleChip = (role: string | undefined, userId: number) => {
@@ -595,7 +905,36 @@ const SuperAdminDashboard = () => {
     
     const handleRoleChange = (newRole: string) => {
       if (selectedUserId) {
-        setPendingRoleChange({ userId: selectedUserId, newRole });
+        // If changing to super_admin, check if user is already in Future Objects company
+        if (newRole === 'super_admin') {
+          const futureObjectsCompany = companies.find(company => 
+            company.name.toLowerCase() === 'future objects' && company.status === 'active'
+          );
+          
+          if (!futureObjectsCompany) {
+            setError('Future Objects company not found. Please create the Future Objects company first.');
+            handleClose();
+            return;
+          }
+          
+          // Find the current user to check their company
+          const currentUser = users.find(user => user.id === selectedUserId);
+          if (currentUser && currentUser.company_id !== futureObjectsCompany.id) {
+            // User is not in Future Objects company, show warning and require company change first
+            setError('To assign Super Admin role, the user must first be assigned to the Future Objects company. Please change the user\'s company to Future Objects first, then change the role.');
+            handleClose();
+            return;
+          }
+          
+          // User is already in Future Objects company, proceed with role change
+          setPendingRoleChange({ 
+            userId: selectedUserId, 
+            newRole
+          });
+        } else {
+          // For other role changes, just update the role
+          setPendingRoleChange({ userId: selectedUserId, newRole });
+        }
         setRoleChangeDialogOpen(true);
       }
       handleClose();
@@ -705,6 +1044,121 @@ const SuperAdminDashboard = () => {
     );
   };
 
+  const handleEditUserClick = (user: User) => {
+    setEditingUser(user);
+    setEditUserForm({
+      username: user.username,
+      email: user.email,
+      role: user.global_role?.role || '',
+      is_active: user.is_active,
+      company_id: user.company_id || null,
+    });
+    setEditUserDialogOpen(true);
+  };
+
+  const handleUpdateUser = async () => {
+    if (!editingUser) return;
+
+    // Create an object with only the fields that have changed
+    const changedFields: UserUpdateFields = {};
+    
+    // Compare each field with the original user data
+    if (editUserForm.username !== editingUser.username) {
+      changedFields.username = editUserForm.username;
+    }
+    
+    if (editUserForm.email !== editingUser.email) {
+      changedFields.email = editUserForm.email;
+    }
+    
+    if (editUserForm.role !== (editingUser.global_role?.role || '')) {
+      changedFields.role = editUserForm.role;
+    }
+    
+    if (editUserForm.is_active !== editingUser.is_active) {
+      changedFields.is_active = editUserForm.is_active;
+    }
+    
+    if (editUserForm.company_id !== editingUser.company_id) {
+      changedFields.company_id = editUserForm.company_id;
+    }
+
+    // If no fields have changed, show a message and return early
+    if (Object.keys(changedFields).length === 0) {
+      setSuccessMessage('No changes detected');
+      return;
+    }
+
+    try {
+      const response = await apiFetch(`/api/admin/users/${editingUser.id}/`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(changedFields),
+      });
+
+      if (response.ok) {
+        const updatedUser = await response.json();
+        
+        // Update the user in the local state with all the updated information
+        setUsers(users.map(user => 
+          user.id === editingUser.id 
+            ? { 
+                ...user, 
+                username: updatedUser.username,
+                email: updatedUser.email,
+                is_active: updatedUser.is_active,
+                company_name: updatedUser.company_name,
+                company_id: updatedUser.company_id,
+                date_joined: updatedUser.date_joined,
+                global_role: updatedUser.global_role
+              }
+            : user
+        ));
+
+        setEditUserDialogOpen(false);
+        setEditingUser(null);
+        setEditUserForm({ username: '', email: '', role: '', is_active: true, company_id: null });
+        setSuccessMessage('User updated successfully');
+      } else {
+        const errorData = await response.json();
+        let errorMessage = 'Failed to update user';
+        
+        if (errorData.detail) {
+          errorMessage = errorData.detail;
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (errorData.non_field_errors) {
+          errorMessage = errorData.non_field_errors.join(', ');
+        } else {
+          // Check for field-specific errors
+          const fieldErrors = Object.entries(errorData)
+            .filter(([key]) => key !== 'detail' && key !== 'error' && key !== 'message')
+            .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
+            .join(', ');
+          
+          if (fieldErrors) {
+            errorMessage = fieldErrors;
+          }
+        }
+        
+        setError(errorMessage);
+      }
+    } catch (error) {
+      console.error('Error updating user:', error);
+      setError('Failed to update user');
+    }
+  };
+
+  const handleCancelEditUser = () => {
+    setEditUserDialogOpen(false);
+    setEditingUser(null);
+    setEditUserForm({ username: '', email: '', role: '', is_active: true, company_id: null });
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -732,107 +1186,105 @@ const SuperAdminDashboard = () => {
         <Typography variant="h3" component="h1" fontWeight="500">
           Super Admin Dashboard
         </Typography>
-        <Box sx={{ width: 200 }} /> {/* Spacer to match the button width in OrganizationsList */}
+        <Box sx={{ width: 200 }} />
       </Box>
 
       {/* Stats Cards */}
       <Box sx={{ mb: 4, width: '100%', overflow: 'hidden' }}>
-        <Grid container spacing={3} sx={{ width: '100%', margin: 0 }}>
-          <Grid item xs={12} sm={6} lg={3} sx={{ padding: '12px !important', minWidth: '280px' }}>
-            <Card sx={{ height: '100%', overflow: 'hidden', width: '100%', minWidth: '260px' }}>
-              <CardContent sx={{ p: 3, '&:last-child': { pb: 3 }, height: '100%' }}>
-                <Typography variant="h6" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
-                  Total Users
+        <Box sx={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
+          gap: 3, 
+          width: '100%' 
+        }}>
+          <Card sx={{ height: '100%', overflow: 'hidden', width: '100%', minWidth: '260px' }}>
+            <CardContent sx={{ p: 3, '&:last-child': { pb: 3 }, height: '100%' }}>
+              <Typography variant="h6" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+                Total Company
+              </Typography>
+              <Typography 
+                variant="h3" 
+                sx={{ 
+                  fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' },
+                  fontWeight: 600,
+                  wordBreak: 'break-word',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}
+              >
+                {stats.totalCompanies}
+              </Typography>
+            </CardContent>
+          </Card>
+          <Card sx={{ height: '100%', overflow: 'hidden', width: '100%', minWidth: '260px' }}>
+            <CardContent sx={{ p: 3, '&:last-child': { pb: 3 }, height: '100%' }}>
+              <Typography variant="h6" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+                Total Users
+              </Typography>
+              <Typography 
+                variant="h3" 
+                sx={{ 
+                  fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' },
+                  fontWeight: 600,
+                  wordBreak: 'break-word',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}
+              >
+                {stats.totalUsers}
+              </Typography>
+            </CardContent>
+          </Card>
+          <Card sx={{ height: '100%', overflow: 'hidden', width: '100%', minWidth: '260px' }}>
+            <CardContent sx={{ p: 3, '&:last-child': { pb: 3 }, height: '100%' }}>
+              <Typography variant="h6" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+                Projects
+              </Typography>
+              <Typography 
+                variant="h3" 
+                sx={{ 
+                  fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' },
+                  fontWeight: 600,
+                  wordBreak: 'break-word',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}
+              >
+                {stats.totalProjects}
+              </Typography>
+            </CardContent>
+          </Card>
+          <Card sx={{ height: '100%', overflow: 'hidden', width: '100%', minWidth: '260px' }}>
+            <CardContent sx={{ p: 3, '&:last-child': { pb: 3 }, height: '100%' }}>
+              <Typography variant="h6" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+                User Distribution
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                <AdminIcon color="primary" sx={{ mr: 1, fontSize: { xs: '1rem', sm: '1.25rem' } }} />
+                <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                  Super Admins: {stats.superAdmins}
                 </Typography>
-                <Typography 
-                  variant="h3" 
-                  sx={{ 
-                    fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' },
-                    fontWeight: 600,
-                    wordBreak: 'break-word',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}
-                >
-                  {stats.totalUsers}
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
+                <BusinessIcon color="secondary" sx={{ mr: 1, fontSize: { xs: '1rem', sm: '1.25rem' } }} />
+                <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                  Tenant Admins: {stats.tenantAdmins}
                 </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} lg={3} sx={{ padding: '12px !important', minWidth: '280px' }}>
-            <Card sx={{ height: '100%', overflow: 'hidden', width: '100%', minWidth: '260px' }}>
-              <CardContent sx={{ p: 3, '&:last-child': { pb: 3 }, height: '100%' }}>
-                <Typography variant="h6" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
-                  Organizations
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
+                <PersonIcon sx={{ mr: 1, fontSize: { xs: '1rem', sm: '1.25rem' } }} />
+                <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                  Users: {stats.regularUsers}
                 </Typography>
-                <Typography 
-                  variant="h3" 
-                  sx={{ 
-                    fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' },
-                    fontWeight: 600,
-                    wordBreak: 'break-word',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}
-                >
-                  {stats.totalOrgs}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} lg={3} sx={{ padding: '12px !important', minWidth: '280px' }}>
-            <Card sx={{ height: '100%', overflow: 'hidden', width: '100%', minWidth: '260px' }}>
-              <CardContent sx={{ p: 3, '&:last-child': { pb: 3 }, height: '100%' }}>
-                <Typography variant="h6" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
-                  Projects
-                </Typography>
-                <Typography 
-                  variant="h3" 
-                  sx={{ 
-                    fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' },
-                    fontWeight: 600,
-                    wordBreak: 'break-word',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}
-                >
-                  {stats.totalProjects}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} lg={3} sx={{ padding: '12px !important', minWidth: '280px' }}>
-            <Card sx={{ height: '100%', overflow: 'hidden', width: '100%', minWidth: '260px' }}>
-              <CardContent sx={{ p: 3, '&:last-child': { pb: 3 }, height: '100%' }}>
-                <Typography variant="h6" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
-                  User Distribution
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                  <AdminIcon color="primary" sx={{ mr: 1, fontSize: { xs: '1rem', sm: '1.25rem' } }} />
-                  <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
-                    Super Admins: {stats.superAdmins}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
-                  <BusinessIcon color="secondary" sx={{ mr: 1, fontSize: { xs: '1rem', sm: '1.25rem' } }} />
-                  <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
-                    Tenant Admins: {stats.tenantAdmins}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
-                  <PersonIcon sx={{ mr: 1, fontSize: { xs: '1rem', sm: '1.25rem' } }} />
-                  <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
-                    Users: {stats.regularUsers}
-                  </Typography>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
       </Box>
 
       <Paper sx={{ mb: 3 }}>
         <Tabs value={activeTab} onChange={handleTabChange} centered>
+          <Tab label="Company" />
           <Tab label="Users" />
           <Tab label="Companies" />
           <Tab label="System Settings" />
@@ -840,11 +1292,11 @@ const SuperAdminDashboard = () => {
         </Tabs>
       </Paper>
 
-      {/* Search and Add Button - Only for Users and Organizations tabs */}
+      {/* Search and Add Button - Only for Companies and Users tabs */}
       {(activeTab === 0 || activeTab === 1) && (
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-            {activeTab === 0 && (
+            {activeTab === 1 && (
               <FormControl size="small" sx={{ minWidth: 150 }}>
                 <InputLabel>Filter by Role</InputLabel>
                 <Select
@@ -879,6 +1331,15 @@ const SuperAdminDashboard = () => {
             <Button
               variant="contained"
               startIcon={<AddIcon />}
+              onClick={() => setOpenCompanyDialog(true)}
+            >
+              Add Company
+            </Button>
+          )}
+          {activeTab === 1 && (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
               onClick={() => {
               setOpenUserDialog(true);
               resetNewUser(); // Generate random password when opening dialog
@@ -887,31 +1348,96 @@ const SuperAdminDashboard = () => {
               Add User
             </Button>
           )}
-          {activeTab === 1 && (
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => setOpenOrgDialog(true)}
-            >
-              Add Organization
-            </Button>
-          )}
         </Box>
       )}
 
 
 
-      {/* Users Tab */}
+      {/* Company Tab */}
       {activeTab === 0 && (
         <TableContainer component={Paper}>
           <Table>
             <TableHead>
               <TableRow>
                 <TableCell>ID</TableCell>
-                <TableCell>Username</TableCell>
+                <TableCell>Name</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Description</TableCell>
+                <TableCell>Created</TableCell>
+                <TableCell align="right">Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {filteredCompanies.length > 0 ? (
+                filteredCompanies.map((company) => (
+                  <TableRow key={company.id}>
+                    <TableCell>{company.id}</TableCell>
+                    <TableCell>{company.name}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={company.status_display}
+                        color={company.status === 'active' ? 'success' : company.status === 'inactive' ? 'default' : 'warning'}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {company.description ? (
+                        <Typography variant="body2" sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {company.description}
+                        </Typography>
+                      ) : '-'}
+                    </TableCell>
+                    <TableCell>{new Date(company.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell align="right">
+                      <IconButton 
+                        size="small" 
+                        color="primary"
+                        onClick={() => handleEditCompanyClick(company)}
+                        sx={{ mr: 1 }}
+                      >
+                        <EditIcon />
+                      </IconButton>
+                      <IconButton 
+                        size="small" 
+                        sx={{ 
+                          color: '#d32f2f',
+                          '&:hover': {
+                            backgroundColor: '#f44336',
+                            color: 'white'
+                          }
+                        }}
+                        onClick={() => handleDeleteCompanyClick(company.id)}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} align="center">
+                    No companies found
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+
+      {/* Users Tab */}
+      {activeTab === 1 && (
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>ID</TableCell>
+                <TableCell>Name</TableCell>
                 <TableCell>Email</TableCell>
+                <TableCell>Company</TableCell>
                 <TableCell>Role</TableCell>
                 <TableCell>Status</TableCell>
+                <TableCell>Created Date</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -922,6 +1448,7 @@ const SuperAdminDashboard = () => {
                     <TableCell>{user.id}</TableCell>
                     <TableCell>{user.username}</TableCell>
                     <TableCell>{user.email}</TableCell>
+                    <TableCell>{user.company_name || '-'}</TableCell>
                     <TableCell>
                       {getRoleChip(user.global_role?.role, user.id)}
                     </TableCell>
@@ -960,7 +1487,17 @@ const SuperAdminDashboard = () => {
                         }}
                       />
                     </TableCell>
+                    <TableCell>{new Date(user.date_joined).toLocaleDateString()}</TableCell>
                     <TableCell align="right">
+                      <IconButton 
+                        size="small" 
+                        color="primary"
+                        onClick={() => handleEditUserClick(user)}
+                        sx={{ mr: 1 }}
+                        title="Edit user"
+                      >
+                        <EditIcon />
+                      </IconButton>
                       <IconButton 
                         sx={{ 
                           color: '#d32f2f',
@@ -971,6 +1508,7 @@ const SuperAdminDashboard = () => {
                         }}
                         onClick={() => handleDeleteUserClick(user.id)}
                         size="small"
+                        title="Delete user"
                       >
                         <DeleteIcon />
                       </IconButton>
@@ -979,7 +1517,7 @@ const SuperAdminDashboard = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} align="center">
+                  <TableCell colSpan={8} align="center">
                     No users found
                   </TableCell>
                 </TableRow>
@@ -989,79 +1527,8 @@ const SuperAdminDashboard = () => {
         </TableContainer>
       )}
 
-      {/* Organizations Tab */}
-      {activeTab === 1 && (
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>ID</TableCell>
-                <TableCell>Name</TableCell>
-                <TableCell>Description</TableCell>
-                <TableCell>Owner</TableCell>
-                <TableCell>Members</TableCell>
-                <TableCell>Created</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredOrganizations.length > 0 ? (
-                filteredOrganizations.map((org) => (
-                  <TableRow key={org.id}>
-                    <TableCell>{org.id}</TableCell>
-                    <TableCell>{org.name}</TableCell>
-                    <TableCell>{org.description || 'N/A'}</TableCell>
-                    <TableCell>{org.owner_name}</TableCell>
-                    <TableCell>{org.members_count}</TableCell>
-                    <TableCell>{new Date(org.created_at).toLocaleDateString()}</TableCell>
-                    <TableCell align="right">
-                      <IconButton 
-                        sx={{ 
-                          color: '#d32f2f',
-                          '&:hover': {
-                            backgroundColor: '#f44336',
-                            color: 'white'
-                          }
-                        }}
-                        onClick={() => handleDeleteOrganizationClick(org.id)}
-                        size="small"
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={7} align="center">
-                    No organizations found
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      )}
-
-      {/* System Settings Tab */}
+      {/* Scrapper Configuration Tab */}
       {activeTab === 2 && (
-        <Paper sx={{ p: 3 }}>
-          <Typography variant="h6" gutterBottom>System Settings</Typography>
-          <Typography variant="body1" color="text.secondary" paragraph>
-            This section is under development. It will include settings for:
-          </Typography>
-          <ul>
-            <li>Email configuration</li>
-            <li>Storage settings</li>
-            <li>Security policies</li>
-            <li>API rate limits</li>
-            <li>Backup and maintenance</li>
-          </ul>
-        </Paper>
-      )}
-
-      {/* Brightdata API Tab */}
-      {activeTab === 3 && (
         <Box>
           <Typography variant="h4" gutterBottom component="h1">
             Scraper Configuration
@@ -1083,7 +1550,7 @@ const SuperAdminDashboard = () => {
                 Platform-Specific Configurations
               </Typography>
               <Typography variant="body1" sx={{ mb: 3, color: '#6c757d', lineHeight: 1.6 }}>
-                The automated batch scraper requires separate Brightdata configurations for each social media platform. 
+                The automated batch scraper requires separate Scraper configurations for each social media platform. 
                 Each platform uses different dataset structures and may require different API tokens.
               </Typography>
               
@@ -1095,6 +1562,8 @@ const SuperAdminDashboard = () => {
                   { value: 'instagram_posts', label: 'Instagram Posts', icon: <InstagramIcon />, color: '#E4405F', description: 'Scrape Instagram posts and images' },
                   { value: 'instagram_reels', label: 'Instagram Reels', icon: <InstagramIcon />, color: '#E4405F', description: 'Collect Instagram video content' },
                   { value: 'instagram_comments', label: 'Instagram Comments', icon: <InstagramIcon />, color: '#E4405F', description: 'Extract comment data from posts' },
+                  { value: 'linkedin_posts', label: 'LinkedIn Posts', icon: <LinkedInIcon />, color: '#0A66C2', description: 'Scrape LinkedIn posts and articles' },
+                  { value: 'tiktok_posts', label: 'TikTok Posts', icon: <MusicVideoIcon />, color: '#000000', description: 'Collect TikTok video content' },
                   { value: 'linkedin_posts', label: 'LinkedIn Posts', icon: <LinkedInIcon />, color: '#0A66C2', description: 'Scrape LinkedIn posts and articles' },
                   { value: 'tiktok_posts', label: 'TikTok Posts', icon: <MusicVideoIcon />, color: '#000000', description: 'Collect TikTok video content' },
                 ].map((platform) => {
@@ -1233,6 +1702,8 @@ const SuperAdminDashboard = () => {
                               <Box sx={{ display: 'flex', alignItems: 'center' }}>
                                 {config.platform === 'linkedin_posts' && <LinkedInIcon />}
                                 {config.platform === 'tiktok_posts' && <MusicVideoIcon />}
+                                {config.platform === 'linkedin_posts' && <LinkedInIcon />}
+                                {config.platform === 'tiktok_posts' && <MusicVideoIcon />}
                                 {config.platform.includes('instagram') && <InstagramIcon />}
                                 {config.platform.includes('facebook') && <FacebookIcon />}
                                 <Typography sx={{ ml: 1 }}>
@@ -1274,6 +1745,23 @@ const SuperAdminDashboard = () => {
         </Box>
       )}
 
+      {/* System Settings Tab */}
+      {activeTab === 3 && (
+        <Paper sx={{ p: 3 }}>
+          <Typography variant="h6" gutterBottom>System Settings</Typography>
+          <Typography variant="body1" color="text.secondary" paragraph>
+            This section is under development. It will include settings for:
+          </Typography>
+          <ul>
+            <li>Email configuration</li>
+            <li>Storage settings</li>
+            <li>Security policies</li>
+            <li>API rate limits</li>
+            <li>Backup and maintenance</li>
+          </ul>
+        </Paper>
+      )}
+
              {/* Create User Dialog */}
        <Dialog open={openUserDialog} onClose={() => setOpenUserDialog(false)} maxWidth="sm" fullWidth>
          <DialogTitle>Create New User</DialogTitle>
@@ -1282,30 +1770,82 @@ const SuperAdminDashboard = () => {
              Enter the user's information below. A secure password will be automatically generated and sent to their email address.
            </DialogContentText>
           <TextField
-            label="Username"
+            label="Name"
             fullWidth
             margin="normal"
             value={newUser.username}
             onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
             required
           />
-          <TextField
-            label="Email"
-            type="email"
-            fullWidth
-            margin="normal"
-            value={newUser.email}
-            onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-            required
-          />
-          
+                       <TextField
+               label="Email"
+               type="email"
+               fullWidth
+               margin="normal"
+               value={newUser.email}
+               onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+               required
+             />
+             
+                            <Autocomplete
+                 options={companies.filter(company => company.status === 'active')}
+                 getOptionLabel={(option) => option.name}
+                 value={companies.find(company => company.id === newUser.company_id) || null}
+                 onChange={(event, newValue) => {
+                   setNewUser({
+                     ...newUser,
+                     company_id: newValue ? newValue.id : null
+                   });
+                 }}
+                 renderInput={(params) => (
+                   <TextField
+                     {...params}
+                     label="Company"
+                     margin="normal"
+                     fullWidth
+                     required
+                                      disabled={newUser.role === 'super_admin'}
+                 helperText={newUser.role === 'super_admin' ? 'Super admins are automatically assigned to Future Objects company' : ''}
+                   />
+                 )}
+                 filterOptions={(options, { inputValue }) => {
+                   return options.filter(option =>
+                     option.name.toLowerCase().includes(inputValue.toLowerCase())
+                   );
+                 }}
+                 isOptionEqualToValue={(option, value) => option.id === value.id}
+                 noOptionsText="no companies found"
+                 disabled={newUser.role === 'super_admin'}
+               />
 
           <FormControl fullWidth margin="normal">
             <InputLabel>Role</InputLabel>
             <Select
               value={newUser.role}
               label="Role"
-              onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+              onChange={(e) => {
+                const newRole = e.target.value;
+                
+                // If changing to super_admin, check if Future Objects company is selected
+                if (newRole === 'super_admin') {
+                  const futureObjectsCompany = companies.find(company => 
+                    company.name.toLowerCase() === 'future objects' && company.status === 'active'
+                  );
+                  if (!futureObjectsCompany) {
+                    setError('Future Objects company not found. Please create the Future Objects company first.');
+                    return;
+                  }
+                  if (newUser.company_id !== futureObjectsCompany.id) {
+                    setError('To assign Super Admin role, the user must be assigned to the Future Objects company. Please select Future Objects as the company first.');
+                    return;
+                  }
+                }
+                
+                setNewUser({ 
+                  ...newUser, 
+                  role: newRole
+                });
+              }}
             >
               <MenuItem value="super_admin">Super Admin</MenuItem>
               <MenuItem value="tenant_admin">Tenant Admin</MenuItem>
@@ -1314,67 +1854,119 @@ const SuperAdminDashboard = () => {
           </FormControl>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenUserDialog(false)}>Cancel</Button>
-          <Button onClick={handleCreateUser} variant="contained" color="primary">
-            Create
+          <Button onClick={() => {
+            setOpenUserDialog(false);
+          }} disabled={isCreatingUser}>Cancel</Button>
+          <Button 
+            onClick={handleCreateUser} 
+            variant="contained" 
+            color="primary"
+            disabled={isCreatingUser}
+            startIcon={isCreatingUser ? <CircularProgress size={20} /> : null}
+          >
+            {isCreatingUser ? 'Creating...' : 'Create'}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Create Organization Dialog */}
-      <Dialog open={openOrgDialog} onClose={() => setOpenOrgDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Create New Organization</DialogTitle>
+      {/* Create Company Dialog */}
+      <Dialog open={openCompanyDialog} onClose={() => setOpenCompanyDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Create New Company</DialogTitle>
         <DialogContent>
           <TextField
-            label="Organization Name"
+            label="Company Name"
             fullWidth
             margin="normal"
-            value={newOrg.name}
-            onChange={(e) => setNewOrg({ ...newOrg, name: e.target.value })}
+            value={newCompany.name}
+            onChange={(e) => setNewCompany({ ...newCompany, name: e.target.value })}
             required
           />
+
+          <FormControl fullWidth margin="normal">
+            <InputLabel>Status</InputLabel>
+                    <Select
+          value={newCompany.status}
+          label="Status"
+          onChange={(e) => setNewCompany({ ...newCompany, status: e.target.value })}
+        >
+          <MenuItem value="active">Active</MenuItem>
+          <MenuItem value="inactive">Inactive</MenuItem>
+        </Select>
+          </FormControl>
           <TextField
             label="Description"
             fullWidth
             margin="normal"
             multiline
             rows={3}
-            value={newOrg.description}
-            onChange={(e) => setNewOrg({ ...newOrg, description: e.target.value })}
+            value={newCompany.description}
+            onChange={(e) => setNewCompany({ ...newCompany, description: e.target.value })}
           />
-          <FormControl fullWidth margin="normal">
-            <InputLabel>Owner</InputLabel>
-            <Select
-              value={newOrg.owner_id || ''}
-              label="Owner"
-              onChange={(e) => setNewOrg({ ...newOrg, owner_id: Number(e.target.value) })}
-            >
-              {users
-                .filter(user => user.global_role?.role === 'tenant_admin' || user.global_role?.role === 'super_admin')
-                .map(user => (
-                  <MenuItem key={user.id} value={user.id}>
-                    {user.username} ({user.email}) - {user.global_role?.role_display}
-                  </MenuItem>
-                ))}
-            </Select>
-          </FormControl>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenOrgDialog(false)}>Cancel</Button>
-          <Button onClick={handleCreateOrganization} variant="contained" color="primary">
-            Create
+          <Button onClick={() => setOpenCompanyDialog(false)} disabled={isCreatingCompany}>Cancel</Button>
+          <Button 
+            onClick={handleCreateCompany} 
+            variant="contained" 
+            color="primary"
+            disabled={isCreatingCompany}
+            startIcon={isCreatingCompany ? <CircularProgress size={20} /> : null}
+          >
+            {isCreatingCompany ? 'Creating...' : 'Create'}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Brightdata Configuration Dialog */}
+      {/* Edit Company Dialog */}
+      <Dialog open={editCompanyDialogOpen} onClose={handleCancelEditCompany} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit Company</DialogTitle>
+        <DialogContent>
+          <TextField
+            label="Company Name"
+            fullWidth
+            margin="normal"
+            value={editingCompany?.name || ''}
+            onChange={(e) => setEditingCompany(editingCompany ? { ...editingCompany, name: e.target.value } : null)}
+            required
+          />
+
+          <FormControl fullWidth margin="normal">
+            <InputLabel>Status</InputLabel>
+            <Select
+              value={editingCompany?.status || 'active'}
+              label="Status"
+              onChange={(e) => setEditingCompany(editingCompany ? { ...editingCompany, status: e.target.value } : null)}
+            >
+              <MenuItem value="active">Active</MenuItem>
+              <MenuItem value="inactive">Inactive</MenuItem>
+            </Select>
+          </FormControl>
+          <TextField
+            label="Description"
+            fullWidth
+            margin="normal"
+            multiline
+            rows={3}
+            value={editingCompany?.description || ''}
+            onChange={(e) => setEditingCompany(editingCompany ? { ...editingCompany, description: e.target.value } : null)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelEditCompany}>Cancel</Button>
+          <Button onClick={handleUpdateCompany} variant="contained" color="primary">
+            Update
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Scraper Configuration Dialog */}
       <Dialog open={brightdataDialogOpen} onClose={() => setBrightdataDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{editConfigId !== null ? 'Edit Configuration' : 'Add New Brightdata Configuration'}</DialogTitle>
+        <DialogTitle>{editConfigId !== null ? 'Edit Configuration' : 'Add New Scraper Configuration'}</DialogTitle>
         <DialogContent>
           <DialogContentText sx={{ mb: 2 }}>
             {editConfigId !== null 
-              ? 'Edit your Brightdata API configuration. API tokens are securely stored and will not be displayed.'
-              : 'Create a new Brightdata API configuration for data scraping. API tokens are securely stored and encrypted.'
+              ? 'Edit your Scraper configuration. API tokens are securely stored and will not be displayed.'
+              : 'Create a new Scraper configuration for data scraping. API tokens are securely stored and encrypted.'
             }
           </DialogContentText>
           <TextField
@@ -1503,7 +2095,7 @@ const SuperAdminDashboard = () => {
           />
           <TextField
             margin="dense"
-            label="Brightdata API Token"
+            label="API Token"
             type="password"
             fullWidth
             value={brightdataForm.apiToken}
@@ -1595,7 +2187,7 @@ const SuperAdminDashboard = () => {
          </Snackbar>
        )}
 
-             {/* Delete Confirmation Dialog for Brightdata Configurations */}
+             {/* Delete Confirmation Dialog for Scraper Configurations */}
        <Dialog
          open={deleteDialogOpen}
          onClose={handleCancelDelete}
@@ -1644,21 +2236,32 @@ const SuperAdminDashboard = () => {
          </DialogActions>
        </Dialog>
 
-       {/* Delete Organization Confirmation Dialog */}
+       {/* Delete Company Confirmation Dialog */}
        <Dialog
-         open={deleteOrgDialogOpen}
-         onClose={handleCancelDeleteOrganization}
+         open={deleteCompanyDialogOpen}
+         onClose={handleCancelDeleteCompany}
        >
-         <DialogTitle>Confirm Organization Deletion</DialogTitle>
+         <DialogTitle>Confirm Company Deletion</DialogTitle>
          <DialogContent>
            <DialogContentText>
-             Are you sure you want to delete this organization? This action cannot be undone and will permanently remove the organization and all associated data.
+             Are you sure you want to delete this company? This action cannot be undone and will permanently remove the company and all associated data.
            </DialogContentText>
          </DialogContent>
          <DialogActions>
-           <Button onClick={handleCancelDeleteOrganization}>Cancel</Button>
-           <Button onClick={handleConfirmDeleteOrganization} color="error" variant="contained">
-             Delete Organization
+           <Button onClick={handleCancelDeleteCompany}>Cancel</Button>
+           <Button 
+             onClick={handleConfirmDeleteCompany}
+             variant="contained"
+             sx={{
+               backgroundColor: '#d32f2f',
+               color: '#fff',
+               '&:hover': {
+                 backgroundColor: '#b71c1c',
+                 color: '#fff',
+               },
+             }}
+           >
+             Delete Company
            </Button>
          </DialogActions>
        </Dialog>
@@ -1678,6 +2281,12 @@ const SuperAdminDashboard = () => {
              </strong>?
              <br></br>
              This action will immediately update the user's permissions and access levels.
+             {pendingRoleChange?.newRole === 'super_admin' && (
+               <>
+                 <br></br>
+                 <strong>Note:</strong> This user is already assigned to the Future Objects company, so the role change can proceed.
+               </>
+             )}
            </DialogContentText>
          </DialogContent>
          <DialogActions>
@@ -1733,6 +2342,152 @@ const SuperAdminDashboard = () => {
              }}
            >
              Confirm Status Change
+           </Button>
+         </DialogActions>
+       </Dialog>
+
+       {/* Company Status Change Confirmation Dialog */}
+       <Dialog
+         open={companyStatusChangeDialogOpen}
+         onClose={handleCancelCompanyStatusChange}
+       >
+         <DialogTitle>Confirm Company Status Change</DialogTitle>
+         <DialogContent>
+           <DialogContentText>
+             Are you sure you want to change this company's status from{' '}
+             <strong>
+               {pendingCompanyStatusChange?.oldStatus === 'active' ? 'Active' : 'Inactive'}
+             </strong>{' '}
+             to{' '}
+             <strong>
+               {pendingCompanyStatusChange?.newStatus === 'active' ? 'Active' : 'Inactive'}
+             </strong>?
+             <br></br>
+             {pendingCompanyStatusChange?.newStatus === 'active'
+               ? 'This will allow the company to be used for user assignments and to carry out data studies.'
+               : 'This will prevent the company from being used for new user assignments and may affect existing users.'
+             }
+           </DialogContentText>
+         </DialogContent>
+         <DialogActions>
+           <Button onClick={handleCancelCompanyStatusChange}>Cancel</Button>
+           <Button 
+             onClick={handleConfirmCompanyStatusChange} 
+             variant="contained"
+             sx={{
+               backgroundColor: '#d32f2f',
+               color: '#fff',
+               '&:hover': {
+                 backgroundColor: '#b71c1c',
+                 color: '#fff',
+               },
+             }}
+           >
+             Confirm Status Change
+           </Button>
+         </DialogActions>
+       </Dialog>
+
+       {/* Edit User Dialog */}
+       <Dialog open={editUserDialogOpen} onClose={handleCancelEditUser}>
+         <DialogTitle>Edit User</DialogTitle>
+         <DialogContent>
+           <TextField
+             label="Name"
+             fullWidth
+             margin="normal"
+             value={editUserForm.username}
+             onChange={(e) => setEditUserForm({ ...editUserForm, username: e.target.value })}
+             required
+           />
+           <TextField
+             label="Email"
+             type="email"
+             fullWidth
+             margin="normal"
+             value={editUserForm.email}
+             onChange={(e) => setEditUserForm({ ...editUserForm, email: e.target.value })}
+             required
+           />
+           <Autocomplete
+             options={companies.filter(company => company.status === 'active')}
+             getOptionLabel={(option) => option.name}
+             value={companies.find(company => company.id === editUserForm.company_id) || null}
+             onChange={(event, newValue) => {
+               setEditUserForm({
+                 ...editUserForm,
+                 company_id: newValue ? newValue.id : null
+               });
+             }}
+             renderInput={(params) => (
+               <TextField
+                 {...params}
+                 label="Company"
+                 margin="normal"
+                 fullWidth
+                 disabled={editUserForm.role === 'super_admin'}
+                 helperText={editUserForm.role === 'super_admin' ? 'Super admins are automatically assigned to Future Objects company' : ''}
+               />
+             )}
+             filterOptions={(options, { inputValue }) => {
+               return options.filter(option =>
+                 option.name.toLowerCase().includes(inputValue.toLowerCase())
+               );
+             }}
+             isOptionEqualToValue={(option, value) => option.id === value.id}
+             noOptionsText="No Companies Found"
+             disabled={editUserForm.role === 'super_admin'}
+           />
+           <FormControl fullWidth margin="normal">
+             <InputLabel>Role</InputLabel>
+             <Select
+               value={editUserForm.role}
+               label="Role"
+                             onChange={(e) => {
+                const newRole = e.target.value;
+                
+                // If changing to super_admin, check if Future Objects company is selected
+                if (newRole === 'super_admin') {
+                  const futureObjectsCompany = companies.find(company => 
+                    company.name.toLowerCase() === 'future objects' && company.status === 'active'
+                  );
+                  if (!futureObjectsCompany) {
+                    setError('Future Objects company not found. Please create the Future Objects company first.');
+                    return;
+                  }
+                  if (editUserForm.company_id !== futureObjectsCompany.id) {
+                    setError('To assign Super Admin role, the user must be assigned to the Future Objects company. Please select Future Objects as the company first.');
+                    return;
+                  }
+                }
+                
+                setEditUserForm({ 
+                  ...editUserForm, 
+                  role: newRole
+                });
+              }}
+             >
+               <MenuItem value="super_admin">Super Admin</MenuItem>
+               <MenuItem value="tenant_admin">Tenant Admin</MenuItem>
+               <MenuItem value="user">User</MenuItem>
+             </Select>
+           </FormControl>
+           <FormControl fullWidth margin="normal">
+             <InputLabel>Status</InputLabel>
+             <Select
+               value={editUserForm.is_active ? 'active' : 'inactive'}
+               label="Status"
+               onChange={(e) => setEditUserForm({ ...editUserForm, is_active: e.target.value === 'active' })}
+             >
+               <MenuItem value="active">Active</MenuItem>
+               <MenuItem value="inactive">Inactive</MenuItem>
+             </Select>
+           </FormControl>
+         </DialogContent>
+         <DialogActions>
+           <Button onClick={handleCancelEditUser}>Cancel</Button>
+           <Button onClick={handleUpdateUser} variant="contained" color="primary">
+             Update
            </Button>
          </DialogActions>
        </Dialog>

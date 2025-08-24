@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
-from rest_framework import generics, status, permissions
+from rest_framework import generics, status, permissions, serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
@@ -10,7 +10,9 @@ from .serializers import (
     UserSerializer, RegisterSerializer, UserProfileSerializer,
     ProjectSerializer, ProjectDetailSerializer,
     OrganizationSerializer, OrganizationDetailSerializer,
-    OrganizationMembershipSerializer
+    OrganizationMembershipSerializer, AdminUserCreateSerializer, AdminUserUpdateSerializer,
+    PlatformSerializer, ServiceSerializer, PlatformServiceSerializer,
+    PlatformServiceCreateSerializer, CompanySerializer, OrganizationMemberCreateSerializer
 )
 from .models import UserProfile, Project, Organization, OrganizationMembership
 from rest_framework.authtoken.views import ObtainAuthToken
@@ -26,19 +28,21 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import (
     UserProfile, Project, Organization, OrganizationMembership, 
-    UserRole, Platform, Service, PlatformService
+    UserRole, Platform, Service, PlatformService, Company, UnifiedUserRecord
 )
 from .serializers import (
     UserProfileSerializer, ProjectSerializer, OrganizationSerializer,
     OrganizationMembershipSerializer, UserRoleSerializer,
     PlatformSerializer, ServiceSerializer, PlatformServiceSerializer,
-    PlatformServiceCreateSerializer
+    PlatformServiceCreateSerializer, CompanySerializer, AdminUserCreateSerializer,
+    UnifiedUserRecordSerializer
 )
 from .permissions import IsSuperAdmin
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.crypto import get_random_string
 from django.conf import settings
+from django.db.models import Count
 
 # Create your views here.
 
@@ -318,9 +322,36 @@ class OrganizationMembershipView(generics.ListCreateAPIView):
             ).exists():
                 raise PermissionDenied("You don't have access to this organization")
 
-            return OrganizationMembership.objects.filter(organization=organization)
+            # Get all memberships for this organization with debugging
+            memberships = OrganizationMembership.objects.filter(organization=organization)
+            
+            # Add debugging information
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"Found {memberships.count()} memberships for organization {organization.id}")
+            for membership in memberships:
+                logger.info(f"Membership: User {membership.user.username} (ID: {membership.user.id}), Role: {membership.role}")
+            
+            return memberships
         except Organization.DoesNotExist:
             raise NotFound("Organization not found")
+
+    def get_serializer_class(self):
+        """Use different serializer for POST requests"""
+        if self.request.method == 'POST':
+            return OrganizationMemberCreateSerializer
+        return OrganizationMembershipSerializer
+
+    def get_serializer_context(self):
+        """Add organization to serializer context"""
+        context = super().get_serializer_context()
+        organization_id = self.kwargs.get('organization_id')
+        try:
+            organization = Organization.objects.get(id=organization_id)
+            context['organization'] = organization
+        except Organization.DoesNotExist:
+            pass
+        return context
 
     def perform_create(self, serializer):
         """Add member to organization"""
@@ -337,9 +368,90 @@ class OrganizationMembershipView(generics.ListCreateAPIView):
             if organization.owner != self.request.user and (not membership or membership.role != 'admin'):
                 raise PermissionDenied("Only organization owners and admins can add members")
 
-            serializer.save(organization=organization)
+            # Add debugging information
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"perform_create called for organization {organization.id}")
+            logger.info(f"Serializer type: {type(serializer).__name__}")
+
+            # For the new serializer, the create method handles everything
+            if isinstance(serializer, OrganizationMemberCreateSerializer):
+                result = serializer.save()
+                logger.info(f"OrganizationMemberCreateSerializer.save() returned: {result}")
+            else:
+                # For existing users, just create membership
+                result = serializer.save(organization=organization)
+                logger.info(f"Regular serializer.save() returned: {result}")
+                
+            # Verify the membership was created
+            if hasattr(result, 'user'):
+                logger.info(f"Membership created for user {result.user.username} (ID: {result.user.id}) in organization {result.organization.id}")
+            else:
+                logger.warning(f"Unexpected result from serializer.save(): {result}")
+                
         except Organization.DoesNotExist:
             raise NotFound("Organization not found")
+
+    def create(self, request, *args, **kwargs):
+        """Override create method to handle errors properly"""
+        try:
+            return super().create(request, *args, **kwargs)
+        except Exception as e:
+            from django.db import IntegrityError
+            if isinstance(e, IntegrityError):
+                # Provide more specific error message based on the constraint
+                error_msg = str(e).lower()
+                if 'unique_together' in error_msg or 'organizationmembership' in error_msg:
+                    return Response({
+                        'error': 'This user is already a member of this organization.',
+                        'detail': 'A user can only be added to an organization once.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                elif 'email' in error_msg and ('unique' in error_msg or 'duplicate' in error_msg):
+                    return Response({
+                        'error': 'A user with this email address already exists.',
+                        'detail': 'Please use a different email address or add the existing user to the organization.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                elif 'username' in error_msg and ('unique' in error_msg or 'duplicate' in error_msg):
+                    return Response({
+                        'error': 'Username generation failed due to duplicate.',
+                        'detail': 'Please try again with a different email address.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    return Response({
+                        'error': 'Database error occurred. This might be due to a duplicate entry.',
+                        'detail': str(e)
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            elif isinstance(e, serializers.ValidationError):
+                # Handle validation errors from the serializer
+                return Response({
+                    'error': 'Validation error',
+                    'detail': str(e)
+                }, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                # Log the unexpected error for debugging
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Unexpected error in OrganizationMembershipView.create: {str(e)}")
+                logger.error(f"Error type: {type(e).__name__}")
+                logger.error(f"Error args: {e.args}")
+                
+                # Provide more specific error information
+                error_detail = str(e)
+                if "company" in error_detail.lower():
+                    return Response({
+                        'error': 'Company assignment error',
+                        'detail': 'There was an issue assigning the user to the company. Please ensure the organization owner has a valid company.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                elif "profile" in error_detail.lower():
+                    return Response({
+                        'error': 'User profile error',
+                        'detail': 'There was an issue with the user profile. Please try again.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    return Response({
+                        'error': 'An unexpected error occurred while adding the member.',
+                        'detail': f'Error: {error_detail}'
+                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class OrganizationMembershipDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
@@ -357,20 +469,97 @@ class OrganizationMembershipDetailView(generics.RetrieveUpdateDestroyAPIView):
 
         # Check if user has permission (owner or admin)
         if self.request.method != 'GET':
+            import logging
+            logger = logging.getLogger(__name__)
+            
+            # Check if user is organization owner
+            is_owner = obj.organization.owner == self.request.user
+            logger.info(f"User {self.request.user.username} is owner: {is_owner}")
+            
+            # Check if user is admin in the organization
             membership = OrganizationMembership.objects.filter(
                 user=self.request.user,
                 organization=obj.organization,
                 role='admin'
             ).first()
+            
+            is_admin = membership is not None
+            logger.info(f"User {self.request.user.username} is admin: {is_admin}")
+            logger.info(f"Target user {obj.user.username} is owner: {obj.user == obj.organization.owner}")
+            logger.info(f"Request method: {self.request.method}")
 
-            if obj.organization.owner != self.request.user and not membership:
+            if not is_owner and not is_admin:
+                logger.warning(f"Permission denied for user {self.request.user.username}")
                 raise PermissionDenied("Only organization owners and admins can modify memberships")
 
-            # Don't allow removing the owner's admin role
+            # Don't allow removing the organization owner
             if obj.user == obj.organization.owner and self.request.method == 'DELETE':
+                logger.warning(f"Cannot remove organization owner {obj.user.username}")
                 raise PermissionDenied("Cannot remove the organization owner")
 
         return obj
+
+    def partial_update(self, request, *args, **kwargs):
+        """Override partial_update method to provide better error handling"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        try:
+            instance = self.get_object()
+            logger.info(f"Attempting to update membership {instance.id} for user {instance.user.username}")
+            logger.info(f"Update data: {request.data}")
+            
+            # Perform the update
+            serializer = self.get_serializer(instance, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
+            
+            logger.info(f"Successfully updated membership {instance.id}")
+            
+            return Response(serializer.data)
+            
+        except PermissionDenied as e:
+            logger.warning(f"Permission denied for membership update: {str(e)}")
+            return Response({
+                'error': 'Permission denied',
+                'detail': str(e)
+            }, status=status.HTTP_403_FORBIDDEN)
+            
+        except Exception as e:
+            logger.error(f"Error updating membership: {str(e)}")
+            return Response({
+                'error': 'Failed to update membership',
+                'detail': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def destroy(self, request, *args, **kwargs):
+        """Override destroy method to provide better error handling"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        try:
+            instance = self.get_object()
+            logger.info(f"Attempting to delete membership {instance.id} for user {instance.user.username}")
+            
+            # Perform the deletion
+            self.perform_destroy(instance)
+            logger.info(f"Successfully deleted membership {instance.id}")
+            
+            return Response(status=status.HTTP_204_NO_CONTENT)
+            
+        except PermissionDenied as e:
+            logger.warning(f"Permission denied for membership deletion: {str(e)}")
+            return Response({
+                'error': 'Permission denied',
+                'detail': str(e)
+            }, status=status.HTTP_403_FORBIDDEN)
+            
+        except Exception as e:
+            logger.error(f"Error deleting membership: {str(e)}")
+            return Response({
+                'error': 'Failed to delete membership',
+                'detail': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class UserSearchView(generics.ListAPIView):
     """
@@ -515,8 +704,63 @@ class ProjectDetailView(generics.RetrieveUpdateDestroyAPIView):
 
         return obj
 
+    def update(self, request, *args, **kwargs):
+        """Override update method to add logging"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        try:
+            instance = self.get_object()
+            logger.info(f"Attempting to update project {instance.id} '{instance.name}'")
+            logger.info(f"Update data: {request.data}")
+            
+            # Perform the update
+            serializer = self.get_serializer(instance, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
+            
+            logger.info(f"Successfully updated project {instance.id}")
+            
+            return Response(serializer.data)
+            
+        except Exception as e:
+            logger.error(f"Error updating project: {str(e)}")
+            raise
+
+    def destroy(self, request, *args, **kwargs):
+        """Override destroy method to add logging"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        try:
+            instance = self.get_object()
+            logger.info(f"Attempting to delete project {instance.id} '{instance.name}'")
+            
+            # Perform the deletion
+            self.perform_destroy(instance)
+            logger.info(f"Successfully deleted project {instance.id}")
+            
+            return Response(status=status.HTTP_204_NO_CONTENT)
+            
+        except Exception as e:
+            logger.error(f"Error deleting project: {str(e)}")
+            raise
+
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 @method_decorator(never_cache, name='dispatch')
+class CurrentUserView(APIView):
+    """Get current user information"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        """Get current user details"""
+        return Response({
+            'id': request.user.id,
+            'username': request.user.username,
+            'email': request.user.email,
+            'is_active': request.user.is_active,
+        })
+
 class CSRFTokenView(APIView):
     """
     Provide CSRF token for frontend applications
@@ -651,37 +895,35 @@ class AdminUserViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsSuperAdmin]
     
     def get_queryset(self):
-        return User.objects.all().order_by('-date_joined')
+        return User.objects.select_related('profile__company', 'global_role').order_by('-date_joined')
+    
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return AdminUserCreateSerializer
+        elif self.action in ['update', 'partial_update']:
+            return AdminUserUpdateSerializer
+        return UserSerializer
     
     def create(self, request, *args, **kwargs):
-        """Create a new user with email notification"""
+        """Create a new user with company assignment and email notification"""
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        # Generate a secure random password
-        password = get_random_string(16, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*')
-        
-        # Create user with the generated password
-        user_data = serializer.validated_data.copy()
-        user_data['password'] = password
-        
         try:
-            user = User.objects.create_user(
-                username=user_data['username'],
-                email=user_data['email'],
-                password=password
-            )
+            user = serializer.save()
             
-            # Create user profile
-            UserProfile.objects.create(user=user)
-            
-            # Create user role
-            role = request.data.get('role', 'user')
-            UserRole.objects.create(user=user, role=role)
-            
-            # Send email notification
+            # Debug: Print user role information
             try:
-                self.send_welcome_email(request, user, password)
+                if hasattr(user, 'global_role') and user.global_role:
+                    print(f"User {user.username} created with role: {user.global_role.role} ({user.global_role.get_role_display()})")
+                else:
+                    print(f"User {user.username} created but no role found")
+            except Exception as e:
+                print(f"Error checking role for user {user.username}: {str(e)}")
+            
+            # Send email notification with the generated password
+            try:
+                self.send_welcome_email(request, user, user._generated_password)
             except Exception as e:
                 # Log the error but don't fail the user creation
                 print(f"Failed to send welcome email to {user.email}: {str(e)}")
@@ -700,11 +942,50 @@ class AdminUserViewSet(viewsets.ModelViewSet):
         """Send welcome email with login credentials"""
         subject = 'Welcome to Track-Futura - Your Account Details'
         
+        # Get user role information - refresh from database to ensure we have the latest data
+        role_display = 'User'  # Default role
+        company_name = 'N/A'  # Default company name
+        try:
+            # Refresh the user object to get the latest role information
+            user.refresh_from_db()
+            print(f"Debug: Checking role for user {user.username}")
+            
+            if hasattr(user, 'global_role') and user.global_role:
+                role_display = user.global_role.get_role_display()
+                print(f"Debug: Found role via global_role: {role_display}")
+            else:
+                print(f"Debug: No global_role found for user {user.username}")
+                # Try to get role directly from UserRole model
+                try:
+                    user_role = UserRole.objects.get(user=user)
+                    role_display = user_role.get_role_display()
+                    print(f"Debug: Found role via direct query: {role_display}")
+                except UserRole.DoesNotExist:
+                    print(f"Debug: No UserRole found for user {user.username}")
+                    pass
+            
+            # Get company information
+            try:
+                if hasattr(user, 'profile') and user.profile and user.profile.company:
+                    company_name = user.profile.company.name
+                    print(f"Debug: Found company for user {user.username}: {company_name}")
+                else:
+                    print(f"Debug: No company found for user {user.username}")
+            except Exception as e:
+                print(f"Error getting company for user {user.username}: {str(e)}")
+                pass
+                
+        except Exception as e:
+            print(f"Error getting role for user {user.username}: {str(e)}")
+            pass
+        
         # Create email content
         context = {
             'username': user.username,
             'email': user.email,
             'password': password,
+            'role': role_display,
+            'company': company_name,
             'login_url': request.build_absolute_uri('/login/'),
             'site_name': 'Track-Futura'
         }
@@ -729,13 +1010,72 @@ class AdminUserViewSet(viewsets.ModelViewSet):
         if not new_role:
             return Response({'error': 'Role is required'}, status=status.HTTP_400_BAD_REQUEST)
         
+        # Check if user is trying to change their own role
+        if user == request.user:
+            return Response({
+                'error': 'You cannot change your own role'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
         # Update or create user role
         user_role, created = UserRole.objects.get_or_create(user=user, defaults={'role': new_role})
         if not created:
             user_role.role = new_role
             user_role.save()
         
-        return Response({'message': 'User role updated successfully'})
+        # Return the updated user data with role and company information
+        # Force a fresh query to get the updated user with all related data
+        updated_user = User.objects.select_related('profile__company', 'global_role').get(id=user.id)
+        return Response(UserSerializer(updated_user).data)
+    
+    def update(self, request, *args, **kwargs):
+        """Update user with protection against self-deactivation and self-role-change"""
+        user = self.get_object()
+        
+        # Check if user is trying to deactivate themselves
+        if user == request.user:
+            is_active = request.data.get('is_active')
+            if is_active is False:
+                return Response({
+                    'error': 'You cannot deactivate your own account'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if user is trying to change their own role
+            if 'role' in request.data:
+                return Response({
+                    'error': 'You cannot change your own role'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        response = super().update(request, *args, **kwargs)
+        
+        # Return the updated user data with role and company information
+        # Force a fresh query to get the updated user with all related data
+        updated_user = User.objects.select_related('profile__company', 'global_role').get(id=user.id)
+        return Response(UserSerializer(updated_user).data)
+    
+    def partial_update(self, request, *args, **kwargs):
+        """Partial update user with protection against self-deactivation and self-role-change"""
+        user = self.get_object()
+        
+        # Check if user is trying to deactivate themselves
+        if user == request.user:
+            is_active = request.data.get('is_active')
+            if is_active is False:
+                return Response({
+                    'error': 'You cannot deactivate your own account'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if user is trying to change their own role
+            if 'role' in request.data:
+                return Response({
+                    'error': 'You cannot change your own role'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        response = super().partial_update(request, *args, **kwargs)
+        
+        # Return the updated user data with role and company information
+        # Force a fresh query to get the updated user with all related data
+        updated_user = User.objects.select_related('profile__company', 'global_role').get(id=user.id)
+        return Response(UserSerializer(updated_user).data)
     
     def destroy(self, request, *args, **kwargs):
         """Delete user"""
@@ -809,6 +1149,7 @@ class AdminStatsView(APIView):
         total_users = User.objects.count()
         total_orgs = Organization.objects.count()
         total_projects = Project.objects.count()
+        total_companies = Company.objects.count()
         
         # Count users by role
         super_admins = UserRole.objects.filter(role='super_admin').count()
@@ -819,7 +1160,241 @@ class AdminStatsView(APIView):
             'totalUsers': total_users,
             'totalOrgs': total_orgs,
             'totalProjects': total_projects,
+            'totalCompanies': total_companies,
             'superAdmins': super_admins,
             'tenantAdmins': tenant_admins,
             'regularUsers': regular_users,
         })
+
+class AdminCompanyViewSet(viewsets.ModelViewSet):
+    """ViewSet for admin company management - Superadmin only"""
+    queryset = Company.objects.all()
+    serializer_class = CompanySerializer
+    permission_classes = [IsAuthenticated, IsSuperAdmin]
+    
+    def get_queryset(self):
+        return Company.objects.all().order_by('-created_at')
+
+
+class UnifiedUserRecordViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for UnifiedUserRecord model.
+    Provides a unified view of user information from User, UserRole, and UserProfile models.
+    """
+    queryset = UnifiedUserRecord.objects.select_related('user', 'company').all()
+    serializer_class = UnifiedUserRecordSerializer
+    permission_classes = [IsAuthenticated]
+    filterset_fields = ['role', 'status', 'company']
+    search_fields = ['name', 'email', 'user__username', 'company__name']
+    ordering_fields = ['name', 'email', 'role', 'status', 'created_date', 'updated_date']
+    ordering = ['-created_date']
+    
+    def get_queryset(self):
+        """Filter queryset based on user permissions"""
+        queryset = super().get_queryset()
+        
+        # Super admins can see all records
+        if self.request.user.is_superuser:
+            return queryset
+        
+        # Tenant admins can see users in their organization
+        try:
+            user_role = self.request.user.global_role
+            if user_role.role == 'tenant_admin':
+                # Filter by organization/company if needed
+                return queryset
+        except UserRole.DoesNotExist:
+            pass
+        
+        # Regular users can only see their own record
+        return queryset.filter(user=self.request.user)
+    
+    def perform_create(self, serializer):
+        """Create unified record and sync with related models"""
+        unified_record = serializer.save()
+        
+        # Sync with User model
+        user = unified_record.user
+        if unified_record.name:
+            name_parts = unified_record.name.split()
+            user.first_name = name_parts[0] if name_parts else ''
+            user.last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ''
+        
+        if unified_record.email:
+            user.email = unified_record.email
+        
+        # Sync status with User.is_active
+        if unified_record.status == 'active':
+            user.is_active = True
+        elif unified_record.status == 'inactive':
+            user.is_active = False
+        
+        user.save()
+        
+        # Create/update UserRole
+        user_role, created = UserRole.objects.get_or_create(user=user)
+        user_role.role = unified_record.role
+        user_role.save()
+        
+        # Create/update UserProfile
+        user_profile, created = UserProfile.objects.get_or_create(user=user)
+        user_profile.company = unified_record.company
+        user_profile.save()
+        
+        print(f"Created unified record for user {user.username} and synced with related models")
+    
+    def update(self, request, *args, **kwargs):
+        """Override update to ensure proper synchronization"""
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        
+        # Save the unified record
+        unified_record = serializer.save()
+        
+        # Sync with related models
+        self._sync_with_related_models(unified_record)
+        
+        if getattr(instance, '_prefetched_objects_cache', None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+        
+        return Response(serializer.data)
+    
+    def partial_update(self, request, *args, **kwargs):
+        """Override partial_update to ensure proper synchronization"""
+        kwargs['partial'] = True
+        return self.update(request, *args, **kwargs)
+    
+    def _sync_with_related_models(self, unified_record):
+        """Helper method to sync unified record with related models"""
+        user = unified_record.user
+        
+        # Sync with User model
+        if unified_record.name:
+            name_parts = unified_record.name.split()
+            user.first_name = name_parts[0] if name_parts else ''
+            user.last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ''
+        
+        if unified_record.email:
+            user.email = unified_record.email
+        
+        # Sync status with User.is_active
+        if unified_record.status == 'active':
+            user.is_active = True
+        elif unified_record.status == 'inactive':
+            user.is_active = False
+        
+        user.save()
+        
+        # Update UserRole
+        try:
+            user_role = user.global_role
+            user_role.role = unified_record.role
+            user_role.save()
+        except UserRole.DoesNotExist:
+            UserRole.objects.create(user=user, role=unified_record.role)
+        
+        # Update UserProfile
+        try:
+            user_profile = user.profile
+            user_profile.company = unified_record.company
+            user_profile.save()
+        except UserProfile.DoesNotExist:
+            UserProfile.objects.create(user=user, company=unified_record.company)
+        
+        print(f"Synced unified record for user {user.username} with related models")
+    
+    def perform_update(self, serializer):
+        """Update unified record and sync with related models"""
+        unified_record = serializer.save()
+        
+        # Sync with related models
+        self._sync_with_related_models(unified_record)
+    
+    def perform_destroy(self, instance):
+        """Delete unified record and handle related models"""
+        user = instance.user
+        username = user.username
+        
+        # Delete the unified record
+        instance.delete()
+        
+        # Note: We don't delete the User, UserRole, or UserProfile here
+        # as they might be needed for other purposes
+        # The unified record is just a view, not the source of truth
+        
+        print(f"Deleted unified record for user {username}")
+    
+    @action(detail=False, methods=['get'])
+    def statistics(self, request):
+        """Get statistics about unified user records"""
+        queryset = self.get_queryset()
+        
+        stats = {
+            'total_users': queryset.count(),
+            'active_users': queryset.filter(status='active').count(),
+            'inactive_users': queryset.filter(status='inactive').count(),
+            'role_distribution': queryset.values('role').annotate(
+                count=Count('id')
+            ),
+            'status_distribution': queryset.values('status').annotate(
+                count=Count('id')
+            ),
+            'company_distribution': queryset.values('company__name').annotate(
+                count=Count('id')
+            ).exclude(company__name__isnull=True)
+        }
+        
+        return Response(stats)
+    
+    @action(detail=True, methods=['post'])
+    def sync_with_related_models(self, request, pk=None):
+        """Manually sync unified record with related models"""
+        try:
+            unified_record = self.get_object()
+            
+            # Sync with related models
+            self._sync_with_related_models(unified_record)
+            
+            return Response({
+                'message': f'Successfully synced unified record for user {unified_record.user.username}',
+                'user_id': unified_record.user.id,
+                'username': unified_record.user.username
+            })
+            
+        except Exception as e:
+            return Response({
+                'error': f'Failed to sync: {str(e)}'
+            }, status=400)
+    
+    @action(detail=False, methods=['post'])
+    def sync_all_records(self, request):
+        """Sync all unified records with their related models"""
+        try:
+            unified_records = self.get_queryset()
+            synced_count = 0
+            errors = []
+            
+            for unified_record in unified_records:
+                try:
+                    self._sync_with_related_models(unified_record)
+                    synced_count += 1
+                except Exception as e:
+                    errors.append(f"User {unified_record.user.username}: {str(e)}")
+            
+            return Response({
+                'message': f'Successfully synced {synced_count} unified records',
+                'synced_count': synced_count,
+                'total_records': unified_records.count(),
+                'errors': errors if errors else None
+            })
+            
+        except Exception as e:
+            return Response({
+                'error': f'Failed to sync all records: {str(e)}'
+            }, status=400)
+    
+

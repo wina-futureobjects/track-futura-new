@@ -5,8 +5,8 @@ from .views import (
     OrganizationListCreateView, OrganizationDetailView,
     OrganizationMembershipView, OrganizationMembershipDetailView,
     UserSearchView, OrganizationStatsView, ProjectStatsView, CSRFTokenView,
-    PlatformViewSet, ServiceViewSet, PlatformServiceViewSet,
-    AvailablePlatformsViewSet
+    CurrentUserView, PlatformViewSet, ServiceViewSet, PlatformServiceViewSet,
+    AvailablePlatformsViewSet, UnifiedUserRecordViewSet
 )
 from rest_framework.authtoken.views import obtain_auth_token
 from rest_framework.routers import DefaultRouter
@@ -17,6 +17,7 @@ urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
     path('login/', CustomAuthToken.as_view(), name='login'),
     path('profile/', UserProfileView.as_view(), name='profile'),
+    path('me/', CurrentUserView.as_view(), name='current-user'),
     path('csrf-token/', CSRFTokenView.as_view(), name='csrf-token'),
 
     # User search
@@ -40,6 +41,7 @@ router.register(r'platforms', PlatformViewSet, basename='platform')
 router.register(r'services', ServiceViewSet, basename='service')
 router.register(r'platform-services', PlatformServiceViewSet, basename='platform-service')
 router.register(r'available-platforms', AvailablePlatformsViewSet, basename='available-platform')
+router.register(r'unified-users', UnifiedUserRecordViewSet, basename='unified-user')
 
 # Include router URLs
 urlpatterns += router.urls
