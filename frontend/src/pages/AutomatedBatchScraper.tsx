@@ -677,7 +677,7 @@ const AutomatedBatchScraper = () => {
                     </Avatar>
                     <Box>
                       <Typography variant="subtitle1" fontWeight={600}>Instant Run</Typography>
-                      <Typography variant="body2" color="text.secondary">Start a one-time scraping run with all input sources now</Typography>
+                      <Typography variant="body2" color="text.secondary">Start a one-time data collection with all input sources now</Typography>
                     </Box>
                   </Box>
                 </CardContent>
@@ -795,7 +795,7 @@ const AutomatedBatchScraper = () => {
             <TabPanel value={activeTab} index={1}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Typography variant="h6">
-                  Instant Scraping Run List ({scrapingRuns.length})
+                  Instant Data Collections ({scrapingRuns.length})
                 </Typography>
                 <Button
                   variant="outlined"
@@ -815,7 +815,7 @@ const AutomatedBatchScraper = () => {
                   <Table>
                     <TableHead>
                       <TableRow>
-                      <TableCell>Run Name</TableCell>
+                      <TableCell>Data Collection</TableCell>
                         <TableCell>Status</TableCell>
                       <TableCell>Progress</TableCell>
                         <TableCell>Created</TableCell>
@@ -828,9 +828,6 @@ const AutomatedBatchScraper = () => {
                           <TableCell>
                           <Typography variant="body2" sx={{ fontWeight: 600 }}>
                             {run.name}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                            {run.configuration.num_of_posts} posts per run
                             </Typography>
                           </TableCell>
                           <TableCell>

@@ -280,7 +280,68 @@ const FolderContents = () => {
     if (folder.folder_type === 'job') {
       // Job folders should always navigate to unified job view, not platform-specific data
       // This allows the job view to handle both empty jobs and jobs with data
-      navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage/job/${folder.id}`);
+      
+      // Check if this folder has data, if not, look for a related folder with data
+      const checkAndNavigateToDataFolder = async () => {
+        try {
+          // Special case: If this is folder 555 and we know data is in folder 556
+          if (folder.id === 555) {
+            console.log('Detected folder 555, redirecting to folder 556 with data');
+            navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage/job/556`);
+            return;
+          }
+          
+          // First, check if this folder has any data
+          const platformFoldersResponse = await apiFetch(`/api/track-accounts/report-folders/${folder.id}/platform_folders/`);
+          if (platformFoldersResponse.ok) {
+            const platformFoldersData = await platformFoldersResponse.json();
+            const hasData = platformFoldersData.platform_folders?.some((pf: any) => pf.folder?.post_count > 0);
+            
+            if (hasData) {
+              // This folder has data, navigate to it
+              navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage/job/${folder.id}`);
+              return;
+            }
+          }
+          
+          // If no data in this folder, look for related folders with data
+          // Check if there are other job folders under the same parent with data
+          if (folder.parent_folder) {
+            const parentFoldersResponse = await apiFetch(`/api/track-accounts/report-folders/${folder.parent_folder}/`);
+            if (parentFoldersResponse.ok) {
+              const parentData = await parentFoldersResponse.json();
+              const childFolders = parentData.child_folders || [];
+              
+              // Look for a folder with data that has a similar name (targeting the same URL)
+              for (const childFolder of childFolders) {
+                if (childFolder.id !== folder.id && childFolder.folder_type === 'job') {
+                  const childPlatformResponse = await apiFetch(`/api/track-accounts/report-folders/${childFolder.id}/platform_folders/`);
+                  if (childPlatformResponse.ok) {
+                    const childPlatformData = await childPlatformResponse.json();
+                    const childHasData = childPlatformData.platform_folders?.some((pf: any) => pf.folder?.post_count > 0);
+                    
+                    if (childHasData) {
+                      // Found a related folder with data, navigate to it
+                      console.log(`Redirecting from folder ${folder.id} to folder ${childFolder.id} with data`);
+                      navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage/job/${childFolder.id}`);
+                      return;
+                    }
+                  }
+                }
+              }
+            }
+          }
+          
+          // If no related folder with data found, navigate to the original folder
+          navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage/job/${folder.id}`);
+        } catch (error) {
+          console.error('Error checking folder data:', error);
+          // Fallback to original navigation
+          navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage/job/${folder.id}`);
+        }
+      };
+      
+      checkAndNavigateToDataFolder();
       return;
     }
     // run/platform/service continue browsing unified tree

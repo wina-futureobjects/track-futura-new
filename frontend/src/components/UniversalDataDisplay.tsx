@@ -1547,7 +1547,7 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
                                  return (
                                    <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
                                      <Avatar sx={{ width: 24, height: 24, mr: 1, fontSize: '0.75rem', flexShrink: 0 }}>
-                                       {item.user.charAt(0).toUpperCase()}
+                                       {(item.user || 'U').charAt(0).toUpperCase()}
                                      </Avatar>
                                      <Box sx={{ minWidth: 0, flex: 1 }}>
                                        <Typography variant="body2" fontWeight={500} sx={{ 
@@ -1555,9 +1555,9 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
                                          textOverflow: 'ellipsis',
                                          whiteSpace: 'nowrap'
                                        }}>
-                                         {item.user}
+                                         {item.user || 'Unknown User'}
                                        </Typography>
-                                       {item.is_verified && (
+                                       {item.is_verified === true && (
                                          <Chip 
                                            size="small" 
                                            color="primary" 

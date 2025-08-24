@@ -71,7 +71,7 @@ def trigger_facebook_scrape(self, request):
         
         # Get webhook base URL from settings
         from django.conf import settings
-        webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://d5177adb0315.ngrok-free.app')
+        webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://178ab6e6114a.ngrok-free.app')
         
         params = {
             "dataset_id": config.dataset_id,
@@ -287,7 +287,7 @@ def _make_brightdata_batch_request(self, scraper_requests: List[ScraperRequest],
         config = primary_request.config
 
         # Import Django settings to get webhook base URL
-        webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://d5177adb0315.ngrok-free.app')
+        webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://178ab6e6114a.ngrok-free.app')
 
         url = "https://api.brightdata.com/datasets/v3/trigger"
         headers = {
@@ -365,8 +365,8 @@ POST https://api.brightdata.com/datasets/v3/trigger
 ```json
 {
     "dataset_id": "gd_lkaxegm826bjpoo9m5",
-    "endpoint": "https://d5177adb0315.ngrok-free.app/api/brightdata/webhook/",
-    "notify": "https://d5177adb0315.ngrok-free.app/api/brightdata/notify/",
+    "endpoint": "https://178ab6e6114a.ngrok-free.app/api/brightdata/webhook/",
+    "notify": "https://178ab6e6114a.ngrok-free.app/api/brightdata/notify/",
     "format": "json",
     "uncompressed_webhook": "true",
     "include_errors": "true",
@@ -438,8 +438,8 @@ POST https://api.brightdata.com/datasets/v3/trigger
 
 ### Environment Variables
 ```bash
-BRIGHTDATA_WEBHOOK_BASE_URL=https://d5177adb0315.ngrok-free.app
-BRIGHTDATA_BASE_URL=https://d5177adb0315.ngrok-free.app
+BRIGHTDATA_WEBHOOK_BASE_URL=https://178ab6e6114a.ngrok-free.app
+BRIGHTDATA_BASE_URL=https://178ab6e6114a.ngrok-free.app
 ```
 
 ### Database Configuration

@@ -81,6 +81,14 @@ class FolderSerializer(serializers.ModelSerializer):
         return []
 
 class FacebookPostSerializer(serializers.ModelSerializer):
+    # Map fields to match frontend expectations
+    user = serializers.CharField(source='user_username_raw', read_only=True)
+    date = serializers.DateTimeField(source='date_posted', read_only=True)
+    comments = serializers.IntegerField(source='num_comments', read_only=True)
+    
+    # Additional fields that the frontend might be using
+    user_posted = serializers.CharField(source='user_username_raw', read_only=True)
+    
     class Meta:
         model = FacebookPost
         fields = '__all__'

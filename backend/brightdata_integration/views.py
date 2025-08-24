@@ -1864,19 +1864,19 @@ def _process_webhook_data_with_batch_support(data, platform: str, scraper_reques
         platform_folder = None
         if scrape_job:
             try:
-                # Get the pre-created folder for this platform
+                # Get the pre-created folder for this platform using unified_job_folder
                 if platform.lower() == 'instagram':
                     from instagram_data.models import Folder
-                    platform_folder = Folder.objects.filter(scrape_job=scrape_job).first()
+                    platform_folder = Folder.objects.filter(unified_job_folder=scrape_job).first()
                 elif platform.lower() == 'facebook':
                     from facebook_data.models import Folder
-                    platform_folder = Folder.objects.filter(scrape_job=scrape_job).first()
+                    platform_folder = Folder.objects.filter(unified_job_folder=scrape_job).first()
                 elif platform.lower() == 'linkedin':
                     from linkedin_data.models import Folder
-                    platform_folder = Folder.objects.filter(scrape_job=scrape_job).first()
+                    platform_folder = Folder.objects.filter(unified_job_folder=scrape_job).first()
                 elif platform.lower() == 'tiktok':
                     from tiktok_data.models import Folder
-                    platform_folder = Folder.objects.filter(scrape_job=scrape_job).first()
+                    platform_folder = Folder.objects.filter(unified_job_folder=scrape_job).first()
                 
                 if platform_folder:
                     logger.info(f"✅ Found pre-created {platform} folder: {platform_folder.id} for job: {scrape_job.id}")
@@ -1924,7 +1924,8 @@ def _process_webhook_data_with_batch_support(data, platform: str, scraper_reques
                             defaults={
                                 'name': unified_folder.name,
                                 'description': f'Created from UnifiedRunFolder {unified_folder.id}',
-                                'project_id': unified_folder.project_id
+                                'project_id': unified_folder.project_id,
+                                'scraping_run': unified_folder.scraping_run
                             }
                         )
                         if created:
@@ -1947,22 +1948,47 @@ def _process_webhook_data_with_batch_support(data, platform: str, scraper_reques
                 # NEW: Use pre-created platform folder
                 if platform_folder:
                     post_fields['folder'] = platform_folder
+                    logger.info(f"✅ Using pre-created platform folder: {platform_folder.id} for post")
+                else:
+                    logger.warning(f"⚠️  No platform folder found for {platform} posts")
                     
-                    # NEW: Add direct job linking
-                    if scrape_job:
-                        post_fields['scrape_job'] = scrape_job
-                    if scraper_requests:
-                        post_fields['scraper_request'] = scraper_requests[0]  # Use first request
-                    
-                    # NEW: Add webhook tracking
-                    post_fields['webhook_snapshot_id'] = scraper_requests[0].request_id if scraper_requests else None
-                    post_fields['webhook_received_at'] = timezone.now()
+                # NEW: Add webhook tracking
+                post_fields['webhook_snapshot_id'] = scraper_requests[0].request_id if scraper_requests else None
+                post_fields['webhook_received_at'] = timezone.now()
 
                 # Create or update post
                 post_id = post_data.get('post_id') or post_data.get('id') or post_data.get('pk')
                 if post_id:
                     # For all platforms, check uniqueness by post_id and folder (if folder exists)
                     folder = post_fields.get('folder')
+                    
+                    # FALLBACK: If no folder assigned, try to find or create one
+                    if not folder and scraper_requests:
+                        try:
+                            # Try to get the folder from the first scraper request
+                            shared_folder_id = scraper_requests[0].folder_id
+                            if shared_folder_id:
+                                from track_accounts.models import UnifiedRunFolder
+                                unified_folder = UnifiedRunFolder.objects.get(id=shared_folder_id)
+                                
+                                # Try to get or create platform folder
+                                if platform.lower() == 'facebook':
+                                    from facebook_data.models import Folder
+                                    folder, created = Folder.objects.get_or_create(
+                                        unified_job_folder=unified_folder,
+                                        defaults={
+                                            'name': unified_folder.name,
+                                            'description': f'Created from UnifiedRunFolder {unified_folder.id}',
+                                            'project_id': unified_folder.project_id,
+                                            'scraping_run': unified_folder.scraping_run
+                                        }
+                                    )
+                                    if created:
+                                        logger.info(f"✅ Created fallback Facebook folder: {folder.id}")
+                                    post_fields['folder'] = folder
+                        except Exception as e:
+                            logger.error(f"Error in fallback folder creation: {str(e)}")
+                    
                     if folder:
                         # If post has a folder, check uniqueness by post_id and folder
                         post, created = PostModel.objects.get_or_create(

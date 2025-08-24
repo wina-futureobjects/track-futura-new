@@ -62,7 +62,7 @@ except json.JSONDecodeError as json_err:
 **Solution**: Removed all hardcoded fallbacks and added explicit error handling:
 ```python
 # Before (problematic):
-webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://d5177adb0315.ngrok-free.app')
+webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL', 'https://178ab6e6114a.ngrok-free.app')
 
 # After (fixed):
 webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL')

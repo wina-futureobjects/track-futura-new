@@ -58,6 +58,7 @@ interface Post {
   post_id: string;
   url: string;
   user_posted: string;
+  content: string;
   description: string;
   likes: number;
   num_comments: number;
@@ -71,7 +72,7 @@ const postToUniversalData = (posts: Post[]): UniversalDataItem[] => {
   return posts.map(post => ({
     id: post.id,
     url: post.url,
-    content: post.description,
+    content: post.content,
     user: post.user_posted,
     date: post.date_posted,
     likes: post.likes,
@@ -98,6 +99,7 @@ const JobFolderView = () => {
   const [error, setError] = useState<string | null>(null);
   const [universalFolder, setUniversalFolder] = useState<UniversalFolder | null>(null);
   const [calculatedStats, setCalculatedStats] = useState<any>(null);
+  const [jobStatus, setJobStatus] = useState<{status: string, message: string} | null>(null);
 
   const fetchJobData = async () => {
     setLoading(true);
@@ -152,12 +154,30 @@ const JobFolderView = () => {
         setScraperRequests(filteredRequests);
       }
 
-                                                       // Fetch platform-specific data (posts) for this job folder
-         const platformDataResponse = await apiFetch(`/api/track-accounts/report-folders/${folderId}/platform_data/`);
-         if (platformDataResponse.ok) {
-           const platformData = await platformDataResponse.json();
-           const fetchedPosts = platformData.posts || [];
-           console.log('Fetched posts:', fetchedPosts.length, fetchedPosts);
+         // Fetch platform folders and data for this job folder
+         const platformFoldersResponse = await apiFetch(`/api/track-accounts/report-folders/${folderId}/platform_folders/`);
+         if (platformFoldersResponse.ok) {
+           const platformFoldersData = await platformFoldersResponse.json();
+           console.log('Platform folders data:', platformFoldersData);
+           
+           // Check if we have platform folders with posts
+           const platformFolders = platformFoldersData.platform_folders || [];
+           let fetchedPosts: Post[] = [];
+           
+           // If we have platform folders, try to get posts from the first one with posts
+           for (const pf of platformFolders) {
+             if (pf.folder && pf.folder.post_count > 0) {
+               // Fetch posts from this platform folder
+               const platformDataResponse = await apiFetch(`/api/track-accounts/report-folders/${folderId}/platform_data/`);
+               if (platformDataResponse.ok) {
+                 const platformData = await platformDataResponse.json();
+                 fetchedPosts = platformData.posts || [];
+                 console.log('Fetched posts from platform folder:', fetchedPosts.length, fetchedPosts);
+                 break;
+               }
+             }
+           }
+           
            setPosts(fetchedPosts);
            
            // Update universal folder with platform info
@@ -165,13 +185,22 @@ const JobFolderView = () => {
              if (prevFolder) {
                return {
                  ...prevFolder,
-                 platform: platformData.platform || prevFolder.platform
+                 platform: platformFoldersData.platform_folders?.[0]?.platform || prevFolder.platform
                };
              }
              return prevFolder;
            });
+           
+           // If no platform folders or no posts, show appropriate message
+           if (platformFoldersData.status && platformFoldersData.message) {
+             console.log('Job status:', platformFoldersData.status, 'Message:', platformFoldersData.message);
+             setJobStatus({
+               status: platformFoldersData.status,
+               message: platformFoldersData.message
+             });
+           }
          } else {
-           console.error('Failed to fetch platform data:', platformDataResponse.status);
+           console.error('Failed to fetch platform folders:', platformFoldersResponse.status);
          }
 
     } catch (error) {
@@ -293,22 +322,31 @@ const JobFolderView = () => {
 
         
 
-                                                                       {/* Universal Data Display */}
-                       {calculatedStats ? (
-              <UniversalDataDisplay
-                folder={universalFolder}
-                platform={universalFolder.platform}
-                onBackNavigation={handleBackClick}
-                onRefresh={fetchJobData}
-                data={postToUniversalData(posts)}
-                stats={calculatedStats}
-                disableApiFetch={true}
-              />
-            ) : (
-             <Box sx={{ p: 3, textAlign: 'center' }}>
-               <Typography>Loading data...</Typography>
-             </Box>
-           )}
+         {/* Universal Data Display */}
+         {calculatedStats ? (
+           <UniversalDataDisplay
+             folder={universalFolder}
+             platform={universalFolder.platform}
+             onBackNavigation={handleBackClick}
+             onRefresh={fetchJobData}
+             data={postToUniversalData(posts)}
+             stats={calculatedStats}
+             disableApiFetch={true}
+           />
+         ) : jobStatus ? (
+           <Box sx={{ p: 3, textAlign: 'center' }}>
+             <Typography variant="h6" color="text.secondary" gutterBottom>
+               {jobStatus.status === 'completed' ? 'No Data Available' : 'Job in Progress'}
+             </Typography>
+             <Typography color="text.secondary">
+               {jobStatus.message}
+             </Typography>
+           </Box>
+         ) : (
+           <Box sx={{ p: 3, textAlign: 'center' }}>
+             <Typography>Loading data...</Typography>
+           </Box>
+         )}
 
         {/* Job Details (Collapsible) */}
         {scraperRequests.length > 0 && (

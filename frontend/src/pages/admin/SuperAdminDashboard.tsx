@@ -834,9 +834,9 @@ const SuperAdminDashboard = () => {
       <Paper sx={{ mb: 3 }}>
         <Tabs value={activeTab} onChange={handleTabChange} centered>
           <Tab label="Users" />
-          <Tab label="Ongoing....." />
+          <Tab label="Companies" />
           <Tab label="System Settings" />
-          <Tab label="Brightdata Configuration" />
+          <Tab label="Scraper Configuration" />
         </Tabs>
       </Paper>
 
@@ -1064,10 +1064,10 @@ const SuperAdminDashboard = () => {
       {activeTab === 3 && (
         <Box>
           <Typography variant="h4" gutterBottom component="h1">
-            Brightdata API Configuration
+            Scraper Configuration
           </Typography>
           <Typography variant="body1" color="text.secondary" paragraph sx={{ mb: 3 }}>
-            Manage your platform-specific Brightdata API configurations for automated data scraping. Each platform requires its own configuration with a unique dataset ID.
+            Manage your platform-specific scraper configurations for automated data scraping. Each platform and service requires its own configuration with a unique dataset ID.
           </Typography>
 
           {/* Platform Overview Cards */}
@@ -1170,13 +1170,6 @@ const SuperAdminDashboard = () => {
                     </Paper>
                   );
                 })}
-              </Box>
-              
-              <Box sx={{ mt: 3, p: 2, backgroundColor: '#f8f9fa', borderRadius: 1, border: '1px solid #e9ecef' }}>
-                <Typography variant="body2" sx={{ color: '#6c757d', textAlign: 'center' }}>
-                  💡 <strong>Tip:</strong> Configure at least one platform to enable automated data scraping. 
-                  Each platform requires a unique Brightdata dataset ID and API token.
-                </Typography>
               </Box>
             </CardContent>
           </Card>
