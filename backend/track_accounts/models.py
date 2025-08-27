@@ -136,8 +136,10 @@ class UnifiedRunFolder(models.Model):
     """
     FOLDER_TYPE_CHOICES = [
         ('run', 'Run'),
+        ('platform', 'Platform'),
         ('service', 'Service'),
-        ('content', 'Content'),
+        ('job', 'Job'),
+        ('content', 'Content'),  # Legacy / backward compatibility
     ]
     
     CATEGORY_CHOICES = [
@@ -146,10 +148,28 @@ class UnifiedRunFolder(models.Model):
         ('comments', 'Comments'),
     ]
     
+    # Identity fields and hierarchy metadata
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     folder_type = models.CharField(max_length=20, choices=FOLDER_TYPE_CHOICES, default='content')
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='posts')
+
+    # Explicit identity for platform/service (nullable for legacy types)
+    PLATFORM_CODE_CHOICES = [
+        ('facebook', 'Facebook'),
+        ('instagram', 'Instagram'),
+        ('linkedin', 'LinkedIn'),
+        ('tiktok', 'TikTok'),
+    ]
+    SERVICE_CODE_CHOICES = [
+        ('posts', 'Posts'),
+        ('reels', 'Reels'),
+        ('comments', 'Comments'),
+        ('profiles', 'Profiles'),
+    ]
+
+    platform_code = models.CharField(max_length=20, choices=PLATFORM_CODE_CHOICES, null=True, blank=True)
+    service_code = models.CharField(max_length=20, choices=SERVICE_CODE_CHOICES, null=True, blank=True)
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='unified_run_folders', null=True)
     scraping_run = models.ForeignKey('workflow.ScrapingRun', on_delete=models.CASCADE, related_name='unified_folders', null=True, blank=True)
     parent_folder = models.ForeignKey('self', on_delete=models.CASCADE, related_name='subfolders', null=True, blank=True)
@@ -163,16 +183,63 @@ class UnifiedRunFolder(models.Model):
     def get_content_count(self):
         """Get the count of content items in this folder"""
         if self.folder_type == 'run':
-            # Count all service folders
+            # Count all platform folders (new), fallback to service if platform layer not present
+            platform_children = self.subfolders.filter(folder_type='platform').count()
+            if platform_children:
+                return platform_children
+            return self.subfolders.filter(folder_type='service').count()
+        elif self.folder_type == 'platform':
+            # Count all service folders under this platform
             return self.subfolders.filter(folder_type='service').count()
         elif self.folder_type == 'service':
-            # Count all content folders
+            # Count all job folders (new), fallback to legacy content
+            job_children = self.subfolders.filter(folder_type='job').count()
+            if job_children:
+                return job_children
             return self.subfolders.filter(folder_type='content').count()
         else:
-            # Content folder - no subfolders
+            # Job/content folder - no subfolders
             return 0
     
     class Meta:
         ordering = ['-created_at']
         verbose_name = "Unified Run Folder"
         verbose_name_plural = "Unified Run Folders"
+        indexes = [
+            models.Index(fields=['scraping_run', 'folder_type']),
+            models.Index(fields=['scraping_run', 'folder_type', 'platform_code', 'service_code']),
+        ]
+        constraints = [
+            # platform folders must have platform_code
+            models.CheckConstraint(
+                name='ck_unified_platform_requires_platform_code',
+                check=(
+                    models.Q(folder_type='platform', platform_code__isnull=False)
+                    | ~models.Q(folder_type='platform')
+                ),
+            ),
+            # service folders must have both platform_code and service_code
+            models.CheckConstraint(
+                name='ck_unified_service_requires_platform_and_service_code',
+                check=(
+                    models.Q(folder_type='service', platform_code__isnull=False, service_code__isnull=False)
+                    | ~models.Q(folder_type='service')
+                ),
+            ),
+        ]
+
+
+class ServiceFolderIndex(models.Model):
+    """
+    Fast lookup index to resolve (run, platform, service) to the corresponding Service folder.
+    """
+    scraping_run = models.ForeignKey('workflow.ScrapingRun', on_delete=models.CASCADE, related_name='service_folder_indexes')
+    platform_code = models.CharField(max_length=20, choices=UnifiedRunFolder.PLATFORM_CODE_CHOICES)
+    service_code = models.CharField(max_length=20, choices=UnifiedRunFolder.SERVICE_CODE_CHOICES)
+    folder = models.ForeignKey(UnifiedRunFolder, on_delete=models.CASCADE, related_name='indexed_service_folder')
+
+    class Meta:
+        unique_together = [('scraping_run', 'platform_code', 'service_code')]
+        indexes = [
+            models.Index(fields=['scraping_run', 'platform_code', 'service_code'])
+        ]

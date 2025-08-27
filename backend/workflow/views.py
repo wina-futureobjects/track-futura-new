@@ -327,6 +327,8 @@ class ScheduledScrapingTaskViewSet(viewsets.ModelViewSet):
                     task.platform: [task.service_type]
                 },
                 num_of_posts=task.num_of_posts,
+                start_date=task.start_date,
+                end_date=task.end_date,
                 auto_create_folders=task.auto_create_folders,
                 status='pending',
                 platform_params={

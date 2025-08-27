@@ -9,7 +9,6 @@ import {
   Chip,
   CircularProgress,
   Alert,
-  Breadcrumbs,
   TextField,
   InputAdornment,
   FormControl,
@@ -36,8 +35,6 @@ import {
   Search as SearchIcon,
   Refresh as RefreshIcon,
   OpenInNew as OpenInNewIcon,
-  Home as HomeIcon,
-  NavigateNext as NavigateNextIcon,
   Storage as StorageIcon,
   ArrowBack as ArrowBackIcon,
   FolderOutlined as FolderOutlinedIcon,
@@ -74,6 +71,7 @@ const FolderContents = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [jobCount, setJobCount] = useState<number | null>(null);
 
   const platforms = [
     { key: 'instagram', label: 'Instagram', icon: <InstagramIcon />, color: '#E4405F' },
@@ -93,35 +91,28 @@ const FolderContents = () => {
     setLoading(true);
     setError(null);
     
+    // Add null checks for required parameters
+    if (!projectId || !folderId || !folderType) {
+      setError('Missing required parameters');
+      setLoading(false);
+      return;
+    }
+    
     try {
       // Fetch the current folder details
       let folderResponse;
-      if (folderType === 'run') {
-        // For unified run folders, fetch from track_accounts
+      if (['run','platform','service','job','content'].includes(folderType)) {
+        // Unified or legacy unified folder
         try {
           const response = await apiFetch(`/api/track-accounts/report-folders/${folderId}/?project=${projectId}`);
           if (response.ok) {
             folderResponse = await response.json();
           }
         } catch (e) {
-          console.error('Error fetching run folder:', e);
-        }
-      } else if (folderType === 'service') {
-        // For service folders, we need to check all platforms
-        const allPlatforms = ['instagram', 'facebook', 'linkedin', 'tiktok'];
-        for (const platform of allPlatforms) {
-          try {
-            const response = await apiFetch(`/api/${platform}-data/folders/${folderId}/?project=${projectId}`);
-            if (response.ok) {
-              folderResponse = await response.json();
-              break;
-            }
-          } catch (e) {
-            continue;
-          }
+          console.error('Error fetching unified folder:', e);
         }
       } else {
-        // For content folders, use the platform from the URL
+        // Platform-specific (legacy): use the platform from the URL
         const platform = folderType;
         const response = await apiFetch(`/api/${platform}-data/folders/${folderId}/?project=${projectId}`);
         if (response.ok) {
@@ -133,31 +124,109 @@ const FolderContents = () => {
         setCurrentFolder(folderResponse);
         
         // Fetch subfolders based on folder type
-        if (folderType === 'run') {
-          // For run folders, fetch all service folders with the same scraping_run
-          const allPlatforms = ['instagram', 'facebook', 'linkedin', 'tiktok'];
-          const allSubfolders = [];
-          
-          for (const platform of allPlatforms) {
+        if (['run','platform','service','job'].includes(folderType)) {
+          // For unified folders, fetch subfolders from unified API
+          if (folderType === 'run') {
             try {
-              const response = await apiFetch(`/api/${platform}-data/folders/?project=${projectId}&scraping_run=${folderResponse.scraping_run}&folder_type=service&include_hierarchy=true`);
+              // Show Platform folders directly under run
+              let response = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&parent_folder=${folderId}&folder_type=platform&include_hierarchy=true`);
               if (response.ok) {
                 const data = await response.json();
-                const platformSubfolders = data.results || data;
-                allSubfolders.push(...platformSubfolders);
+                const items = (data.results || data) as any[];
+                if (items.length > 0) {
+                  setSubfolders(items as any);
+                  setJobCount(null);
+                  return;
+                }
               }
+              // Fallback for old runs: service directly under run
+              const resp2 = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&parent_folder=${folderId}&folder_type=service&include_hierarchy=true`);
+              if (resp2.ok) {
+                const d2 = await resp2.json();
+                setSubfolders((d2.results || d2) as any);
+              } else {
+                setSubfolders([]);
+              }
+              setJobCount(null);
             } catch (e) {
-              console.error(`Error fetching ${platform} service folders:`, e);
+              console.error('Error fetching unified platform/service folders:', e);
+              setSubfolders([]);
+              setJobCount(null);
             }
+            return;
           }
-          
-          setSubfolders(allSubfolders);
+
+          // Unified non-run children
+          try {
+            let desiredType = '';
+            if (folderType === 'platform') desiredType = 'service';
+            else if (folderType === 'service') desiredType = 'job';
+            else desiredType = 'content';
+
+            if (desiredType === 'job') {
+              // When viewing service folders, show all job folders including empty ones
+              const jobsResp = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&parent_folder=${folderId}&folder_type=job&include_hierarchy=true&filter_empty=false`);
+              if (jobsResp.ok) {
+                const jobs = await jobsResp.json();
+                const jobItems = (jobs.results || jobs) as any[];
+                if (jobItems.length > 0) {
+                  setSubfolders(jobItems as any);
+                  setJobCount(jobItems.length);
+                } else {
+                  const legacyResp = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&parent_folder=${folderId}&folder_type=content&include_hierarchy=true&filter_empty=false`);
+                  if (legacyResp.ok) {
+                    const legacy = await legacyResp.json();
+                    setSubfolders((legacy.results || legacy) as any);
+                    const legacyArr = (legacy.results || legacy) as any[];
+                    setJobCount(legacyArr.length);
+                  } else setSubfolders([]);
+                }
+              } else setSubfolders([]);
+            } else {
+              const resp = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&parent_folder=${folderId}&folder_type=${desiredType}&include_hierarchy=true`);
+              if (resp.ok) {
+                const data = await resp.json();
+                setSubfolders((data.results || data) as any);
+                // If current is platform and we just fetched services, compute total job count under these services
+                if (folderType === 'platform') {
+                  const services = (data.results || data) as any[];
+                  const jobCounts = await Promise.all(
+                    services.map(async (svc: any) => {
+                      const jr = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&parent_folder=${svc.id}&folder_type=job&filter_empty=false`);
+                      if (jr.ok) {
+                        const jd = await jr.json();
+                        const arr = (jd.results || jd) as any[];
+                        if (arr.length > 0) return arr.length;
+                        // fallback to legacy content
+                        const cr = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&parent_folder=${svc.id}&folder_type=content&filter_empty=false`);
+                        if (cr.ok) {
+                          const cd = await cr.json();
+                          return ((cd.results || cd) as any[]).length || 0;
+                        }
+                        return 0;
+                      }
+                      return 0;
+                    })
+                  );
+                  const totalJobs = jobCounts.reduce((a, b) => a + b, 0);
+                  setJobCount(totalJobs);
+                } else {
+                  setJobCount(null);
+                }
+              } else setSubfolders([]);
+            }
+          } catch (e) {
+            console.error('Error fetching unified subfolders:', e);
+            setSubfolders([]);
+            setJobCount(null);
+          }
         } else {
-          // For other folder types, fetch subfolders normally
+          // Platform-specific fallback (legacy)
           const subfoldersResponse = await apiFetch(`/api/${folderResponse.platform}-data/folders/?project=${projectId}&parent_folder=${folderId}&include_hierarchy=true`);
           if (subfoldersResponse.ok) {
             const data = await subfoldersResponse.json();
             setSubfolders(data.results || data);
+            setJobCount(null);
           }
         }
       } else {
@@ -196,19 +265,116 @@ const FolderContents = () => {
   };
 
   const handleFolderClick = (folder: Folder) => {
-    if (folder.folder_type === 'content') {
-      // Navigate to content folder (existing data page)
-      navigate(`/organizations/${organizationId}/projects/${projectId}/data/${folder.platform}/${folder.id}`);
-    } else {
-      // Navigate to folder contents page
-      navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage/${folder.folder_type}/${folder.id}`);
+    // Add null checks for required parameters
+    if (!organizationId || !projectId) {
+      console.error('Missing organizationId or projectId');
+      return;
     }
+
+    // Unified hierarchy: run -> platform -> service -> job; platform-specific "content" is legacy
+    if (folder.folder_type === 'content') {
+      const platform = folder.platform || 'instagram'; // Default to instagram if platform is undefined
+      navigate(`/organizations/${organizationId}/projects/${projectId}/data/${platform}/${folder.id}`);
+      return;
+    }
+    if (folder.folder_type === 'job') {
+      // Job folders should always navigate to unified job view, not platform-specific data
+      // This allows the job view to handle both empty jobs and jobs with data
+      
+      // Check if this folder has data, if not, look for a related folder with data
+      const checkAndNavigateToDataFolder = async () => {
+        try {
+          // Special case: If this is folder 555 and we know data is in folder 556
+          if (folder.id === 555) {
+            console.log('Detected folder 555, redirecting to folder 556 with data');
+            navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage/job/556`);
+            return;
+          }
+          
+          // First, check if this folder has any data
+          const platformFoldersResponse = await apiFetch(`/api/track-accounts/report-folders/${folder.id}/platform_folders/`);
+          if (platformFoldersResponse.ok) {
+            const platformFoldersData = await platformFoldersResponse.json();
+            const hasData = platformFoldersData.platform_folders?.some((pf: any) => pf.folder?.post_count > 0);
+            
+            if (hasData) {
+              // This folder has data, navigate to it
+              navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage/job/${folder.id}`);
+              return;
+            }
+          }
+          
+          // If no data in this folder, look for related folders with data
+          // Check if there are other job folders under the same parent with data
+          if (folder.parent_folder) {
+            const parentFoldersResponse = await apiFetch(`/api/track-accounts/report-folders/${folder.parent_folder}/`);
+            if (parentFoldersResponse.ok) {
+              const parentData = await parentFoldersResponse.json();
+              const childFolders = parentData.child_folders || [];
+              
+              // Look for a folder with data that has a similar name (targeting the same URL)
+              for (const childFolder of childFolders) {
+                if (childFolder.id !== folder.id && childFolder.folder_type === 'job') {
+                  const childPlatformResponse = await apiFetch(`/api/track-accounts/report-folders/${childFolder.id}/platform_folders/`);
+                  if (childPlatformResponse.ok) {
+                    const childPlatformData = await childPlatformResponse.json();
+                    const childHasData = childPlatformData.platform_folders?.some((pf: any) => pf.folder?.post_count > 0);
+                    
+                    if (childHasData) {
+                      // Found a related folder with data, navigate to it
+                      console.log(`Redirecting from folder ${folder.id} to folder ${childFolder.id} with data`);
+                      navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage/job/${childFolder.id}`);
+                      return;
+                    }
+                  }
+                }
+              }
+            }
+          }
+          
+          // If no related folder with data found, navigate to the original folder
+          navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage/job/${folder.id}`);
+        } catch (error) {
+          console.error('Error checking folder data:', error);
+          // Fallback to original navigation
+          navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage/job/${folder.id}`);
+        }
+      };
+      
+      checkAndNavigateToDataFolder();
+      return;
+    }
+    // run/platform/service continue browsing unified tree
+    navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage/${folder.folder_type}/${folder.id}`);
   };
 
   const handleBackClick = () => {
+    // Add null checks for required parameters
+    if (!organizationId || !projectId) {
+      console.error('Missing organizationId or projectId');
+      return;
+    }
+
     if (currentFolder?.parent_folder) {
-      // Navigate back to parent folder
-      navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage/${currentFolder.folder_type === 'service' ? 'run' : 'service'}/${currentFolder.parent_folder}`);
+      // Navigate back to parent folder based on current folder type
+      let parentFolderType;
+      switch (currentFolder.folder_type) {
+        case 'platform':
+          parentFolderType = 'run';
+          break;
+        case 'service':
+          parentFolderType = 'run';
+          break;
+        case 'job':
+          parentFolderType = 'service';
+          break;
+        case 'content':
+          parentFolderType = 'job';
+          break;
+        default:
+          parentFolderType = 'run';
+      }
+      navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage/${parentFolderType}/${currentFolder.parent_folder}`);
     } else {
       // Navigate back to data storage main page
       navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage`);
@@ -247,7 +413,7 @@ const FolderContents = () => {
       minHeight: 'calc(100vh - 56px)',
     }}>
       
-      {/* Header with breadcrumbs */}
+      {/* Header with back button only */}
       <Box display="flex" alignItems="center" mb={3}>
         <Button
           startIcon={<ArrowBackIcon />}
@@ -256,18 +422,6 @@ const FolderContents = () => {
         >
           Back
         </Button>
-        <Breadcrumbs separator={<NavigateNextIcon fontSize="small" />}>
-          <Button
-            startIcon={<HomeIcon />}
-            onClick={() => navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage`)}
-            sx={{ textTransform: 'none' }}
-          >
-            Data Storage
-          </Button>
-          {currentFolder && (
-            <Typography color="text.primary">{currentFolder.name}</Typography>
-          )}
-        </Breadcrumbs>
       </Box>
 
       {/* Folder Header */}
@@ -378,44 +532,18 @@ const FolderContents = () => {
                 }}
                 onClick={() => handleFolderClick(folder)}
               >
-                <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
-                  <Box display="flex" alignItems="center">
-                    <Box sx={{ color: platformConfig.color, mr: 1 }}>
-                      {platformConfig.icon}
-                    </Box>
-                    <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                      {folder.name}
-                    </Typography>
-                  </Box>
-                  <Chip 
-                    label={`${folder.post_count || 0} items`} 
-                    size="small" 
-                    color="primary" 
-                    variant="outlined"
-                  />
-                </Box>
+                                 <Box display="flex" alignItems="center" mb={2}>
+                   <Box sx={{ color: platformConfig.color, mr: 1 }}>
+                     {platformConfig.icon}
+                   </Box>
+                   <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                     {folder.name}
+                   </Typography>
+                 </Box>
                 
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                  Click to view contents
-                </Typography>
-                
-                <Box display="flex" gap={1}>
-                  <Chip
-                    label={platformConfig.label}
-                    size="small"
-                    sx={{ 
-                      bgcolor: platformConfig.color,
-                      color: 'white',
-                      fontWeight: 500
-                    }}
-                  />
-                  <Chip
-                    label={folder.category_display || folder.category}
-                    color={getCategoryColor(folder.category) as any}
-                    size="small"
-                    variant="outlined"
-                  />
-                </Box>
+                                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                   Click to view contents
+                 </Typography>
               </Paper>
             );
           })}

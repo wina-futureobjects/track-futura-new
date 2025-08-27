@@ -683,6 +683,24 @@ class WorkflowService:
             ScrapingRun: Created scraping run instance
         """
         try:
+            # Validate configuration
+            if not configuration.get('start_date'):
+                raise ValueError("Start date is required in configuration")
+            
+            if not configuration.get('end_date'):
+                raise ValueError("End date is required in configuration")
+            
+            # Validate that end_date is not before start_date
+            try:
+                from datetime import datetime
+                start_date = datetime.fromisoformat(configuration['start_date'].replace('Z', '+00:00'))
+                end_date = datetime.fromisoformat(configuration['end_date'].replace('Z', '+00:00'))
+                
+                if end_date < start_date:
+                    raise ValueError("End date cannot be before start date")
+            except (ValueError, AttributeError):
+                raise ValueError("Invalid date format in configuration")
+            
             project = Project.objects.get(id=project_id)
             
             # Create scraping run
@@ -699,16 +717,16 @@ class WorkflowService:
             logger.info(f"Created scraping run {scraping_run.id} for project {project.name}")
             
             # Create hierarchical folders
-            from .folder_service import FolderService
-            folder_service = FolderService()
+            from .correct_folder_service import CorrectFolderService
+            folder_service = CorrectFolderService()
             
             # Get all TrackSource records for this project
             track_sources = TrackSource.objects.filter(project=scraping_run.project)
             
             if track_sources.exists():
-                # Create hierarchical folder structure
-                created_folders = folder_service.create_hierarchical_folders(scraping_run, list(track_sources))
-                logger.info(f"Created hierarchical folders for scraping run {scraping_run.id}")
+                # Create correct hierarchical folder structure
+                created_folders = folder_service.create_correct_folder_structure(scraping_run, list(track_sources))
+                logger.info(f"Created correct hierarchical folders for scraping run {scraping_run.id}")
             
             # Create jobs directly from TrackSource items
             self._create_scraping_jobs_from_tracksources(scraping_run, configuration)

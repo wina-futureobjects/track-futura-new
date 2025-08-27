@@ -102,16 +102,47 @@ class FolderViewSet(viewsets.ModelViewSet):
         
         if folder_id:
             try:
-                folder = Folder.objects.get(id=folder_id)
+                folder_id_int = int(folder_id)
+                
+                # First, try to find an Instagram folder with this ID
+                try:
+                    folder = Folder.objects.get(id=folder_id_int)
+                    print(f"=== FOLDER GET_OBJECT DEBUG ===")
+                    print(f"Found Instagram folder by ID: {folder.id}, Name: {folder.name}, Project: {folder.project_id}")
+                    print(f"=== END FOLDER GET_OBJECT DEBUG ===")
+                    return folder
+                except Folder.DoesNotExist:
+                    # It might be a UnifiedRunFolder ID, try to find the linked Instagram folder
+                    from track_accounts.models import UnifiedRunFolder
+                    try:
+                        unified_folder = UnifiedRunFolder.objects.get(id=folder_id_int)
+                        print(f"=== FOLDER GET_OBJECT DEBUG ===")
+                        print(f"Found UnifiedRunFolder by ID: {unified_folder.id}, Name: {unified_folder.name}")
+                        
+                        # Find Instagram folders linked to this UnifiedRunFolder
+                        linked_instagram_folders = Folder.objects.filter(unified_job_folder=unified_folder)
+                        
+                        if linked_instagram_folders.exists():
+                            # Use the first linked Instagram folder
+                            instagram_folder = linked_instagram_folders.first()
+                            print(f"Found linked Instagram folder: {instagram_folder.id}, Name: {instagram_folder.name}")
+                            print(f"=== END FOLDER GET_OBJECT DEBUG ===")
+                            return instagram_folder
+                        else:
+                            print(f"No linked Instagram folder found for UnifiedRunFolder {folder_id_int}")
+                            print(f"=== END FOLDER GET_OBJECT DEBUG ===")
+                            raise Http404(f"No Instagram folder linked to UnifiedRunFolder {folder_id_int}")
+                    except UnifiedRunFolder.DoesNotExist:
+                        print(f"=== FOLDER GET_OBJECT DEBUG ===")
+                        print(f"Neither Instagram folder nor UnifiedRunFolder with ID {folder_id_int} found")
+                        print(f"=== END FOLDER GET_OBJECT DEBUG ===")
+                        raise Http404(f"Folder with id {folder_id_int} does not exist")
+                        
+            except (ValueError, TypeError):
                 print(f"=== FOLDER GET_OBJECT DEBUG ===")
-                print(f"Found folder by ID: {folder.id}, Name: {folder.name}, Project: {folder.project_id}")
+                print(f"Invalid folder_id format: {folder_id}")
                 print(f"=== END FOLDER GET_OBJECT DEBUG ===")
-                return folder
-            except Folder.DoesNotExist:
-                print(f"=== FOLDER GET_OBJECT DEBUG ===")
-                print(f"Folder with ID {folder_id} not found")
-                print(f"=== END FOLDER GET_OBJECT DEBUG ===")
-                raise Http404(f"Folder with id {folder_id} does not exist")
+                raise Http404(f"Invalid folder id format: {folder_id}")
         
         # Fallback to default behavior if no ID is provided
         return super().get_object()
@@ -346,7 +377,38 @@ class InstagramPostViewSet(viewsets.ModelViewSet):
         # Filter by folder if specified
         folder_id = self.request.query_params.get('folder_id')
         if folder_id:
-            queryset = queryset.filter(folder_id=folder_id)
+            try:
+                folder_id_int = int(folder_id)
+                
+                # First, try to find an Instagram folder with this ID
+                instagram_folder = Folder.objects.filter(id=folder_id_int).first()
+                
+                if instagram_folder:
+                    # It's a direct Instagram folder ID
+                    queryset = queryset.filter(folder_id=folder_id_int)
+                else:
+                    # It might be a UnifiedRunFolder ID, try to find the linked Instagram folder
+                    from track_accounts.models import UnifiedRunFolder
+                    unified_folder = UnifiedRunFolder.objects.filter(id=folder_id_int).first()
+                    
+                    if unified_folder:
+                        # Find Instagram folders linked to this UnifiedRunFolder
+                        linked_instagram_folders = Folder.objects.filter(unified_job_folder=unified_folder)
+                        
+                        if linked_instagram_folders.exists():
+                            # Use the first linked Instagram folder
+                            instagram_folder_ids = [f.id for f in linked_instagram_folders]
+                            queryset = queryset.filter(folder_id__in=instagram_folder_ids)
+                        else:
+                            # No linked Instagram folder found, return empty queryset
+                            queryset = InstagramPost.objects.none()
+                    else:
+                        # Neither Instagram folder nor UnifiedRunFolder found, return empty queryset
+                        queryset = InstagramPost.objects.none()
+                        
+            except (ValueError, TypeError):
+                # Invalid folder_id format, return empty queryset
+                queryset = InstagramPost.objects.none()
         
         # Filter by content type if specified
         content_type = self.request.query_params.get('content_type')

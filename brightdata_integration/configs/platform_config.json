@@ -5,17 +5,17 @@
     "service_type": "posts",
     "content_type": "post",
     "payload_structure": {
-      "user_name": "extract_from_url"
+      "url": "direct_url"
     },
     "url_extraction": {
       "field": "facebook_link",
-      "method": "extract_username_from_url"
+      "method": "direct_url"
     },
     "discovery_params": {
-      "discover_by": "user_name"
+      "discover_by": "url"
     },
-    "required_fields": ["user_name"],
-    "optional_fields": [],
+    "required_fields": ["url"],
+    "optional_fields": ["num_of_posts", "start_date", "end_date", "posts_to_not_include"],
     "api_limitations": {
       "rate_limit": "requests_per_minute",
       "max_posts": 1000

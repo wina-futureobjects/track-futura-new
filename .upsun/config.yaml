@@ -43,7 +43,7 @@ applications:
         DEBUG: "True"
         DJANGO_SECURE_SSL_REDIRECT: "False"
         # BrightData webhook endpoint configuration
-        BRIGHTDATA_BASE_URL: "https://api.upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site"
+        BRIGHTDATA_BASE_URL: "https://7cd5255d8f2b.ngrok-free.app"
         # Completely disable DataDog tracing and monitoring
         DD_TRACE_ENABLED: "false"
         DD_PROFILING_ENABLED: "false"

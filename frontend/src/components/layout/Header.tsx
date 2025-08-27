@@ -346,6 +346,13 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle, showSidebarToggle = tru
     }
   }, [location.pathname, userRole]);
   
+  // Effect to clear organizations when developer mode changes
+  useEffect(() => {
+    if (userRole === 'super_admin') {
+      setOrganizations([]); // Clear organizations to force refresh with new filter
+    }
+  }, [isDeveloperMode, userRole]);
+  
   // Separate effect for organization name to prevent unnecessary re-renders
   useEffect(() => {
     console.log('Organization ID changed:', organizationId);
@@ -380,11 +387,23 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle, showSidebarToggle = tru
       
       if (response.ok) {
         const data = await response.json();
+        let orgsData = [];
+        
         if (Array.isArray(data)) {
-          setOrganizations(data);
+          orgsData = data;
         } else if (data && typeof data === 'object' && 'results' in data) {
-          setOrganizations(data.results || []);
+          orgsData = data.results || [];
         }
+        
+        // If super admin is in developer mode, filter to only show organizations they created
+        if (userRole === 'super_admin' && isDeveloperMode) {
+          const currentUser = getCurrentUser();
+          if (currentUser && currentUser.id) {
+            orgsData = orgsData.filter((org: any) => org.owner === currentUser.id);
+          }
+        }
+        
+        setOrganizations(orgsData);
       }
     } catch (error) {
       console.error('Error fetching organizations:', error);
@@ -426,7 +445,7 @@ const Header: React.FC<HeaderProps> = ({ open, onToggle, showSidebarToggle = tru
   const handleOrgDropdownOpen = useCallback((event: React.MouseEvent<HTMLElement>) => {
     setOrgDropAnchorEl(event.currentTarget);
     fetchAllOrganizations();
-  }, []);
+  }, [userRole, isDeveloperMode]);
   
   // Handle project dropdown open
   const handleProjectDropdownOpen = useCallback((event: React.MouseEvent<HTMLElement>) => {

@@ -77,10 +77,33 @@ class FolderViewSet(viewsets.ModelViewSet):
         if self.action in ['retrieve', 'update', 'partial_update', 'destroy']:
             folder_id = self.kwargs.get('pk')
             try:
-                return Folder.objects.get(id=folder_id)
-            except Folder.DoesNotExist:
+                folder_id_int = int(folder_id)
+                
+                # First, try to find a Facebook folder with this ID
+                try:
+                    return Folder.objects.get(id=folder_id_int)
+                except Folder.DoesNotExist:
+                    # It might be a UnifiedRunFolder ID, try to find the linked Facebook folder
+                    from track_accounts.models import UnifiedRunFolder
+                    try:
+                        unified_folder = UnifiedRunFolder.objects.get(id=folder_id_int)
+                        
+                        # Find Facebook folders linked to this UnifiedRunFolder
+                        linked_facebook_folders = Folder.objects.filter(unified_job_folder=unified_folder)
+                        
+                        if linked_facebook_folders.exists():
+                            # Use the first linked Facebook folder
+                            return linked_facebook_folders.first()
+                        else:
+                            from rest_framework.exceptions import NotFound
+                            raise NotFound(f"No Facebook folder linked to UnifiedRunFolder {folder_id_int}")
+                    except UnifiedRunFolder.DoesNotExist:
+                        from rest_framework.exceptions import NotFound
+                        raise NotFound("No Folder matches the given query.")
+                        
+            except (ValueError, TypeError):
                 from rest_framework.exceptions import NotFound
-                raise NotFound("No Folder matches the given query.")
+                raise NotFound("Invalid folder ID format.")
         
         # For list endpoints, use the filtered queryset
         return super().get_object()
@@ -300,7 +323,39 @@ class FacebookPostViewSet(viewsets.ModelViewSet):
             # Filter by folder if specified
             folder_id = self.request.query_params.get('folder_id')
             if folder_id:
-                queryset = queryset.filter(folder_id=folder_id)
+                try:
+                    folder_id_int = int(folder_id)
+                    
+                    # First, try to find a Facebook folder with this ID
+                    from .models import Folder
+                    facebook_folder = Folder.objects.filter(id=folder_id_int).first()
+                    
+                    if facebook_folder:
+                        # It's a direct Facebook folder ID
+                        queryset = queryset.filter(folder_id=folder_id_int)
+                    else:
+                        # It might be a UnifiedRunFolder ID, try to find the linked Facebook folder
+                        from track_accounts.models import UnifiedRunFolder
+                        unified_folder = UnifiedRunFolder.objects.filter(id=folder_id_int).first()
+                        
+                        if unified_folder:
+                            # Find Facebook folders linked to this UnifiedRunFolder
+                            linked_facebook_folders = Folder.objects.filter(unified_job_folder=unified_folder)
+                            
+                            if linked_facebook_folders.exists():
+                                # Use the first linked Facebook folder
+                                facebook_folder_ids = [f.id for f in linked_facebook_folders]
+                                queryset = queryset.filter(folder_id__in=facebook_folder_ids)
+                            else:
+                                # No linked Facebook folder found, return empty queryset
+                                queryset = FacebookPost.objects.none()
+                        else:
+                            # Neither Facebook folder nor UnifiedRunFolder found, return empty queryset
+                            queryset = FacebookPost.objects.none()
+                            
+                except (ValueError, TypeError):
+                    # Invalid folder_id format, return empty queryset
+                    queryset = FacebookPost.objects.none()
             
             # Check if content_type field exists before filtering
             content_type = self.request.query_params.get('content_type')

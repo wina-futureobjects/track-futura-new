@@ -217,14 +217,35 @@ class AutomatedBatchScraper:
 
     def _get_sources_for_job(self, job: BatchScraperJob) -> List[TrackSource]:
         """
-        Get sources for a batch job - either from input collection URLs or from project TrackSources
+        Get sources for a batch job - either from input collection URLs, specific track source, or from project TrackSources
         """
+        # Check if this job is associated with a specific track source
+        if job.platform_params and 'track_source_id' in job.platform_params:
+            return self._get_sources_from_track_source(job)
         # Check if this job is associated with an input collection
-        if job.platform_params and 'input_collection_id' in job.platform_params:
+        elif job.platform_params and 'input_collection_id' in job.platform_params:
             return self._get_sources_from_input_collection(job)
         else:
             # Fall back to getting sources from project (legacy behavior)
             return self._get_accounts_from_folders(job.source_folder_ids)
+
+    def _get_sources_from_track_source(self, job: BatchScraperJob) -> List[TrackSource]:
+        """
+        Get a specific TrackSource by ID from platform_params
+        """
+        try:
+            track_source_id = job.platform_params.get('track_source_id')
+            source = TrackSource.objects.get(id=track_source_id)
+            
+            self.logger.info(f"Found track source {source.id}: {source.name}")
+            return [source]
+            
+        except TrackSource.DoesNotExist:
+            self.logger.error(f"TrackSource with ID {track_source_id} not found")
+            return []
+        except Exception as e:
+            self.logger.error(f"Error getting track source: {str(e)}")
+            return []
 
     def _get_sources_from_input_collection(self, job: BatchScraperJob) -> List[TrackSource]:
         """
@@ -541,7 +562,7 @@ class AutomatedBatchScraper:
 
     def _get_or_create_output_folder(self, job: BatchScraperJob, platform: str, source: TrackSource, content_type: str) -> Optional[int]:
         """
-        Get or create a SINGLE output folder per job for ALL scraped data from all accounts
+        Get or create a UnifiedRunFolder for the job that can be used across all platforms
         """
         if not job.auto_create_folders:
             return None
@@ -562,49 +583,48 @@ class AutomatedBatchScraper:
                 folder_category = 'posts'  # Default fallback
                 content_type_for_name = content_type
 
-            # 🔧 CRITICAL CHANGE: Create ONE folder per job, not per account
-            # Generate folder name using date and job name (NO account_name)
-            folder_name = f"{platform.title()}_{content_type_for_name.upper()}_{timezone.now().strftime('%Y-%m-%d')}_{job.name}"
-
-            # Get the appropriate folder model for this platform
-            FolderModel = self.PLATFORM_FOLDER_MODELS.get(platform)
-            if not FolderModel:
-                self.logger.error(f"No folder model found for platform: {platform}")
-                return None
-
-            # Create or get the folder with the appropriate category
-            folder_defaults = {'project_id': job.project_id}
-
-            # Only set category if the model supports it (Instagram and Facebook do)
-            if hasattr(FolderModel, '_meta') and any(field.name == 'category' for field in FolderModel._meta.fields):
-                folder_defaults['category'] = folder_category
-
-            folder, created = FolderModel.objects.get_or_create(
+            # 🔧 FIXED: Create UnifiedRunFolder instead of platform-specific folder
+            # Generate folder name using date and job name
+            folder_name = f"{platform.title()} {content_type_for_name.title()} - {source.name}"
+            
+            # Import UnifiedRunFolder from track_accounts
+            from track_accounts.models import UnifiedRunFolder
+            
+            # Create or get the UnifiedRunFolder
+            unified_folder, created = UnifiedRunFolder.objects.get_or_create(
                 name=folder_name,
-                defaults=folder_defaults
+                defaults={
+                    'description': f'Created from batch job: {job.name}',
+                    'folder_type': 'content',
+                    'project_id': job.project_id,
+                    'category': folder_category,
+                    'service_code': content_type_for_name
+                }
             )
 
             if created:
-                self.logger.info(f"✅ Created new SHARED {platform} {folder_category} folder: {folder_name}")
+                self.logger.info(f"✅ Created new UnifiedRunFolder: {folder_name} (ID: {unified_folder.id})")
             else:
-                self.logger.info(f"✅ Using existing SHARED {platform} folder: {folder_name}")
+                self.logger.info(f"✅ Using existing UnifiedRunFolder: {folder_name} (ID: {unified_folder.id})")
 
-            return folder.id
+            return unified_folder.id
 
         except Exception as e:
-            self.logger.error(f"Error creating output folder for {platform}: {str(e)}")
+            self.logger.error(f"Error creating UnifiedRunFolder for {platform}: {str(e)}")
             return None
 
     def _create_scraper_request(self, job: BatchScraperJob, source: TrackSource,
                               platform: str, url: str, config: BrightdataConfig,
-                              folder_id: Optional[int], content_type: str) -> Optional[ScraperRequest]:
+                              folder_id: Optional[int], content_type: str, 
+                              scrape_job: 'workflow.ScrapingJob' = None) -> Optional[ScraperRequest]:
         """
-        Create a scraper request for the source and platform
+        Create a scraper request for the source and platform with direct job linking
         """
         try:
             # Get the platform config key that includes content type
             platform_config_key = self._get_platform_config_key(platform, content_type)
 
+            # Create ScraperRequest
             scraper_request = ScraperRequest.objects.create(
                 config=config,
                 batch_job=job,
@@ -631,7 +651,7 @@ class AutomatedBatchScraper:
                     }
                     scraper_request.save()
 
-            self.logger.info(f"Created scraper request for {source.name} on {platform} ({content_type})")
+            self.logger.info(f"Created scraper request for {source.name} on {platform} ({content_type}) with direct job link")
             return scraper_request
 
         except Exception as e:
@@ -675,9 +695,10 @@ class AutomatedBatchScraper:
         try:
             config = scraper_request.config
 
-            # Import Django settings to get base URL and webhook token
-            base_url = getattr(settings, 'BRIGHTDATA_BASE_URL', 'http://localhost:8000')
-            webhook_token = getattr(settings, 'BRIGHTDATA_WEBHOOK_TOKEN', 'your-webhook-secret-token')
+            # Import Django settings to get webhook base URL
+            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL')
+            if not webhook_base_url:
+                raise ValueError("BRIGHTDATA_WEBHOOK_BASE_URL setting is not configured")
 
             url = "https://api.brightdata.com/datasets/v3/trigger"
             headers = {
@@ -688,7 +709,8 @@ class AutomatedBatchScraper:
             # Base parameters - simplified to match working independent code
             params = {
                 "dataset_id": config.dataset_id,
-                "endpoint": f"{base_url}/api/brightdata/webhook/",
+                "endpoint": f"{webhook_base_url}/api/brightdata/webhook/",
+                "notify": f"{webhook_base_url}/api/brightdata/notify/",
                 "format": "json",
                 "uncompressed_webhook": "true",
                 "include_errors": "true",
@@ -700,6 +722,7 @@ class AutomatedBatchScraper:
                     "type": "discover_new",
                     "discover_by": "url",
                 })
+            # Facebook doesn't need discovery parameters - dataset works with URL payload directly
 
             # ===== DETAILED DEBUG LOGGING =====
             print("\n" + "="*80)
@@ -708,8 +731,7 @@ class AutomatedBatchScraper:
             print(f"Platform: {scraper_request.platform}")
             print(f"Config Name: {config.name}")
             print(f"Config ID: {config.id}")
-            print(f"Base URL: {base_url}")
-            print(f"Webhook Token: {webhook_token}")
+            print(f"Webhook Base URL: {webhook_base_url}")
             print()
             print("📡 REQUEST DETAILS:")
             print(f"URL: {url}")
@@ -721,7 +743,7 @@ class AutomatedBatchScraper:
             print("Working script uses:")
             print('  Authorization: Bearer c20a28d5-5c6c-43c3-9567-a6d7c193e727')
             print('  dataset_id: gd_lk5ns7kz21pck8jpis')
-            print('  endpoint: https://api.upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site/api/brightdata/webhook/')
+            print(f'  endpoint: {webhook_base_url}/api/brightdata/webhook/')
             print()
             print("This request uses:")
             print(f'  Authorization: {headers["Authorization"]}')
@@ -732,7 +754,7 @@ class AutomatedBatchScraper:
             # Check for differences
             working_token = "c20a28d5-5c6c-43c3-9567-a6d7c193e727"
             working_dataset = "gd_lk5ns7kz21pck8jpis"
-            working_endpoint = "https://api.upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site/api/brightdata/webhook/"
+            working_endpoint = f"{webhook_base_url}/api/brightdata/webhook/"
 
             if headers["Authorization"] != f"Bearer {working_token}":
                 print("❌ API TOKEN MISMATCH!")
@@ -784,7 +806,15 @@ class AutomatedBatchScraper:
             print("="*80 + "\n")
 
             if response.status_code == 200:
-                response_data = response.json()
+                try:
+                    response_data = response.json()
+                except json.JSONDecodeError as json_err:
+                    response_data = {
+                        "error": "Invalid or empty JSON response",
+                        "raw_response": response.text,
+                        "json_error": str(json_err)
+                    }
+                
                 scraper_request.request_id = response_data.get('snapshot_id') or response_data.get('request_id')
                 scraper_request.response_metadata = response_data
                 scraper_request.save()
@@ -875,8 +905,16 @@ class AutomatedBatchScraper:
 
         # Get platform-specific parameters from the first request
         platform_params = {}
-        if requests[0].request_payload and 'platform_params' in requests[0].request_payload:
-            platform_params = requests[0].request_payload['platform_params']
+        if requests[0].request_payload:
+            # Handle both dict and list payload types safely
+            if isinstance(requests[0].request_payload, dict) and 'platform_params' in requests[0].request_payload:
+                platform_params = requests[0].request_payload['platform_params']
+            elif isinstance(requests[0].request_payload, list):
+                # If payload is a list, skip platform_params extraction
+                platform_params = {}
+            else:
+                # For any other type, use empty dict
+                platform_params = {}
 
         # Create batch payload with all sources
         payload = []
@@ -888,15 +926,15 @@ class AutomatedBatchScraper:
 
             # Add platform-specific parameters for Facebook Posts
             if request.platform == 'facebook_posts':
-                # Add num_of_posts to limit the output
-                item['num_of_posts'] = request.num_of_posts
-                # Add date parameters if available
-                if request.start_date:
-                    item['start_date'] = request.start_date.strftime('%m-%d-%Y')
-                if request.end_date:
-                    item['end_date'] = request.end_date.strftime('%m-%d-%Y')
-                # Add posts_to_not_include (empty array as default)
-                item['posts_to_not_include'] = []
+                # For Facebook with URL discovery, use the full target_url directly
+                item = {
+                    "url": request.target_url,
+                    "num_of_posts": request.num_of_posts,
+                    "posts_to_not_include": [],
+                    "start_date": request.start_date.strftime('%m-%d-%Y') if request.start_date else "",
+                    "end_date": request.end_date.strftime('%m-%d-%Y') if request.end_date else "",
+                }
+                
                 if 'include_profile_data' in platform_params:
                     item['include_profile_data'] = platform_params['include_profile_data']
 
@@ -979,10 +1017,16 @@ class AutomatedBatchScraper:
         # Create batch payload with all sources
         payload = []
         for request in requests:
-            # Base payload for LinkedIn batch API (simplified - no num_of_posts, start_date, end_date)
+            # LinkedIn batch API format - following the expected curl format
             item = {
                 "url": request.target_url,
             }
+
+            # Add date parameters in MM-DD-YYYY format (consistent with other platforms)
+            if request.start_date:
+                item['start_date'] = request.start_date.strftime('%m-%d-%Y')
+            if request.end_date:
+                item['end_date'] = request.end_date.strftime('%m-%d-%Y')
 
             # Add platform-specific parameters for LinkedIn Posts
             if 'limit' in platform_params:
@@ -1026,9 +1070,10 @@ class AutomatedBatchScraper:
 
             config = primary_request.config
 
-            # Import Django settings to get base URL and webhook token
-            base_url = getattr(settings, 'BRIGHTDATA_BASE_URL', 'http://localhost:8000')
-            webhook_token = getattr(settings, 'BRIGHTDATA_WEBHOOK_TOKEN', 'your-webhook-secret-token')
+            # Import Django settings to get webhook base URL
+            webhook_base_url = getattr(settings, 'BRIGHTDATA_WEBHOOK_BASE_URL')
+            if not webhook_base_url:
+                raise ValueError("BRIGHTDATA_WEBHOOK_BASE_URL setting is not configured")
 
             url = "https://api.brightdata.com/datasets/v3/trigger"
             headers = {
@@ -1039,9 +1084,8 @@ class AutomatedBatchScraper:
             # Base parameters - simplified to match working independent code
             params = {
                 "dataset_id": config.dataset_id,
-                "endpoint": f"{base_url}/api/brightdata/webhook/",
-                "auth_header": f"Bearer {webhook_token}",
-                "notify": f"{base_url}/api/brightdata/notify/",
+                "endpoint": f"{webhook_base_url}/api/brightdata/webhook/",
+                "notify": f"{webhook_base_url}/api/brightdata/notify/",
                 "format": "json",
                 "uncompressed_webhook": "true",
                 "include_errors": "true",
@@ -1054,16 +1098,14 @@ class AutomatedBatchScraper:
                     "discover_by": "url",
                 })
             elif primary_request.platform.startswith('facebook'):
-                # Facebook-specific parameters
-                params.update({
-                    "type": "discover_new",
-                    "discover_by": "user_name",
-                })
+                # Facebook-specific parameters - NO discovery parameters needed
+                # The dataset gd_lkaxegm826bjpoo9m5 works with URL payload without discovery params
+                pass
             elif primary_request.platform.startswith('linkedin'):
-                # LinkedIn-specific parameters
+                # LinkedIn-specific parameters - using profile_url discovery like the curl example
                 params.update({
                     "type": "discover_new",
-                    "discover_by": "url",
+                    "discover_by": "profile_url",
                 })
             elif primary_request.platform.startswith('tiktok'):
                 # TikTok-specific parameters
@@ -1072,25 +1114,39 @@ class AutomatedBatchScraper:
                     "discover_by": "url",
                 })
 
-            # ===== DETAILED DEBUG LOGGING =====
+            # ===== ENHANCED DEBUG LOGGING FOR FACEBOOK FAILURE INVESTIGATION =====
             print("\n" + "="*80)
-            print("🐛 BRIGHTDATA BATCH API REQUEST DEBUG")
+            print("🔍 FACEBOOK BATCH FAILURE DEBUG INVESTIGATION")
             print("="*80)
             print(f"Platform: {primary_request.platform}")
             print(f"Config Name: {config.name}")
             print(f"Config ID: {config.id}")
-            print(f"Base URL: {base_url}")
-            print(f"Webhook Token: {webhook_token}")
+            print(f"Dataset ID: {config.dataset_id}")
+            print(f"API Token: {config.api_token[:10]}...")
+            print(f"Webhook Base URL: {webhook_base_url}")
             print(f"Batch Size: {len(scraper_requests)} requests, {len(payload)} sources")
             print()
-            print("📡 REQUEST DETAILS:")
+            
+            # Detailed request information
+            print("📡 FULL REQUEST DETAILS:")
             print(f"URL: {url}")
-            print(f"Headers: {headers}")
-            print(f"Params: {params}")
-            print(f"Payload ({len(payload)} items): {payload}")
+            print(f"Headers: {json.dumps(headers, indent=2)}")
+            print(f"Params: {json.dumps(params, indent=2)}")
+            print(f"Payload: {json.dumps(payload, indent=2)}")
             print()
             
-            # Log platform-specific parameters being sent
+            # Validate payload structure
+            print("🔍 PAYLOAD VALIDATION:")
+            for i, item in enumerate(payload):
+                print(f"Item {i+1}:")
+                print(f"  URL: {item.get('url', 'MISSING')}")
+                print(f"  num_of_posts: {item.get('num_of_posts', 'MISSING')}")
+                print(f"  start_date: {item.get('start_date', 'MISSING')}")
+                print(f"  end_date: {item.get('end_date', 'MISSING')}")
+                print(f"  posts_to_not_include: {item.get('posts_to_not_include', 'MISSING')}")
+                print()
+            
+            # Platform-specific parameter analysis
             if payload and len(payload) > 0:
                 print("🔧 PLATFORM-SPECIFIC PARAMETERS:")
                 sample_item = payload[0]
@@ -1129,7 +1185,15 @@ class AutomatedBatchScraper:
             print("="*80 + "\n")
 
             if response.status_code == 200:
-                response_data = response.json()
+                try:
+                    response_data = response.json()
+                except json.JSONDecodeError as json_err:
+                    response_data = {
+                        "error": "Invalid or empty JSON response",
+                        "raw_response": response.text,
+                        "json_error": str(json_err)
+                    }
+                
                 snapshot_id = response_data.get('snapshot_id') or response_data.get('request_id')
 
                 # 🔧 CRITICAL FIX: Update ALL requests with the same snapshot_id
@@ -1138,33 +1202,10 @@ class AutomatedBatchScraper:
                     request.response_metadata = response_data
                     request.save()
 
-                # 🚀 NEW FIX: Update the webhook endpoint to include snapshot_id
-                # This ensures BrightData sends the snapshot_id as a query parameter
+                # Note: The snapshot_id is already included in the webhook processing
+                # No need for a second API call to update the endpoint
                 if snapshot_id:
-                    try:
-                        updated_endpoint = f"{base_url}/api/brightdata/webhook/?snapshot_id={snapshot_id}"
-
-                        # Make a second API call to update the webhook endpoint
-                        update_params = params.copy()
-                        update_params["endpoint"] = updated_endpoint
-
-                        print(f"🔄 UPDATING WEBHOOK ENDPOINT:")
-                        print(f"   Old: {params['endpoint']}")
-                        print(f"   New: {updated_endpoint}")
-
-                        # Update the webhook endpoint for this job
-                        update_response = requests.post(url, headers=headers, params=update_params, json=payload)
-
-                        if update_response.status_code == 200:
-                            print(f"✅ Successfully updated webhook endpoint with snapshot_id")
-                            self.logger.info(f"✅ Updated webhook endpoint to include snapshot_id: {snapshot_id}")
-                        else:
-                            print(f"⚠️  Failed to update webhook endpoint: {update_response.status_code}")
-                            self.logger.warning(f"Failed to update webhook endpoint: {update_response.text}")
-
-                    except Exception as e:
-                        print(f"⚠️  Error updating webhook endpoint: {str(e)}")
-                        self.logger.warning(f"Error updating webhook endpoint: {str(e)}")
+                    self.logger.info(f"✅ Received snapshot_id: {snapshot_id} for webhook processing")
 
                 self.logger.info(f"✅ Successfully triggered batch scrape for {primary_request.platform} with {len(payload)} sources. Snapshot ID: {snapshot_id}")
                 self.logger.info(f"✅ Updated {len(scraper_requests)} scraper requests with snapshot_id: {snapshot_id}")
@@ -1197,6 +1238,57 @@ class AutomatedBatchScraper:
             print(f"❌ EXCEPTION! Error: {str(e)}")
             print("="*80 + "\n")
             return False
+
+    def _pre_create_platform_folders(self, scrape_job: 'workflow.ScrapingJob', unified_folder_id: int) -> Dict[str, int]:
+        """
+        Pre-create platform-specific folders for a scraping job
+        Returns a dict mapping platform to folder_id
+        """
+        platform_folders = {}
+        
+        try:
+            from track_accounts.models import UnifiedRunFolder
+            unified_folder = UnifiedRunFolder.objects.get(id=unified_folder_id)
+            
+            # Pre-create folders for all platforms
+            platforms = ['instagram', 'facebook', 'linkedin', 'tiktok']
+            
+            for platform in platforms:
+                try:
+                    if platform == 'instagram':
+                        from instagram_data.models import Folder
+                    elif platform == 'facebook':
+                        from facebook_data.models import Folder
+                    elif platform == 'linkedin':
+                        from linkedin_data.models import Folder
+                    elif platform == 'tiktok':
+                        from tiktok_data.models import Folder
+                    else:
+                        continue
+                    
+                    # Create platform-specific folder
+                    platform_folder = Folder.objects.create(
+                        name=f"{platform.title()} - {unified_folder.name}",
+                        description=f"Pre-created folder for {platform} scraping job",
+                        category=unified_folder.category or 'posts',
+                        project_id=unified_folder.project_id,
+                        scraping_run=unified_folder.scraping_run,
+                        scrape_job=scrape_job,  # NEW: Direct link to ScrapingJob
+                        unified_job_folder=unified_folder
+                    )
+                    
+                    platform_folders[platform] = platform_folder.id
+                    self.logger.info(f"✅ Pre-created {platform} folder: {platform_folder.id} for job: {scrape_job.id}")
+                    
+                except Exception as e:
+                    self.logger.error(f"Error creating {platform} folder: {str(e)}")
+                    continue
+            
+            return platform_folders
+            
+        except Exception as e:
+            self.logger.error(f"Error in _pre_create_platform_folders: {str(e)}")
+            return {}
 
 # Convenience function for external use
 def create_and_execute_batch_job(name: str, project_id: int, source_folder_ids: List[int],

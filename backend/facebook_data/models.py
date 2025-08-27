@@ -28,6 +28,8 @@ class Folder(models.Model):
     parent_folder = models.ForeignKey('self', on_delete=models.CASCADE, related_name='subfolders', null=True, blank=True, help_text="Parent folder in the hierarchy")
     folder_type = models.CharField(max_length=20, choices=FOLDER_TYPE_CHOICES, default='content', help_text="Type of folder in the hierarchy")
     scraping_run = models.ForeignKey('workflow.ScrapingRun', on_delete=models.CASCADE, related_name='facebook_folders', null=True, blank=True, help_text="Associated scraping run")
+    # Link back to unified job folder (nullable, for reliable joins from webhooks)
+    unified_job_folder = models.ForeignKey('track_accounts.UnifiedRunFolder', on_delete=models.SET_NULL, null=True, blank=True, related_name='facebook_platform_folders', help_text="Linked unified job folder")
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -65,6 +67,9 @@ class Folder(models.Model):
     
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['unified_job_folder']),
+        ]
 
 class FacebookPost(models.Model):
     """

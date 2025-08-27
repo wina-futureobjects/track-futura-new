@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import BrightdataConfig, ScraperRequest, BatchScraperJob
+from .models import BrightdataConfig, ScraperRequest, BatchScraperJob, BrightdataNotification, WebhookEvent
 
 @admin.register(BrightdataConfig)
 class BrightdataConfigAdmin(admin.ModelAdmin):
@@ -81,3 +81,31 @@ class ScraperRequestAdmin(admin.ModelAdmin):
             'fields': ('created_at', 'updated_at')
         }),
     )
+
+@admin.register(WebhookEvent)
+class WebhookEventAdmin(admin.ModelAdmin):
+    list_display = ('id', 'platform', 'snapshot_id', 'status', 'received_at', 'processed_at')
+    list_filter = ('platform', 'status', 'received_at')
+    search_fields = ('snapshot_id', 'platform')
+    readonly_fields = ('received_at', 'processed_at')
+    ordering = ('-received_at',)
+    
+    fieldsets = (
+        ('Event Information', {
+            'fields': ('platform', 'snapshot_id', 'status')
+        }),
+        ('Timestamps', {
+            'fields': ('received_at', 'processed_at')
+        }),
+        ('Raw Payload', {
+            'classes': ('collapse',),
+            'fields': ('raw_payload',)
+        }),
+        ('Error Information', {
+            'classes': ('collapse',),
+            'fields': ('error_message',)
+        }),
+    )
+    
+    def has_add_permission(self, request):
+        return False  # Webhook events should only be created by webhooks

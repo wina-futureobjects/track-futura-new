@@ -92,6 +92,7 @@ class UserRole(models.Model):
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     avatar = models.CharField(max_length=255, blank=True, null=True)
+    company = models.ForeignKey('Company', on_delete=models.SET_NULL, null=True, blank=True, related_name='users')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -132,6 +133,7 @@ class OrganizationMembership(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='member')
+    display_name = models.CharField(max_length=255, blank=True, null=True, help_text="Display name for this user in this organization")
     date_joined = models.DateTimeField(auto_now_add=True)
     
     class Meta:
@@ -168,3 +170,119 @@ class Project(models.Model):
     
     class Meta:
         ordering = ['-created_at']
+
+
+class Company(models.Model):
+    """
+    Company model for managing company information
+    """
+    STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('inactive', 'Inactive'),
+    ]
+    
+    name = models.CharField(max_length=200, help_text="Company name")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+    description = models.TextField(blank=True, null=True, help_text="Company description")
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Company"
+        verbose_name_plural = "Companies"
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.name} ({self.status})"
+    
+    @property
+    def is_active(self):
+        return self.status == 'active'
+
+
+class UnifiedUserRecord(models.Model):
+    """
+    Unified user record model that consolidates data from User, UserRole, and UserProfile models.
+    This model provides a single view of user information without changing existing models.
+    """
+    # Core user information from Django User model
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='unified_record')
+    
+    # Name fields (from User model)
+    name = models.CharField(max_length=255, blank=True, help_text="Full name of the user")
+    
+    # Email (from User model)
+    email = models.EmailField(blank=True, help_text="User's email address")
+    
+    # Company (from UserProfile model)
+    company = models.ForeignKey(Company, on_delete=models.SET_NULL, null=True, blank=True, related_name='unified_users')
+    
+    # Role (from UserRole model)
+    ROLE_CHOICES = (
+        ('super_admin', 'Super Admin'),
+        ('tenant_admin', 'Tenant Admin'),
+        ('user', 'User'),
+    )
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='user', help_text="User's role in the system")
+    
+    # Status (derived from User.is_active)
+    STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('inactive', 'Inactive'),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active', help_text="User's status")
+    
+    # Timestamps
+    created_date = models.DateTimeField(auto_now_add=True, help_text="When the user was created")
+    updated_date = models.DateTimeField(auto_now=True, help_text="When the user record was last updated")
+    
+    class Meta:
+        verbose_name = "Unified User Record"
+        verbose_name_plural = "Unified User Records"
+        ordering = ['-created_date']
+        indexes = [
+            models.Index(fields=['role']),
+            models.Index(fields=['status']),
+            models.Index(fields=['company']),
+            models.Index(fields=['created_date']),
+        ]
+    
+    def __str__(self):
+        return f"{self.name or self.user.username} ({self.get_role_display()})"
+    
+    def save(self, *args, **kwargs):
+        # Auto-populate fields from related models if not set
+        if not self.name and self.user:
+            first_name = self.user.first_name or ""
+            last_name = self.user.last_name or ""
+            self.name = f"{first_name} {last_name}".strip() or self.user.username
+        
+        if not self.email and self.user:
+            self.email = self.user.email
+        
+        if not self.status:
+            self.status = 'active' if self.user.is_active else 'inactive'
+        
+        super().save(*args, **kwargs)
+    
+    @property
+    def is_active(self):
+        """Check if user is active"""
+        return self.status == 'active'
+    
+    @property
+    def display_name(self):
+        """Get display name for the user"""
+        return self.name or self.user.username
+    
+    @property
+    def role_display(self):
+        """Get human-readable role name"""
+        return self.get_role_display()
+    
+    @property
+    def company_name(self):
+        """Get company name if available"""
+        return self.company.name if self.company else None

@@ -161,6 +161,10 @@ export interface UniversalDataDisplayProps {
   };
   dataAdapter?: (rawData: any[], category?: string) => UniversalDataItem[];
   statsAdapter?: (rawStats: any, category?: string) => UniversalFolderStats;
+  // New props for direct data display
+  data?: UniversalDataItem[];
+  stats?: UniversalFolderStats;
+  disableApiFetch?: boolean;
 }
 
 interface TabPanelProps {
@@ -199,7 +203,10 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
   onExport,
   customFields = {},
   dataAdapter,
-  statsAdapter
+  statsAdapter,
+  data: propData,
+  stats: propStats,
+  disableApiFetch = false
 }) => {
   // State management
   const [data, setData] = useState<UniversalDataItem[]>([]);
@@ -455,6 +462,12 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
 
   // Fetch folder statistics
   const fetchStats = async () => {
+    // If we have direct stats props, use them
+    if (propStats && disableApiFetch) {
+      setStats(propStats);
+      return;
+    }
+    
     try {
       const folderParam = `folder_id=${folder.id}`;
       const projectParam = folder.id ? `&project=${folder.id}` : '';
@@ -655,15 +668,33 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
 
   // Load data on component mount and when sorting/filtering changes
   useEffect(() => {
+    // If we have direct data props, use them instead of fetching
+    if (propData && disableApiFetch) {
+      setData(propData);
+      setTotalCount(propData.length);
+      setLoading(false);
+      return;
+    }
+    
     // Only fetch if we have a valid folder
     if (folder && folder.id) {
-      // Check if there are actual filter values to apply
-      const hasFilterValues = Boolean(startDate || endDate || minLikes || maxLikes);
-      fetchData(page, rowsPerPage, searchTerm, hasFilterValues);
+      if (!disableApiFetch) {
+        // Check if there are actual filter values to apply
+        const hasFilterValues = Boolean(startDate || endDate || minLikes || maxLikes);
+        fetchData(page, rowsPerPage, searchTerm, hasFilterValues);
+        fetchWebhookStatus();
+      }
+      // Always call fetchStats to handle propStats when disableApiFetch is true
       fetchStats();
-      fetchWebhookStatus();
     }
-  }, [page, rowsPerPage, searchTerm, sortBy, sortOrder, startDate, endDate, minLikes, maxLikes, folder.id, platform]);
+  }, [page, rowsPerPage, searchTerm, sortBy, sortOrder, startDate, endDate, minLikes, maxLikes, folder.id, platform, propData, disableApiFetch]);
+
+  // Effect to handle propStats when they change
+  useEffect(() => {
+    if (propStats && disableApiFetch) {
+      setStats(propStats);
+    }
+  }, [propStats, disableApiFetch]);
 
   // Event handlers
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -1188,13 +1219,6 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
             variant="outlined"
             size="small"
           />
-          <Chip
-            icon={<WebhookIcon />}
-            label={webhookStatus.isActive ? 'Webhook Active' : 'Webhook Inactive'}
-            color={webhookStatus.isActive ? 'success' : 'default'}
-            variant="outlined"
-            size="small"
-          />
         </Box>
 
         {/* Statistics Overview */}
@@ -1280,8 +1304,6 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
           <Tabs value={tabValue} onChange={handleTabChange} aria-label="universal data tabs">
             <Tab label="Data Overview" {...a11yProps(0)} />
-            <Tab label="Upload & Management" {...a11yProps(1)} />
-            <Tab label="Webhook Status" {...a11yProps(2)} />
           </Tabs>
         </Box>
         
@@ -1525,7 +1547,7 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
                                  return (
                                    <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
                                      <Avatar sx={{ width: 24, height: 24, mr: 1, fontSize: '0.75rem', flexShrink: 0 }}>
-                                       {item.user.charAt(0).toUpperCase()}
+                                       {(item.user || 'U').charAt(0).toUpperCase()}
                                      </Avatar>
                                      <Box sx={{ minWidth: 0, flex: 1 }}>
                                        <Typography variant="body2" fontWeight={500} sx={{ 
@@ -1533,9 +1555,9 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
                                          textOverflow: 'ellipsis',
                                          whiteSpace: 'nowrap'
                                        }}>
-                                         {item.user}
+                                         {item.user || 'Unknown User'}
                                        </Typography>
-                                       {item.is_verified && (
+                                       {item.is_verified === true && (
                                          <Chip 
                                            size="small" 
                                            color="primary" 

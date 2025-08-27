@@ -101,19 +101,30 @@ class ReportFolderDetailSerializer(ReportFolderSerializer):
 
 class UnifiedRunFolderSerializer(serializers.ModelSerializer):
     platform = serializers.SerializerMethodField()
+    category_display = serializers.SerializerMethodField()
     subfolders = serializers.SerializerMethodField()
     post_count = serializers.SerializerMethodField()
     
     class Meta:
         model = UnifiedRunFolder
         fields = [
-            'id', 'name', 'description', 'folder_type', 'category', 
-            'project', 'scraping_run', 'parent_folder', 'platform', 
-            'subfolders', 'post_count', 'created_at', 'updated_at'
+            'id', 'name', 'description', 'folder_type', 'category', 'category_display',
+            'platform_code', 'service_code', 'project', 'scraping_run', 'parent_folder', 
+            'platform', 'subfolders', 'post_count', 'created_at', 'updated_at'
         ]
     
     def get_platform(self, obj):
-        return 'unified'
+        # Return the actual platform code if available, otherwise 'unified'
+        return obj.platform_code or 'unified'
+    
+    def get_category_display(self, obj):
+        # Return a human-readable category name
+        category_display_map = {
+            'posts': 'Posts',
+            'reels': 'Reels', 
+            'comments': 'Comments'
+        }
+        return category_display_map.get(obj.category, obj.category.title())
     
     def get_subfolders(self, obj):
         if hasattr(obj, '_prefetched_objects_cache') and 'subfolders' in obj._prefetched_objects_cache:

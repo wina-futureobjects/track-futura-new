@@ -18,6 +18,8 @@ import {
   Paper,
   Select,
   SelectChangeEvent,
+  Snackbar,
+  Alert,
   Table,
   TableBody,
   TableCell,
@@ -62,10 +64,12 @@ const OrganizationsList = () => {
   const [loading, setLoading] = useState(true);
   const [openNewDialog, setOpenNewDialog] = useState(false);
   const [openEditDialog, setOpenEditDialog] = useState(false);
+  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [selectedOrganization, setSelectedOrganization] = useState<Organization | null>(null);
   const [orgName, setOrgName] = useState('');
   const [orgDescription, setOrgDescription] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('last viewed');
 
@@ -178,11 +182,9 @@ const OrganizationsList = () => {
           console.error('Could not parse error response:', e);
         }
         throw new Error(errorDetail);
-      }
+             }
 
-      const data = await response.json();
-
-      fetchOrganizations();
+       fetchOrganizations();
       setOpenNewDialog(false);
     } catch (error) {
       console.error('Error creating organization:', error);
@@ -213,17 +215,21 @@ const OrganizationsList = () => {
 
       fetchOrganizations();
       setOpenEditDialog(false);
+      setSuccess('Organization updated successfully!');
+      setError(null); // Clear any previous errors
+      
+      // Auto-hide success message after 3 seconds
+      setTimeout(() => {
+        setSuccess(null);
+      }, 3000);
     } catch (error) {
       console.error('Error updating organization:', error);
       setError('Failed to update organization. Please try again.');
+      setSuccess(null); // Clear any previous success messages
     }
   };
 
   const handleDeleteOrganization = async (organizationId: number) => {
-    if (!window.confirm('Are you sure you want to delete this organization? All projects inside this organization will be deleted.')) {
-      return;
-    }
-
     try {
       const response = await apiFetch(`/api/users/organizations/${organizationId}/`, {
         method: 'DELETE',
@@ -234,10 +240,17 @@ const OrganizationsList = () => {
       }
 
       fetchOrganizations();
+      setOpenDeleteDialog(false);
+      setOpenEditDialog(false);
     } catch (error) {
       console.error('Error deleting organization:', error);
       setError('Failed to delete organization. Please try again.');
     }
+  };
+
+  const handleDeleteClick = (organization: Organization) => {
+    setSelectedOrganization(organization);
+    setOpenDeleteDialog(true);
   };
 
   const handleSortChange = (event: SelectChangeEvent) => {
@@ -247,7 +260,8 @@ const OrganizationsList = () => {
   // Filter and sort organizations
   const filteredAndSortedOrganizations = organizations
     .filter(org =>
-      org.name.toLowerCase().includes(searchQuery.toLowerCase())
+      org.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      org.owner_name.toLowerCase().includes(searchQuery.toLowerCase())
     )
     .sort((a, b) => {
       switch (sortBy) {
@@ -272,11 +286,6 @@ const OrganizationsList = () => {
       minHeight: 'calc(100vh - 56px)',
     }}>
       {/* Breadcrumbs */}
-      <Box sx={{ mb: 2 }}>
-        <Breadcrumbs aria-label="breadcrumb">
-          <Typography color="text.primary">Organizations</Typography>
-        </Breadcrumbs>
-      </Box>
 
       {/* Header and actions */}
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
@@ -313,29 +322,29 @@ const OrganizationsList = () => {
           mb: 1,
         }}
       >
-        <TextField
-          placeholder="Search organizations"
-          variant="outlined"
-          size="small"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          sx={{
-            width: '300px',
-            '& .MuiOutlinedInput-root': {
-              backgroundColor: 'white',
-              '& fieldset': {
-                borderColor: 'rgba(0, 0, 0, 0.23)',
-              },
-            },
-          }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            ),
-          }}
-        />
+                 <TextField
+           placeholder="Search organizations or owners"
+           variant="outlined"
+           size="small"
+           value={searchQuery}
+           onChange={(e) => setSearchQuery(e.target.value)}
+           sx={{
+             width: '300px',
+             '& .MuiOutlinedInput-root': {
+               backgroundColor: 'white',
+               '& fieldset': {
+                 borderColor: 'rgba(0, 0, 0, 0.23)',
+               },
+             },
+           }}
+           InputProps={{
+             startAdornment: (
+               <InputAdornment position="start">
+                 <SearchIcon />
+               </InputAdornment>
+             ),
+           }}
+         />
         <FormControl size="small" sx={{ minWidth: 180, backgroundColor: 'white' }}>
           <InputLabel id="sort-select-label">Sort by</InputLabel>
           <Select
@@ -501,8 +510,17 @@ const OrganizationsList = () => {
         </DialogContent>
         <DialogActions>
           <Button
-            onClick={() => selectedOrganization && handleDeleteOrganization(selectedOrganization.id)}
+            onClick={() => selectedOrganization && handleDeleteClick(selectedOrganization)}
             color="error"
+            variant="outlined"
+            sx={{
+              borderColor: '#d32f2f',
+              color: '#d32f2f',
+              '&:hover': {
+                borderColor: '#b71c1c',
+                backgroundColor: 'rgba(211, 47, 47, 0.04)',
+              }
+            }}
           >
             Delete
           </Button>
@@ -512,14 +530,65 @@ const OrganizationsList = () => {
             Save Changes
           </Button>
         </DialogActions>
-      </Dialog>
+             </Dialog>
 
-      {/* Error message */}
-      {error && (
-        <Box mt={2} p={2} bgcolor="error.light" color="error.dark" borderRadius={1}>
-          <Typography variant="body2">{error}</Typography>
-        </Box>
-      )}
+       {/* Delete Confirmation Dialog */}
+       <Dialog open={openDeleteDialog} onClose={() => setOpenDeleteDialog(false)} maxWidth="sm" fullWidth>
+         <DialogTitle>Delete Organization</DialogTitle>
+         <DialogContent>
+           <Typography variant="body1" sx={{ mb: 2 }}>
+             Are you sure you want to delete the organization "{selectedOrganization?.name}"?
+           </Typography>
+           <Typography
+             variant="body2"
+             sx={{
+               mb: 1,
+               color: 'red',
+               fontWeight: 500,
+             }}
+           >
+             Notes: This action cannot be undone. 
+             All projects inside this organization will be permanently deleted.
+           </Typography>
+         </DialogContent>
+         <DialogActions>
+           <Button onClick={() => setOpenDeleteDialog(false)}>
+             Cancel
+           </Button>
+           <Button
+             onClick={() => selectedOrganization && handleDeleteOrganization(selectedOrganization.id)}
+             color="error"
+             variant="contained"
+             sx={{
+               backgroundColor: '#d32f2f',
+               '&:hover': {
+                 backgroundColor: '#b71c1c',
+               }
+             }}
+           >
+             Delete Organization
+           </Button>
+         </DialogActions>
+       </Dialog>
+
+               {/* Error message */}
+       {error && (
+         <Box mt={2} p={2} bgcolor="error.light" color="error.dark" borderRadius={1}>
+           <Typography variant="body2">{error}</Typography>
+         </Box>
+       )}
+
+                       {/* Success Snackbar */}
+         <Snackbar
+           open={!!success}
+           autoHideDuration={3000}
+           onClose={() => setSuccess(null)}
+           anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+         >
+           <Alert onClose={() => setSuccess(null)} severity="success" sx={{ width: '100%' }}>
+             {success}
+           </Alert>
+         </Snackbar>
     </Box>
   );
 };
