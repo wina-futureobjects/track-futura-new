@@ -1286,9 +1286,8 @@ const SuperAdminDashboard = () => {
         <Tabs value={activeTab} onChange={handleTabChange} centered>
           <Tab label="Company" />
           <Tab label="Users" />
-          <Tab label="Companies" />
-          <Tab label="System Settings" />
           <Tab label="Scraper Configuration" />
+          <Tab label="System Settings" />
         </Tabs>
       </Paper>
 
@@ -1527,7 +1526,7 @@ const SuperAdminDashboard = () => {
         </TableContainer>
       )}
 
-      {/* Scrapper Configuration Tab */}
+      {/* Scraper Configuration Tab */}
       {activeTab === 2 && (
         <Box>
           <Typography variant="h4" gutterBottom component="h1">
