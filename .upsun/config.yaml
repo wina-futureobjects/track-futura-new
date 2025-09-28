@@ -96,7 +96,7 @@ applications:
           expires: -1
           scripts: false
           allow: true
-          try_files: ["$uri", "$uri/", "/index.html"]
+          passthru: "/index.html"
         "/assets":
           root: "dist/assets"
           expires: 365d
@@ -123,7 +123,6 @@ services:
       extensions:
         - pg_trgm
         - unaccent
-    disk: 1024
 
 routes:
   "https://api.{default}/":
@@ -131,9 +130,6 @@ routes:
     upstream: "backend:http"
     cache:
       enabled: false
-    headers:
-      X-Frame-Options: "SAMEORIGIN"
-      X-Content-Type-Options: "nosniff"
 
   "https://{default}/":
     type: upstream
@@ -143,6 +139,3 @@ routes:
       default_ttl: 300
       cookies: ['*']
       headers: ['Authorization']
-    headers:
-      X-Frame-Options: "SAMEORIGIN"
-      X-Content-Type-Options: "nosniff"
