@@ -603,9 +603,9 @@ class AutomatedBatchScraper:
             )
 
             if created:
-                self.logger.info(f"✅ Created new UnifiedRunFolder: {folder_name} (ID: {unified_folder.id})")
+                self.logger.info(f"SUCCESS Created new UnifiedRunFolder: {folder_name} (ID: {unified_folder.id})")
             else:
-                self.logger.info(f"✅ Using existing UnifiedRunFolder: {folder_name} (ID: {unified_folder.id})")
+                self.logger.info(f"SUCCESS Using existing UnifiedRunFolder: {folder_name} (ID: {unified_folder.id})")
 
             return unified_folder.id
 
@@ -726,20 +726,20 @@ class AutomatedBatchScraper:
 
             # ===== DETAILED DEBUG LOGGING =====
             print("\n" + "="*80)
-            print("🐛 BRIGHTDATA API REQUEST DEBUG - AUTOMATED BATCH SCRAPER")
+            print("DEBUG BRIGHTDATA API REQUEST DEBUG - AUTOMATED BATCH SCRAPER")
             print("="*80)
             print(f"Platform: {scraper_request.platform}")
             print(f"Config Name: {config.name}")
             print(f"Config ID: {config.id}")
             print(f"Webhook Base URL: {webhook_base_url}")
             print()
-            print("📡 REQUEST DETAILS:")
+            print("REQUEST REQUEST DETAILS:")
             print(f"URL: {url}")
             print(f"Headers: {headers}")
             print(f"Params: {params}")
             print(f"Payload ({len(payload)} items): {payload}")
             print()
-            print("🔍 COMPARISON WITH WORKING manualrun.py:")
+            print("DEBUG COMPARISON WITH WORKING manualrun.py:")
             print("Working script uses:")
             print('  Authorization: Bearer c20a28d5-5c6c-43c3-9567-a6d7c193e727')
             print('  dataset_id: gd_lk5ns7kz21pck8jpis')
@@ -757,28 +757,28 @@ class AutomatedBatchScraper:
             working_endpoint = f"{webhook_base_url}/api/brightdata/webhook/"
 
             if headers["Authorization"] != f"Bearer {working_token}":
-                print("❌ API TOKEN MISMATCH!")
+                print("ERROR API TOKEN MISMATCH!")
                 print(f"   Expected: Bearer {working_token}")
                 print(f"   Got:      {headers['Authorization']}")
             else:
-                print("✅ API Token matches")
+                print("SUCCESS API Token matches")
 
             if params["dataset_id"] != working_dataset:
-                print("❌ DATASET ID MISMATCH!")
+                print("ERROR DATASET ID MISMATCH!")
                 print(f"   Expected: {working_dataset}")
                 print(f"   Got:      {params['dataset_id']}")
             else:
-                print("✅ Dataset ID matches")
+                print("SUCCESS Dataset ID matches")
 
             if params["endpoint"] != working_endpoint:
-                print("❌ ENDPOINT MISMATCH!")
+                print("ERROR ENDPOINT MISMATCH!")
                 print(f"   Expected: {working_endpoint}")
                 print(f"   Got:      {params['endpoint']}")
             else:
-                print("✅ Endpoint matches")
+                print("SUCCESS Endpoint matches")
 
             print()
-            print("🚀 MAKING API REQUEST...")
+            print("MAKING MAKING API REQUEST...")
             print("="*80)
 
             # Log batch details
@@ -799,7 +799,7 @@ class AutomatedBatchScraper:
             response = requests.post(url, headers=headers, params=params, json=payload)
 
             # ===== DETAILED RESPONSE LOGGING =====
-            print("\n📥 BRIGHTDATA API RESPONSE:")
+            print("\nRESPONSE BRIGHTDATA API RESPONSE:")
             print(f"Status Code: {response.status_code}")
             print(f"Response Headers: {dict(response.headers)}")
             print(f"Response Text: {response.text}")
@@ -820,7 +820,7 @@ class AutomatedBatchScraper:
                 scraper_request.save()
 
                 self.logger.info(f"Successfully triggered batch scrape for {scraper_request.platform} with {len(payload)} sources. Request ID: {scraper_request.request_id}")
-                print(f"✅ SUCCESS! Request ID: {scraper_request.request_id}")
+                print(f"SUCCESS SUCCESS! Request ID: {scraper_request.request_id}")
                 return True
             else:
                 error_msg = f"BrightData API error for {scraper_request.platform} batch: {response.status_code} - {response.text}"
@@ -828,7 +828,7 @@ class AutomatedBatchScraper:
                 scraper_request.status = 'failed'
                 scraper_request.error_message = error_msg
                 scraper_request.save()
-                print(f"❌ FAILED! Status: {response.status_code}, Error: {response.text}")
+                print(f"ERROR FAILED! Status: {response.status_code}, Error: {response.text}")
                 return False
 
         except Exception as e:
@@ -837,7 +837,7 @@ class AutomatedBatchScraper:
             scraper_request.status = 'failed'
             scraper_request.error_message = error_msg
             scraper_request.save()
-            print(f"❌ EXCEPTION! Error: {str(e)}")
+            print(f"ERROR EXCEPTION! Error: {str(e)}")
             print("="*80 + "\n")
             return False
 
@@ -867,13 +867,9 @@ class AutomatedBatchScraper:
             }]
         else:
             # Instagram Posts API format (includes posts and other content types)
+            # Use simplified payload format that works with the API
             payload = [{
-                "url": scraper_request.target_url,
-                "num_of_posts": scraper_request.num_of_posts,
-                "start_date": scraper_request.start_date.strftime('%m-%d-%Y') if scraper_request.start_date else "",
-                "end_date": scraper_request.end_date.strftime('%m-%d-%Y') if scraper_request.end_date else "",
-                "post_type": "Post" if content_type == 'posts' else content_type.title(),
-                "posts_to_not_include": [],  # Could be extended to support excluded posts
+                "url": scraper_request.target_url
             }]
 
         return self._make_brightdata_request(scraper_request, payload)
@@ -1116,7 +1112,7 @@ class AutomatedBatchScraper:
 
             # ===== ENHANCED DEBUG LOGGING FOR FACEBOOK FAILURE INVESTIGATION =====
             print("\n" + "="*80)
-            print("🔍 FACEBOOK BATCH FAILURE DEBUG INVESTIGATION")
+            print("DEBUG FACEBOOK BATCH FAILURE DEBUG INVESTIGATION")
             print("="*80)
             print(f"Platform: {primary_request.platform}")
             print(f"Config Name: {config.name}")
@@ -1128,7 +1124,7 @@ class AutomatedBatchScraper:
             print()
             
             # Detailed request information
-            print("📡 FULL REQUEST DETAILS:")
+            print("REQUEST FULL REQUEST DETAILS:")
             print(f"URL: {url}")
             print(f"Headers: {json.dumps(headers, indent=2)}")
             print(f"Params: {json.dumps(params, indent=2)}")
@@ -1136,7 +1132,7 @@ class AutomatedBatchScraper:
             print()
             
             # Validate payload structure
-            print("🔍 PAYLOAD VALIDATION:")
+            print("DEBUG PAYLOAD VALIDATION:")
             for i, item in enumerate(payload):
                 print(f"Item {i+1}:")
                 print(f"  URL: {item.get('url', 'MISSING')}")
@@ -1178,7 +1174,7 @@ class AutomatedBatchScraper:
             response = requests.post(url, headers=headers, params=params, json=payload)
 
             # ===== DETAILED RESPONSE LOGGING =====
-            print("\n📥 BRIGHTDATA API RESPONSE:")
+            print("\nRESPONSE BRIGHTDATA API RESPONSE:")
             print(f"Status Code: {response.status_code}")
             print(f"Response Headers: {dict(response.headers)}")
             print(f"Response Text: {response.text}")
@@ -1205,12 +1201,12 @@ class AutomatedBatchScraper:
                 # Note: The snapshot_id is already included in the webhook processing
                 # No need for a second API call to update the endpoint
                 if snapshot_id:
-                    self.logger.info(f"✅ Received snapshot_id: {snapshot_id} for webhook processing")
+                    self.logger.info(f"SUCCESS Received snapshot_id: {snapshot_id} for webhook processing")
 
-                self.logger.info(f"✅ Successfully triggered batch scrape for {primary_request.platform} with {len(payload)} sources. Snapshot ID: {snapshot_id}")
-                self.logger.info(f"✅ Updated {len(scraper_requests)} scraper requests with snapshot_id: {snapshot_id}")
-                print(f"✅ SUCCESS! Snapshot ID: {snapshot_id}")
-                print(f"✅ Updated {len(scraper_requests)} scraper requests with the same snapshot_id")
+                self.logger.info(f"SUCCESS Successfully triggered batch scrape for {primary_request.platform} with {len(payload)} sources. Snapshot ID: {snapshot_id}")
+                self.logger.info(f"SUCCESS Updated {len(scraper_requests)} scraper requests with snapshot_id: {snapshot_id}")
+                print(f"SUCCESS SUCCESS! Snapshot ID: {snapshot_id}")
+                print(f"SUCCESS Updated {len(scraper_requests)} scraper requests with the same snapshot_id")
                 return True
             else:
                 error_msg = f"BrightData API error for {primary_request.platform} batch: {response.status_code} - {response.text}"
@@ -1222,7 +1218,7 @@ class AutomatedBatchScraper:
                     request.error_message = error_msg
                     request.save()
 
-                print(f"❌ FAILED! Status: {response.status_code}, Error: {response.text}")
+                print(f"ERROR FAILED! Status: {response.status_code}, Error: {response.text}")
                 return False
 
         except Exception as e:
@@ -1235,7 +1231,7 @@ class AutomatedBatchScraper:
                 request.error_message = error_msg
                 request.save()
 
-            print(f"❌ EXCEPTION! Error: {str(e)}")
+            print(f"ERROR EXCEPTION! Error: {str(e)}")
             print("="*80 + "\n")
             return False
 
@@ -1278,7 +1274,7 @@ class AutomatedBatchScraper:
                     )
                     
                     platform_folders[platform] = platform_folder.id
-                    self.logger.info(f"✅ Pre-created {platform} folder: {platform_folder.id} for job: {scrape_job.id}")
+                    self.logger.info(f"SUCCESS Pre-created {platform} folder: {platform_folder.id} for job: {scrape_job.id}")
                     
                 except Exception as e:
                     self.logger.error(f"Error creating {platform} folder: {str(e)}")

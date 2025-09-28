@@ -65,7 +65,7 @@ class RegisterView(generics.CreateAPIView):
 class CustomAuthToken(ObtainAuthToken):
     def post(self, request, *args, **kwargs):
         serializer = self.serializer_class(data=request.data, context={'request': request})
-        
+
         if not serializer.is_valid():
             # Check if username exists
             username = request.data.get('username', '')

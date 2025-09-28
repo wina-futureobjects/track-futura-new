@@ -117,7 +117,7 @@ class Command(BaseCommand):
             if created:
                 created_count += 1
                 self.stdout.write(
-                    self.style.SUCCESS(f'✅ Created template: {template.name}')
+                    self.style.SUCCESS(f'Created template: {template.name}')
                 )
             else:
                 # Update existing template with new data
@@ -126,13 +126,13 @@ class Command(BaseCommand):
                 template.save()
                 updated_count += 1
                 self.stdout.write(
-                    self.style.WARNING(f'🔄 Updated template: {template.name}')
+                    self.style.WARNING(f'Updated template: {template.name}')
                 )
 
         self.stdout.write(
             self.style.SUCCESS(
-                f'\n🎉 Successfully processed {len(templates)} templates:'
-                f'\n   📦 {created_count} created'
-                f'\n   🔄 {updated_count} updated'
+                f'\nSuccessfully processed {len(templates)} templates:'
+                f'\n   {created_count} created'
+                f'\n   {updated_count} updated'
             )
         ) 

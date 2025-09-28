@@ -39,154 +39,8 @@ import {
   Analytics
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
+import { reportService, ReportTemplate, GeneratedReport } from '../services/reportService';
 
-// Mock data for demo
-const mockTemplates = [
-  {
-    id: 1,
-    name: 'Sentiment Analysis',
-    description: 'Analyze sentiment of comments and feedback across social media platforms',
-    template_type: 'sentiment_analysis',
-    icon: 'psychology',
-    color: 'green',
-    estimated_time: '2-5 minutes',
-    required_data_types: ['comments', 'reviews'],
-    features: [
-      'Positive/Negative/Neutral classification',
-      'Confidence scores for each sentiment',
-      'Trending keywords analysis',
-      'Sentiment over time tracking'
-    ]
-  },
-  {
-    id: 2,
-    name: 'Engagement Metrics',
-    description: 'Track engagement rates and interaction patterns across your social media posts',
-    template_type: 'engagement_metrics',
-    icon: 'trending_up',
-    color: 'blue',
-    estimated_time: '1-3 minutes',
-    required_data_types: ['posts', 'likes', 'comments', 'shares'],
-    features: [
-      'Engagement rate calculation',
-      'Top performing posts identification',
-      'Audience interaction patterns',
-      'Peak engagement times'
-    ]
-  },
-  {
-    id: 3,
-    name: 'Content Analysis',
-    description: 'Deep dive into content performance and optimization opportunities',
-    template_type: 'content_analysis',
-    icon: 'description',
-    color: 'purple',
-    estimated_time: '3-7 minutes',
-    required_data_types: ['posts', 'images', 'videos'],
-    features: [
-      'Content type breakdown',
-      'Hashtag effectiveness analysis',
-      'Visual content impact assessment',
-      'Content scheduling optimization'
-    ]
-  },
-  {
-    id: 4,
-    name: 'User Behavior Analysis',
-    description: 'Understand your audience behavior and interaction preferences',
-    template_type: 'user_behavior',
-    icon: 'people',
-    color: 'orange',
-    estimated_time: '4-8 minutes',
-    required_data_types: ['users', 'interactions', 'demographics'],
-    features: [
-      'User engagement patterns',
-      'Demographic breakdowns',
-      'Peak activity times',
-      'User journey mapping'
-    ]
-  },
-  {
-    id: 5,
-    name: 'Trend Analysis',
-    description: 'Identify emerging trends and opportunities in your industry',
-    template_type: 'trend_analysis',
-    icon: 'assessment',
-    color: 'teal',
-    estimated_time: '5-10 minutes',
-    required_data_types: ['hashtags', 'keywords', 'mentions'],
-    features: [
-      'Trending topics identification',
-      'Hashtag performance tracking',
-      'Seasonal trend analysis',
-      'Competitor trend comparison'
-    ]
-  },
-  {
-    id: 6,
-    name: 'Competitive Analysis',
-    description: 'Compare your performance against competitors and industry benchmarks',
-    template_type: 'competitive_analysis',
-    icon: 'compare_arrows',
-    color: 'red',
-    estimated_time: '6-12 minutes',
-    required_data_types: ['competitor_data', 'benchmarks'],
-    features: [
-      'Competitor performance comparison',
-      'Market share analysis',
-      'Growth opportunity identification',
-      'Benchmark reporting'
-    ]
-  }
-];
-
-const mockReports = [
-  {
-    id: 1,
-    title: 'Sentiment Analysis - Dec 2024',
-    template_name: 'Sentiment Analysis',
-    status: 'completed',
-    created_at: '2024-12-15T10:30:00Z',
-    completed_at: '2024-12-15T10:33:00Z'
-  },
-  {
-    id: 2,
-    title: 'Engagement Metrics - Q4 2024',
-    template_name: 'Engagement Metrics',
-    status: 'processing',
-    created_at: '2024-12-15T09:15:00Z',
-    completed_at: null
-  },
-  {
-    id: 3,
-    title: 'Content Analysis - November',
-    template_name: 'Content Analysis',
-    status: 'completed',
-    created_at: '2024-12-14T14:20:00Z',
-    completed_at: '2024-12-14T14:26:00Z'
-  }
-];
-
-interface ReportTemplate {
-  id: number;
-  name: string;
-  description: string;
-  template_type: string;
-  icon: string;
-  color: string;
-  estimated_time: string;
-  required_data_types: string[];
-  features: string[];
-}
-
-interface GeneratedReport {
-  id: number;
-  title: string;
-  template_name: string;
-  status: string;
-  created_at: string;
-  completed_at?: string | null;
-}
 
 const Report: React.FC = () => {
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
@@ -199,12 +53,11 @@ const Report: React.FC = () => {
   const navigate = useNavigate();
   const { organizationId, projectId } = useParams();
 
-  // Mock API functions for demo
+  // API functions
   const fetchTemplates = useCallback(async () => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setTemplates(mockTemplates);
+      const templatesData = await reportService.getTemplates();
+      setTemplates(templatesData);
     } catch (error) {
       console.error('Error fetching templates:', error);
       showSnackbar('Failed to load report templates', 'error');
@@ -213,9 +66,8 @@ const Report: React.FC = () => {
 
   const fetchReports = useCallback(async () => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 300));
-      setReports(mockReports);
+      const reportsData = await reportService.getReports();
+      setReports(reportsData);
     } catch (error) {
       console.error('Error fetching reports:', error);
       showSnackbar('Failed to load recent reports', 'error');
@@ -243,10 +95,15 @@ const Report: React.FC = () => {
     const iconMap: { [key: string]: React.ReactNode } = {
       psychology: <Psychology />,
       trending_up: <TrendingUp />,
+      article: <Description />,
       description: <Description />,
       people: <People />,
       assessment: <Assessment />,
-      compare_arrows: <CompareArrows />
+      show_chart: <Timeline />,
+      compare_arrows: <CompareArrows />,
+      analytics: <Analytics />,
+      bar_chart: <BarChart />,
+      data_usage: <DataUsage />
     };
     return iconMap[iconName] || <AutoAwesome />;
   };
@@ -287,31 +144,18 @@ const Report: React.FC = () => {
 
     setGenerating(true);
     try {
-      // Simulate report generation
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Create a new report entry
-      const newReport = {
-        id: Date.now(), // Use timestamp as unique ID for demo
-        title: reportTitle,
-        template_name: generateDialog.template.name,
-        status: 'completed',
-        created_at: new Date().toISOString(),
-        completed_at: new Date().toISOString(),
-        processing_time: 180,
-        description: `Generated ${generateDialog.template.name.toLowerCase()} report with latest data`
-      };
-      
-      // Save to localStorage for Generated Reports page
-      const existingReports = localStorage.getItem('generated_reports');
-      const allReports = existingReports ? JSON.parse(existingReports) : [];
-      allReports.unshift(newReport); // Add to beginning
-      localStorage.setItem('generated_reports', JSON.stringify(allReports));
-      
+      // Generate report using the API (with project context)
+      const newReport = await reportService.generateReport(
+        generateDialog.template.id,
+        reportTitle,
+        {}, // configuration can be expanded later
+        projectId // Pass project ID for real data analysis
+      );
+
       setReports(prev => [newReport, ...prev]);
       setGenerateDialog({ open: false, template: null });
       showSnackbar(`Report "${reportTitle}" generated successfully!`, 'success');
-      
+
       // Navigate to the generated report with proper context
       if (organizationId && projectId) {
         navigate(`/organizations/${organizationId}/projects/${projectId}/report/generated/${newReport.id}`);
@@ -320,7 +164,7 @@ const Report: React.FC = () => {
       }
     } catch (error) {
       console.error('Error generating report:', error);
-      showSnackbar('Failed to generate report', 'error');
+      showSnackbar('Failed to generate report. Please try again.', 'error');
     } finally {
       setGenerating(false);
     }

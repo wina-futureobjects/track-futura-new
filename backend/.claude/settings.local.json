@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/winam/OneDrive/문서/PREVIOUS/TrackFutura/**)",
+      "Bash(curl:*)",
+      "Bash(taskkill:*)",
+      "Bash(findstr:*)",
+      "Bash(python -m pip install:*)",
+      "Bash(npm install)",
+      "Bash(python manage.py:*)",
+      "Bash(npm run dev:*)",
+      "Bash(pip install:*)",
+      "Bash(python:*)",
+      "Bash(cat:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(git add:*)",
+      "Bash(if exist nul del nul)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git reset:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

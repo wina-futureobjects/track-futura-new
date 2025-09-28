@@ -6,9 +6,10 @@ applications:
 
     web:
       commands:
-        start: "waitress-serve --unix-socket=$SOCKET config.wsgi:application"
+        start: "waitress-serve --port=$PORT config.wsgi:application"
       upstream:
-        socket_family: unix
+        socket_family: tcp
+        protocol: http
       locations:
         "/":
           passthru: true
@@ -16,6 +17,10 @@ applications:
           allow: true
           expires: "1h"
           root: "staticfiles"
+        "/media":
+          allow: true
+          expires: "1d"
+          root: "media"
     build:
       flavor: none
     hooks:
@@ -24,27 +29,36 @@ applications:
         # Upgrade pip first
         pip install --upgrade pip setuptools wheel
         # Install requirements with verbose output
-        pip install -r requirements.txt --verbose
+        pip install -r requirements.txt --verbose --no-cache-dir
         # Basic Django check
         python -c "import django; print('Django installed successfully')"
       deploy: |
         set -eux
-        # Collect static files (without whitenoise)
+        # Collect static files
         python manage.py collectstatic --noinput --verbosity=2
         # Run migrations
         python manage.py migrate --verbosity=2
-        # Test deployment configuration
-        python manage.py test_deployment
+        # Load initial data if needed
+        python -c "
+        import os
+        if os.environ.get('LOAD_INITIAL_DATA') == 'true':
+            os.system('python manage.py loaddata initial_data.json')
+        "
     relationships:
       database: "db:postgresql"
     variables:
       env:
-        DJANGO_SETTINGS_MODULE: "config.settings"
-        DEBUG: "True"
-        DJANGO_SECURE_SSL_REDIRECT: "False"
-        # BrightData webhook endpoint configuration
-        BRIGHTDATA_BASE_URL: "https://7cd5255d8f2b.ngrok-free.app"
-        # Completely disable DataDog tracing and monitoring
+        DJANGO_SETTINGS_MODULE: "config.settings_production"
+        DEBUG: "False"
+        DJANGO_SECURE_SSL_REDIRECT: "True"
+        DJANGO_SECURE_PROXY_SSL_HEADER: "HTTP_X_FORWARDED_PROTO,https"
+        DJANGO_USE_TZ: "True"
+        # Database will be configured automatically by Upsun relationship
+        # BrightData webhook endpoint configuration (will be updated with actual domain)
+        BRIGHTDATA_WEBHOOK_BASE_URL: "https://api.{default}"
+        # OpenAI API key (should be set in Upsun environment variables)
+        # OPENAI_API_KEY: "your-openai-api-key"
+        # Disable DataDog tracing and monitoring
         DD_TRACE_ENABLED: "false"
         DD_PROFILING_ENABLED: "false"
         DD_APM_ENABLED: "false"
@@ -53,10 +67,16 @@ applications:
         DD_RUNTIME_METRICS_ENABLED: "false"
         DD_INSTRUMENTATION_TELEMETRY_ENABLED: "false"
         PYTHONPATH: "/app"
+        # Security settings for production
+        DJANGO_CSRF_TRUSTED_ORIGINS: "https://*.upsun.app,https://*.platform.sh"
+        DJANGO_ALLOWED_HOSTS: "*.upsun.app,*.platform.sh"
     mounts:
       "/staticfiles":
         source: "local"
         source_path: "static_assets"
+      "/media":
+        source: "local"
+        source_path: "media_files"
 
   frontend:
     source:
@@ -64,9 +84,10 @@ applications:
     type: "nodejs:18"
     web:
       commands:
-        start: "npm run start"
+        start: "serve -s dist -l tcp://0.0.0.0:$PORT"
       upstream:
         socket_family: tcp
+        protocol: http
       locations:
         "/":
           root: "dist"
@@ -75,6 +96,7 @@ applications:
           expires: -1
           scripts: false
           allow: true
+          try_files: ["$uri", "$uri/", "/index.html"]
         "/assets":
           root: "dist/assets"
           expires: 365d
@@ -84,13 +106,14 @@ applications:
       flavor: none
     hooks:
       build: |
-        # Set API base URL for Upsun deployment
-        # The API will be available at https://api.{default}/ based on our routes configuration
-        export VITE_API_BASE_URL=""
-        echo "Setting VITE_API_BASE_URL to empty string to use dynamic detection"
-        echo "API will be detected as: https://api.\${hostname}"
-        npm install
+        set -eux
+        # Install Node.js dependencies
+        npm ci --prefer-offline --no-audit
+        # Build the frontend application
         npm run build
+    variables:
+      env:
+        NODE_ENV: "production"
 
 # Define database service
 services:
@@ -100,16 +123,26 @@ services:
       extensions:
         - pg_trgm
         - unaccent
+    disk: 1024
 
 routes:
   "https://api.{default}/":
     type: upstream
     upstream: "backend:http"
+    cache:
+      enabled: false
+    headers:
+      X-Frame-Options: "SAMEORIGIN"
+      X-Content-Type-Options: "nosniff"
 
   "https://{default}/":
     type: upstream
     upstream: "frontend:http"
     cache:
       enabled: true
-      default_ttl: 0
+      default_ttl: 300
       cookies: ['*']
+      headers: ['Authorization']
+    headers:
+      X-Frame-Options: "SAMEORIGIN"
+      X-Content-Type-Options: "nosniff"

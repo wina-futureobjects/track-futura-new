@@ -39,16 +39,23 @@ class ChatService {
     return response.json();
   }
 
-  async addMessage(threadId: string, content: string, sender: 'user' | 'ai'): Promise<Message> {
+  async addMessage(threadId: string, content: string, sender: 'user' | 'ai', projectId?: string): Promise<Message> {
+    const body: any = {
+      content,
+      sender,
+    };
+
+    // Add project_id if available for AI analysis
+    if (projectId) {
+      body.project_id = projectId;
+    }
+
     const response = await apiFetch(`/api/chat/threads/${threadId}/add_message/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        content,
-        sender,
-      }),
+      body: JSON.stringify(body),
     });
     if (!response.ok) throw new Error('Failed to add message');
     return response.json();

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { 
   Container, 
   Paper, 
@@ -181,6 +182,7 @@ const FollowUpSuggestions: React.FC<{ onSuggestionClick: (question: string) => v
 };
 
 const Analysis: React.FC = () => {
+  const { projectId } = useParams<{ projectId: string }>();
   const [input, setInput] = useState<string>('');
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -247,9 +249,11 @@ const Analysis: React.FC = () => {
       setThreads(prev => [newThread, ...(Array.isArray(prev) ? prev : [])]);
       setCurrentThread(newThread);
       setMessages([]);
-      setShowSuggestions(true);
+      setShowSuggestions(false); // Hide suggestions when starting to chat
+      return newThread;
     } catch (error) {
       console.error('Failed to create thread:', error);
+      return null;
     }
   };
 
@@ -451,26 +455,44 @@ const Analysis: React.FC = () => {
 
   // Handle sending a message
   const handleSendMessage = async () => {
-    if (input.trim() === '' || !currentThread) return;
-    
+    if (input.trim() === '') return;
+
     try {
       setIsLoading(true);
-      
-      // Add user message
-      const userMessage = await chatService.addMessage(currentThread.id, input, 'user');
-      setMessages(prev => [...prev, userMessage]);
+      const messageContent = input;
       setInput('');
-      
-      // Simulate AI response (would be replaced with actual AI service call)
-      const aiResponse = await mockAIResponse(input);
-      const aiMessage = await chatService.addMessage(currentThread.id, aiResponse, 'ai');
-      setMessages(prev => [...prev, aiMessage]);
-      
-      // Refresh current thread to get latest state
-      const updatedThread = await chatService.getThread(currentThread.id);
-      setCurrentThread(updatedThread);
+
+      // Create thread if none exists
+      let thread = currentThread;
+      if (!thread) {
+        thread = await createNewThread();
+      }
+
+      if (!thread) {
+        console.error('Failed to create or get thread');
+        return;
+      }
+
+      // Add user message and get AI response (with project context)
+      const response = await chatService.addMessage(thread.id, messageContent, 'user', projectId);
+
+      if (response.user_message && response.ai_message) {
+        // Backend returns both messages - add them both at once
+        setMessages(prev => [...prev, response.user_message, response.ai_message]);
+      } else {
+        // Fallback format: single message
+        setMessages(prev => [...prev, response]);
+      }
     } catch (error) {
       console.error('Failed to send message:', error);
+      // Add error message to chat
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        content: 'Sorry, I encountered an error. Please try again.',
+        sender: 'ai',
+        timestamp: new Date(),
+        is_error: true
+      }]);
     } finally {
       setIsLoading(false);
     }
@@ -1040,7 +1062,7 @@ Try asking about:
                 <IconButton
                   color="primary"
                   onClick={handleSendMessage}
-                  disabled={input.trim() === '' || isLoading || !currentThread}
+                  disabled={input.trim() === '' || isLoading}
                   sx={{
                     bgcolor: 'primary.main',
                     color: 'white',

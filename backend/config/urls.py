@@ -81,6 +81,7 @@ urlpatterns = [
     path("api/brightdata/", include("brightdata_integration.urls")),
     path("api/chat/", include("chat.urls")),
     path("api/workflow/", include("workflow.urls")),
+    path("api/dashboard/", include("dashboard.urls")),
     path("api/", RedirectView.as_view(url="/api/users/", permanent=False)),
 
 ]

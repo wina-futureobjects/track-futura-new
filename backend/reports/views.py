@@ -11,6 +11,8 @@ from datetime import datetime, timedelta
 import csv
 from .models import ReportTemplate, GeneratedReport
 from rest_framework import serializers
+from .openai_service import report_openai_service
+from .pdf_generator import pdf_generator
 
 # Serializers
 class ReportTemplateSerializer(serializers.ModelSerializer):
@@ -85,18 +87,31 @@ class GeneratedReportViewSet(viewsets.ModelViewSet):
                 status='processing'
             )
             
-            # Process the report based on template type
+            # Process the report based on template type using OpenAI
             try:
+                # Try to get project_id from request
+                project_id = None
+                if hasattr(request, 'user') and request.user.is_authenticated:
+                    project_id = request.query_params.get('project_id') or request.data.get('project_id')
+                    if project_id:
+                        try:
+                            project_id = int(project_id)
+                        except (ValueError, TypeError):
+                            project_id = None
+
                 if template.template_type == 'sentiment_analysis':
-                    self._process_sentiment_analysis(report)
+                    report.results = report_openai_service.generate_sentiment_analysis_report(configuration, project_id=project_id)
                 elif template.template_type == 'engagement_metrics':
-                    self._process_engagement_metrics(report)
+                    report.results = report_openai_service.generate_engagement_metrics_report(configuration, project_id=project_id)
+                elif template.template_type == 'content_analysis':
+                    report.results = report_openai_service.generate_content_analysis_report(configuration, project_id=project_id)
                 else:
                     # Default processing for other types
                     self._process_default_template(report)
-                
+
                 report.status = 'completed'
                 report.completed_at = timezone.now()
+                report.data_source_count = report.results.get('data_source_count', 0)
                 
             except Exception as e:
                 report.status = 'failed'
@@ -308,9 +323,60 @@ class GeneratedReportViewSet(viewsets.ModelViewSet):
                     writer.writerow([key, str(value)])
             
             return response
-            
+
         except Exception as e:
             return Response(
                 {'error': f'Error downloading CSV: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=['GET'])
+    def download_pdf(self, request, pk=None):
+        """
+        Download report results as PDF
+        """
+        try:
+            report = self.get_object()
+
+            if report.status != 'completed':
+                return Response(
+                    {'error': 'Report is not completed yet'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Generate PDF with enhanced visualizations
+            try:
+                pdf_buffer = report_openai_service.generate_enhanced_pdf(
+                    report.results, report.title, report.template.template_type
+                )
+            except Exception as e:
+                # Fallback to basic PDF generator if enhanced fails
+                print(f"Enhanced PDF generation failed, using fallback: {e}")
+                if report.template.template_type == 'sentiment_analysis':
+                    pdf_buffer = pdf_generator.generate_sentiment_analysis_pdf(
+                        report.results, report.title
+                    )
+                elif report.template.template_type == 'engagement_metrics':
+                    pdf_buffer = pdf_generator.generate_engagement_metrics_pdf(
+                        report.results, report.title
+                    )
+                elif report.template.template_type == 'content_analysis':
+                    pdf_buffer = pdf_generator.generate_content_analysis_pdf(
+                        report.results, report.title
+                    )
+                else:
+                    pdf_buffer = pdf_generator.generate_generic_pdf(
+                        report.results, report.title, report.template.template_type
+                    )
+
+            # Create PDF response
+            response = HttpResponse(pdf_buffer.getvalue(), content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="{report.title.replace(" ", "_")}_{report.id}.pdf"'
+
+            return response
+
+        except Exception as e:
+            return Response(
+                {'error': f'Error generating PDF: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )

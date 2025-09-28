@@ -51,6 +51,7 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import StatCard from '../components/dashboard/StatCard';
+import { dashboardService, DashboardStats, ActivityTimelineItem, PlatformDistributionItem, RecentActivityItem, TopPerformerItem, WeeklyGoalItem } from '../services/dashboardService';
 import {
   AreaChart,
   Area,
@@ -89,53 +90,8 @@ interface Project {
   progress?: number;
 }
 
-// Mock data for the dashboard
-interface ProjectStats {
-  totalPosts: number;
-  totalAccounts: number;
-  totalReports: number;
-  totalStorageUsed: string;
-  creditBalance: number;
-  maxCredits: number;
-  engagementRate: number;
-  growthRate: number;
-}
-
-// Demo data for the charts
-const activityData = [
-  { date: 'Jun', instagram: 340, facebook: 240, linkedin: 180, tiktok: 120 },
-  { date: 'Jul', instagram: 520, facebook: 320, linkedin: 220, tiktok: 180 },
-  { date: 'Aug', instagram: 450, facebook: 280, linkedin: 310, tiktok: 240 },
-  { date: 'Sep', instagram: 610, facebook: 380, linkedin: 340, tiktok: 320 },
-  { date: 'Oct', instagram: 580, facebook: 450, linkedin: 290, tiktok: 360 },
-];
-
-const platformDistribution = [
-  { name: 'Instagram', value: 45, color: '#E1306C' },
-  { name: 'Facebook', value: 30, color: '#1877F2' },
-  { name: 'LinkedIn', value: 15, color: '#0A66C2' },
-  { name: 'TikTok', value: 10, color: '#000000' },
-];
-
-// Additional mock data for enhanced dashboard
-const recentActivity = [
-  { id: 1, action: 'New Instagram post uploaded', time: '2 hours ago', type: 'upload' },
-  { id: 2, action: 'Facebook analysis completed', time: '4 hours ago', type: 'analysis' },
-  { id: 3, action: 'Report generated successfully', time: '1 day ago', type: 'report' },
-  { id: 4, action: 'LinkedIn data imported', time: '2 days ago', type: 'import' },
-];
-
-const topPerformers = [
-  { platform: 'Instagram', account: '@brand_official', engagement: '8.4%', growth: '+12.3%' },
-  { platform: 'Facebook', account: 'Brand Page', engagement: '6.2%', growth: '+8.1%' },
-  { platform: 'LinkedIn', account: 'Company Page', engagement: '4.8%', growth: '+15.2%' },
-];
-
-const weeklyGoals = [
-  { goal: 'Post Uploads', current: 45, target: 60, percentage: 75 },
-  { goal: 'Engagement Rate', current: 3.2, target: 4.0, percentage: 80 },
-  { goal: 'New Followers', current: 1200, target: 1500, percentage: 80 },
-];
+// Dashboard data types using the dashboard service interfaces
+type ProjectStats = DashboardStats;
 
 const ProjectDashboard = () => {
   const theme = useTheme();
@@ -150,7 +106,7 @@ const ProjectDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Project stats - will be fetched from API
+  // Dashboard data state
   const [stats, setStats] = useState<ProjectStats>({
     totalPosts: 0,
     totalAccounts: 0,
@@ -159,41 +115,55 @@ const ProjectDashboard = () => {
     creditBalance: 0,
     maxCredits: 0,
     engagementRate: 0,
-    growthRate: 0
+    growthRate: 0,
+    platforms: {},
+    totalLikes: 0,
+    totalComments: 0,
+    totalShares: 0,
+    totalViews: 0
   });
+  const [activityData, setActivityData] = useState<ActivityTimelineItem[]>([]);
+  const [platformDistribution, setPlatformDistribution] = useState<PlatformDistributionItem[]>([]);
+  const [recentActivity, setRecentActivity] = useState<RecentActivityItem[]>([]);
+  const [topPerformers, setTopPerformers] = useState<TopPerformerItem[]>([]);
+  const [weeklyGoals, setWeeklyGoals] = useState<WeeklyGoalItem[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
   
   // Determine which URL pattern we're using
   const isOrgProjectUrl = location.pathname.includes('/organizations/') && location.pathname.includes('/projects/');
 
-  // Function to fetch project statistics
-  const fetchProjectStats = async () => {
+  // Function to fetch all dashboard data
+  const fetchDashboardData = async () => {
     if (!projectId) return;
-    
+
     try {
       setStatsLoading(true);
-      const response = await apiFetch(`/api/users/projects/${projectId}/stats/`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch project statistics');
-      }
-      
-      const data = await response.json();
-      setStats({
-        totalPosts: data.totalPosts || 0,
-        totalAccounts: data.totalAccounts || 0,
-        totalReports: data.totalReports || 0,
-        totalStorageUsed: data.totalStorageUsed || '0 MB',
-        creditBalance: data.creditBalance || 0,
-        maxCredits: data.maxCredits || 0,
-        engagementRate: data.engagementRate || 0,
-        growthRate: data.growthRate || 0
-      });
+      setDashboardLoading(true);
+
+      // Fetch all dashboard data in parallel
+      const [statsData, activityTimeline, platformDist, recentAct, topPerf, weeklyGoalsData] = await Promise.all([
+        dashboardService.getStats(projectId),
+        dashboardService.getActivityTimeline(projectId),
+        dashboardService.getPlatformDistribution(projectId),
+        dashboardService.getRecentActivity(projectId),
+        dashboardService.getTopPerformers(projectId),
+        dashboardService.getWeeklyGoals(projectId)
+      ]);
+
+      setStats(statsData);
+      setActivityData(activityTimeline);
+      setPlatformDistribution(platformDist);
+      setRecentActivity(recentAct);
+      setTopPerformers(topPerf);
+      setWeeklyGoals(weeklyGoalsData);
+
     } catch (error) {
-      console.error('Error fetching project statistics:', error);
-      // Don't set error state for stats - just log it and keep using default values
+      console.error('Error fetching dashboard data:', error);
+      // Don't set error state - just log it and keep using default values
     } finally {
       setStatsLoading(false);
+      setDashboardLoading(false);
     }
   };
 
@@ -226,7 +196,7 @@ const ProjectDashboard = () => {
     };
     
     fetchProject();
-    fetchProjectStats();
+    fetchDashboardData();
   }, [projectId, isOrgProjectUrl]);
 
   // Function to get the project URL in the correct format
@@ -316,7 +286,7 @@ const ProjectDashboard = () => {
             <Button
               variant="outlined"
               startIcon={<RefreshCw size={16} />}
-              onClick={fetchProjectStats}
+              onClick={fetchDashboardData}
               disabled={statsLoading}
               sx={{ 
                 borderColor: 'divider',
@@ -504,11 +474,16 @@ const ProjectDashboard = () => {
                 </Box>
               </Box>
               <Box sx={{ height: { xs: 320, lg: 420, xl: 480 }, width: '100%', mt: 2 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart
-                    data={activityData}
-                    margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-                  >
+                {dashboardLoading ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                    <CircularProgress />
+                  </Box>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={activityData.length > 0 ? activityData : [{ date: 'No Data', instagram: 0, facebook: 0, linkedin: 0, tiktok: 0 }]}
+                      margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                    >
                     <defs>
                       <linearGradient id="colorInstagram" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#E1306C" stopOpacity={0.8}/>
@@ -569,8 +544,9 @@ const ProjectDashboard = () => {
                       fill="url(#colorTiktok)" 
                       strokeWidth={2}
                     />
-                  </AreaChart>
-                </ResponsiveContainer>
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
               </Box>
             </Paper>
           </Grid>
@@ -588,23 +564,30 @@ const ProjectDashboard = () => {
               </Typography>
               
               <Box sx={{ height: { xs: 240, lg: 340, xl: 400 }, display: 'flex', justifyContent: 'center', alignItems: 'center', mt: 2 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={platformDistribution}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={80}
-                      outerRadius={120}
-                      paddingAngle={4}
-                      dataKey="value"
-                      strokeWidth={1}
-                      stroke="#fff"
-                    >
-                      {platformDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
+                {dashboardLoading ? (
+                  <CircularProgress />
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={platformDistribution.length > 0 ? platformDistribution : [
+                          { name: 'No Data', value: 100, color: '#e0e0e0' }
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={80}
+                        outerRadius={120}
+                        paddingAngle={4}
+                        dataKey="value"
+                        strokeWidth={1}
+                        stroke="#fff"
+                      >
+                        {(platformDistribution.length > 0 ? platformDistribution : [
+                          { name: 'No Data', value: 100, color: '#e0e0e0' }
+                        ]).map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
                     <Tooltip 
                       formatter={(value: number) => [`${value}%`, 'Percentage']}
                       contentStyle={{ 
@@ -621,7 +604,8 @@ const ProjectDashboard = () => {
                       formatter={(value) => <span style={{ color: '#666', fontSize: '0.875rem' }}>{value}</span>}
                     />
                   </PieChart>
-                </ResponsiveContainer>
+                  </ResponsiveContainer>
+                )}
               </Box>
             </Paper>
           </Grid>
@@ -638,33 +622,43 @@ const ProjectDashboard = () => {
                   <RefreshCw size={16} />
                 </IconButton>
               </Box>
-              <Stack spacing={2.5}>
-                {recentActivity.map((activity) => (
-                  <Box key={activity.id} sx={{ display: 'flex', alignItems: 'center', gap: 2.5 }}>
-                    <Avatar sx={{ 
-                      bgcolor: activity.type === 'upload' ? alpha(theme.palette.primary.main, 0.1) :
-                                activity.type === 'analysis' ? alpha(theme.palette.success.main, 0.1) :
-                                activity.type === 'report' ? alpha(theme.palette.warning.main, 0.1) :
-                                alpha(theme.palette.info.main, 0.1),
-                      color: activity.type === 'upload' ? theme.palette.primary.main :
-                             activity.type === 'analysis' ? theme.palette.success.main :
-                             activity.type === 'report' ? theme.palette.warning.main :
-                             theme.palette.info.main,
-                      width: 40,
-                      height: 40
-                    }}>
-                      {activity.type === 'upload' && <Activity size={18} />}
-                      {activity.type === 'analysis' && <Target size={18} />}
-                      {activity.type === 'report' && <BarChart3 size={18} />}
-                      {activity.type === 'import' && <HardDrive size={18} />}
-                    </Avatar>
-                    <Box sx={{ flexGrow: 1 }}>
-                      <Typography variant="body2" fontWeight={500}>{activity.action}</Typography>
-                      <Typography variant="caption" color="text.secondary">{activity.time}</Typography>
+              {dashboardLoading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
+                  <CircularProgress size={24} />
+                </Box>
+              ) : (
+                <Stack spacing={2.5}>
+                  {recentActivity.length > 0 ? recentActivity.map((activity) => (
+                    <Box key={activity.id} sx={{ display: 'flex', alignItems: 'center', gap: 2.5 }}>
+                      <Avatar sx={{
+                        bgcolor: activity.type === 'upload' ? alpha(theme.palette.primary.main, 0.1) :
+                                  activity.type === 'analysis' ? alpha(theme.palette.success.main, 0.1) :
+                                  activity.type === 'report' ? alpha(theme.palette.warning.main, 0.1) :
+                                  alpha(theme.palette.info.main, 0.1),
+                        color: activity.type === 'upload' ? theme.palette.primary.main :
+                               activity.type === 'analysis' ? theme.palette.success.main :
+                               activity.type === 'report' ? theme.palette.warning.main :
+                               theme.palette.info.main,
+                        width: 40,
+                        height: 40
+                      }}>
+                        {activity.type === 'upload' && <Activity size={18} />}
+                        {activity.type === 'analysis' && <Target size={18} />}
+                        {activity.type === 'report' && <BarChart3 size={18} />}
+                        {activity.type === 'import' && <HardDrive size={18} />}
+                      </Avatar>
+                      <Box sx={{ flexGrow: 1 }}>
+                        <Typography variant="body2" fontWeight={500}>{activity.action}</Typography>
+                        <Typography variant="caption" color="text.secondary">{activity.time}</Typography>
+                      </Box>
                     </Box>
-                  </Box>
-                ))}
-              </Stack>
+                  )) : (
+                    <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
+                      No recent activity
+                    </Typography>
+                  )}
+                </Stack>
+              )}
             </Paper>
           </Grid>
 
@@ -677,36 +671,46 @@ const ProjectDashboard = () => {
                   <Award size={16} />
                 </IconButton>
               </Box>
-              <Stack spacing={3.5}>
-                {topPerformers.map((performer, index) => (
-                  <Box key={index}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Avatar sx={{ 
-                          bgcolor: performer.platform === 'Instagram' ? '#E1306C' :
-                                   performer.platform === 'Facebook' ? '#1877F2' :
-                                   '#0A66C2',
-                          width: 36,
-                          height: 36
-                        }}>
-                          {performer.platform === 'Instagram' && <Instagram size={16} />}
-                          {performer.platform === 'Facebook' && <Facebook size={16} />}
-                          {performer.platform === 'LinkedIn' && <Linkedin size={16} />}
-                        </Avatar>
-                        <Box>
-                          <Typography variant="body2" fontWeight={600}>{performer.account}</Typography>
-                          <Typography variant="caption" color="text.secondary">{performer.platform}</Typography>
+              {dashboardLoading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
+                  <CircularProgress size={24} />
+                </Box>
+              ) : (
+                <Stack spacing={3.5}>
+                  {topPerformers.length > 0 ? topPerformers.map((performer, index) => (
+                    <Box key={index}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                          <Avatar sx={{
+                            bgcolor: performer.platform === 'Instagram' ? '#E1306C' :
+                                     performer.platform === 'Facebook' ? '#1877F2' :
+                                     '#0A66C2',
+                            width: 36,
+                            height: 36
+                          }}>
+                            {performer.platform === 'Instagram' && <Instagram size={16} />}
+                            {performer.platform === 'Facebook' && <Facebook size={16} />}
+                            {performer.platform === 'LinkedIn' && <Linkedin size={16} />}
+                          </Avatar>
+                          <Box>
+                            <Typography variant="body2" fontWeight={600}>{performer.account}</Typography>
+                            <Typography variant="caption" color="text.secondary">{performer.platform}</Typography>
+                          </Box>
+                        </Box>
+                        <Box sx={{ textAlign: 'right' }}>
+                          <Typography variant="body2" fontWeight={600}>{performer.engagement}</Typography>
+                          <Typography variant="caption" color="success.main">{performer.growth}</Typography>
                         </Box>
                       </Box>
-                      <Box sx={{ textAlign: 'right' }}>
-                        <Typography variant="body2" fontWeight={600}>{performer.engagement}</Typography>
-                        <Typography variant="caption" color="success.main">{performer.growth}</Typography>
-                      </Box>
+                      {index < topPerformers.length - 1 && <Divider />}
                     </Box>
-                    {index < topPerformers.length - 1 && <Divider />}
-                  </Box>
-                ))}
-              </Stack>
+                  )) : (
+                    <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
+                      No top performers data
+                    </Typography>
+                  )}
+                </Stack>
+              )}
             </Paper>
           </Grid>
 
@@ -719,33 +723,43 @@ const ProjectDashboard = () => {
                   <Target size={16} />
                 </IconButton>
               </Box>
-              <Stack spacing={3.5}>
-                {weeklyGoals.map((goal, index) => (
-                  <Box key={index}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
-                      <Typography variant="body2" fontWeight={500}>{goal.goal}</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {goal.goal === 'Engagement Rate' ? `${goal.current}% / ${goal.target}%` : `${goal.current} / ${goal.target}`}
+              {dashboardLoading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
+                  <CircularProgress size={24} />
+                </Box>
+              ) : (
+                <Stack spacing={3.5}>
+                  {weeklyGoals.length > 0 ? weeklyGoals.map((goal, index) => (
+                    <Box key={index}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5 }}>
+                        <Typography variant="body2" fontWeight={500}>{goal.goal}</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {goal.goal === 'Engagement Rate' ? `${goal.current}% / ${goal.target}%` : `${goal.current} / ${goal.target}`}
+                        </Typography>
+                      </Box>
+                      <LinearProgress
+                        variant="determinate"
+                        value={goal.percentage}
+                        sx={{
+                          height: 10,
+                          borderRadius: 5,
+                          backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                          '& .MuiLinearProgress-bar': {
+                            borderRadius: 5
+                          }
+                        }}
+                      />
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                        {goal.percentage}% complete
                       </Typography>
                     </Box>
-                    <LinearProgress 
-                      variant="determinate" 
-                      value={goal.percentage} 
-                      sx={{ 
-                        height: 10, 
-                        borderRadius: 5,
-                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                        '& .MuiLinearProgress-bar': {
-                          borderRadius: 5
-                        }
-                      }} 
-                    />
-                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                      {goal.percentage}% complete
+                  )) : (
+                    <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
+                      No weekly goals data
                     </Typography>
-                  </Box>
-                ))}
-              </Stack>
+                  )}
+                </Stack>
+              )}
             </Paper>
           </Grid>
         </Grid>
