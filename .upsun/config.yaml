@@ -107,8 +107,10 @@ applications:
     hooks:
       build: |
         set -eux
-        # Install Node.js dependencies
-        npm install --prefer-offline --no-audit
+        # Install Node.js dependencies including dev dependencies
+        npm install --include=dev --prefer-offline --no-audit
+        # Verify important build dependencies
+        ls -la node_modules/@vitejs/plugin-react/ || echo "Plugin not found"
         # Build the frontend application
         npm run build
     variables:
