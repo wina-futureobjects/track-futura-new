@@ -81,7 +81,7 @@ applications:
   frontend:
     source:
       root: "frontend"
-    type: "nodejs:18"
+    type: "nodejs:20"
     web:
       commands:
         start: "serve -s dist -l tcp://0.0.0.0:$PORT"
@@ -108,7 +108,7 @@ applications:
       build: |
         set -eux
         # Install Node.js dependencies
-        npm ci --prefer-offline --no-audit
+        npm install --prefer-offline --no-audit
         # Build the frontend application
         npm run build
     variables:
