@@ -1,16 +1,25 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { resolve } from 'path'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   base: '/',
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, './src'),
+    },
+  },
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
     emptyOutDir: true,
-    sourcemap: false
+    sourcemap: false,
+    rollupOptions: {
+      external: [],
+    }
   },
   server: {
     proxy: {
@@ -20,5 +29,8 @@ export default defineConfig({
         secure: false,
       }
     }
+  },
+  optimizeDeps: {
+    include: ['react', 'react-dom'],
   }
 })

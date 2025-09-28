@@ -107,10 +107,15 @@ applications:
     hooks:
       build: |
         set -eux
+        # Clean any previous installs
+        rm -rf node_modules package-lock.json
         # Install Node.js dependencies including dev dependencies
-        npm install --include=dev --prefer-offline --no-audit
-        # Verify important build dependencies
+        npm install --include=dev --no-audit
+        # Verify critical build dependencies
         ls -la node_modules/@vitejs/plugin-react/ || echo "Plugin not found"
+        ls -la node_modules/vite/ || echo "Vite not found"
+        # Clear Vite cache
+        rm -rf node_modules/.vite
         # Build the frontend application
         npm run build
     variables:
