@@ -78,7 +78,7 @@ urlpatterns = [
     path("api/track-accounts/", include("track_accounts.urls")),
     path("api/linkedin-data/", include("linkedin_data.urls")),
     path("api/tiktok-data/", include("tiktok_data.urls")),
-    path("api/brightdata/", include("brightdata_integration.urls")),
+    path("api/apify/", include("apify_integration.urls")),
     path("api/chat/", include("chat.urls")),
     path("api/workflow/", include("workflow.urls")),
     path("api/dashboard/", include("dashboard.urls")),

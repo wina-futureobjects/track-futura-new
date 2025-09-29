@@ -1,132 +1,55 @@
 applications:
-  backend:
+  trackfutura:
+    type: python:3.12
+    root: backend
     source:
-      root: "backend"
-    type: "python:3.11"
-
-    web:
-      commands:
-        start: "gunicorn --bind 0.0.0.0:$PORT --workers 2 config.wsgi:application"
-      upstream:
-        socket_family: tcp
-        protocol: http
-      locations:
-        "/":
-          passthru: true
-        "/static":
-          allow: true
-          expires: "1h"
-          root: "staticfiles"
-        "/media":
-          allow: true
-          expires: "1d"
-          root: "media"
+      root: backend
     build:
-      flavor: none
-    hooks:
-      build: |
-        set -eux
-        # Upgrade pip first
-        pip install --upgrade pip setuptools wheel
-        # Install requirements
-        pip install -r requirements.txt --no-cache-dir
-        # Basic Django check
-        python -c "import django; print('Django installed successfully')"
-      deploy: |
-        set -eux
-        # Collect static files
-        python manage.py collectstatic --noinput
-        # Run migrations
-        python manage.py migrate
-    relationships:
-      database: "db:postgresql"
-    variables:
-      env:
-        DJANGO_SETTINGS_MODULE: "config.settings_production"
-        DEBUG: "False"
-        DJANGO_SECURE_SSL_REDIRECT: "True"
-        DJANGO_SECURE_PROXY_SSL_HEADER: "HTTP_X_FORWARDED_PROTO,https"
-        DJANGO_USE_TZ: "True"
-        # BrightData webhook endpoint configuration
-        BRIGHTDATA_WEBHOOK_BASE_URL: "https://api.{default}"
-        # Disable DataDog monitoring
-        DD_TRACE_ENABLED: "false"
-        DD_PROFILING_ENABLED: "false"
-        DD_APM_ENABLED: "false"
-        DD_LOGS_ENABLED: "false"
-        DD_TRACE_STARTUP_LOGS: "false"
-        DD_RUNTIME_METRICS_ENABLED: "false"
-        DD_INSTRUMENTATION_TELEMETRY_ENABLED: "false"
-        PYTHONPATH: "/app"
-        # Security settings for production
-        DJANGO_CSRF_TRUSTED_ORIGINS: "https://*.upsun.app,https://*.platform.sh"
-        DJANGO_ALLOWED_HOSTS: "*.upsun.app,*.platform.sh"
-    mounts:
-      "/staticfiles":
-        source: "local"
-        source_path: "static_assets"
-      "/media":
-        source: "local"
-        source_path: "media_files"
-
-  frontend:
-    source:
-      root: "frontend"
-    type: "nodejs:20"
-    web:
-      commands:
-        start: "npx serve -s dist -l tcp://0.0.0.0:$PORT"
-      upstream:
-        socket_family: tcp
-        protocol: http
-      locations:
-        "/":
-          root: "dist"
-          index:
-            - "index.html"
-          expires: -1
-          scripts: false
-          allow: true
-          passthru: "/index.html"
-        "/assets":
-          root: "dist/assets"
-          expires: 365d
-          scripts: false
-          allow: true
-    build:
-      flavor: none
-    hooks:
-      build: |
-        set -eux
-        # Clean any previous installs
-        rm -rf node_modules package-lock.json
-        # Install Node.js dependencies
-        npm ci --include=dev
-        # Build the frontend application
-        npm run build
-    variables:
-      env:
-        NODE_ENV: "production"
-
-# Define database service
-services:
-  db:
-    type: postgresql:15
-    configuration:
+      flavor: django
+    runtime:
       extensions:
-        - pg_trgm
-        - unaccent
+        - apache2
+      environment_variables:
+        DJANGO_SETTINGS_MODULE: config.settings_upsun
+        PYTHONPATH: /app
+    web:
+      commands:
+        start: "gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 3"
+      upstream:
+        socket_family: unix
+      document_root: backend
+    hooks:
+      build: |
+        pip install -r requirements.txt
+        python manage.py collectstatic --noinput
+        python manage.py migrate
+        python manage.py setup_apify_configs --api-token $APIFY_API_TOKEN
+    mounts:
+      - source: local
+        source_path: static
+        target: /app/static
+      - source: local
+        source_path: media
+        target: /app/media
+    relationships:
+      database:
+        service: postgresql
+    variables:
+      env:
+        DEBUG: false
+        ALLOWED_HOSTS: "['*']"
+        CORS_ALLOW_ALL_ORIGINS: true
+        CORS_ALLOW_CREDENTIALS: true
+        CORS_ALLOWED_ORIGINS: "['https://trackfutura.com', 'https://www.trackfutura.com']"
+        CSRF_TRUSTED_ORIGINS: "['https://trackfutura.com', 'https://www.trackfutura.com']"
+        WEBHOOK_BASE_URL: "https://trackfutura.com"
 
-routes:
-  "https://api.{default}/":
-    type: upstream
-    upstream: "backend:http"
-    cache:
-      enabled: false
-
-  "https://{default}/":
-    type: upstream
-    upstream: "frontend:http"
-    cache:
-      enabled: true
-      default_ttl: 300
+services:
+  postgresql:
+    type: postgresql:15
+    disk: 1024
+    variables:
+      env:
+        POSTGRES_DB: trackfutura
+        POSTGRES_USER: trackfutura
+        POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
