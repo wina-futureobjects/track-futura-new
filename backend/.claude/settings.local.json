@@ -19,7 +19,17 @@
       "Bash(git push:*)",
       "Bash(git reset:*)",
       "Bash(upsun:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(venvScripts:*)",
+      "Bash(./venv/Scripts/activate)",
+      "Bash(flyctl apps:*)",
+      "Bash(flyctl launch:*)",
+      "Bash(if exist \"backend/fly.toml\" del \"backend/fly.toml\")",
+      "Bash(flyctl postgres create:*)",
+      "Bash(flyctl postgres attach:*)",
+      "Bash(flyctl secrets set:*)",
+      "Bash(flyctl deploy:*)",
+      "Bash(flyctl status:*)"
     ],
     "deny": [],
     "ask": []

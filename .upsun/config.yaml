@@ -6,7 +6,7 @@ applications:
 
     web:
       commands:
-        start: "waitress-serve --port=$PORT config.wsgi:application"
+        start: "gunicorn --bind 0.0.0.0:$PORT --workers 2 config.wsgi:application"
       upstream:
         socket_family: tcp
         protocol: http
@@ -28,22 +28,16 @@ applications:
         set -eux
         # Upgrade pip first
         pip install --upgrade pip setuptools wheel
-        # Install requirements with verbose output
-        pip install -r requirements.txt --verbose --no-cache-dir
+        # Install requirements
+        pip install -r requirements.txt --no-cache-dir
         # Basic Django check
         python -c "import django; print('Django installed successfully')"
       deploy: |
         set -eux
         # Collect static files
-        python manage.py collectstatic --noinput --verbosity=2
+        python manage.py collectstatic --noinput
         # Run migrations
-        python manage.py migrate --verbosity=2
-        # Load initial data if needed
-        python -c "
-        import os
-        if os.environ.get('LOAD_INITIAL_DATA') == 'true':
-            os.system('python manage.py loaddata initial_data.json')
-        "
+        python manage.py migrate
     relationships:
       database: "db:postgresql"
     variables:
@@ -53,12 +47,9 @@ applications:
         DJANGO_SECURE_SSL_REDIRECT: "True"
         DJANGO_SECURE_PROXY_SSL_HEADER: "HTTP_X_FORWARDED_PROTO,https"
         DJANGO_USE_TZ: "True"
-        # Database will be configured automatically by Upsun relationship
-        # BrightData webhook endpoint configuration (will be updated with actual domain)
+        # BrightData webhook endpoint configuration
         BRIGHTDATA_WEBHOOK_BASE_URL: "https://api.{default}"
-        # OpenAI API key (should be set in Upsun environment variables)
-        # OPENAI_API_KEY: "your-openai-api-key"
-        # Disable DataDog tracing and monitoring
+        # Disable DataDog monitoring
         DD_TRACE_ENABLED: "false"
         DD_PROFILING_ENABLED: "false"
         DD_APM_ENABLED: "false"
@@ -84,7 +75,7 @@ applications:
     type: "nodejs:20"
     web:
       commands:
-        start: "serve -s dist -l tcp://0.0.0.0:$PORT"
+        start: "npx serve -s dist -l tcp://0.0.0.0:$PORT"
       upstream:
         socket_family: tcp
         protocol: http
@@ -109,13 +100,8 @@ applications:
         set -eux
         # Clean any previous installs
         rm -rf node_modules package-lock.json
-        # Install Node.js dependencies including dev dependencies
-        npm install --include=dev --no-audit
-        # Verify critical build dependencies
-        ls -la node_modules/@vitejs/plugin-react/ || echo "Plugin not found"
-        ls -la node_modules/vite/ || echo "Vite not found"
-        # Clear Vite cache
-        rm -rf node_modules/.vite
+        # Install Node.js dependencies
+        npm ci --include=dev
         # Build the frontend application
         npm run build
     variables:
@@ -144,5 +130,3 @@ routes:
     cache:
       enabled: true
       default_ttl: 300
-      cookies: ['*']
-      headers: ['Authorization']

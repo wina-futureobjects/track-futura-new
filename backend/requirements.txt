@@ -29,3 +29,4 @@ kaleido==0.2.1
 reportlab==4.2.2
 openai==1.55.3
 Pillow==11.1.0
+dj-database-url==2.3.0
