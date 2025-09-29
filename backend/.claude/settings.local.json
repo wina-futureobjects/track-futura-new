@@ -29,7 +29,8 @@
       "Bash(flyctl postgres attach:*)",
       "Bash(flyctl secrets set:*)",
       "Bash(flyctl deploy:*)",
-      "Bash(flyctl status:*)"
+      "Bash(flyctl status:*)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []
