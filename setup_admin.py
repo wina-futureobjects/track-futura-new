@@ -3,8 +3,11 @@ import os
 import sys
 import django
 
+# Change to backend directory
+os.chdir('/app/backend')
+
 # Add the backend directory to sys.path
-sys.path.append('/app/backend')
+sys.path.insert(0, '/app/backend')
 
 # Set Django settings module
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'trackfutura.settings')
