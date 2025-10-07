@@ -1,5 +1,6 @@
+# TrackFutura deployment with integrated React frontend - Force rebuild v3
 applications:
-  trackfutura-v2:
+  trackfutura:
     source:
       root: .
     type: python:3.12
@@ -64,4 +65,4 @@ services:
 routes:
   "https://{default}/":
     type: upstream
-    upstream: "trackfutura-v2:http"
+    upstream: "trackfutura:http"
