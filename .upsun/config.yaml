@@ -1,5 +1,5 @@
 applications:
-  trackfutura:
+  trackfutura-v2:
     source:
       root: .
     type: python:3.12
@@ -64,4 +64,4 @@ services:
 routes:
   "https://{default}/":
     type: upstream
-    upstream: "trackfutura:http"
+    upstream: "trackfutura-v2:http"
