@@ -24,11 +24,6 @@ applications:
         python manage.py migrate --noinput
     
     disk: 1024
-    
-    variables:
-      env:
-        DEBUG: false
-        DJANGO_SETTINGS_MODULE: config.settings
 
 services:
   postgresql:
