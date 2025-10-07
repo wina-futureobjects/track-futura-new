@@ -1,15 +1,29 @@
 from django.contrib import admin
-from .models import TrackSource, TrackAccount, ReportFolder, ReportEntry, UnifiedRunFolder, ServiceFolderIndex
+from .models import TrackSource, TrackAccount, SourceFolder, ReportFolder, ReportEntry, UnifiedRunFolder, ServiceFolderIndex
+
+@admin.register(SourceFolder)
+class SourceFolderAdmin(admin.ModelAdmin):
+    list_display = ('name', 'folder_type', 'project', 'get_source_count', 'created_at')
+    list_filter = ('project', 'folder_type', 'created_at')
+    search_fields = ('name', 'description')
+    readonly_fields = ('created_at', 'updated_at')
+    ordering = ('folder_type', 'name')
+    raw_id_fields = ('project',)
+    list_select_related = ('project',)
+
+    def get_source_count(self, obj):
+        return obj.sources.count()
+    get_source_count.short_description = 'Sources'
 
 @admin.register(TrackSource)
 class TrackSourceAdmin(admin.ModelAdmin):
-    list_display = ('name', 'platform', 'service_name', 'facebook_link', 'instagram_link', 'linkedin_link', 'tiktok_link', 'project')
-    list_filter = ('project', 'platform', 'service_name')
+    list_display = ('name', 'platform', 'service_name', 'folder', 'facebook_link', 'instagram_link', 'linkedin_link', 'tiktok_link', 'project')
+    list_filter = ('project', 'platform', 'service_name', 'folder')
     search_fields = ('name',)
     readonly_fields = ('created_at', 'updated_at')
     ordering = ('created_at',)
-    raw_id_fields = ('project',)
-    list_select_related = ('project',)
+    raw_id_fields = ('project', 'folder')
+    list_select_related = ('project', 'folder')
 
 # Keep backward compatibility alias
 TrackAccountAdmin = TrackSourceAdmin

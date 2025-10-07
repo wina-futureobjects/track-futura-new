@@ -1,55 +1,41 @@
 applications:
   trackfutura:
-    type: python:3.12
-    root: backend
     source:
       root: backend
+    type: python:3.12
+    
+    dependencies:
+      python3:
+        pip: ">=23.0"
+    
     build:
-      flavor: django
-    runtime:
-      extensions:
-        - apache2
-      environment_variables:
-        DJANGO_SETTINGS_MODULE: config.settings_upsun
-        PYTHONPATH: /app
+      flavor: none
+    
     web:
       commands:
-        start: "gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 3"
-      upstream:
-        socket_family: unix
-      document_root: backend
+        start: "gunicorn config.wsgi:application --bind 0.0.0.0:$PORT"
+    
     hooks:
       build: |
         pip install -r requirements.txt
         python manage.py collectstatic --noinput
-        python manage.py migrate
-        python manage.py setup_apify_configs --api-token $APIFY_API_TOKEN
-    mounts:
-      - source: local
-        source_path: static
-        target: /app/static
-      - source: local
-        source_path: media
-        target: /app/media
-    relationships:
-      database:
-        service: postgresql
+      
+      deploy: |
+        python manage.py migrate --noinput
+    
+    disk: 1024
+    
     variables:
       env:
         DEBUG: false
-        ALLOWED_HOSTS: "['*']"
-        CORS_ALLOW_ALL_ORIGINS: true
-        CORS_ALLOW_CREDENTIALS: true
-        CORS_ALLOWED_ORIGINS: "['https://trackfutura.com', 'https://www.trackfutura.com']"
-        CSRF_TRUSTED_ORIGINS: "['https://trackfutura.com', 'https://www.trackfutura.com']"
-        WEBHOOK_BASE_URL: "https://trackfutura.com"
+        DJANGO_SETTINGS_MODULE: config.settings
 
 services:
   postgresql:
     type: postgresql:15
-    disk: 1024
-    variables:
-      env:
-        POSTGRES_DB: trackfutura
-        POSTGRES_USER: trackfutura
-        POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    disk: 512
+
+routes:
+  "https://{default}/":
+    type: upstream
+    upstream: "trackfutura:http"

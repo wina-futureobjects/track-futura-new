@@ -10,9 +10,10 @@ from rest_framework.permissions import AllowAny
 from rest_framework.pagination import PageNumberPagination
 from django.http import HttpResponse
 from django.db.models import Q
-from .models import TrackSource, ReportFolder, ReportEntry, UnifiedRunFolder
+from .models import TrackSource, SourceFolder, ReportFolder, ReportEntry, UnifiedRunFolder
 from .serializers import (
     TrackSourceSerializer,
+    SourceFolderSerializer,
     ReportFolderSerializer, ReportEntrySerializer, ReportFolderDetailSerializer,
     UnifiedRunFolderSerializer
 )
@@ -42,7 +43,12 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
         project_id = self.request.query_params.get('project')
         if project_id:
             queryset = queryset.filter(project_id=project_id)
-        
+
+        # Filter by folder if specified
+        folder_id = self.request.query_params.get('folder')
+        if folder_id:
+            queryset = queryset.filter(folder_id=folder_id)
+
         # Search functionality
         search = self.request.query_params.get('search')
         if search:
@@ -107,6 +113,7 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
         
         print(f"=== BACKEND FILTER DEBUG ===")
         print(f"Project ID: {project_id}")
+        print(f"Folder ID: {folder_id}")
         print(f"Search: {search}")
         print(f"Has Facebook: {has_facebook}")
         print(f"Has Instagram: {has_instagram}")
@@ -118,6 +125,9 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
         print(f"Page: {self.request.query_params.get('page')}")
         print(f"Page Size: {self.request.query_params.get('page_size')}")
         print(f"Final queryset count: {queryset.count()}")
+        if queryset.count() > 0:
+            for s in queryset[:5]:  # Show first 5 sources
+                print(f"  - Source ID {s.id}: {s.name}, Folder: {s.folder_id}, Instagram: {s.instagram_link}")
         print(f"=== END BACKEND FILTER DEBUG ===")
         
         return queryset.order_by('created_at')
@@ -128,6 +138,8 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
         """
         # Get project from request data directly
         project_id = self.request.data.get('project')
+        if project_id:
+            project_id = int(project_id)
         serializer.save(project_id=project_id)
     
     def perform_update(self, serializer):
@@ -136,6 +148,8 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
         """
         # Get project from request data directly
         project_id = self.request.data.get('project')
+        if project_id:
+            project_id = int(project_id)
         serializer.save(project_id=project_id)
 
     def destroy(self, request, *args, **kwargs):
@@ -371,17 +385,22 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
         try:
             # Get query parameters
             project_id = request.query_params.get('project')
-            
+            folder_id = request.query_params.get('folder')
+
             # Start with base queryset
             queryset = TrackSource.objects.all()
-            
+
             # Filter by project if specified
             if project_id:
                 queryset = queryset.filter(project_id=project_id)
-            
+
+            # Filter by folder if specified
+            if folder_id:
+                queryset = queryset.filter(folder_id=folder_id)
+
             # Calculate statistics
             total = queryset.count()
-            
+
             # Social media counts
             social_media_counts = {
                 'facebook': queryset.exclude(
@@ -397,14 +416,45 @@ class TrackSourceViewSet(viewsets.ModelViewSet):
                     Q(tiktok_link__isnull=True) | Q(tiktok_link='')
                 ).count(),
             }
-            
+
             return Response({
                 'total': total,
                 'socialMediaCounts': social_media_counts,
             })
-            
+
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class SourceFolderViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for managing Source Folders
+    """
+    serializer_class = SourceFolderSerializer
+    permission_classes = [AllowAny]
+    pagination_class = CustomPageNumberPagination
+
+    def get_queryset(self):
+        """Filter folders based on query parameters"""
+        queryset = SourceFolder.objects.all()
+
+        # Filter by project if specified
+        project_id = self.request.query_params.get('project')
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+
+        # Filter by folder type if specified
+        folder_type = self.request.query_params.get('folder_type')
+        if folder_type:
+            queryset = queryset.filter(folder_type=folder_type)
+
+        # Search functionality
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(name__icontains=search) | Q(description__icontains=search)
+            )
+
+        return queryset
 
 class ReportFolderViewSet(viewsets.ModelViewSet):
     """

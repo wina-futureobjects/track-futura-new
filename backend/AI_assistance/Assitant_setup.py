@@ -1,6 +1,19 @@
+import os
 from pinecone import Pinecone
+from django.conf import settings
 
-pc = Pinecone(api_key="pcsk_6jzqLN_HkohN8MKuupU2wE6m17413eDCgpvr8RhTXYajc9fxYbMVBBBMmfHKpxHH9vj4e")
+# Load Django settings to access environment variables
+try:
+    from django.conf import settings
+    api_key = settings.PINECONE_API_KEY
+except:
+    # Fallback to direct environment variable access
+    api_key = os.getenv('PINECONE_API_KEY', '')
+
+if not api_key:
+    raise ValueError("PINECONE_API_KEY environment variable is required")
+
+pc = Pinecone(api_key=api_key)
 
 # Try to create the assistant, handle if it already exists
 try:

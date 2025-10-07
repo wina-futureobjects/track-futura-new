@@ -83,7 +83,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             height: 'calc(100vh - 84px)',
             overflow: 'auto',
             width: '100%',
-            p: 0.5,
+            p: 0,
             margin: 0,
           }}
         >

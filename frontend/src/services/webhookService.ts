@@ -92,7 +92,7 @@ export interface WebhookConfig {
 }
 
 class WebhookService {
-  private baseUrl = `${API_BASE_URL}/api/brightdata`;
+  private baseUrl = `${API_BASE_URL}/api/apify`;
 
   constructor() {
     console.log('🔧 WebhookService initialized with API_BASE_URL:', API_BASE_URL);

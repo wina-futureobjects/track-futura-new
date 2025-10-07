@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Set Auth Token - TrackFutura Dev</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f0f0f0; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        button { background: #007bff; color: white; border: none; padding: 15px 25px; border-radius: 5px; cursor: pointer; font-size: 16px; margin: 10px 5px; }
+        button:hover { background: #0056b3; }
+        .success { background: #28a745; color: white; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        .info { background: #17a2b8; color: white; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        .token { background: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; border-radius: 4px; font-family: monospace; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>TrackFutura Development - Auth Token Setup</h1>
+        
+        <div class="info">
+            <strong>Development Testing Tool</strong><br>
+            Use this tool to set up authentication for testing the TrackFutura frontend.
+        </div>
+
+        <h2>Test Credentials</h2>
+        <p><strong>Username:</strong> testuser</p>
+        <p><strong>Password:</strong> testpass123</p>
+        <p><strong>Token:</strong></p>
+        <div class="token">e242daf2ea05576f08fb8d808aba529b0c7ffbab</div>
+
+        <h2>Quick Setup</h2>
+        <button onclick="setAuthToken()">🔑 Set Auth Token</button>
+        <button onclick="clearAuthToken()">🗑️ Clear Auth Token</button>
+        <button onclick="checkToken()">👀 Check Current Token</button>
+        <button onclick="goToApp()">🚀 Go to TrackFutura App</button>
+
+        <div id="status"></div>
+
+        <h2>Manual Login</h2>
+        <p>Alternatively, you can <a href="http://localhost:5174/login" target="_blank">login manually</a> using the credentials above.</p>
+    </div>
+
+    <script>
+        const TOKEN = 'e242daf2ea05576f08fb8d808aba529b0c7ffbab';
+        
+        function setAuthToken() {
+            localStorage.setItem('authToken', TOKEN);
+            showStatus('✅ Auth token set successfully!', 'success');
+        }
+        
+        function clearAuthToken() {
+            localStorage.removeItem('authToken');
+            showStatus('🗑️ Auth token cleared!', 'info');
+        }
+        
+        function checkToken() {
+            const currentToken = localStorage.getItem('authToken');
+            if (currentToken) {
+                showStatus(`Current token: ${currentToken}`, 'info');
+            } else {
+                showStatus('No auth token found', 'info');
+            }
+        }
+        
+        function goToApp() {
+            window.open('http://localhost:5174/', '_blank');
+        }
+        
+        function showStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = `<div class="${type}">${message}</div>`;
+        }
+        
+        // Auto-check token on load
+        window.onload = function() {
+            checkToken();
+        };
+    </script>
+</body>
+</html>

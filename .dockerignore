@@ -1,94 +1,76 @@
 # Git
-.git/
+.git
 .gitignore
 
-# Docker files
-**/Dockerfile
-**/.dockerignore
-**/docker-compose*.yml
+# Docker
+Dockerfile
+docker-compose.yml
+docker-compose.*.yml
 
-# Documentation
-*.md
-README*
-docs/
+# Development
+.env
+.env.local
+.env.*.local
+*.log
+logs
 
-# IDEs
-.vscode/
-.idea/
-.cursor/
+# Dependencies
+backend/venv
+backend/__pycache__
+backend/*.pyc
+backend/*/*.pyc
+backend/*/*/*.pyc
+frontend/node_modules
+frontend/.next
+frontend/out
+frontend/build
+
+# IDE
+.vscode
+.idea
 *.swp
 *.swo
 *~
 
 # OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
-# Environment variables
-.env
-.env.*
-.environment
+# Database
+backend/db.sqlite3
+*.db
+*.sqlite
+*.sqlite3
 
-# Node modules
-**/node_modules/
-**/npm-debug.log*
-**/yarn-debug.log*
-**/yarn-error.log*
+# Static/Media files
+backend/staticfiles
+backend/media
+frontend/dist
 
-# Python
-**/__pycache__/
-**/*.py[cod]
-**/*$py.class
-**/venv/
-**/env/
+# Testing
+backend/coverage
+frontend/coverage
+.pytest_cache
+.coverage
 
-# Build outputs
-**/dist/
-**/build/
-**/staticfiles/
+# Build artifacts
+backend/build
+frontend/build
+backend/dist
 
-# Database files
-**/*.sqlite3
-**/*.db
+# Documentation
+*.md
+docs/
 
-# Log files
-**/*.log
-
-# Temporary files
-**/*.tmp
-**/*.temp
-**/tmp/
-**/temp/
+# Config files for other deployments
+render.yaml
+fly.toml
+*.toml
 
 # Backup files
-**/*.backup
-**/*.bak
-**/*.orig
+*.backup
+brightdata_backup_*
 
-# Test files
-**/test_*.py
-**/debug_*.py
-**/*_test.py
-**/demo_*.py
-**/seed_*.py
-**/fix_*.py
-**/check_*.py
-
-# Data files
-**/*.csv
-**/*.sql
-**/*.json.backup
-
-# Platform specific
-upsun_cli/
-.upsun/
-
-# Cache
-**/.npm
-**/.eslintcache
-**/*.tsbuildinfo 
+# Development tools
+.cursor
+.cursorrules

@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     "linkedin_data",
     "tiktok_data",
     "apify_integration",
+    "brightdata_integration",  # New BrightData integration
     "chat",
     "workflow",
 ]
@@ -100,6 +101,9 @@ WSGI_APPLICATION = "config.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# Configure database based on environment
+import dj_database_url
+
 # Default to SQLite for development
 DATABASES = {
     "default": {
@@ -107,6 +111,29 @@ DATABASES = {
         "NAME": BASE_DIR / "db.sqlite3",
     }
 }
+
+# Override with PostgreSQL if DATABASE_URL is provided (production)
+if os.getenv('DATABASE_URL'):
+    DATABASES['default'] = dj_database_url.parse(os.getenv('DATABASE_URL'))
+    # Add SSL requirement for production
+    DATABASES['default']['OPTIONS'] = {
+        'sslmode': 'require',
+    }
+elif os.getenv('DATABASE_HOST'):
+    # Manual PostgreSQL configuration
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('DATABASE_NAME', 'trackfutura'),
+            'USER': os.getenv('DATABASE_USER', 'postgres'),
+            'PASSWORD': os.getenv('DATABASE_PASSWORD', ''),
+            'HOST': os.getenv('DATABASE_HOST', 'localhost'),
+            'PORT': os.getenv('DATABASE_PORT', '5432'),
+            'OPTIONS': {
+                'sslmode': 'prefer',
+            },
+        }
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -220,7 +247,18 @@ CORS_ALLOWED_ORIGINS = [
     "https://upsun-deployment-xiwfmii-inhoolfrqniuu.eu-5.platformsh.site",
     "http://localhost:3000",
     "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:5175",
+    "http://localhost:5185",
     "http://localhost:8000",
+    "http://localhost:8080",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    "http://127.0.0.1:5175",
+    "http://127.0.0.1:5185",
+    "http://127.0.0.1:8000",
+    "http://127.0.0.1:8080",
 ]
 CORS_ALLOWED_HEADERS = [
     'accept',
@@ -280,17 +318,25 @@ CSRF_TRUSTED_ORIGINS = [
     # Local development URLs
     "http://localhost:3000",
     "http://localhost:5173",
+    "http://localhost:5185",
     "http://localhost:8000",
+    "http://localhost:8080",
     "https://localhost:3000",
     "https://localhost:5173",
+    "https://localhost:5185",
     "https://localhost:8000",
+    "https://localhost:8080",
     # Common localhost variants
     "http://127.0.0.1:3000",
     "http://127.0.0.1:5173",
+    "http://127.0.0.1:5185",
     "http://127.0.0.1:8000",
+    "http://127.0.0.1:8080",
     "https://127.0.0.1:3000",
     "https://127.0.0.1:5173",
+    "https://127.0.0.1:5185",
     "https://127.0.0.1:8000",
+    "https://127.0.0.1:8080",
 ]
 
 # Never fail CSRF
@@ -339,10 +385,14 @@ if os.getenv('PLATFORM_APPLICATION_NAME'):
 CORS_ALLOWED_ORIGINS = DYNAMIC_CORS_ORIGINS + [
     'http://localhost:3000',
     'http://localhost:5173',
+    'http://localhost:5185',
     'http://localhost:8000',
+    'http://localhost:8080',
     'https://localhost:3000',
     'https://localhost:5173',
+    'https://localhost:5185',
     'https://localhost:8000',
+    'https://localhost:8080',
 ]
 
 # ✅ CSRF COMPLETELY DISABLED - NO MORE DUPLICATE SETTINGS
@@ -378,44 +428,8 @@ if os.getenv('PLATFORM_APPLICATION_NAME'):
     # But still don't redirect or enforce
     SECURE_SSL_REDIRECT = False
 
-# BrightData Integration Settings - Auto-detect domain for Upsun deployment
-def get_brightdata_base_url():
-    # Manual override via environment variable (highest priority)
-    manual_url = os.getenv('BRIGHTDATA_BASE_URL')
-    if manual_url:
-        return manual_url
-
-    # Auto-detect for Upsun/Platform.sh deployment
-    if os.getenv('PLATFORM_APPLICATION_NAME'):
-        # Get the default route from Platform.sh environment
-        platform_routes = os.getenv('PLATFORM_ROUTES')
-        if platform_routes:
-            try:
-                import json
-                routes = json.loads(platform_routes)
-                # Find the primary HTTPS route
-                for route_url, route_config in routes.items():
-                    if route_config.get('primary') and route_url.startswith('https://'):
-                        return route_url.rstrip('/')
-                # Fallback: use the first HTTPS route
-                for route_url in routes.keys():
-                    if route_url.startswith('https://'):
-                        return route_url.rstrip('/')
-            except (json.JSONDecodeError, AttributeError):
-                pass
-
-        # Fallback: construct from app name and default Upsun domain
-        app_name = os.getenv('PLATFORM_APPLICATION_NAME')
-        project_id = os.getenv('PLATFORM_PROJECT')
-        environment = os.getenv('PLATFORM_ENVIRONMENT', 'main')
-        if app_name and project_id:
-            return f"https://{app_name}-{project_id}.{environment}.platformsh.site"
-
-    # Development fallback
-    return 'http://localhost:8000'
-
-BRIGHTDATA_BASE_URL = get_brightdata_base_url()
-BRIGHTDATA_WEBHOOK_TOKEN = os.getenv('BRIGHTDATA_WEBHOOK_TOKEN', 'your-default-webhook-secret-token-change-this')
+# Apify Integration Settings
+APIFY_API_TOKEN = os.getenv('APIFY_API_TOKEN', '')
 
 # Production/Upsun settings.
 if (os.getenv('PLATFORM_APPLICATION_NAME') is not None):
@@ -461,63 +475,6 @@ WEBHOOK_ENABLE_CERT_PINNING = os.environ.get('WEBHOOK_ENABLE_CERT_PINNING', 'Fal
 # Webhook IP whitelist (comma-separated)
 WEBHOOK_ALLOWED_IPS = [ip.strip() for ip in os.environ.get('WEBHOOK_ALLOWED_IPS', '').split(',') if ip.strip()]
 
-# Auto-detect Upsun/Production URLs
-def get_webhook_base_url():
-    """Auto-detect the correct base URL for webhooks based on environment"""
-
-    # Check for explicit override
-    if 'BRIGHTDATA_BASE_URL' in os.environ:
-        return os.environ['BRIGHTDATA_BASE_URL']
-
-    # Upsun environment detection
-    if 'PLATFORM_ROUTES' in os.environ:
-        try:
-            import json
-            routes = json.loads(os.environ['PLATFORM_ROUTES'])
-            # Find the primary route
-            for route_url, route_config in routes.items():
-                if route_config.get('primary', False):
-                    return route_url.rstrip('/')
-            # Fallback to first HTTPS route
-            for route_url in routes.keys():
-                if route_url.startswith('https://'):
-                    return route_url.rstrip('/')
-        except (json.JSONDecodeError, KeyError):
-            pass
-
-    # Platform.sh environment detection
-    if 'PLATFORM_APPLICATION_NAME' in os.environ:
-        app_name = os.environ.get('PLATFORM_APPLICATION_NAME', 'app')
-        branch = os.environ.get('PLATFORM_BRANCH', 'main')
-        project_id = os.environ.get('PLATFORM_PROJECT', '')
-        if project_id:
-            return f"https://{branch}-{project_id}.platformsh.site"
-
-    # Ngrok detection for development
-    if 'NGROK_URL' in os.environ:
-        return os.environ['NGROK_URL']
-
-    # Railway detection
-    if 'RAILWAY_STATIC_URL' in os.environ:
-        return f"https://{os.environ['RAILWAY_STATIC_URL']}"
-
-    # Heroku detection
-    if 'HEROKU_APP_NAME' in os.environ:
-        return f"https://{os.environ['HEROKU_APP_NAME']}.herokuapp.com"
-
-    # Local development fallback
-    return 'https://178ab6e6114a.ngrok-free.app'
-
-BRIGHTDATA_BASE_URL = get_webhook_base_url()
-
-# BrightData webhook configuration
-BRIGHTDATA_WEBHOOK_BASE_URL = os.environ.get('BRIGHTDATA_WEBHOOK_BASE_URL', 'https://178ab6e6114a.ngrok-free.app')
-
-# Ngrok support for local development
-NGROK_ENABLED = os.environ.get('NGROK_ENABLED', 'False').lower() == 'true'
-NGROK_AUTH_TOKEN = os.environ.get('NGROK_AUTH_TOKEN', '')
-NGROK_SUBDOMAIN = os.environ.get('NGROK_SUBDOMAIN', '')
-NGROK_REGION = os.environ.get('NGROK_REGION', 'us')  # us, eu, ap, au, sa, jp, in
 
 # Cache configuration for webhook monitoring
 CACHES = {
@@ -548,18 +505,9 @@ if DEBUG:
     WEBHOOK_MAX_TIMESTAMP_AGE = 600  # 10 minutes
     WEBHOOK_ALLOWED_IPS = []  # Allow all IPs in development
 
-    # Enable ngrok auto-detection
-    if NGROK_ENABLED and not BRIGHTDATA_BASE_URL.startswith('https://'):
-        try:
-            import requests
-            response = requests.get('http://localhost:4040/api/tunnels', timeout=2)
-            if response.status_code == 200:
-                tunnels = response.json().get('tunnels', [])
-                for tunnel in tunnels:
-                    if tunnel.get('proto') == 'https':
-                        BRIGHTDATA_BASE_URL = tunnel['public_url']
-                        break
-        except:
-            pass  # Ngrok not running or not accessible
-
-print(f"Webhook Base URL: {BRIGHTDATA_BASE_URL}")  # For debugging
+# API Keys Configuration
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+APIFY_API_TOKEN = os.getenv('APIFY_API_TOKEN', '')
+PINECONE_API_KEY = os.getenv('PINECONE_API_KEY', '')
+BRIGHTDATA_API_KEY = os.getenv('BRIGHTDATA_API_KEY', '')
+BRIGHTDATA_WEBHOOK_TOKEN = os.getenv('BRIGHTDATA_WEBHOOK_TOKEN', '')

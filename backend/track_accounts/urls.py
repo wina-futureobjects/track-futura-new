@@ -6,6 +6,7 @@ router = DefaultRouter()
 router.register(r'sources', views.TrackSourceViewSet, basename='track-source')
 # Keep accounts endpoint for backward compatibility - point to same viewset
 router.register(r'accounts', views.TrackSourceViewSet, basename='track-account')
+router.register(r'source-folders', views.SourceFolderViewSet, basename='source-folder')
 router.register(r'reports', views.ReportFolderViewSet, basename='report-folder')
 router.register(r'report-folders', views.UnifiedRunFolderViewSet, basename='unified-run-folder')
 

@@ -53,6 +53,7 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  TextareaAutosize,
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -80,6 +81,8 @@ import WebhookIcon from '@mui/icons-material/Webhook';
 import SettingsIcon from '@mui/icons-material/Settings';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import SaveIcon from '@mui/icons-material/Save';
+import CancelIcon from '@mui/icons-material/Cancel';
 import { apiFetch } from '../utils/api';
 
 // Universal Data Interfaces
@@ -245,6 +248,11 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadLoading, setUploadLoading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // Editing states
+  const [editingRows, setEditingRows] = useState<Set<number>>(new Set());
+  const [editedData, setEditedData] = useState<Record<number, Partial<UniversalDataItem>>>({});
+  const [savingRows, setSavingRows] = useState<Set<number>>(new Set());
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
 
@@ -773,6 +781,272 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
     setSnackbarOpen(false);
   };
 
+  // Editing handlers
+  const handleEditStart = (itemId: number) => {
+    setEditingRows(prev => new Set([...prev, itemId]));
+    // Initialize edited data with current values
+    const currentItem = data.find(item => item.id === itemId);
+    if (currentItem) {
+      setEditedData(prev => ({ ...prev, [itemId]: { ...currentItem } }));
+    }
+  };
+
+  const handleEditCancel = (itemId: number) => {
+    setEditingRows(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(itemId);
+      return newSet;
+    });
+    setEditedData(prev => {
+      const { [itemId]: deleted, ...rest } = prev;
+      return rest;
+    });
+  };
+
+  const handleEditSave = async (itemId: number) => {
+    const editedItem = editedData[itemId];
+    if (!editedItem) return;
+
+    setSavingRows(prev => new Set([...prev, itemId]));
+    
+    try {
+      // Make API call to save the edited data
+      const response = await apiFetch(`/api/instagram-data/posts/${itemId}/`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_posted: editedItem.user,
+          description: editedItem.content,
+          likes: editedItem.likes,
+          num_comments: editedItem.comments,
+          views: editedItem.views,
+          is_verified: editedItem.is_verified,
+          followers: editedItem.followers,
+          shares: editedItem.shares,
+          posts_count: editedItem.posts_count,
+          is_paid_partnership: editedItem.is_paid_partnership,
+          post_user: editedItem.post_user,
+          date: editedItem.date,
+          replies_number: editedItem.replies_number,
+        }),
+      });
+
+      if (response.ok) {
+        // Update local data
+        setData(prev => prev.map(item => 
+          item.id === itemId ? { ...item, ...editedItem } : item
+        ));
+        
+        // Clear editing state
+        handleEditCancel(itemId);
+        
+        setSnackbarMessage('Post updated successfully');
+        setSnackbarOpen(true);
+      } else {
+        throw new Error('Failed to save changes');
+      }
+    } catch (error) {
+      console.error('Error saving edited data:', error);
+      setSnackbarMessage('Failed to save changes. Please try again.');
+      setSnackbarOpen(true);
+    } finally {
+      setSavingRows(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(itemId);
+        return newSet;
+      });
+    }
+  };
+
+  const handleFieldEdit = (itemId: number, field: string, value: any) => {
+    setEditedData(prev => ({
+      ...prev,
+      [itemId]: {
+        ...prev[itemId],
+        [field]: value
+      }
+    }));
+  };
+
+  // Render editable cell content
+  const renderEditableCell = (item: UniversalDataItem, field: any) => {
+    const isEditing = editingRows.has(item.id);
+    const editedValue = editedData[item.id];
+    const currentValue = editedValue ? editedValue[field.key as keyof UniversalDataItem] : item[field.key as keyof UniversalDataItem];
+
+    if (!isEditing) {
+      // Render normal view
+      switch (field.key) {
+        case 'content':
+          return (
+            <Typography variant="body2" sx={{ 
+              maxWidth: '100%',
+              display: '-webkit-box',
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              lineHeight: 1.4
+            }}>
+              {item.content || 'No content'}
+            </Typography>
+          );
+        
+        case 'likes':
+        case 'comments':
+        case 'views':
+        case 'followers':
+          return (
+            <Typography variant="body2" fontWeight={500}>
+              {(currentValue as number || 0).toLocaleString()}
+            </Typography>
+          );
+
+        case 'engagement':
+          const engagementValue = ((item.likes || 0) + (item.comments || 0) + (item.shares || 0));
+          return (
+            <Typography variant="body2" fontWeight={500}>
+              {engagementValue.toLocaleString()}
+            </Typography>
+          );
+        
+        case 'is_verified':
+          return (
+            <Box sx={{ textAlign: 'center' }}>
+              {currentValue ? (
+                <Chip size="small" color="success" label="Yes" />
+              ) : (
+                <Chip size="small" color="default" label="No" />
+              )}
+            </Box>
+          );
+        
+        case 'is_paid_partnership':
+          return (
+            <Box sx={{ textAlign: 'center' }}>
+              {currentValue ? (
+                <Chip size="small" color="warning" label="Yes" />
+              ) : (
+                <Chip size="small" color="default" label="No" />
+              )}
+            </Box>
+          );
+
+        case 'date':
+        case 'post_user':
+        case 'replies_number':
+        case 'shares':
+        case 'posts_count':
+          return (
+            <Typography variant="body2" fontWeight={field.key.includes('number') || field.key.includes('count') ? 500 : 400}>
+              {field.key === 'date' && currentValue ? formatDate(currentValue as string) :
+               (field.key.includes('number') || field.key.includes('count')) ? (currentValue as number || 0).toLocaleString() :
+               String(currentValue || 'N/A')}
+            </Typography>
+          );
+        
+        default:
+          return (
+            <Typography variant="body2">
+              {String(currentValue || 'N/A')}
+            </Typography>
+          );
+      }
+    } else {
+      // Render editable version
+      switch (field.key) {
+        case 'content':
+          return (
+            <TextField
+              multiline
+              rows={3}
+              value={currentValue as string || ''}
+              onChange={(e) => handleFieldEdit(item.id, 'content', e.target.value)}
+              size="small"
+              sx={{ width: '100%' }}
+              placeholder="Post content..."
+            />
+          );
+        
+        case 'likes':
+        case 'comments':
+        case 'views':
+        case 'followers':
+        case 'replies_number':
+        case 'shares':
+        case 'posts_count':
+          return (
+            <TextField
+              type="number"
+              value={currentValue as number || 0}
+              onChange={(e) => handleFieldEdit(item.id, field.key, parseInt(e.target.value) || 0)}
+              size="small"
+              sx={{ width: '100%' }}
+              inputProps={{ min: 0 }}
+            />
+          );
+
+        case 'engagement':
+          const editEngagementValue = ((editedValue?.likes || item.likes || 0) + 
+                                      (editedValue?.comments || item.comments || 0) + 
+                                      (editedValue?.shares || item.shares || 0));
+          return (
+            <TextField
+              value={editEngagementValue.toLocaleString()}
+              size="small"
+              sx={{ width: '100%' }}
+              disabled
+              helperText="Auto-calculated"
+              InputProps={{
+                readOnly: true
+              }}
+            />
+          );
+        
+        case 'is_verified':
+        case 'is_paid_partnership':
+          return (
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={currentValue as boolean || false}
+                  onChange={(e) => handleFieldEdit(item.id, field.key, e.target.checked)}
+                  size="small"
+                />
+              }
+              label=""
+              sx={{ margin: 0, justifyContent: 'center' }}
+            />
+          );
+
+        case 'post_user':
+        case 'date':
+          return (
+            <TextField
+              value={currentValue as string || ''}
+              onChange={(e) => handleFieldEdit(item.id, field.key, e.target.value)}
+              size="small"
+              sx={{ width: '100%' }}
+              placeholder={field.key === 'date' ? 'YYYY-MM-DD' : 'Post user'}
+              type={field.key === 'date' ? 'date' : 'text'}
+            />
+          );
+        
+        default:
+          return (
+            <TextField
+              value={currentValue as string || ''}
+              onChange={(e) => handleFieldEdit(item.id, field.key, e.target.value)}
+              size="small"
+              sx={{ width: '100%' }}
+            />
+          );
+      }
+    }
+  };
+
   // Upload handlers
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -1087,43 +1361,41 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
       case 'comments':
         return [
           { key: 'content', label: 'Comment', width: '50%' },
-          { key: 'user', label: 'Comment User', width: '15%' },
-          { key: 'post_user', label: 'Post User', width: '15%' },
-          { key: 'date', label: 'Date', width: '10%' },
-          { key: 'likes', label: 'Likes', width: '5%', align: 'right' },
-          { key: 'replies_number', label: 'Replies', width: '5%', align: 'right' }
+          { key: 'post_user', label: 'Post User', width: '20%' },
+          { key: 'date', label: 'Date', width: '15%' },
+          { key: 'likes', label: 'Likes', width: '8%', align: 'right' },
+          { key: 'engagement', label: 'Engagement', width: '7%', align: 'right' }
         ];
       
       case 'reels':
         return [
-          { key: 'content', label: 'Content', width: '45%' },
-          { key: 'user', label: 'User', width: '15%' },
-          { key: 'date', label: 'Date', width: '10%' },
-          { key: 'likes', label: 'Likes', width: '8%', align: 'right' },
-          { key: 'comments', label: 'Comments', width: '8%', align: 'right' },
-          { key: 'views', label: 'Views', width: '8%', align: 'right' },
-          { key: 'shares', label: 'Shares', width: '6%', align: 'right' }
+          { key: 'content', label: 'Content', width: '50%' },
+          { key: 'date', label: 'Date', width: '12%' },
+          { key: 'likes', label: 'Likes', width: '9%', align: 'right' },
+          { key: 'engagement', label: 'Engagement', width: '9%', align: 'right' },
+          { key: 'comments', label: 'Comments', width: '10%', align: 'right' },
+          { key: 'views', label: 'Views', width: '10%', align: 'right' }
         ];
       
       case 'profiles':
         return [
-          { key: 'user', label: 'Username', width: '25%' },
-          { key: 'followers', label: 'Followers', width: '15%', align: 'right' },
-          { key: 'posts_count', label: 'Posts', width: '10%', align: 'right' },
+          { key: 'followers', label: 'Followers', width: '18%', align: 'right' },
+          { key: 'posts_count', label: 'Posts', width: '12%', align: 'right' },
           { key: 'likes', label: 'Total Likes', width: '15%', align: 'right' },
+          { key: 'engagement', label: 'Engagement', width: '15%', align: 'right' },
           { key: 'comments', label: 'Total Comments', width: '15%', align: 'right' },
-          { key: 'is_verified', label: 'Verified', width: '10%', align: 'center' },
-          { key: 'is_paid_partnership', label: 'Paid Partnership', width: '10%', align: 'center' }
+          { key: 'is_verified', label: 'Verified', width: '12%', align: 'center' },
+          { key: 'is_paid_partnership', label: 'Paid Partnership', width: '13%', align: 'center' }
         ];
       
       case 'posts':
       default:
         return [
-          { key: 'content', label: 'Content', width: '55%' },
-          { key: 'user', label: 'User', width: '18%' },
-          { key: 'date', label: 'Date', width: '10%' },
-          { key: 'likes', label: 'Likes', width: '5%', align: 'right' },
-          { key: 'comments', label: 'Comments', width: '5%', align: 'right' }
+          { key: 'content', label: 'Content', width: '60%' },
+          { key: 'date', label: 'Date', width: '15%' },
+          { key: 'likes', label: 'Likes', width: '8%', align: 'right' },
+          { key: 'engagement', label: 'Engagement', width: '9%', align: 'right' },
+          { key: 'comments', label: 'Comments', width: '8%', align: 'right' }
         ];
     }
   };
@@ -1526,166 +1798,66 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
                            key={field.key} 
                            sx={{ width: field.width, textAlign: field.align || 'left' }}
                          >
-                           {(() => {
-                             switch (field.key) {
-                               case 'content':
-                                 return (
-                                   <Typography variant="body2" sx={{ 
-                                     maxWidth: '100%',
-                                     display: '-webkit-box',
-                                     WebkitLineClamp: 3,
-                                     WebkitBoxOrient: 'vertical',
-                                     overflow: 'hidden',
-                                     textOverflow: 'ellipsis',
-                                     lineHeight: 1.4
-                                   }}>
-                                     {item.content || 'No content'}
-                                   </Typography>
-                                 );
-                               
-                               case 'user':
-                                 return (
-                                   <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
-                                     <Avatar sx={{ width: 24, height: 24, mr: 1, fontSize: '0.75rem', flexShrink: 0 }}>
-                                       {(item.user || 'U').charAt(0).toUpperCase()}
-                                     </Avatar>
-                                     <Box sx={{ minWidth: 0, flex: 1 }}>
-                                       <Typography variant="body2" fontWeight={500} sx={{ 
-                                         overflow: 'hidden',
-                                         textOverflow: 'ellipsis',
-                                         whiteSpace: 'nowrap'
-                                       }}>
-                                         {item.user || 'Unknown User'}
-                                       </Typography>
-                                       {item.is_verified === true && (
-                                         <Chip 
-                                           size="small" 
-                                           color="primary" 
-                                           label="Verified" 
-                                           sx={{ mt: 0.5, height: 16, fontSize: '0.75rem' }}
-                                         />
-                                       )}
-                                     </Box>
-                                   </Box>
-                                 );
-                               
-                               case 'post_user':
-                                 return (
-                                   <Typography variant="body2" sx={{ 
-                                     overflow: 'hidden',
-                                     textOverflow: 'ellipsis',
-                                     whiteSpace: 'nowrap'
-                                   }}>
-                                     {item.post_user || 'Unknown'}
-                                   </Typography>
-                                 );
-                               
-                               case 'date':
-                                 return (
-                                   <Typography variant="body2" noWrap>
-                                     {item.date ? formatDate(item.date) : 'Unknown'}
-                                   </Typography>
-                                 );
-                               
-                               case 'likes':
-                                 return (
-                                   <Typography variant="body2" fontWeight={500}>
-                                     {(item.likes || 0).toLocaleString()}
-                                   </Typography>
-                                 );
-                               
-                               case 'comments':
-                                 return (
-                                   <Typography variant="body2" fontWeight={500}>
-                                     {(item.comments || 0).toLocaleString()}
-                                   </Typography>
-                                 );
-                               
-                               case 'replies_number':
-                                 return (
-                                   <Typography variant="body2" fontWeight={500}>
-                                     {(item.replies_number || 0).toLocaleString()}
-                                   </Typography>
-                                 );
-                               
-                               case 'views':
-                                 return (
-                                   <Typography variant="body2" fontWeight={500}>
-                                     {(item.views || 0).toLocaleString()}
-                                   </Typography>
-                                 );
-                               
-                               case 'shares':
-                                 return (
-                                   <Typography variant="body2" fontWeight={500}>
-                                     {(item.shares || 0).toLocaleString()}
-                                   </Typography>
-                                 );
-                               
-                               case 'followers':
-                                 return (
-                                   <Typography variant="body2" fontWeight={500}>
-                                     {(item.followers || 0).toLocaleString()}
-                                   </Typography>
-                                 );
-                               
-                               case 'posts_count':
-                                 return (
-                                   <Typography variant="body2" fontWeight={500}>
-                                     {(item.posts_count || 0).toLocaleString()}
-                                   </Typography>
-                                 );
-                               
-                               case 'is_verified':
-                                 return (
-                                   <Box sx={{ textAlign: 'center' }}>
-                                     {item.is_verified ? (
-                                       <Chip size="small" color="success" label="Yes" />
-                                     ) : (
-                                       <Chip size="small" color="default" label="No" />
-                                     )}
-                                   </Box>
-                                 );
-                               
-                               case 'is_paid_partnership':
-                                 return (
-                                   <Box sx={{ textAlign: 'center' }}>
-                                     {item.is_paid_partnership ? (
-                                       <Chip size="small" color="warning" label="Yes" />
-                                     ) : (
-                                       <Chip size="small" color="default" label="No" />
-                                     )}
-                                   </Box>
-                                 );
-                               
-                               default:
-                                 return (
-                                   <Typography variant="body2">
-                                     {String(item[field.key as keyof UniversalDataItem] || 'N/A')}
-                                   </Typography>
-                                 );
-                             }
-                           })()}
+                           {renderEditableCell(item, field)}
                          </TableCell>
                        ))}
                        <TableCell sx={{ width: '8%', pl: 3 }}>
                          <Box sx={{ display: 'flex', gap: 0.5 }}>
-                           <Tooltip title="Open Content">
-                             <IconButton 
-                               size="small" 
-                               onClick={() => window.open(item.url, '_blank')}
-                             >
-                               <OpenInNewIcon fontSize="small" />
-                             </IconButton>
-                           </Tooltip>
-                           <Tooltip title="Copy Link">
-                             <IconButton 
-                               size="small" 
-                               onClick={() => handleCopyLink(item.url)}
-                             >
-                               <ContentCopyIcon fontSize="small" />
-                             </IconButton>
-                           </Tooltip>
+                           {editingRows.has(item.id) ? (
+                             <>
+                               <Tooltip title="Save Changes">
+                                 <IconButton 
+                                   size="small" 
+                                   color="primary"
+                                   onClick={() => handleEditSave(item.id)}
+                                   disabled={savingRows.has(item.id)}
+                                 >
+                                   {savingRows.has(item.id) ? (
+                                     <CircularProgress size={16} />
+                                   ) : (
+                                     <SaveIcon fontSize="small" />
+                                   )}
+                                 </IconButton>
+                               </Tooltip>
+                               <Tooltip title="Cancel">
+                                 <IconButton 
+                                   size="small" 
+                                   color="secondary"
+                                   onClick={() => handleEditCancel(item.id)}
+                                   disabled={savingRows.has(item.id)}
+                                 >
+                                   <CancelIcon fontSize="small" />
+                                 </IconButton>
+                               </Tooltip>
+                             </>
+                           ) : (
+                             <>
+                               <Tooltip title="Edit">
+                                 <IconButton 
+                                   size="small" 
+                                   onClick={() => handleEditStart(item.id)}
+                                 >
+                                   <EditIcon fontSize="small" />
+                                 </IconButton>
+                               </Tooltip>
+                               <Tooltip title="Open Content">
+                                 <IconButton 
+                                   size="small" 
+                                   onClick={() => window.open(item.url, '_blank')}
+                                 >
+                                   <OpenInNewIcon fontSize="small" />
+                                 </IconButton>
+                               </Tooltip>
+                               <Tooltip title="Copy Link">
+                                 <IconButton 
+                                   size="small" 
+                                   onClick={() => handleCopyLink(item.url)}
+                                 >
+                                   <ContentCopyIcon fontSize="small" />
+                                 </IconButton>
+                               </Tooltip>
+                             </>
+                           )}
                          </Box>
                        </TableCell>
                      </TableRow>

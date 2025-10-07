@@ -4,6 +4,38 @@ from users.models import Project
 
 # Create your models here.
 
+class SourceFolder(models.Model):
+    """
+    Model for organizing Track Sources into folders (e.g., Company Sources, Competitor Sources)
+    """
+    FOLDER_TYPE_CHOICES = [
+        ('company', 'Company Sources'),
+        ('competitor', 'Competitor Sources'),
+        ('other', 'Other'),
+    ]
+
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    folder_type = models.CharField(max_length=20, choices=FOLDER_TYPE_CHOICES, default='other')
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='source_folders', null=True)
+
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.get_folder_type_display()})"
+
+    class Meta:
+        ordering = ['folder_type', 'name']
+        verbose_name = "Source Folder"
+        verbose_name_plural = "Source Folders"
+        unique_together = [['project', 'name']]
+        indexes = [
+            models.Index(fields=['project', 'folder_type']),
+            models.Index(fields=['created_at']),
+        ]
+
 class TrackSource(models.Model):
     """
     Model for storing Track Source data
@@ -18,7 +50,10 @@ class TrackSource(models.Model):
     
     # Reference to the project
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='track_sources', null=True)
-    
+
+    # Folder organization
+    folder = models.ForeignKey(SourceFolder, on_delete=models.SET_NULL, related_name='sources', null=True, blank=True)
+
     # Core fields
     name = models.CharField(max_length=255)
     
@@ -197,8 +232,49 @@ class UnifiedRunFolder(models.Model):
             if job_children:
                 return job_children
             return self.subfolders.filter(folder_type='content').count()
+        elif self.folder_type == 'job':
+            # Job folder - count posts from linked platform-specific folders
+            total_count = 0
+
+            # Check for linked Instagram folders
+            try:
+                from instagram_data.models import Folder as IGFolder, InstagramPost
+                ig_folders = IGFolder.objects.filter(unified_job_folder=self)
+                for igf in ig_folders:
+                    total_count += InstagramPost.objects.filter(folder=igf).count()
+            except:
+                pass
+
+            # Check for linked Facebook folders
+            try:
+                from facebook_data.models import Folder as FBFolder, FacebookPost
+                fb_folders = FBFolder.objects.filter(unified_job_folder=self)
+                for fbf in fb_folders:
+                    total_count += FacebookPost.objects.filter(folder=fbf).count()
+            except:
+                pass
+
+            # Check for linked LinkedIn folders
+            try:
+                from linkedin_data.models import Folder as LIFolder, LinkedInPost
+                li_folders = LIFolder.objects.filter(unified_job_folder=self)
+                for lif in li_folders:
+                    total_count += LinkedInPost.objects.filter(folder=lif).count()
+            except:
+                pass
+
+            # Check for linked TikTok folders
+            try:
+                from tiktok_data.models import Folder as TTFolder, TikTokPost
+                tt_folders = TTFolder.objects.filter(unified_job_folder=self)
+                for ttf in tt_folders:
+                    total_count += TikTokPost.objects.filter(folder=ttf).count()
+            except:
+                pass
+
+            return total_count
         else:
-            # Job/content folder - no subfolders
+            # Content folder - no subfolders
             return 0
     
     class Meta:

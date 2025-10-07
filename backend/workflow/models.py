@@ -1,8 +1,9 @@
+import os
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 from users.models import Project, PlatformService
-from brightdata_integration.models import BatchScraperJob
+from brightdata_integration.models import BrightDataBatchJob
 
 class InputCollection(models.Model):
     """Model for input collections that can be used for scraping"""
@@ -128,8 +129,8 @@ class ScrapingJob(models.Model):
     """Individual scraping job for each input entry"""
     scraping_run = models.ForeignKey(ScrapingRun, on_delete=models.CASCADE, related_name='scraping_jobs')
     input_collection = models.ForeignKey(InputCollection, on_delete=models.CASCADE, related_name='scraping_jobs', null=True, blank=True)
-    batch_job = models.ForeignKey(BatchScraperJob, on_delete=models.CASCADE, related_name='scraping_jobs')
-    request_id = models.CharField(max_length=255, blank=True, null=True, help_text="BrightData request/snapshot ID for webhook mapping")
+    batch_job = models.ForeignKey(BrightDataBatchJob, on_delete=models.CASCADE, related_name='scraping_jobs')
+    request_id = models.CharField(max_length=255, blank=True, null=True, help_text="BrightData request ID for tracking")
     status = models.CharField(max_length=20, choices=[
         ('pending', 'Pending'),
         ('processing', 'Processing'),
@@ -169,7 +170,7 @@ class ScrapingJob(models.Model):
 class WorkflowTask(models.Model):
     """Model for workflow tasks that manage scraping jobs"""
     input_collection = models.ForeignKey(InputCollection, on_delete=models.CASCADE, related_name='workflow_tasks')
-    batch_job = models.ForeignKey(BatchScraperJob, on_delete=models.CASCADE, related_name='workflow_tasks')
+    batch_job = models.ForeignKey(BrightDataBatchJob, on_delete=models.CASCADE, related_name='workflow_tasks')
     status = models.CharField(max_length=20, choices=[
         ('pending', 'Pending'),
         ('processing', 'Processing'),
@@ -222,8 +223,8 @@ class ScheduledScrapingTask(models.Model):
     auto_create_folders = models.BooleanField(default=True)
     
     # BrightData configuration (preset)
-    brightdata_dataset_id = models.CharField(max_length=100, default='gd_lk5ns7kz21pck8jpis')
-    brightdata_api_key = models.CharField(max_length=100, default='c20a28d5-5c6c-43c3-9567-a6d7c193e727')
+    brightdata_dataset_id = models.CharField(max_length=100, default='default_dataset_id')
+    brightdata_api_token = models.CharField(max_length=100, default='')  # Will use environment variable
     
     # Status tracking
     status = models.CharField(max_length=20, choices=[
@@ -244,6 +245,15 @@ class ScheduledScrapingTask(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.track_source.name} ({self.platform})"
+
+    def get_api_token(self):
+        """Get API token from instance or environment variable"""
+        if self.brightdata_api_token:
+            return self.brightdata_api_token
+        
+        # Fallback to environment variable
+        from django.conf import settings
+        return getattr(settings, 'BRIGHTDATA_API_KEY', '') or os.getenv('BRIGHTDATA_API_KEY', '')
 
     def get_platform_url(self):
         """Get the URL for the specified platform from the TrackSource"""

@@ -16,7 +16,7 @@ from django.conf import settings
 from dateutil import parser as date_parser
 
 from .models import FacebookPost, FacebookComment, CommentScrapingJob, Folder
-from brightdata_integration.models import BrightdataConfig
+from apify_integration.models import ApifyConfig
 
 logger = logging.getLogger(__name__)
 
@@ -131,13 +131,13 @@ class FacebookCommentScraper:
                 pass
             return False
     
-    def _get_facebook_config(self) -> Optional[BrightdataConfig]:
+    def _get_facebook_config(self) -> Optional[ApifyConfig]:
         """
         Get the active Facebook Comments configuration for comment scraping
         """
         try:
-            return BrightdataConfig.objects.get(platform='facebook_comments', is_active=True)
-        except BrightdataConfig.DoesNotExist:
+            return ApifyConfig.objects.get(platform='facebook_comments', is_active=True)
+        except ApifyConfig.DoesNotExist:
             return None
     
     def _get_posts_from_folders(self, folder_ids: List[int]) -> List[FacebookPost]:
@@ -148,7 +148,7 @@ class FacebookCommentScraper:
         self.logger.info(f"Found {posts.count()} posts in selected folders")
         return list(posts)
     
-    def _make_brightdata_request(self, job: CommentScrapingJob, config: BrightdataConfig, payload: List[Dict]) -> bool:
+    def _make_brightdata_request(self, job: CommentScrapingJob, config: ApifyConfig, payload: List[Dict]) -> bool:
         """
         Make the BrightData API request for comment scraping
         """
@@ -372,7 +372,7 @@ class FacebookCommentScraper:
                 'error': str(e)
             }
     
-    def _make_direct_brightdata_request(self, config: BrightdataConfig, payload: List[Dict]) -> Tuple[bool, Dict]:
+    def _make_direct_brightdata_request(self, config: ApifyConfig, payload: List[Dict]) -> Tuple[bool, Dict]:
         """
         Make a direct BrightData API request (without job tracking)
         """

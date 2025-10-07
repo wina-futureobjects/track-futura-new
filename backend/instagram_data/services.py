@@ -16,7 +16,7 @@ from django.conf import settings
 from dateutil import parser as date_parser
 
 from .models import InstagramPost, InstagramComment, Folder, CommentScrapingJob
-from brightdata_integration.models import BrightdataConfig
+from apify_integration.models import ApifyConfig
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +134,7 @@ class InstagramCommentScraper:
         self.logger.info(f"Found {posts.count()} Instagram posts in selected folders")
         return list(posts)
     
-    def _make_brightdata_request(self, job: CommentScrapingJob, config: BrightdataConfig, payload: List[Dict]) -> bool:
+    def _make_brightdata_request(self, job: CommentScrapingJob, config: ApifyConfig, payload: List[Dict]) -> bool:
         """
         Make the BrightData API request for Instagram comment scraping
         """
@@ -239,16 +239,16 @@ class InstagramCommentScraper:
                 'error': str(e)
             }
     
-    def _get_instagram_config(self) -> Optional[BrightdataConfig]:
+    def _get_instagram_config(self) -> Optional[ApifyConfig]:
         """
         Get the active Instagram Comments configuration
         """
         try:
-            return BrightdataConfig.objects.get(platform='instagram_comments', is_active=True)
-        except BrightdataConfig.DoesNotExist:
+            return ApifyConfig.objects.get(platform='instagram_comments', is_active=True)
+        except ApifyConfig.DoesNotExist:
             return None
     
-    def _make_direct_brightdata_request(self, config: BrightdataConfig, payload: List[Dict]) -> Tuple[bool, Dict]:
+    def _make_direct_brightdata_request(self, config: ApifyConfig, payload: List[Dict]) -> Tuple[bool, Dict]:
         """
         Make a direct BrightData API request (without job tracking)
         """

@@ -67,6 +67,13 @@ class ChatService {
     });
     if (!response.ok) throw new Error('Failed to archive thread');
   }
+
+  async clearAllHistory(): Promise<void> {
+    const response = await apiFetch('/api/chat/threads/clear_all_history/', {
+      method: 'POST',
+    });
+    if (!response.ok) throw new Error('Failed to clear chat history');
+  }
 }
 
 export const chatService = new ChatService(); 

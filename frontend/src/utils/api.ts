@@ -76,17 +76,27 @@ export const getApiBaseUrl = (): string => {
     href: typeof window !== 'undefined' ? window.location.href : 'undefined'
   });
 
-  // In development, try to use the direct backend URL if proxy is not working
-  // Check if we're running on localhost:5173 (Vite dev server)
-  if (typeof window !== 'undefined' && window.location.port === '5173') {
-    // Use direct backend URL to bypass potential proxy issues
-    console.log('✅ Using development direct API URL: http://127.0.0.1:8000');
-    return 'http://127.0.0.1:8000';
+  // In development, use the Vite proxy if available (when running on Vite dev server)
+  if (typeof window !== 'undefined' && (
+    window.location.port === '5173' || 
+    window.location.port === '5174' || 
+    window.location.port === '5175' ||
+    window.location.port === '5185'
+  )) {
+    // Use empty string to use the same origin (Vite proxy will handle /api requests)
+    console.log('✅ Using Vite dev server proxy (same origin)');
+    return '';
   }
 
-  // Force direct backend URL for development to fix transaction issues
-  console.log('✅ Using development direct API URL: http://127.0.0.1:8000 (forced)');
-  return 'http://127.0.0.1:8000';
+  // For Django integrated mode (port 8080), use same origin
+  if (typeof window !== 'undefined' && window.location.port === '8080') {
+    console.log('✅ Using Django integrated mode (same origin)');
+    return '';
+  }
+
+  // Force direct backend URL for development fallback
+  console.log('✅ Using development direct API URL: http://127.0.0.1:8080 (fallback)');
+  return 'http://127.0.0.1:8080';
 };
 
 /**
@@ -112,6 +122,7 @@ export const apiFetch = (endpoint: string, options?: RequestInit): Promise<Respo
 
   // Get auth token from localStorage if available
   const token = localStorage.getItem('authToken');
+  console.log('🔑 Token from localStorage:', token ? `${token.substring(0, 10)}...` : 'NOT FOUND');
 
   // Prepare headers with minimal requirements for testing
   const headers = {
@@ -132,7 +143,14 @@ export const apiFetch = (endpoint: string, options?: RequestInit): Promise<Respo
     mode: 'cors' as RequestMode
   };
 
-  console.log('📤 Fetch Options:', { url, headers, method: options?.method });
+  console.log('📤 Fetch Options:', {
+    url,
+    headers: {
+      ...headers,
+      Authorization: headers.Authorization ? `${headers.Authorization.substring(0, 20)}...` : 'MISSING'
+    },
+    method: options?.method
+  });
 
   // Smart fallback function
   const tryFallbackUrl = async (originalError: any): Promise<Response> => {

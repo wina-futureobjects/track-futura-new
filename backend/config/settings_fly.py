@@ -1,102 +1,197 @@
 """
-Production settings for TrackFutura project deployed on Fly.io
+Django settings for TrackFutura on Fly.io deployment.
 """
 
 import os
-from .settings import *
+import dj_database_url
+from pathlib import Path
 
-# Production Security Settings
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-change-me-in-production')
+
+# SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
-SECRET_KEY = os.environ.get('SECRET_KEY', "django-insecure-k14j23-+4o*h)26ms8k#ghmv*kglz!hsf^h%sac1^sy7w6f2qw")
 
-# Hosts and Origins for Fly.io
+# Fly.io specific hosts
 ALLOWED_HOSTS = [
-    '.fly.dev',
-    'trackfutura.fly.dev',
     'localhost',
     '127.0.0.1',
+    '.fly.dev',
+    '.fly.io',
+    'trackfutura-app.fly.dev',
+    '*'  # For development only
 ]
 
-# Parse additional allowed hosts from environment
-if 'DJANGO_ALLOWED_HOSTS' in os.environ:
-    additional_hosts = os.environ['DJANGO_ALLOWED_HOSTS'].split(',')
-    ALLOWED_HOSTS.extend([host.strip() for host in additional_hosts])
+# Application definition
+INSTALLED_APPS = [
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
 
-CSRF_TRUSTED_ORIGINS = [
-    'https://*.fly.dev',
-    'https://trackfutura.fly.dev',
+    # Third-party apps
+    "rest_framework",
+    "rest_framework.authtoken",
+    "corsheaders",
+
+    # Local apps
+    "users",
+    "reports",
+    "analytics",
+    "data_collector",
+    "query_builder",
+    "instagram_data",
+    "facebook_data",
+    "track_accounts",
+    "linkedin_data",
+    "tiktok_data",
+    "apify_integration",
+    "chat",
+    "workflow",
 ]
 
-# Parse additional trusted origins from environment
-if 'DJANGO_CSRF_TRUSTED_ORIGINS' in os.environ:
-    additional_origins = os.environ['DJANGO_CSRF_TRUSTED_ORIGINS'].split(',')
-    CSRF_TRUSTED_ORIGINS.extend([origin.strip() for origin in additional_origins])
+MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
+    "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+]
 
-# Database Configuration for Fly.io PostgreSQL
-DATABASE_URL = os.environ.get('DATABASE_URL')
-if DATABASE_URL:
-    import dj_database_url
-    DATABASES = {
-        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600)
-    }
-else:
-    # Fallback to individual environment variables
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': os.environ.get('DATABASE_NAME', 'trackfutura'),
-            'USER': os.environ.get('DATABASE_USER', 'postgres'),
-            'PASSWORD': os.environ.get('DATABASE_PASSWORD', ''),
-            'HOST': os.environ.get('DATABASE_HOST', 'localhost'),
-            'PORT': os.environ.get('DATABASE_PORT', '5432'),
-        }
-    }
+ROOT_URLCONF = "config.urls"
 
-# Static Files Configuration - Serve through Django in single container
-STATIC_URL = '/static/'
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [BASE_DIR / "templates"],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+            ],
+        },
+    },
+]
+
+WSGI_APPLICATION = "config.wsgi.application"
+
+# Database
+# Use SQLite for simplicity on Fly.io
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': '/data/db.sqlite3',
+    }
+}
+
+# Password validation
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+    },
+    {
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+    },
+    {
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
+    },
+    {
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
+    },
+]
+
+# Internationalization
+LANGUAGE_CODE = "en-us"
+TIME_ZONE = "UTC"
+USE_I18N = True
+USE_TZ = True
+
+# Static files (CSS, JavaScript, Images)
+STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-# Serve frontend static files
-STATICFILES_DIRS = [
-    os.path.join(BASE_DIR.parent, 'frontend', 'dist'),
+# Use WhiteNoise for static file serving
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+# Media files
+MEDIA_URL = '/media/'
+MEDIA_ROOT = '/data/media'
+
+# Default primary key field type
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Django REST Framework settings
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 10,
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ],
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.FormParser',
+        'rest_framework.parsers.MultiPartParser',
+    ],
+}
+
+# CORS settings for production
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = [
+    "https://trackfutura-app.fly.dev",
 ]
 
-# Media Files Configuration
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
 
-# Security Settings for Production
+# CSRF settings
+CSRF_TRUSTED_ORIGINS = [
+    "https://trackfutura-app.fly.dev",
+]
+
+# Security settings for production
 if not DEBUG:
-    SECURE_SSL_REDIRECT = os.environ.get('DJANGO_SECURE_SSL_REDIRECT', 'True').lower() == 'true'
+    # Allow health checks via HTTP by disabling SSL redirect for specific paths
+    # SECURE_SSL_REDIRECT = True  # Temporarily disabled to fix health checks
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-    SECURE_BROWSER_XSS_FILTER = True
-    SECURE_CONTENT_TYPE_NOSNIFF = True
-    X_FRAME_OPTIONS = 'DENY'
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_BROWSER_XSS_FILTER = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
-# CORS Configuration for production
-CORS_ALLOW_ALL_ORIGINS = False
-CORS_ALLOWED_ORIGINS = [
-    f"https://{host}" for host in ALLOWED_HOSTS if not host.startswith('.') and host not in ['localhost', '127.0.0.1']
-]
-
-# Add wildcard patterns for Fly.io domains
-CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^https://.*\.fly\.dev$",
-]
-
-# BrightData Configuration
-BRIGHTDATA_WEBHOOK_BASE_URL = os.environ.get(
-    'BRIGHTDATA_WEBHOOK_BASE_URL',
-    'https://trackfutura.fly.dev'
-)
-
-# OpenAI Configuration
-OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
-
-# Logging Configuration
+# Logging
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -115,31 +210,24 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
-        'brightdata_integration': {
-            'handlers': ['console'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
     },
 }
 
-# Cache Configuration (using database cache for simplicity)
+# Apify Integration Settings
+APIFY_API_TOKEN = os.environ.get('APIFY_API_TOKEN', '')
+
+# Cache configuration
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
-        'LOCATION': 'cache_table',
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'default-cache',
+        'TIMEOUT': 300,
+        'OPTIONS': {
+            'MAX_ENTRIES': 1000,
+            'CULL_FREQUENCY': 3,
+        }
     }
 }
 
-# Session Configuration
-SESSION_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_SECURE = not DEBUG
-SESSION_COOKIE_HTTPONLY = True
-CSRF_COOKIE_HTTPONLY = True
-
-# File Upload Settings
-FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
-DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
-
-# URL Configuration to serve frontend
-ROOT_URLCONF = 'config.urls_fly'
+# Email configuration (optional)
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'

@@ -16,26 +16,99 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
 from django.views.generic import RedirectView
 from django.http import JsonResponse, HttpResponse
 from django.db import connection
 from django.conf import settings
 from django.conf.urls.static import static
+from django.shortcuts import render
+from django.template.response import TemplateResponse
+import os
 
 
-def api_status(request):
-    """Simple API status endpoint for root path"""
-    return JsonResponse({
-        'status': 'Track-Futura API is running',
-        'version': '1.0',
-        'endpoints': {
-            'users': '/api/users/',
-            'reports': '/api/reports/',
-            'analytics': '/api/analytics/',
-            'admin': '/admin/',
-        }
-    })
+def serve_frontend(request):
+    """Serve the frontend application"""
+    # Check if this is a request for a static asset
+    if request.path.startswith('/assets/'):
+        # Try to serve the actual static file
+        asset_path = os.path.join(settings.BASE_DIR, 'staticfiles', request.path.lstrip('/'))
+        try:
+            # Determine content type based on file extension
+            if request.path.endswith('.css'):
+                content_type = 'text/css'
+            elif request.path.endswith('.js'):
+                content_type = 'application/javascript'
+            elif request.path.endswith('.png'):
+                content_type = 'image/png'
+            elif request.path.endswith('.svg'):
+                content_type = 'image/svg+xml'
+            else:
+                content_type = 'application/octet-stream'
+            
+            with open(asset_path, 'rb') as f:
+                content = f.read()
+            return HttpResponse(content, content_type=content_type)
+        except FileNotFoundError:
+            pass  # Fall through to serve index.html
+    
+    # Path to the frontend index.html file
+    frontend_path = os.path.join(settings.BASE_DIR, 'staticfiles', 'index.html')
+    
+    try:
+        with open(frontend_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        return HttpResponse(content, content_type='text/html')
+    except FileNotFoundError:
+        # Fallback to a simple welcome page if frontend files are not found
+        return HttpResponse("""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>TrackFutura - Social Media Analytics</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+                .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                h1 { color: #2c3e50; text-align: center; }
+                .api-links { margin-top: 30px; }
+                .api-link { display: block; padding: 10px; margin: 10px 0; background: #3498db; color: white; text-decoration: none; border-radius: 5px; text-align: center; }
+                .api-link:hover { background: #2980b9; }
+                .status { background: #27ae60; color: white; padding: 10px; border-radius: 5px; text-align: center; margin-bottom: 20px; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="status">✅ TrackFutura API is running successfully!</div>
+                <h1>TrackFutura - Social Media Analytics Platform</h1>
+                <p>Welcome to TrackFutura, your comprehensive social media analytics and tracking platform.</p>
+                
+                <h2>Available API Endpoints:</h2>
+                <div class="api-links">
+                    <a href="/admin/" class="api-link">🔧 Admin Panel</a>
+                    <a href="/api/users/" class="api-link">👥 Users API</a>
+                    <a href="/api/reports/" class="api-link">📊 Reports API</a>
+                    <a href="/api/analytics/" class="api-link">📈 Analytics API</a>
+                    <a href="/api/dashboard/" class="api-link">📱 Dashboard API</a>
+                    <a href="/api/health/" class="api-link">❤️ Health Check</a>
+                </div>
+                
+                <h2>Platform Features:</h2>
+                <ul>
+                    <li>📱 Multi-platform social media tracking (Facebook, Instagram, LinkedIn, TikTok)</li>
+                    <li>📊 Advanced analytics and reporting</li>
+                    <li>🤖 AI-powered insights</li>
+                    <li>📈 Real-time data collection</li>
+                    <li>💬 Interactive chat interface</li>
+                    <li>🔄 Automated workflow management</li>
+                </ul>
+                
+                <p style="text-align: center; margin-top: 30px; color: #7f8c8d;">
+                    <small>Deployed on Fly.io | Version 1.0</small>
+                </p>
+            </div>
+        </body>
+        </html>
+        """, content_type='text/html')
 
 def health_check(request):
     """Health check endpoint for Docker container monitoring"""
@@ -59,10 +132,31 @@ def favicon_view(request):
     """Return empty response for favicon to prevent 404s"""
     return HttpResponse(status=204)  # No Content
 
+def api_status(request):
+    """API status endpoint for backward compatibility"""
+    try:
+        # Test database connection
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+
+        return JsonResponse({
+            'status': 'healthy',
+            'message': 'TrackFutura API is running',
+            'database': 'connected',
+            'version': '1.0',
+            'timestamp': request.META.get('HTTP_X_FORWARDED_FOR', request.META.get('REMOTE_ADDR'))
+        })
+    except Exception as e:
+        return JsonResponse({
+            'status': 'unhealthy',
+            'message': 'Database connection failed',
+            'error': str(e)
+        }, status=503)
+
 
 
 urlpatterns = [
-    path("", api_status, name="api_status"),  # Handle root path
+    path("", serve_frontend, name="frontend"),  # Serve frontend at root
     path("api/health/", health_check, name="health_check"),  # Health check endpoint
     path("favicon.ico", favicon_view, name="favicon"),  # Handle favicon
     path("admin/", admin.site.urls),
@@ -79,12 +173,25 @@ urlpatterns = [
     path("api/linkedin-data/", include("linkedin_data.urls")),
     path("api/tiktok-data/", include("tiktok_data.urls")),
     path("api/apify/", include("apify_integration.urls")),
+    path("api/brightdata/", include("brightdata_integration.urls")),  # New BrightData API
     path("api/chat/", include("chat.urls")),
     path("api/workflow/", include("workflow.urls")),
     path("api/dashboard/", include("dashboard.urls")),
     path("api/", RedirectView.as_view(url="/api/users/", permanent=False)),
-
 ]
+
+# Serve static files in development and frontend assets
+if settings.DEBUG or True:  # Always serve static files for frontend
+    from django.contrib.staticfiles.urls import staticfiles_urlpatterns
+    from django.conf.urls.static import static
+    
+    urlpatterns += staticfiles_urlpatterns()
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+    
+    # Catch-all pattern for frontend routing (React Router)
+    urlpatterns += [
+        re_path(r'^(?!api|admin|static|media).*$', serve_frontend, name="frontend_catchall"),
+    ]
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

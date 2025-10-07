@@ -46,6 +46,8 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
 import TimelineIcon from '@mui/icons-material/Timeline';
+import DeleteIcon from '@mui/icons-material/Delete';
+import ClearAllIcon from '@mui/icons-material/ClearAll';
 import { chatService, type Message, type ChatThread } from '../services/chatService';
 import ChatChart from '../components/ChatChart';
 
@@ -520,6 +522,44 @@ const Analysis: React.FC = () => {
     setShowSuggestions(!showSuggestions);
   };
 
+  // Handle deleting a specific thread
+  const handleDeleteThread = async (threadId: string) => {
+    // event.stopPropagation() is already called in the onClick handler
+    try {
+      await chatService.archiveThread(threadId);
+
+      // Remove thread from local state
+      setThreads(prev => prev.filter(t => t.id !== threadId));
+
+      // If the deleted thread was active, clear current thread
+      if (currentThread?.id === threadId) {
+        setCurrentThread(null);
+        setMessages([]);
+        setShowSuggestions(true);
+      }
+    } catch (error) {
+      console.error('Failed to delete thread:', error);
+      // You could add a toast notification here
+    }
+  };
+
+  // Handle clearing all chat history
+  const handleClearAllHistory = async () => {
+    try {
+      await chatService.clearAllHistory();
+      
+      // Clear all local state
+      setThreads([]);
+      setCurrentThread(null);
+      setMessages([]);
+      setShowSuggestions(true);
+      setHasAsked(false);
+    } catch (error) {
+      console.error('Failed to clear all history:', error);
+      // You could add a toast notification here
+    }
+  };
+
   // Mock AI response function (to be replaced with actual AI service)
   const mockAIResponse = async (userInput: string): Promise<string> => {
     // Simulate network delay
@@ -837,6 +877,27 @@ Try asking about:
           >
             + New Chat
           </Button>
+          {threads.length > 0 && (
+            <Button
+              variant="outlined"
+              onClick={handleClearAllHistory}
+              startIcon={<ClearAllIcon />}
+              sx={{
+                borderColor: '#dc2626',
+                color: '#dc2626',
+                borderRadius: 1.5,
+                textTransform: 'none',
+                fontWeight: 600,
+                width: '100%',
+                '&:hover': { 
+                  bgcolor: '#fef2f2',
+                  borderColor: '#dc2626'
+                }
+              }}
+            >
+              Clear All History
+            </Button>
+          )}
         </Box>
         <Box sx={{ flex: 1, p: 3, overflowY: 'auto', minHeight: 0 }}>
           <Stack spacing={2}>
@@ -844,25 +905,55 @@ Try asking about:
               Today
             </Typography>
             {threads.map((thread) => (
-              <Button
+              <Box
                 key={thread.id}
-                variant="text"
-                onClick={() => handleThreadSelect(thread)}
                 sx={{
-                  justifyContent: 'flex-start',
-                  textAlign: 'left',
-                  textTransform: 'none',
-                  color: '#1e293b',
-                  p: 1.5,
-                  borderRadius: 1,
-                  bgcolor: currentThread?.id === thread.id ? '#f1f5f9' : 'transparent',
-                  '&:hover': { bgcolor: '#f1f5f9' }
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.5,
+                  '&:hover .delete-btn': { opacity: 1 }
                 }}
               >
-                <Typography noWrap sx={{ fontSize: '0.875rem' }}>
-                  {thread.title || (thread.last_message?.content ? thread.last_message.content.split('\n')[0].substring(0, 35) + '...' : null) || 'New Chat'}
-                </Typography>
-              </Button>
+                <Button
+                  variant="text"
+                  onClick={() => handleThreadSelect(thread)}
+                  sx={{
+                    flex: 1,
+                    justifyContent: 'flex-start',
+                    textAlign: 'left',
+                    textTransform: 'none',
+                    color: '#1e293b',
+                    p: 1.5,
+                    borderRadius: 1,
+                    bgcolor: currentThread?.id === thread.id ? '#f1f5f9' : 'transparent',
+                    '&:hover': { bgcolor: '#f1f5f9' },
+                    minWidth: 0
+                  }}
+                >
+                  <Typography noWrap sx={{ fontSize: '0.875rem' }}>
+                    {thread.title || (thread.last_message?.content ? thread.last_message.content.split('\n')[0].substring(0, 35) + '...' : null) || 'New Chat'}
+                  </Typography>
+                </Button>
+                <IconButton
+                  className="delete-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteThread(thread.id);
+                  }}
+                  size="small"
+                  sx={{
+                    opacity: 0,
+                    transition: 'opacity 0.2s',
+                    color: '#64748b',
+                    '&:hover': { 
+                      color: '#dc2626',
+                      bgcolor: '#fef2f2'
+                    }
+                  }}
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Box>
             ))}
           </Stack>
         </Box>

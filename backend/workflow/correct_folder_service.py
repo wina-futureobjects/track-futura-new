@@ -107,19 +107,42 @@ class CorrectFolderService:
     def _create_run_folder(self, scraping_run: ScrapingRun):
         """
         Create the top-level Scraping Run folder
-        
+
         Args:
             scraping_run: ScrapingRun instance
-            
+
         Returns:
             Single run folder that represents the entire scraping run
         """
-        name = f"Scraping Run - {scraping_run.created_at.strftime('%Y-%m-%d %H:%M')}"
-        description = f"Scraping run created on {scraping_run.created_at.strftime('%Y-%m-%d %H:%M')}"
-        
+        from track_accounts.models import UnifiedRunFolder, SourceFolder
+
+        # Get source folder names from configuration
+        source_folder_names = []
+        folder_id = scraping_run.configuration.get('folder_id')
+        source_folder_ids = scraping_run.configuration.get('source_folder_ids', [])
+
+        # Try to get folder names
+        if folder_id:
+            try:
+                source_folder = SourceFolder.objects.get(id=folder_id)
+                source_folder_names.append(source_folder.name)
+            except SourceFolder.DoesNotExist:
+                pass
+        elif source_folder_ids:
+            source_folders = SourceFolder.objects.filter(id__in=source_folder_ids)
+            source_folder_names = [sf.name for sf in source_folders]
+
+        # Create folder name with source folder names + date/time
+        if source_folder_names:
+            folder_base_name = ", ".join(source_folder_names)
+        else:
+            folder_base_name = "Scraping Run"
+
+        # Format: "Brand Sources - 06/10/2025 14:00:00"
+        name = f"{folder_base_name} - {scraping_run.created_at.strftime('%d/%m/%Y %H:%M:%S')}"
+        description = f"Scraping run created on {scraping_run.created_at.strftime('%d/%m/%Y %H:%M:%S')}"
+
         # Create a single run folder in the track_accounts app (platform-agnostic)
-        from track_accounts.models import UnifiedRunFolder
-        
         run_folder = UnifiedRunFolder.objects.create(
             name=name,
             description=description,
@@ -128,7 +151,7 @@ class CorrectFolderService:
             project=scraping_run.project,
             category='posts'
         )
-        
+
         logger.info(f"Created unified run folder: {name}")
         return run_folder
     

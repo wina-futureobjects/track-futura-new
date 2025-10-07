@@ -34,6 +34,7 @@ import {
   Assignment as AssignmentIcon
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
+import { reportService } from '../services/reportService';
 
 // Mock data for generated reports - this would come from localStorage or API in a real app
 const mockGeneratedReports = [
@@ -93,6 +94,7 @@ interface GeneratedReport {
   id: number;
   title: string;
   template_name: string;
+  template_type?: string;
   status: string;
   created_at: string;
   completed_at?: string | null;
@@ -110,28 +112,19 @@ const GeneratedReports: React.FC = () => {
   const navigate = useNavigate();
   const { organizationId, projectId } = useParams();
 
-  // Load reports from localStorage or use mock data
+  // Load reports from API
   const loadReports = useCallback(async () => {
+    setLoading(true);
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // In a real app, this would load from an API or localStorage
-      const storedReports = localStorage.getItem('generated_reports');
-      if (storedReports) {
-        const parsedReports = JSON.parse(storedReports);
-        // Merge with mock data, preferring stored reports
-        const allReports = [...parsedReports, ...mockGeneratedReports.filter(
-          mock => !parsedReports.some((stored: GeneratedReport) => stored.id === mock.id)
-        )];
-        setReports(allReports);
-      } else {
-        setReports(mockGeneratedReports);
-      }
+      // Fetch real reports from API
+      const realReports = await reportService.getReports();
+      console.log('Loaded real reports:', realReports);
+      setReports(realReports);
     } catch (error) {
       console.error('Error loading reports:', error);
+      // Fallback to mock data only if API fails
       setReports(mockGeneratedReports);
-      showSnackbar('Failed to load some reports', 'error');
+      showSnackbar('Failed to load reports from server, showing cached data', 'error');
     } finally {
       setLoading(false);
     }
@@ -176,10 +169,42 @@ const GeneratedReports: React.FC = () => {
   };
 
   const handleViewReport = (reportId: number) => {
+    // Find the report to get its template type
+    const report = reports.find(r => r.id === reportId);
+    const templateType = report?.template_type;
+
+    console.log('🔍 Navigating to report:', { reportId, templateType });
+
+    // Route to template-specific endpoint based on template type
+    let templatePath = '';
+    switch (templateType) {
+      case 'engagement_metrics':
+        templatePath = 'engagement-metrics';
+        break;
+      case 'sentiment_analysis':
+        templatePath = 'sentiment-analysis';
+        break;
+      case 'content_analysis':
+        templatePath = 'content-analysis';
+        break;
+      case 'trend_analysis':
+        templatePath = 'trend-analysis';
+        break;
+      case 'competitive_analysis':
+        templatePath = 'competitive-analysis';
+        break;
+      case 'user_behavior':
+        templatePath = 'user-behavior';
+        break;
+      default:
+        // Fallback to generic route if template type is unknown
+        templatePath = 'generated';
+    }
+
     if (organizationId && projectId) {
-      navigate(`/organizations/${organizationId}/projects/${projectId}/report/generated/${reportId}`);
+      navigate(`/organizations/${organizationId}/projects/${projectId}/reports/${templatePath}/${reportId}`);
     } else {
-      navigate(`/report/generated/${reportId}`);
+      navigate(`/reports/${templatePath}/${reportId}`);
     }
   };
 

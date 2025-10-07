@@ -301,9 +301,20 @@ class FolderViewSet(viewsets.ModelViewSet):
             
             else:
                 return Response({'error': 'Unknown folder category'}, status=status.HTTP_400_BAD_REQUEST)
-                
+
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['get'], url_path='posts')
+    def posts(self, request, pk=None):
+        """
+        Get all posts for a specific folder
+        Endpoint: /api/facebook-data/folders/{id}/posts/
+        """
+        folder = self.get_object()
+        posts = FacebookPost.objects.filter(folder=folder)
+        serializer = FacebookPostSerializer(posts, many=True)
+        return Response(serializer.data)
 
 class FacebookPostViewSet(viewsets.ModelViewSet):
     """

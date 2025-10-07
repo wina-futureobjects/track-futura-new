@@ -23,6 +23,12 @@ import {
   Snackbar,
   Tabs,
   Tab,
+  IconButton,
+  Menu,
+  ListItemIcon,
+  ListItemText,
+  Checkbox,
+  Tooltip,
 } from '@mui/material';
 import {
   Folder as FolderIcon,
@@ -34,6 +40,10 @@ import {
   Refresh as RefreshIcon,
   Storage as StorageIcon,
   Add as AddIcon,
+  Delete as DeleteIcon,
+  MoreVert as MoreVertIcon,
+  SelectAll as SelectAllIcon,
+  Clear as ClearIcon,
 } from '@mui/icons-material';
 import { apiFetch } from '../utils/api';
 
@@ -121,6 +131,15 @@ const DataStorage = () => {
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
   const [isEditingFolder, setIsEditingFolder] = useState(false);
 
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{ mouseX: number; mouseY: number; folder: Folder } | null>(null);
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const [selectedFolderForMenu, setSelectedFolderForMenu] = useState<Folder | null>(null);
+
+  // Batch selection state
+  const [selectedFolders, setSelectedFolders] = useState<Set<number>>(new Set());
+  const [isDeleteMode, setIsDeleteMode] = useState(false);
+
   const platforms = [
     { key: 'instagram', label: 'Instagram', icon: <InstagramIcon />, color: '#E4405F' },
     { key: 'facebook', label: 'Facebook', icon: <FacebookIcon />, color: '#1877F2' },
@@ -144,8 +163,14 @@ const DataStorage = () => {
         return folders;
       }
       return [];
-    } catch (error) {
-      console.error(`Error fetching ${platform} folders:`, error);
+    } catch (error: any) {
+      // Handle 404s and other client errors gracefully
+      if (error.status === 404 || (error.message && error.message.includes('404'))) {
+        console.log(`No ${platform} folders found (404) - this is normal if platform has no data yet`);
+        return [];
+      }
+      
+      console.warn(`Error fetching ${platform} folders:`, error);
       return [];
     }
   };
@@ -168,12 +193,13 @@ const DataStorage = () => {
     setError(null);
     
     try {
-      // Fetch run folders from track_accounts (unified run folders)
+      // Fetch run folders with complete hierarchy from track_accounts
       let runFolders: any[] = [];
       try {
-        const runFoldersResponse = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&folder_type=run&include_hierarchy=true`);
+        const runFoldersResponse = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&folder_type=run`);
         if (runFoldersResponse.ok) {
           const runData = await runFoldersResponse.json();
+          // The API returns the complete nested hierarchy with subfolders populated
           runFolders = (runData.results || runData).map((folder: any) => ({
             ...folder,
             platform: 'unified'
@@ -183,35 +209,35 @@ const DataStorage = () => {
         console.warn('Could not fetch run folders from track_accounts:', error);
       }
 
-      // Fetch Unified hierarchy: platform -> service -> job
-      const platformLevelResults = await Promise.all(
-        runFolders.map((rf: any) => fetchUnifiedChildren(rf.id, 'platform').then(arr => arr.map((f: any) => ({ ...f, platform: 'unified' }))))
-      );
-      const platformFoldersUnified = platformLevelResults.flat();
+      // Flatten the hierarchy to a single array for filtering/searching
+      // This recursively extracts all folders from the nested structure
+      const flattenFolders = (folder: any): any[] => {
+        const result = [folder];
+        if (folder.subfolders && folder.subfolders.length > 0) {
+          folder.subfolders.forEach((subfolder: any) => {
+            result.push(...flattenFolders(subfolder));
+          });
+        }
+        return result;
+      };
 
-      const serviceLevelResults = await Promise.all(
-        platformFoldersUnified.map((pf: any) => fetchUnifiedChildren(pf.id, 'service').then(arr => arr.map((f: any) => ({ ...f, platform: 'unified' }))))
-      );
-      const serviceFoldersUnified = serviceLevelResults.flat();
+      const allFoldersFromHierarchy = runFolders.flatMap(flattenFolders);
 
-      // Prefer job; if none, fall back to legacy content
-      const jobLevelJobResults = await Promise.all(
-        serviceFoldersUnified.map((sf: any) => fetchUnifiedChildren(sf.id, 'job').then(arr => arr.map((f: any) => ({ ...f, platform: 'unified' }))))
+      // Also fetch standalone platform-specific folders (not linked to unified structure)
+      const platformFolders = await Promise.all(
+        platforms.map(p => fetchFolders(p.key))
       );
-      const jobFoldersUnified = jobLevelJobResults.flat();
-      const needLegacy = serviceFoldersUnified.filter(sf => !jobFoldersUnified.some((jf: any) => jf.parent_folder === sf.id));
-      const legacyContentResults = await Promise.all(
-        needLegacy.map((sf: any) => fetchUnifiedChildren(sf.id, 'content').then(arr => arr.map((f: any) => ({ ...f, platform: 'unified' }))))
-      );
-      const legacyContentFoldersUnified = legacyContentResults.flat();
+      const allPlatformFolders = platformFolders.flat();
 
-      // Combine all unified levels; keep platform-specific folders if needed for other parts of the page
+      // Filter out platform folders that are already in the hierarchy (have unified_job_folder_id)
+      const standalonePlatformFolders = allPlatformFolders.filter(
+        (pf: any) => !pf.unified_job_folder_id && !pf.unified_job_folder
+      );
+
+      // Combine hierarchical folders + standalone platform folders
       const allFolders = [
-        ...runFolders,
-        ...platformFoldersUnified,
-        ...serviceFoldersUnified,
-        ...jobFoldersUnified,
-        ...legacyContentFoldersUnified,
+        ...allFoldersFromHierarchy,
+        ...standalonePlatformFolders,
       ];
 
       setFolders(allFolders);
@@ -231,7 +257,7 @@ const DataStorage = () => {
       
     } catch (error) {
       console.error('Error fetching folders:', error);
-      setError('Failed to load data folders. Please try again.');
+      setError('Some data folders may be unavailable. This is normal if data is still being processed.');
     } finally {
       setLoading(false);
     }
@@ -267,25 +293,30 @@ const DataStorage = () => {
   };
 
   const getHierarchicalFolders = () => {
-    // Use unified-only hierarchy: run -> platform -> service -> job/content
+    // Use the subfolders structure already provided by the API
+    // The backend already returns the complete nested hierarchy with subfolders populated
     const runFoldersUnified = folders.filter(folder => folder.platform === 'unified' && folder.folder_type === 'run');
 
-    const hierarchy = runFoldersUnified.map(runFolder => {
-      const platformChildren = folders.filter(f => f.platform === 'unified' && f.folder_type === 'platform' && f.parent_folder === runFolder.id);
-      const platformNodes = platformChildren.map(platformFolder => {
-        const serviceChildren = folders.filter(f => f.platform === 'unified' && f.folder_type === 'service' && f.parent_folder === platformFolder.id);
-        const serviceNodes = serviceChildren.map(serviceFolder => {
-          // Prefer job folders; fallback to legacy content
-          const jobChildren = folders.filter(f => f.platform === 'unified' && f.folder_type === 'job' && f.parent_folder === serviceFolder.id);
-          const legacyChildren = jobChildren.length ? [] : folders.filter(f => f.platform === 'unified' && f.folder_type === 'content' && f.parent_folder === serviceFolder.id);
-          return { ...serviceFolder, subfolders: jobChildren.length ? jobChildren : legacyChildren } as Folder;
-        });
-        return { ...platformFolder, subfolders: serviceNodes } as Folder;
-      });
-      return { ...runFolder, subfolders: platformNodes } as Folder;
-    });
+    // The run folders already have their complete hierarchy in the 'subfolders' field from the API
+    // No need to manually rebuild it
+    const hierarchy = runFoldersUnified;
 
-    return hierarchy;
+    // Also include platform-specific folders that don't have unified_job_folder link
+    // These are standalone scraped data folders (e.g., from Apify direct creation)
+    const standalonePlatformFolders = folders.filter(folder =>
+      folder.platform !== 'unified' &&
+      folder.folder_type === 'content' &&
+      !folder.parent_folder
+    );
+
+    // Convert standalone folders to look like run folders for consistent UI
+    const standaloneAsRuns = standalonePlatformFolders.map(folder => ({
+      ...folder,
+      folder_type: 'run' as const, // Display as run-level folders
+      subfolders: []
+    }));
+
+    return [...hierarchy, ...standaloneAsRuns];
   };
 
   const handleFolderClick = (platform: string, folder: Folder) => {
@@ -415,7 +446,7 @@ const DataStorage = () => {
 
     try {
       setIsEditingFolder(true);
-      
+
       const folderData = {
         name: folderName.trim(),
         description: folderDescription.trim() || null,
@@ -425,8 +456,20 @@ const DataStorage = () => {
 
       console.log('Updating folder with data:', folderData);
       console.log('Platform:', selectedPlatform);
+      console.log('Editing folder:', editingFolder);
 
-      const response = await apiFetch(`/api/${selectedPlatform}-data/folders/${editingFolder.id}/`, {
+      // Use the correct endpoint based on folder type
+      // UnifiedRunFolders use the report-folders endpoint
+      // Platform-specific folders use the platform-specific endpoint
+      const isUnifiedFolder = selectedPlatform === 'unified' || editingFolder.folder_type === 'run';
+      const endpoint = isUnifiedFolder
+        ? `/api/track-accounts/report-folders/${editingFolder.id}/`
+        : `/api/${selectedPlatform}-data/folders/${editingFolder.id}/`;
+
+      console.log('Using endpoint:', endpoint);
+      console.log('Is unified folder:', isUnifiedFolder);
+
+      const response = await apiFetch(endpoint, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -435,19 +478,22 @@ const DataStorage = () => {
       });
 
       if (!response.ok) {
-        let errorDetail = 'Failed to update folder';
+        let errorDetail = `Failed to update folder (Status: ${response.status})`;
         try {
           const errorData = await response.json();
+          console.error('Error response status:', response.status);
           console.error('Error data from server:', errorData);
+          console.error('Response headers:', response.headers);
           if (errorData.detail) {
             errorDetail = errorData.detail;
           } else if (typeof errorData === 'object') {
             errorDetail = Object.entries(errorData)
-              .map(([field, errors]) => `${field}: ${errors}`)
-              .join(', ');
+              .map(([field, errors]) => `${field}: ${Array.isArray(errors) ? errors.join(', ') : errors}`)
+              .join('; ');
           }
         } catch (e) {
           console.error('Could not parse error response:', e);
+          errorDetail = `Failed to update folder. Status: ${response.status} ${response.statusText}`;
         }
         throw new Error(errorDetail);
       }
@@ -479,12 +525,47 @@ const DataStorage = () => {
     }
 
     try {
-      const response = await apiFetch(`/api/${folder.platform}-data/folders/${folder.id}/`, {
+      console.log('Attempting to delete folder:', folder);
+      
+      // Determine the correct API endpoint based on folder type
+      let deleteUrl: string;
+      
+      if (folder.platform === 'unified') {
+        // For unified folders, use the track-accounts API
+        deleteUrl = `/api/track-accounts/report-folders/${folder.id}/`;
+      } else {
+        // For platform-specific folders, use the platform-specific API
+        deleteUrl = `/api/${folder.platform}-data/folders/${folder.id}/`;
+      }
+      
+      console.log('Delete API URL:', deleteUrl);
+      
+      const response = await apiFetch(deleteUrl, {
         method: 'DELETE',
       });
 
+      console.log('Delete response status:', response.status);
+      console.log('Delete response ok:', response.ok);
+
       if (!response.ok) {
-        throw new Error('Failed to delete folder');
+        // Try to get error details from the response
+        let errorMessage = 'Failed to delete folder';
+        try {
+          const errorData = await response.json();
+          console.log('Error response data:', errorData);
+          errorMessage = errorData.error || errorData.detail || errorMessage;
+        } catch (e) {
+          console.log('Could not parse error response as JSON');
+          // If we can't parse JSON, try to get text
+          try {
+            const errorText = await response.text();
+            console.log('Error response text:', errorText);
+            if (errorText) errorMessage = errorText;
+          } catch (e2) {
+            console.log('Could not get error response text');
+          }
+        }
+        throw new Error(errorMessage);
       }
 
       setSnackbarMessage('Folder deleted successfully!');
@@ -496,6 +577,146 @@ const DataStorage = () => {
     } catch (error) {
       console.error('Error deleting folder:', error);
       setSnackbarMessage(error instanceof Error ? error.message : 'Failed to delete folder. Please try again.');
+      setSnackbarOpen(true);
+    }
+  };
+
+  // Context menu handlers
+  const handleContextMenu = (event: React.MouseEvent, folder: Folder) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setContextMenu({
+      mouseX: event.clientX + 2,
+      mouseY: event.clientY - 6,
+      folder
+    });
+  };
+
+  const handleCloseContextMenu = () => {
+    setContextMenu(null);
+  };
+
+  const handleMenuClick = (event: React.MouseEvent<HTMLElement>, folder: Folder) => {
+    event.stopPropagation();
+    setAnchorEl(event.currentTarget);
+    setSelectedFolderForMenu(folder);
+  };
+
+  const handleCloseMenu = () => {
+    setAnchorEl(null);
+    setSelectedFolderForMenu(null);
+  };
+
+  const handleEditFromMenu = () => {
+    if (selectedFolderForMenu) {
+      handleEditFolder(selectedFolderForMenu);
+    }
+    handleCloseMenu();
+  };
+
+  const handleDeleteFromMenu = () => {
+    if (selectedFolderForMenu) {
+      handleDeleteFolder(selectedFolderForMenu);
+    }
+    handleCloseMenu();
+  };
+
+  // Batch operations
+  const handleToggleDeleteMode = () => {
+    setIsDeleteMode(!isDeleteMode);
+    setSelectedFolders(new Set());
+  };
+
+  const handleFolderSelection = (folderId: number, checked: boolean) => {
+    const newSelected = new Set(selectedFolders);
+    if (checked) {
+      newSelected.add(folderId);
+    } else {
+      newSelected.delete(folderId);
+    }
+    setSelectedFolders(newSelected);
+  };
+
+  const handleSelectAll = () => {
+    const allFolderIds = getHierarchicalFolders().map(f => f.id);
+    setSelectedFolders(new Set(allFolderIds));
+  };
+
+  const handleClearSelection = () => {
+    setSelectedFolders(new Set());
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedFolders.size === 0) return;
+
+    const folderNames = getHierarchicalFolders()
+      .filter(f => selectedFolders.has(f.id))
+      .map(f => f.name)
+      .join(', ');
+
+    if (!window.confirm(`Are you sure you want to delete ${selectedFolders.size} folder(s)?\n\n${folderNames}\n\nThis action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const deletePromises = Array.from(selectedFolders).map(async (folderId) => {
+        const folder = getHierarchicalFolders().find(f => f.id === folderId);
+        if (folder) {
+          console.log('Bulk deleting folder:', folder);
+          
+          // Determine the correct API endpoint based on folder type
+          let deleteUrl: string;
+          
+          if (folder.platform === 'unified') {
+            // For unified folders, use the track-accounts API
+            deleteUrl = `/api/track-accounts/report-folders/${folder.id}/`;
+          } else {
+            // For platform-specific folders, use the platform-specific API
+            deleteUrl = `/api/${folder.platform}-data/folders/${folder.id}/`;
+          }
+          
+          console.log('Bulk delete API URL:', deleteUrl);
+          
+          const response = await apiFetch(deleteUrl, {
+            method: 'DELETE',
+          });
+          
+          console.log(`Delete response for ${folder.name}:`, response.status, response.ok);
+          
+          if (!response.ok) {
+            // Try to get error details from the response
+            let errorMessage = `Failed to delete folder: ${folder.name}`;
+            try {
+              const errorData = await response.json();
+              console.log(`Error response data for ${folder.name}:`, errorData);
+              errorMessage = errorData.error || errorData.detail || errorMessage;
+            } catch (e) {
+              try {
+                const errorText = await response.text();
+                console.log(`Error response text for ${folder.name}:`, errorText);
+                if (errorText) errorMessage = `${folder.name}: ${errorText}`;
+              } catch (e2) {
+                console.log(`Could not get error response for ${folder.name}`);
+              }
+            }
+            throw new Error(errorMessage);
+          }
+        }
+      });
+
+      await Promise.all(deletePromises);
+
+      setSnackbarMessage(`Successfully deleted ${selectedFolders.size} folder(s)!`);
+      setSnackbarOpen(true);
+      setSelectedFolders(new Set());
+      setIsDeleteMode(false);
+      
+      // Refresh the folders list
+      fetchAllFolders();
+      
+    } catch (error) {
+      console.error('Error deleting folders:', error);
+      setSnackbarMessage(error instanceof Error ? error.message : 'Failed to delete some folders. Please try again.');
       setSnackbarOpen(true);
     }
   };
@@ -545,50 +766,115 @@ const DataStorage = () => {
             mb: 1,
           }}
         >
-          <TextField
-            placeholder="Search folders"
-            variant="outlined"
-            size="small"
-            value={searchTerm}
-            onChange={handleSearchChange}
-            sx={{ 
-              width: '300px',
-              '& .MuiOutlinedInput-root': {
-                backgroundColor: 'white',
-                '& fieldset': {
-                  borderColor: 'rgba(0, 0, 0, 0.23)',
+          <Box display="flex" alignItems="center" gap={2}>
+            <TextField
+              placeholder="Search folders"
+              variant="outlined"
+              size="small"
+              value={searchTerm}
+              onChange={handleSearchChange}
+              sx={{ 
+                width: '300px',
+                '& .MuiOutlinedInput-root': {
+                  backgroundColor: 'white',
+                  '& fieldset': {
+                    borderColor: 'rgba(0, 0, 0, 0.23)',
+                  },
                 },
-              },
-            }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
-            }}
-          />
-          <FormControl size="small" sx={{ minWidth: 180, backgroundColor: 'white' }}>
-            <InputLabel id="category-select-label">Category</InputLabel>
-            <Select
-              labelId="category-select-label"
-              id="category-select"
-              value={categoryFilter}
-              label="Category"
-              onChange={handleCategoryFilterChange}
-            >
-              {categories.map((category) => (
-                <MenuItem key={category.value} value={category.value}>
-                  {category.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+              }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              }}
+            />
+            
+            {/* Batch Delete Controls */}
+            {isDeleteMode && (
+              <Box display="flex" alignItems="center" gap={1}>
+                <Tooltip title="Select All">
+                  <IconButton 
+                    size="small" 
+                    onClick={handleSelectAll}
+                    disabled={getHierarchicalFolders().length === 0}
+                  >
+                    <SelectAllIcon />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Clear Selection">
+                  <IconButton 
+                    size="small" 
+                    onClick={handleClearSelection}
+                    disabled={selectedFolders.size === 0}
+                  >
+                    <ClearIcon />
+                  </IconButton>
+                </Tooltip>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  size="small"
+                  startIcon={<DeleteIcon />}
+                  onClick={handleBatchDelete}
+                  disabled={selectedFolders.size === 0}
+                >
+                  Delete ({selectedFolders.size})
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleToggleDeleteMode}
+                >
+                  Cancel
+                </Button>
+              </Box>
+            )}
+          </Box>
+
+          <Box display="flex" alignItems="center" gap={2}>
+            <FormControl size="small" sx={{ minWidth: 180, backgroundColor: 'white' }}>
+              <InputLabel id="category-select-label">Category</InputLabel>
+              <Select
+                labelId="category-select-label"
+                id="category-select"
+                value={categoryFilter}
+                label="Category"
+                onChange={handleCategoryFilterChange}
+              >
+                {categories.map((category) => (
+                  <MenuItem key={category.value} value={category.value}>
+                    {category.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            
+            {!isDeleteMode && (
+              <Tooltip title="Delete Mode">
+                <Button
+                  variant="outlined"
+                  color="error"
+                  size="small"
+                  startIcon={<DeleteIcon />}
+                  onClick={handleToggleDeleteMode}
+                  disabled={getHierarchicalFolders().length === 0}
+                >
+                  Delete
+                </Button>
+              </Tooltip>
+            )}
+          </Box>
         </Box>
 
         {/* Folders Count */}
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          Showing {getHierarchicalFolders().length} run folder{getHierarchicalFolders().length !== 1 ? 's' : ''}
+          {isDeleteMode ? (
+            `${selectedFolders.size} of ${getHierarchicalFolders().length} folder${getHierarchicalFolders().length !== 1 ? 's' : ''} selected`
+          ) : (
+            `Showing ${getHierarchicalFolders().length} run folder${getHierarchicalFolders().length !== 1 ? 's' : ''}`
+          )}
         </Typography>
 
         {error && (
@@ -613,26 +899,53 @@ const DataStorage = () => {
                   <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 2 }}>
                     {getHierarchicalFolders().map((runFolder) => (
                       <Paper 
-                        key={`${runFolder.platform}-${runFolder.id}`}
+                        key={`run-folder-${runFolder.id}-${runFolder.name?.replace(/\s+/g, '-').toLowerCase()}`}
                         sx={{ 
                           p: 2, 
-                          border: '1px solid #e0e0e0',
+                          border: isDeleteMode && selectedFolders.has(runFolder.id) ? '2px solid #f44336' : '1px solid #e0e0e0',
                           cursor: 'pointer',
                           transition: 'all 0.2s ease-in-out',
+                          backgroundColor: isDeleteMode && selectedFolders.has(runFolder.id) ? '#ffebee' : 'white',
                           '&:hover': { 
                             boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-                            transform: 'translateY(-2px)'
+                            transform: !isDeleteMode ? 'translateY(-2px)' : 'none'
                           }
                         }}
-                        onClick={() => handleRunFolderClick(runFolder)}
+                        onClick={() => {
+                          if (isDeleteMode) {
+                            handleFolderSelection(runFolder.id, !selectedFolders.has(runFolder.id));
+                          } else {
+                            handleRunFolderClick(runFolder);
+                          }
+                        }}
+                        onContextMenu={(e) => !isDeleteMode && handleContextMenu(e, runFolder)}
                       >
                         <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
                           <Box display="flex" alignItems="center">
+                            {isDeleteMode && (
+                              <Checkbox
+                                checked={selectedFolders.has(runFolder.id)}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  handleFolderSelection(runFolder.id, e.target.checked);
+                                }}
+                                sx={{ mr: 1 }}
+                              />
+                            )}
                             <StorageIcon sx={{ mr: 1, color: 'primary.main' }} />
                             <Typography variant="h6" sx={{ fontWeight: 500 }}>
                               {runFolder.name}
                             </Typography>
                           </Box>
+                          {!isDeleteMode && (
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleMenuClick(e, runFolder)}
+                              sx={{ opacity: 0.7, '&:hover': { opacity: 1 } }}
+                            >
+                              <MoreVertIcon />
+                            </IconButton>
+                          )}
                         </Box>
                         
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
@@ -861,6 +1174,63 @@ const DataStorage = () => {
         message={snackbarMessage}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       />
+
+      {/* Context Menu */}
+      <Menu
+        open={contextMenu !== null}
+        onClose={handleCloseContextMenu}
+        anchorReference="anchorPosition"
+        anchorPosition={
+          contextMenu !== null
+            ? { top: contextMenu.mouseY, left: contextMenu.mouseX }
+            : undefined
+        }
+      >
+        <MenuItem onClick={() => {
+          if (contextMenu?.folder) {
+            handleEditFolder(contextMenu.folder);
+          }
+          handleCloseContextMenu();
+        }}>
+          <ListItemText>Edit Folder</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => {
+          if (contextMenu?.folder) {
+            handleDeleteFolder(contextMenu.folder);
+          }
+          handleCloseContextMenu();
+        }}>
+          <ListItemIcon>
+            <DeleteIcon color="error" />
+          </ListItemIcon>
+          <ListItemText sx={{ color: 'error.main' }}>Delete Folder</ListItemText>
+        </MenuItem>
+      </Menu>
+
+      {/* Dropdown Menu */}
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleCloseMenu}
+        anchorOrigin={{
+          vertical: 'top',
+          horizontal: 'right',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'right',
+        }}
+      >
+        <MenuItem onClick={handleEditFromMenu}>
+          <ListItemText>Edit Folder</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleDeleteFromMenu}>
+          <ListItemIcon>
+            <DeleteIcon color="error" />
+          </ListItemIcon>
+          <ListItemText sx={{ color: 'error.main' }}>Delete Folder</ListItemText>
+        </MenuItem>
+      </Menu>
      </Box>
    );
  };

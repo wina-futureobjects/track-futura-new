@@ -2,7 +2,8 @@ from typing import List, Optional, Dict, Any
 from django.db import transaction
 from django.utils import timezone
 from .models import InputCollection, WorkflowTask, ScrapingRun, ScrapingJob
-from brightdata_integration.models import BatchScraperJob, BrightdataConfig
+from brightdata_integration.models import BrightDataBatchJob, BrightDataScraperRequest, BrightDataConfig
+from brightdata_integration.services import BrightDataAutomatedBatchScraper
 from users.models import Project, PlatformService
 from track_accounts.models import TrackSource
 import logging
@@ -118,6 +119,31 @@ class WorkflowService:
                 status='pending'
             )
             
+            # Execute the batch job using BrightDataAutomatedBatchScraper
+            try:
+                scraper = BrightDataAutomatedBatchScraper()
+                execution_success = scraper.execute_batch_job(batch_job.id)
+                
+                if execution_success:
+                    workflow_task.status = 'processing'
+                    logger.info(f"Successfully started BrightData execution for batch job {batch_job.id}")
+                else:
+                    workflow_task.status = 'failed'
+                    batch_job.status = 'failed'
+                    batch_job.error_log = "Failed to execute batch job"
+                    batch_job.save()
+                    logger.error(f"Failed to execute batch job {batch_job.id}")
+                
+                workflow_task.save()
+                    
+            except Exception as e:
+                logger.error(f"Error executing batch job {batch_job.id}: {str(e)}")
+                workflow_task.status = 'failed'
+                workflow_task.save()
+                batch_job.status = 'failed'
+                batch_job.error_log = str(e)
+                batch_job.save()
+            
             # Update input collection status
             input_collection.status = 'processing'
             input_collection.save()
@@ -132,7 +158,7 @@ class WorkflowService:
             input_collection.save()
             return None
     
-    def _get_or_create_brightdata_config(self, platform_service: PlatformService) -> Optional[BrightdataConfig]:
+    def _get_or_create_brightdata_config(self, platform_service: PlatformService) -> Optional[BrightDataConfig]:
         """
         Get or create BrightData configuration for platform-service combination
         
@@ -140,7 +166,7 @@ class WorkflowService:
             platform_service: PlatformService instance
             
         Returns:
-            BrightdataConfig: Configuration instance or None if not found
+            BrightDataConfig: Configuration instance or None if not found
         """
         try:
             # Map platform and service to BrightData config platform format
@@ -149,39 +175,19 @@ class WorkflowService:
             
             # Create the platform key for BrightData config
             if platform_name == 'facebook':
-                if service_name == 'posts':
-                    config_platform = 'facebook_posts'
-                elif service_name == 'reels':
-                    config_platform = 'facebook_reels'
-                elif service_name == 'comments':
-                    config_platform = 'facebook_comments'
-                else:
-                    config_platform = 'facebook_posts'  # Default
+                config_platform = 'facebook'
             elif platform_name == 'instagram':
-                if service_name == 'posts':
-                    config_platform = 'instagram_posts'
-                elif service_name == 'reels':
-                    config_platform = 'instagram_reels'
-                elif service_name == 'comments':
-                    config_platform = 'instagram_comments'
-                else:
-                    config_platform = 'instagram_posts'  # Default
+                config_platform = 'instagram'
             elif platform_name == 'linkedin':
-                if service_name == 'posts':
-                    config_platform = 'linkedin_posts'
-                else:
-                    config_platform = 'linkedin_posts'  # Default
+                config_platform = 'linkedin'
             elif platform_name == 'tiktok':
-                if service_name == 'posts':
-                    config_platform = 'tiktok_posts'
-                else:
-                    config_platform = 'tiktok_posts'  # Default
+                config_platform = 'tiktok'
             else:
                 logger.error(f"Unsupported platform: {platform_name}")
                 return None
             
             # Try to find existing config
-            config = BrightdataConfig.objects.filter(
+            config = BrightDataConfig.objects.filter(
                 platform=config_platform,
                 is_active=True
             ).first()
@@ -198,16 +204,16 @@ class WorkflowService:
             logger.error(f"Error getting BrightData config: {str(e)}")
             return None
     
-    def _create_batch_scraper_job(self, input_collection: InputCollection, config: BrightdataConfig) -> Optional[BatchScraperJob]:
+    def _create_batch_scraper_job(self, input_collection: InputCollection, config: BrightDataConfig) -> Optional[BrightDataBatchJob]:
         """
         Create batch scraper job from input collection
         
         Args:
             input_collection: InputCollection instance
-            config: BrightdataConfig instance
+            config: BrightDataConfig instance
             
         Returns:
-            BatchScraperJob: Created batch job instance or None if failed
+            BrightDataBatchJob: Created batch job instance or None if failed
         """
         try:
             # Determine content type based on service
@@ -215,7 +221,7 @@ class WorkflowService:
             content_type = self._map_service_to_content_type(service_name)
             
             # Create batch scraper job with platform service information
-            batch_job = BatchScraperJob.objects.create(
+            batch_job = BrightDataBatchJob.objects.create(
                 name=f"Workflow_{input_collection.id}_{content_type}",
                 project=input_collection.project,
                 source_folder_ids=[],  # Will be populated by the scraper service
@@ -224,7 +230,6 @@ class WorkflowService:
                     input_collection.platform_service.platform.name: [content_type]
                 },
                 num_of_posts=10,  # Default value
-                auto_create_folders=True,
                 status='pending',
                 platform_params={
                     'platform_service_id': input_collection.platform_service.id,
@@ -233,12 +238,12 @@ class WorkflowService:
                 }
             )
             
-            logger.info(f"Created batch scraper job {batch_job.id} for input collection {input_collection.id}")
+            logger.info(f"Created BrightData batch scraper job {batch_job.id} for input collection {input_collection.id}")
             
             return batch_job
             
         except Exception as e:
-            logger.error(f"Error creating batch scraper job: {str(e)}")
+            logger.error(f"Error creating BrightData batch scraper job: {str(e)}")
             return None
     
     def _map_service_to_content_type(self, service_name: str) -> str:
@@ -261,7 +266,7 @@ class WorkflowService:
         
         return mapping.get(service_name, 'post')
     
-    def configure_input_collection_job(self, input_collection_id: int, job_config: dict) -> Optional[BatchScraperJob]:
+    def configure_input_collection_job(self, input_collection_id: int, job_config: dict) -> Optional[BrightDataBatchJob]:
         """
         Configure and create a batch scraper job for an existing input collection
         
@@ -270,7 +275,7 @@ class WorkflowService:
             job_config: Configuration for the job (name, num_of_posts, etc.)
             
         Returns:
-            BatchScraperJob: Created batch job instance or None if failed
+            BrightDataBatchJob: Created batch job instance or None if failed
         """
         try:
             logger.info(f"Starting job configuration for input collection {input_collection_id}")
@@ -294,7 +299,7 @@ class WorkflowService:
             logger.info(f"Mapped service '{service_name}' to content type '{content_type}'")
             
             # Create batch scraper job with the provided configuration
-            batch_job = BatchScraperJob.objects.create(
+            batch_job = BrightDataBatchJob.objects.create(
                 name=job_config.get('name', f"Workflow_{input_collection.id}_{content_type}"),
                 project=input_collection.project,
                 source_folder_ids=[],
@@ -305,7 +310,6 @@ class WorkflowService:
                 num_of_posts=job_config.get('num_of_posts', 10),
                 start_date=job_config.get('start_date'),
                 end_date=job_config.get('end_date'),
-                auto_create_folders=job_config.get('auto_create_folders', True),
                 status='pending',
                 platform_params={
                     'platform_service_id': input_collection.platform_service.id,
@@ -385,8 +389,8 @@ class WorkflowService:
             # Find the corresponding PlatformService
             try:
                 platform_service = PlatformService.objects.get(
-                    platform__name=platform_name,
-                    service__name=service_name,
+                    platform__name__iexact=platform_name,
+                    service__name__iexact=service_name,
                     is_enabled=True
                 )
             except PlatformService.DoesNotExist:
@@ -530,13 +534,13 @@ class WorkflowService:
             service: Service type (posts, comments, etc.)
             
         Returns:
-            str: Dataset ID for BrightData
+            str: Dataset ID for Apify
         """
         platform_mapping = self.DATASET_MAPPING.get(platform, {})
         return platform_mapping.get(service, 'gd_lk5ns7kz21pck8jpis')  # Default dataset
     
     def _create_batch_scraper_job_for_run(self, input_collection: InputCollection, 
-                                        configuration: Dict[str, Any], dataset_id: str) -> Optional[BatchScraperJob]:
+                                        configuration: Dict[str, Any], dataset_id: str) -> Optional[BrightDataBatchJob]:
         """
         Create batch scraper job for a specific input collection with run configuration
         
@@ -546,7 +550,7 @@ class WorkflowService:
             dataset_id: Dataset ID for BrightData
             
         Returns:
-            BatchScraperJob: Created batch job or None if failed
+            BrightDataBatchJob: Created batch job or None if failed
         """
         try:
             # Get or create BrightData config
@@ -583,7 +587,7 @@ class WorkflowService:
             content_type = self._map_service_to_content_type(service_name)
             
             # Create batch scraper job with global configuration
-            batch_job = BatchScraperJob.objects.create(
+            batch_job = BrightDataBatchJob.objects.create(
                 name=f"Batch Job - {input_collection.platform_service.platform.name} - {input_collection.platform_service.service.name}",
                 project=input_collection.project,
                 source_folder_ids=[],  # Will be populated by BrightData integration
@@ -594,8 +598,6 @@ class WorkflowService:
                 num_of_posts=configuration.get('num_of_posts', 10),
                 start_date=start_date,
                 end_date=end_date,
-                auto_create_folders=configuration.get('auto_create_folders', True),
-                output_folder_pattern=configuration.get('output_folder_pattern', 'scraped_data'),
                 platform_params={
                     'input_collection_id': input_collection.id,
                     'dataset_id': dataset_id,
@@ -603,7 +605,7 @@ class WorkflowService:
                 }
             )
             
-            logger.info(f"Created batch scraper job {batch_job.id} for input collection {input_collection.id}")
+            logger.info(f"Created BrightData batch scraper job {batch_job.id} for input collection {input_collection.id}")
             return batch_job
             
         except Exception as e:
@@ -719,10 +721,16 @@ class WorkflowService:
             # Create hierarchical folders
             from .correct_folder_service import CorrectFolderService
             folder_service = CorrectFolderService()
-            
+
             # Get all TrackSource records for this project
             track_sources = TrackSource.objects.filter(project=scraping_run.project)
-            
+
+            # Filter by folder if folder_id is specified in configuration
+            folder_id = configuration.get('folder_id')
+            if folder_id:
+                track_sources = track_sources.filter(folder_id=folder_id)
+                logger.info(f"Filtering track sources for folder structure by folder_id: {folder_id}")
+
             if track_sources.exists():
                 # Create correct hierarchical folder structure
                 created_folders = folder_service.create_correct_folder_structure(scraping_run, list(track_sources))
@@ -742,16 +750,22 @@ class WorkflowService:
     def _create_scraping_jobs_from_tracksources(self, scraping_run: ScrapingRun, configuration: Dict[str, Any]):
         """
         Create individual scraping jobs directly from TrackSource items
-        
+
         Args:
             scraping_run: ScrapingRun instance
             configuration: Global configuration from ScrapingRun
         """
         from track_accounts.models import TrackSource
         from users.models import PlatformService
-        
+
         # Get all TrackSource records for this project
         track_sources = TrackSource.objects.filter(project=scraping_run.project)
+
+        # Filter by folder if folder_id is specified in configuration
+        folder_id = configuration.get('folder_id')
+        if folder_id:
+            track_sources = track_sources.filter(folder_id=folder_id)
+            logger.info(f"Filtering track sources by folder_id: {folder_id}")
         
         for track_source in track_sources:
             # Get platform and service info
@@ -761,8 +775,8 @@ class WorkflowService:
             # Find the corresponding PlatformService
             try:
                 platform_service = PlatformService.objects.get(
-                    platform__name=platform_name,
-                    service__name=service_name,
+                    platform__name__iexact=platform_name,
+                    service__name__iexact=service_name,
                     is_enabled=True
                 )
             except PlatformService.DoesNotExist:
@@ -823,7 +837,7 @@ class WorkflowService:
                 content_type = self._map_service_to_content_type(service_name)
                 
                 # Create batch scraper job
-                batch_job = BatchScraperJob.objects.create(
+                batch_job = BrightDataBatchJob.objects.create(
                     name=f"Batch Job - {platform_name} - {service_name}",
                     project=scraping_run.project,
                     source_folder_ids=[],
@@ -834,8 +848,6 @@ class WorkflowService:
                     num_of_posts=configuration.get('num_of_posts', 10),
                     start_date=start_date,
                     end_date=end_date,
-                    auto_create_folders=configuration.get('auto_create_folders', True),
-                    output_folder_pattern=configuration.get('output_folder_pattern', 'scraped_data'),
                     platform_params={
                         'track_source_id': track_source.id,
                         'dataset_id': dataset_id,
@@ -868,25 +880,25 @@ class WorkflowService:
 
 def update_scraping_jobs_from_batch_job(batch_job_id: int) -> bool:
     """
-    Update ScrapingJob statuses based on the completion of a BatchScraperJob.
-    This method should be called when a BatchScraperJob completes to ensure
-    ScrapingJob statuses are properly updated even if ScraperRequests fail.
+    Update ScrapingJob statuses based on the completion of a BrightDataBatchJob.
+    This method should be called when a BrightDataBatchJob completes to ensure
+    ScrapingJob statuses are properly updated even if BrightDataScraperRequests fail.
     """
     try:
-        from brightdata_integration.models import BatchScraperJob, ScraperRequest
+        from brightdata_integration.models import BrightDataBatchJob, BrightDataScraperRequest
         
-        batch_job = BatchScraperJob.objects.get(id=batch_job_id)
+        batch_job = BrightDataBatchJob.objects.get(id=batch_job_id)
         
-        # Get all ScrapingJobs associated with this BatchScraperJob
+        # Get all ScrapingJobs associated with this BrightDataBatchJob
         scraping_jobs = ScrapingJob.objects.filter(batch_job=batch_job)
         
-        # Get all ScraperRequests associated with this BatchScraperJob
-        scraper_requests = ScraperRequest.objects.filter(batch_job=batch_job)
+        # Get all BrightDataScraperRequests associated with this BrightDataBatchJob
+        scraper_requests = BrightDataScraperRequest.objects.filter(batch_job=batch_job)
         
-        # Create a mapping of ScraperRequest to ScrapingJob
+        # Create a mapping of BrightDataScraperRequest to ScrapingJob
         request_to_job = {}
         for scraping_job in scraping_jobs:
-            # Find the corresponding ScraperRequest by URL and platform
+            # Find the corresponding BrightDataScraperRequest by URL and platform
             matching_request = None
             for request in scraper_requests:
                 if (request.target_url == scraping_job.url and 
@@ -897,13 +909,13 @@ def update_scraping_jobs_from_batch_job(batch_job_id: int) -> bool:
             if matching_request:
                 request_to_job[matching_request.id] = scraping_job
         
-        # Update ScrapingJob statuses based on ScraperRequest statuses
+        # Update ScrapingJob statuses based on BrightDataScraperRequest statuses
         updated_count = 0
         for request in scraper_requests:
             if request.id in request_to_job:
                 scraping_job = request_to_job[request.id]
                 
-                # Update status based on ScraperRequest status
+                # Update status based on BrightDataScraperRequest status
                 if request.status == 'completed':
                     scraping_job.status = 'completed'
                     scraping_job.completed_at = timezone.now()
@@ -921,12 +933,12 @@ def update_scraping_jobs_from_batch_job(batch_job_id: int) -> bool:
                 scraping_job.save()
                 updated_count += 1
         
-        logger.info(f"Updated {updated_count} ScrapingJob statuses for BatchScraperJob {batch_job_id}")
+        logger.info(f"Updated {updated_count} ScrapingJob statuses for BrightDataBatchJob {batch_job_id}")
         return True
         
-    except BatchScraperJob.DoesNotExist:
-        logger.error(f"BatchScraperJob with ID {batch_job_id} does not exist")
+    except BrightDataBatchJob.DoesNotExist:
+        logger.error(f"BrightDataBatchJob with ID {batch_job_id} does not exist")
         return False
     except Exception as e:
-        logger.error(f"Error updating ScrapingJob statuses for BatchScraperJob {batch_job_id}: {str(e)}")
+        logger.error(f"Error updating ScrapingJob statuses for BrightDataBatchJob {batch_job_id}: {str(e)}")
         return False 

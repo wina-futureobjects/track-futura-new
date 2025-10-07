@@ -51,6 +51,17 @@ interface DraftSource {
   other_social_media: string | null;
   selectedPlatform?: string | null;
   selectedService?: string | null;
+  folder?: number | null;
+}
+
+interface SourceFolder {
+  id: number;
+  name: string;
+  description: string | null;
+  folder_type: 'company' | 'competitor' | 'other';
+  folder_type_display: string;
+  project: number;
+  source_count: number;
 }
 
 
@@ -223,6 +234,7 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
   const navigate = useNavigate();
   const theme = useTheme();
   const [draftSources, setDraftSources] = useState<DraftSource[]>([]);
+  const [folders, setFolders] = useState<SourceFolder[]>([]);
   const [loading, setLoading] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [snackbar, setSnackbar] = useState({
@@ -243,6 +255,29 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
         console.error('Error loading draft:', error);
       }
     }
+  }, [projectId]);
+
+  // Fetch folders for the project
+  useEffect(() => {
+    const fetchFolders = async () => {
+      if (!projectId) return;
+
+      try {
+        const response = await apiFetch(`/api/track-accounts/source-folders/?project=${projectId}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data && typeof data === 'object' && 'results' in data) {
+            setFolders(data.results || []);
+          } else if (Array.isArray(data)) {
+            setFolders(data);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching folders:', error);
+      }
+    };
+
+    fetchFolders();
   }, [projectId]);
 
   // Auto-save draft to localStorage
@@ -373,6 +408,7 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
       other_social_media: null,
       selectedPlatform: null,
       selectedService: null,
+      folder: null,
     };
     setDraftSources(prev => [...prev, newSource]);
   };
@@ -500,6 +536,7 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
               project: parseInt(projectId || '0'),
               platform: source.selectedPlatform,
               service_name: source.selectedService,
+              folder: source.folder,
               ...socialMediaLinks,
             }),
           });
@@ -692,6 +729,7 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
                       other_social_media: null,
                       selectedPlatform: null,
                       selectedService: null,
+                      folder: null,
                     };
                     setDraftSources([newSource]);
                     // Update the name immediately
@@ -733,6 +771,7 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
                           other_social_media: null,
                           selectedPlatform: platform.key,
                           selectedService: null,
+                          folder: null,
                         };
                         setDraftSources([newSource]);
                                               } else {
@@ -854,6 +893,48 @@ const BulkSourceCreate: React.FC<BulkSourceCreateProps> = ({
                   }
                   }}
                 />
+              </Box>
+            )}
+
+            {/* Step 5: Folder Selection (only show if service is selected) */}
+            {draftSources[0]?.selectedPlatform && draftSources[0]?.selectedService && (
+              <Box>
+                <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600, color: '#374151' }}>
+                  Step 5: Select Folder (Optional)
+                </Typography>
+                <TextField
+                  select
+                  fullWidth
+                  label="Select Folder"
+                  value={draftSources[0]?.folder ?? ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '' || value === null) {
+                      handleFieldChange(draftSources[0].id, 'folder', null);
+                    } else {
+                      handleFieldChange(draftSources[0].id, 'folder', Number(value));
+                    }
+                  }}
+                >
+                  <MenuItem value="">
+                    <em>No Folder</em>
+                  </MenuItem>
+                  {folders.map((folder) => (
+                    <MenuItem key={folder.id} value={folder.id}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box
+                          sx={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: '50%',
+                            bgcolor: folder.folder_type === 'company' ? '#3b82f6' : folder.folder_type === 'competitor' ? '#ef4444' : '#8b5cf6'
+                          }}
+                        />
+                        {folder.name} ({folder.folder_type_display})
+                      </Box>
+                    </MenuItem>
+                  ))}
+                </TextField>
               </Box>
             )}
 

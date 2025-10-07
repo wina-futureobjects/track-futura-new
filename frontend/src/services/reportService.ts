@@ -48,7 +48,15 @@ class ReportService {
     try {
       const response = await apiFetch('/api/reports/generated/');
       if (!response.ok) throw new Error('Failed to fetch generated reports');
-      return response.json();
+      const data = await response.json();
+
+      // Handle paginated response - extract the results array
+      if (data.results && Array.isArray(data.results)) {
+        return data.results;
+      }
+
+      // Fallback for non-paginated response
+      return Array.isArray(data) ? data : [];
     } catch (error) {
       console.error('Error fetching generated reports:', error);
       throw error;

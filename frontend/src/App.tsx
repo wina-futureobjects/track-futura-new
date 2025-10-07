@@ -31,6 +31,13 @@ import Report from './pages/Report';
 import ReportDetail from './pages/ReportDetail';
 import ReportFolders from './pages/ReportFolders';
 import ReportView from './pages/ReportView';
+import GeneratedReportDetail from './pages/GeneratedReportDetail';
+import EngagementMetricsReport from './pages/EngagementMetricsReport';
+import SentimentAnalysisReport from './pages/SentimentAnalysisReport';
+import ContentAnalysisReport from './pages/ContentAnalysisReport';
+import TrendAnalysisReport from './pages/TrendAnalysisReport';
+import CompetitiveAnalysisReport from './pages/CompetitiveAnalysisReport';
+import UserBehaviorReport from './pages/UserBehaviorReport';
 
 // Admin and auth imports
 import SuperAdminDashboard from './pages/admin/SuperAdminDashboard';
@@ -176,7 +183,7 @@ function App() {
               {/* Legacy report routes */}
               <Route path="/report" element={<LegacyRouteRedirect><Report /></LegacyRouteRedirect>} />
               <Route path="/report/:id" element={<LegacyRouteRedirect><ReportView /></LegacyRouteRedirect>} />
-              <Route path="/report/generated/:id" element={<LegacyRouteRedirect><ReportView /></LegacyRouteRedirect>} />
+              <Route path="/report/generated/:id" element={<LegacyRouteRedirect><GeneratedReportDetail /></LegacyRouteRedirect>} />
               <Route path="/reports/generated" element={<LegacyRouteRedirect><GeneratedReports /></LegacyRouteRedirect>} />
               <Route path="/report-folders" element={<LegacyRouteRedirect><ReportFolders /></LegacyRouteRedirect>} />
               <Route path="/report-folders/:reportId" element={<LegacyRouteRedirect><ReportDetail /></LegacyRouteRedirect>} />
@@ -322,9 +329,94 @@ function App() {
               <Route path="/organizations/:organizationId/projects/:projectId/report/generated/:id" element={
                 <ProtectedRoute>
                   <Layout>
-                    <ReportView />
+                    <GeneratedReportDetail />
                   </Layout>
                 </ProtectedRoute>
+              } />
+
+              {/* Template-Specific Report Routes */}
+              <Route path="/organizations/:organizationId/projects/:projectId/reports/engagement-metrics/:id" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <EngagementMetricsReport />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/reports/engagement-metrics/:id" element={
+                <LegacyRouteRedirect>
+                  <EngagementMetricsReport />
+                </LegacyRouteRedirect>
+              } />
+
+              <Route path="/organizations/:organizationId/projects/:projectId/reports/sentiment-analysis/:id" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <SentimentAnalysisReport />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/reports/sentiment-analysis/:id" element={
+                <LegacyRouteRedirect>
+                  <SentimentAnalysisReport />
+                </LegacyRouteRedirect>
+              } />
+
+              <Route path="/organizations/:organizationId/projects/:projectId/reports/content-analysis/:id" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <ContentAnalysisReport />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/reports/content-analysis/:id" element={
+                <LegacyRouteRedirect>
+                  <ContentAnalysisReport />
+                </LegacyRouteRedirect>
+              } />
+
+              <Route path="/organizations/:organizationId/projects/:projectId/reports/trend-analysis/:id" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <TrendAnalysisReport />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/reports/trend-analysis/:id" element={
+                <LegacyRouteRedirect>
+                  <TrendAnalysisReport />
+                </LegacyRouteRedirect>
+              } />
+
+              <Route path="/organizations/:organizationId/projects/:projectId/reports/competitive-analysis/:id" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <CompetitiveAnalysisReport />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/reports/competitive-analysis/:id" element={
+                <LegacyRouteRedirect>
+                  <CompetitiveAnalysisReport />
+                </LegacyRouteRedirect>
+              } />
+
+              <Route path="/organizations/:organizationId/projects/:projectId/reports/user-behavior/:id" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <UserBehaviorReport />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/reports/user-behavior/:id" element={
+                <LegacyRouteRedirect>
+                  <UserBehaviorReport />
+                </LegacyRouteRedirect>
               } />
 
               {/* Generated Reports routes */}

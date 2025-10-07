@@ -27,6 +27,10 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  FormControl,
+  Select,
+  MenuItem as MuiMenuItem,
+  InputLabel,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import {
@@ -47,6 +51,18 @@ import {
 } from '@mui/icons-material';
 import { apiFetch } from '../utils/api';
 
+interface SourceFolder {
+  id: number;
+  name: string;
+  description: string | null;
+  folder_type: 'company' | 'competitor' | 'other';
+  folder_type_display: string;
+  project: number;
+  source_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
 interface TrackSource {
   id: number;
   name: string;
@@ -58,6 +74,9 @@ interface TrackSource {
   other_social_media: string | null;
   service_name: string | null;
   url_count: number;
+  folder: number | null;
+  folder_name: string | null;
+  folder_type: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -93,6 +112,8 @@ const TrackSourcesList = () => {
   const projectId = getProjectId();
   
   const [sources, setSources] = useState<TrackSource[]>([]);
+  const [folders, setFolders] = useState<SourceFolder[]>([]);
+  const [selectedFolder, setSelectedFolder] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -131,19 +152,30 @@ const TrackSourcesList = () => {
     sourceName: '',
   });
 
+  // Folder dialog state
+  const [folderDialog, setFolderDialog] = useState({
+    open: false,
+    mode: 'create' as 'create' | 'edit',
+    folderId: null as number | null,
+    folderName: '',
+    folderDescription: '',
+    folderType: 'company' as 'company' | 'competitor' | 'other',
+  });
+
   // CSV download loading state
   const [csvDownloading, setCsvDownloading] = useState(false);
 
   // Fetch sources with filters
   const fetchSources = async (
-    pageNumber = 0, 
-    pageSize = 10, 
+    pageNumber = 0,
+    pageSize = 10,
     searchQuery = '',
-    socialMedia = socialMediaFilters
+    socialMedia = socialMediaFilters,
+    folderId: number | null = selectedFolder
   ) => {
     try {
       setLoading(true);
-      
+
       // Don't fetch sources if no project is found
       if (!projectId) {
         console.error('No project ID found in URL');
@@ -152,13 +184,18 @@ const TrackSourcesList = () => {
         setLoading(false);
         return;
       }
-      
+
       // Build query parameters
       let queryParams = `page=${pageNumber + 1}&page_size=${pageSize}`;
-      
+
       // Add project ID (required)
       queryParams += `&project=${projectId}`;
-      
+
+      // Add folder filter
+      if (folderId) {
+        queryParams += `&folder=${folderId}`;
+      }
+
       // Add search parameter
       if (searchQuery) {
         queryParams += `&search=${encodeURIComponent(searchQuery)}`;
@@ -221,13 +258,18 @@ const TrackSourcesList = () => {
   };
 
   // Fetch filter statistics
-  const fetchFilterStats = async () => {
+  const fetchFilterStats = async (folderId: number | null = null) => {
     try {
       let queryParams = '';
       if (projectId) {
         queryParams = `?project=${projectId}`;
       }
-      
+
+      // Add folder filter to stats if a folder is selected
+      if (folderId) {
+        queryParams += `&folder=${folderId}`;
+      }
+
       const response = await apiFetch(`/api/track-accounts/sources/statistics/${queryParams}`);
       if (response.ok) {
         const stats = await response.json();
@@ -239,10 +281,30 @@ const TrackSourcesList = () => {
     }
   };
 
+  // Fetch folders for the project
+  const fetchFolders = async () => {
+    try {
+      if (!projectId) return;
+
+      const response = await apiFetch(`/api/track-accounts/source-folders/?project=${projectId}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data && typeof data === 'object' && 'results' in data) {
+          setFolders(data.results || []);
+        } else if (Array.isArray(data)) {
+          setFolders(data);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching folders:', error);
+    }
+  };
+
   // Refresh both sources and stats
   const refreshData = () => {
     fetchSources(page, rowsPerPage, searchTerm, socialMediaFilters);
-    fetchFilterStats();
+    fetchFilterStats(selectedFolder);
+    fetchFolders();
   };
   
 
@@ -252,6 +314,7 @@ const TrackSourcesList = () => {
     if (projectId) {
       fetchSources(page, rowsPerPage, searchTerm, socialMediaFilters);
       fetchFilterStats();
+      fetchFolders();
     }
   }, [projectId]);
 
@@ -297,6 +360,7 @@ const TrackSourcesList = () => {
   // Clear all filters
   const handleClearFilters = () => {
     setSearchTerm('');
+    setSelectedFolder(null);
     setSocialMediaFilters({
       hasFacebook: false,
       hasInstagram: false,
@@ -494,11 +558,58 @@ const TrackSourcesList = () => {
   };
 
   // Check if any filters are active
-  const hasActiveFilters = searchTerm || 
-    socialMediaFilters.hasFacebook || socialMediaFilters.hasInstagram || 
+  const hasActiveFilters = searchTerm || selectedFolder ||
+    socialMediaFilters.hasFacebook || socialMediaFilters.hasInstagram ||
     socialMediaFilters.hasLinkedIn || socialMediaFilters.hasTikTok;
 
+  // Folder management functions
+  const handleCreateFolder = () => {
+    setFolderDialog({
+      open: true,
+      mode: 'create',
+      folderId: null,
+      folderName: '',
+      folderDescription: '',
+      folderType: 'company',
+    });
+  };
 
+  const handleSaveFolder = async () => {
+    try {
+      const folderData = {
+        name: folderDialog.folderName,
+        description: folderDialog.folderDescription,
+        folder_type: folderDialog.folderType,
+        project: projectId,
+      };
+
+      if (folderDialog.mode === 'create') {
+        const response = await apiFetch('/api/track-accounts/source-folders/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(folderData),
+        });
+
+        if (response.ok) {
+          showSnackbar('Folder created successfully', 'success');
+          fetchFolders();
+          setFolderDialog({ ...folderDialog, open: false });
+        } else {
+          throw new Error('Failed to create folder');
+        }
+      }
+    } catch (error) {
+      console.error('Error saving folder:', error);
+      showSnackbar('Failed to save folder', 'error');
+    }
+  };
+
+  const handleFolderFilter = (folderId: number | null) => {
+    setSelectedFolder(folderId);
+    setPage(0);
+    fetchSources(0, rowsPerPage, searchTerm, socialMediaFilters, folderId);
+    fetchFilterStats(folderId);
+  };
 
   // Helper functions to match workflow management page
   const getPlatformIcon = (platformName: string) => {
@@ -705,6 +816,120 @@ const TrackSourcesList = () => {
             )}
           </Box>
 
+          {/* Folder Filter Row */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#374151', minWidth: 80 }}>
+              Folder :
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, flex: 1, flexWrap: 'wrap' }}>
+              <Button
+                variant={selectedFolder === null ? "contained" : "outlined"}
+                size="small"
+                onClick={() => handleFolderFilter(null)}
+                sx={{
+                  minWidth: 'auto',
+                  px: 2,
+                  py: 0.5,
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  ...(selectedFolder === null ? {
+                    bgcolor: '#6b7280',
+                    color: 'white',
+                    border: 'none',
+                    '&:hover': { bgcolor: '#4b5563' }
+                  } : {
+                    border: 'none',
+                    color: '#6b7280',
+                    bgcolor: 'transparent',
+                    '&:hover': {
+                      bgcolor: '#6b7280',
+                      color: 'white'
+                    }
+                  })
+                }}
+              >
+                All Sources
+              </Button>
+              {folders.map((folder) => (
+                <Button
+                  key={folder.id}
+                  variant={selectedFolder === folder.id ? "contained" : "outlined"}
+                  size="small"
+                  onClick={() => handleFolderFilter(folder.id)}
+                  sx={{
+                    minWidth: 'auto',
+                    px: 2,
+                    py: 0.5,
+                    borderRadius: 2,
+                    textTransform: 'none',
+                    fontSize: '0.75rem',
+                    fontWeight: 500,
+                    ...(selectedFolder === folder.id ? {
+                      bgcolor: folder.folder_type === 'company' ? '#3b82f6' : folder.folder_type === 'competitor' ? '#ef4444' : '#8b5cf6',
+                      color: 'white',
+                      border: 'none',
+                      '&:hover': {
+                        bgcolor: folder.folder_type === 'company' ? '#2563eb' : folder.folder_type === 'competitor' ? '#dc2626' : '#7c3aed'
+                      }
+                    } : {
+                      border: 'none',
+                      color: folder.folder_type === 'company' ? '#3b82f6' : folder.folder_type === 'competitor' ? '#ef4444' : '#8b5cf6',
+                      bgcolor: 'transparent',
+                      '&:hover': {
+                        bgcolor: folder.folder_type === 'company' ? '#3b82f6' : folder.folder_type === 'competitor' ? '#ef4444' : '#8b5cf6',
+                        color: 'white'
+                      }
+                    })
+                  }}
+                >
+                  {folder.name}
+                  <Chip
+                    label={folder.source_count}
+                    size="small"
+                    variant="outlined"
+                    sx={{
+                      ml: 0.5,
+                      height: 16,
+                      fontSize: '0.625rem',
+                      ...(selectedFolder === folder.id ? {
+                        borderColor: 'white',
+                        color: 'white'
+                      } : {
+                        borderColor: folder.folder_type === 'company' ? '#3b82f6' : folder.folder_type === 'competitor' ? '#ef4444' : '#8b5cf6',
+                        color: folder.folder_type === 'company' ? '#3b82f6' : folder.folder_type === 'competitor' ? '#ef4444' : '#8b5cf6'
+                      })
+                    }}
+                  />
+                </Button>
+              ))}
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<AddIcon sx={{ fontSize: 14 }} />}
+                onClick={handleCreateFolder}
+                sx={{
+                  minWidth: 'auto',
+                  px: 2,
+                  py: 0.5,
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  border: '1px dashed #d1d5db',
+                  color: '#6b7280',
+                  '&:hover': {
+                    border: '1px dashed #9ca3af',
+                    bgcolor: '#f9fafb'
+                  }
+                }}
+              >
+                New Folder
+              </Button>
+            </Box>
+          </Box>
+
           {/* Social Media Presence Filters Row */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#374151', minWidth: 80 }}>
@@ -721,8 +946,8 @@ const TrackSourcesList = () => {
                   };
                   setSocialMediaFilters(updatedFilters);
                   setPage(0);
-                  fetchSources(0, rowsPerPage, searchTerm, updatedFilters);
-                  fetchFilterStats();
+                  fetchSources(0, rowsPerPage, searchTerm, updatedFilters, selectedFolder);
+                  fetchFilterStats(selectedFolder);
                 }}
                 startIcon={<FacebookIcon sx={{ fontSize: 16 }} />}
                 sx={{
@@ -779,8 +1004,8 @@ const TrackSourcesList = () => {
                   };
                   setSocialMediaFilters(updatedFilters);
                   setPage(0);
-                  fetchSources(0, rowsPerPage, searchTerm, updatedFilters);
-                  fetchFilterStats();
+                  fetchSources(0, rowsPerPage, searchTerm, updatedFilters, selectedFolder);
+                  fetchFilterStats(selectedFolder);
                 }}
                 startIcon={<InstagramIcon sx={{ fontSize: 16 }} />}
                 sx={{
@@ -837,8 +1062,8 @@ const TrackSourcesList = () => {
                   };
                   setSocialMediaFilters(updatedFilters);
                   setPage(0);
-                  fetchSources(0, rowsPerPage, searchTerm, updatedFilters);
-                  fetchFilterStats();
+                  fetchSources(0, rowsPerPage, searchTerm, updatedFilters, selectedFolder);
+                  fetchFilterStats(selectedFolder);
                 }}
                 startIcon={<LinkedInIcon sx={{ fontSize: 16 }} />}
                 sx={{
@@ -895,8 +1120,8 @@ const TrackSourcesList = () => {
                   };
                   setSocialMediaFilters(updatedFilters);
                   setPage(0);
-                  fetchSources(0, rowsPerPage, searchTerm, updatedFilters);
-                  fetchFilterStats();
+                  fetchSources(0, rowsPerPage, searchTerm, updatedFilters, selectedFolder);
+                  fetchFilterStats(selectedFolder);
                 }}
                 startIcon={<TikTokIcon sx={{ fontSize: 16 }} />}
                 sx={{
@@ -977,6 +1202,7 @@ const TrackSourcesList = () => {
                      <TableHead>
                        <TableRow>
                          <TableCell>Name</TableCell>
+                         <TableCell>Folder</TableCell>
                          <TableCell>Platform</TableCell>
                          <TableCell>Service</TableCell>
                          <TableCell>URL</TableCell>
@@ -990,6 +1216,24 @@ const TrackSourcesList = () => {
                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
                                {source.name}
                              </Typography>
+                           </TableCell>
+                           <TableCell>
+                             {source.folder_name ? (
+                               <Chip
+                                 label={source.folder_name}
+                                 size="small"
+                                 sx={{
+                                   bgcolor: source.folder_type === 'company' ? '#dbeafe' : source.folder_type === 'competitor' ? '#fee2e2' : '#ede9fe',
+                                   color: source.folder_type === 'company' ? '#1e40af' : source.folder_type === 'competitor' ? '#991b1b' : '#5b21b6',
+                                   fontWeight: 500,
+                                   fontSize: '0.7rem',
+                                 }}
+                               />
+                             ) : (
+                               <Typography variant="body2" sx={{ color: '#9ca3af', fontSize: '0.75rem' }}>
+                                 No folder
+                               </Typography>
+                             )}
                            </TableCell>
                            <TableCell>
                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -1107,6 +1351,71 @@ const TrackSourcesList = () => {
             }}
           >
             Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Folder Create/Edit Dialog */}
+      <Dialog
+        open={folderDialog.open}
+        onClose={() => setFolderDialog({ ...folderDialog, open: false })}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 600 }}>
+          {folderDialog.mode === 'create' ? 'Create New Folder' : 'Edit Folder'}
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
+            <TextField
+              label="Folder Name"
+              value={folderDialog.folderName}
+              onChange={(e) => setFolderDialog({ ...folderDialog, folderName: e.target.value })}
+              fullWidth
+              required
+              placeholder="e.g., Nike Official Sources"
+            />
+            <TextField
+              label="Description"
+              value={folderDialog.folderDescription}
+              onChange={(e) => setFolderDialog({ ...folderDialog, folderDescription: e.target.value })}
+              fullWidth
+              multiline
+              rows={3}
+              placeholder="Optional description for this folder"
+            />
+            <FormControl fullWidth>
+              <InputLabel>Folder Type</InputLabel>
+              <Select
+                value={folderDialog.folderType}
+                label="Folder Type"
+                onChange={(e) => setFolderDialog({ ...folderDialog, folderType: e.target.value as 'company' | 'competitor' | 'other' })}
+              >
+                <MuiMenuItem value="company">Company Sources</MuiMenuItem>
+                <MuiMenuItem value="competitor">Competitor Sources</MuiMenuItem>
+                <MuiMenuItem value="other">Other</MuiMenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button
+            onClick={() => setFolderDialog({ ...folderDialog, open: false })}
+            variant="outlined"
+            color="primary"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSaveFolder}
+            variant="contained"
+            disabled={!folderDialog.folderName}
+            sx={{
+              bgcolor: theme.palette.primary.main,
+              '&:hover': { bgcolor: theme.palette.primary.dark }
+            }}
+          >
+            {folderDialog.mode === 'create' ? 'Create' : 'Save'}
           </Button>
         </DialogActions>
       </Dialog>

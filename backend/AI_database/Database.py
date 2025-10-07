@@ -1,6 +1,19 @@
+import os
 from pinecone import Pinecone, ServerlessSpec
+from django.conf import settings
 
-pc = Pinecone(api_key="pcsk_78mXZf_N5w38HcHeJD6MniEjw3BBdiEGTpATqAyzhAWKnRZcsWjwASQnXwYkYf5r1hk5hA")
+# Load Django settings to access environment variables
+try:
+    from django.conf import settings
+    api_key = settings.PINECONE_API_KEY
+except:
+    # Fallback to direct environment variable access
+    api_key = os.getenv('PINECONE_API_KEY', '')
+
+if not api_key:
+    raise ValueError("PINECONE_API_KEY environment variable is required")
+
+pc = Pinecone(api_key=api_key)
 
 
 #Create index

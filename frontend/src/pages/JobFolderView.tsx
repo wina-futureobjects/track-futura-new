@@ -23,6 +23,8 @@ import {
   Pending as PendingIcon,
   Error as ErrorIcon,
   Refresh as RefreshIcon,
+  Download as DownloadIcon,
+  GetApp as GetAppIcon,
 } from '@mui/icons-material';
 import { apiFetch } from '../utils/api';
 import UniversalDataDisplay, { UniversalFolder, UniversalDataItem } from '../components/UniversalDataDisplay';
@@ -100,108 +102,138 @@ const JobFolderView = () => {
   const [universalFolder, setUniversalFolder] = useState<UniversalFolder | null>(null);
   const [calculatedStats, setCalculatedStats] = useState<any>(null);
   const [jobStatus, setJobStatus] = useState<{status: string, message: string} | null>(null);
+  const [downloading, setDownloading] = useState<{csv: boolean, json: boolean}>({csv: false, json: false});
+  const [actualBatchJobId, setActualBatchJobId] = useState<number | null>(null);
+
+  // Download functions
+  const downloadData = async (format: 'csv' | 'json') => {
+    const jobId = actualBatchJobId || folderId;
+    if (!jobId) return;
+    
+    setDownloading(prev => ({ ...prev, [format]: true }));
+    
+    try {
+      const response = await apiFetch(`/api/apify/batch-jobs/${jobId}/export/?format=${format}`);
+      if (!response.ok) {
+        throw new Error(`Failed to download ${format.toUpperCase()} data`);
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `batch_job_${jobId}_results.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(`Error downloading ${format}:`, error);
+      setError(`Failed to download ${format.toUpperCase()} file. Please try again.`);
+    } finally {
+      setDownloading(prev => ({ ...prev, [format]: false }));
+    }
+  };
 
   const fetchJobData = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      // Fetch job folder details
-      const folderResponse = await apiFetch(`/api/track-accounts/report-folders/${folderId}/?project=${projectId}`);
-      if (!folderResponse.ok) {
-        throw new Error('Failed to fetch job folder details');
+      // Fetch the job folder from unified folders API
+      const jobFolderResponse = await apiFetch(`/api/track-accounts/report-folders/${folderId}/`);
+      if (!jobFolderResponse.ok) {
+        throw new Error('Failed to fetch job folder');
       }
-             const folderData = await folderResponse.json();
-       setJobFolder(folderData);
 
-       // Create UniversalFolder object for UniversalDataDisplay
-       const universalFolderData: UniversalFolder = {
-         id: folderData.id,
-         name: folderData.name,
-         description: folderData.description,
-         category: 'posts', // Job folders are always posts
-         category_display: 'Posts',
-         platform: folderData.platform_code || folderData.platform || 'instagram',
-         job_id: folderData.id,
-         created_at: folderData.created_at,
-         updated_at: folderData.created_at,
-         action_type: 'collect_posts'
-       };
-       setUniversalFolder(universalFolderData);
+      const jobFolderData = await jobFolderResponse.json();
+      console.log('Job folder data:', jobFolderData);
 
-       // Fetch associated scraper requests - we'll get all requests and filter by track_source_id
-      const requestsResponse = await apiFetch(`/api/brightdata/requests/`);
-      if (requestsResponse.ok) {
-        const requestsData = await requestsResponse.json();
-        const allRequests = requestsData.results || requestsData || [];
-        
-        // Filter requests that are associated with this job folder
-        // Since we know the job folder is for track_source_id 49, we'll filter by that
-        const filteredRequests = allRequests.filter((req: any) => {
-          if (req.batch_job && req.batch_job.platform_params) {
-            try {
-              const params = typeof req.batch_job.platform_params === 'string' 
-                ? JSON.parse(req.batch_job.platform_params) 
-                : req.batch_job.platform_params;
-              return params.track_source_id === 49; // The track source for this job
-            } catch {
-              return false;
-            }
-          }
-          return false;
+      setJobFolder(jobFolderData);
+
+      // Get platform-specific folders (Instagram/Facebook/etc) linked to this job folder
+      const platformFolders = jobFolderData.subfolders || [];
+      console.log('Platform folders:', platformFolders);
+
+      if (platformFolders.length === 0) {
+        setJobStatus({
+          status: 'warning',
+          message: 'No data folders found for this job. The scraping may not have completed yet.'
         });
-        
-        setScraperRequests(filteredRequests);
+        setLoading(false);
+        return;
       }
 
-         // Fetch platform folders and data for this job folder
-         const platformFoldersResponse = await apiFetch(`/api/track-accounts/report-folders/${folderId}/platform_folders/`);
-         if (platformFoldersResponse.ok) {
-           const platformFoldersData = await platformFoldersResponse.json();
-           console.log('Platform folders data:', platformFoldersData);
-           
-           // Check if we have platform folders with posts
-           const platformFolders = platformFoldersData.platform_folders || [];
-           let fetchedPosts: Post[] = [];
-           
-           // If we have platform folders, try to get posts from the first one with posts
-           for (const pf of platformFolders) {
-             if (pf.folder && pf.folder.post_count > 0) {
-               // Fetch posts from this platform folder
-               const platformDataResponse = await apiFetch(`/api/track-accounts/report-folders/${folderId}/platform_data/`);
-               if (platformDataResponse.ok) {
-                 const platformData = await platformDataResponse.json();
-                 fetchedPosts = platformData.posts || [];
-                 console.log('Fetched posts from platform folder:', fetchedPosts.length, fetchedPosts);
-                 break;
-               }
-             }
-           }
-           
-           setPosts(fetchedPosts);
-           
-           // Update universal folder with platform info
-           setUniversalFolder(prevFolder => {
-             if (prevFolder) {
-               return {
-                 ...prevFolder,
-                 platform: platformFoldersData.platform_folders?.[0]?.platform || prevFolder.platform
-               };
-             }
-             return prevFolder;
-           });
-           
-           // If no platform folders or no posts, show appropriate message
-           if (platformFoldersData.status && platformFoldersData.message) {
-             console.log('Job status:', platformFoldersData.status, 'Message:', platformFoldersData.message);
-             setJobStatus({
-               status: platformFoldersData.status,
-               message: platformFoldersData.message
-             });
-           }
-         } else {
-           console.error('Failed to fetch platform folders:', platformFoldersResponse.status);
-         }
+      // Fetch posts from each platform folder
+      let allPosts: Post[] = [];
+
+      for (const platformFolder of platformFolders) {
+        const platform = platformFolder.platform || 'instagram';
+        const platformFolderId = platformFolder.id;
+
+        try {
+          // Fetch posts from the platform-specific API (with project parameter for security)
+          const postsEndpoint = `/api/${platform}-data/folders/${platformFolderId}/posts/?project=${projectId}`;
+          const postsResponse = await apiFetch(postsEndpoint);
+
+          if (postsResponse.ok) {
+            const postsData = await postsResponse.json();
+            const posts = postsData.results || postsData || [];
+
+            // Map platform posts to common format
+            const mappedPosts: Post[] = posts.map((post: any, index: number) => ({
+              id: post.id || index + 1,
+              post_id: post.post_id || post.shortcode || post.id || '',
+              url: post.url || post.postUrl || '',
+              user_posted: post.user_posted || post.ownerUsername || post.user || '',
+              content: post.description || post.caption || post.text || post.content || '',
+              description: post.description || post.caption || post.text || '',
+              likes: post.likes || post.likesCount || 0,
+              num_comments: post.num_comments || post.commentsCount || post.comments || 0,
+              date_posted: post.date_posted || post.timestamp || post.date || '',
+              created_at: post.created_at || post.timestamp || '',
+              is_verified: post.is_verified || false
+            }));
+
+            allPosts = [...allPosts, ...mappedPosts];
+          }
+        } catch (err) {
+          console.error(`Error fetching posts from ${platform} folder ${platformFolderId}:`, err);
+        }
+      }
+
+      setPosts(allPosts);
+
+      // Create UniversalFolder object for UniversalDataDisplay
+      const universalFolderData: UniversalFolder = {
+        id: jobFolderData.id,
+        name: jobFolderData.name,
+        description: jobFolderData.description || 'Job folder with scraped data',
+        category: jobFolderData.category || 'posts',
+        category_display: jobFolderData.category_display || 'Posts',
+        platform: jobFolderData.platform_code || jobFolderData.platform || 'instagram',
+        job_id: jobFolderData.id,
+        created_at: jobFolderData.created_at,
+        updated_at: jobFolderData.updated_at || jobFolderData.created_at,
+        action_type: 'collect_posts'
+      };
+      setUniversalFolder(universalFolderData);
+
+      // Update job folder with actual post count
+      setJobFolder(prev => prev ? { ...prev, post_count: allPosts.length } : prev);
+
+      // Set job status
+      if (allPosts.length === 0) {
+        setJobStatus({
+          status: 'warning',
+          message: 'No posts found. The scraping may not have completed or no data was available.'
+        });
+      } else {
+        setJobStatus({
+          status: 'completed',
+          message: `Successfully loaded ${allPosts.length} posts`
+        });
+      }
 
     } catch (error) {
       console.error('Error fetching job data:', error);
@@ -320,7 +352,36 @@ const JobFolderView = () => {
            </Alert>
          )}
 
-        
+        {/* Download Section */}
+        {posts.length > 0 && (
+          <Paper sx={{ p: 2, mb: 3 }}>
+            <Box display="flex" alignItems="center" justifyContent="space-between">
+              <Typography variant="h6">
+                Export Data ({posts.length} posts)
+              </Typography>
+              <Box display="flex" gap={2}>
+                <Button
+                  variant="outlined"
+                  startIcon={downloading.csv ? <CircularProgress size={20} /> : <DownloadIcon />}
+                  onClick={() => downloadData('csv')}
+                  disabled={downloading.csv || downloading.json}
+                  size="small"
+                >
+                  Download CSV
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={downloading.json ? <CircularProgress size={20} /> : <GetAppIcon />}
+                  onClick={() => downloadData('json')}
+                  disabled={downloading.csv || downloading.json}
+                  size="small"
+                >
+                  Download JSON
+                </Button>
+              </Box>
+            </Box>
+          </Paper>
+        )}
 
          {/* Universal Data Display */}
          {calculatedStats ? (

@@ -107,12 +107,13 @@ interface BatchScraperJob {
   completed_at: string | null;
 }
 
-interface BrightdataConfig {
+interface ApifyConfig {
   id: number;
   name: string;
   platform: string;
   platform_display: string;
   is_active: boolean;
+  actor_id: string;
 }
 
 interface TabPanelProps {
@@ -160,6 +161,9 @@ const AutomatedBatchScraper = () => {
   const [periodicRuns, setPeriodicRuns] = useState<ScrapingRun[]>([]);
   const [selectedRun, setSelectedRun] = useState<ScrapingRun | null>(null);
   const [scrapingJobs, setScrapingJobs] = useState<ScrapingJob[]>([]);
+
+  // Source Folders
+  const [sourceFolders, setSourceFolders] = useState<any[]>([]);
   
   // Configuration
   const [selectedInputCollection, setSelectedInputCollection] = useState<TrackSourceCollection | null>(null);
@@ -181,6 +185,7 @@ const AutomatedBatchScraper = () => {
   });
   
   const [globalConfigForm, setGlobalConfigForm] = useState({
+    folderId: null as number | null,
     numOfPosts: null as number | null,
     startDate: null as Dayjs | null,
     endDate: null as Dayjs | null,
@@ -211,31 +216,39 @@ const AutomatedBatchScraper = () => {
 
   const fetchData = async () => {
     if (!projectId) return;
-    
+
     try {
       setLoading(true);
       setError(null);
-      
+
       const [
         collections,
         tasks,
-        runs
+        runs,
+        foldersResponse
       ] = await Promise.all([
         workflowService.getAllInputCollections(parseInt(projectId)),
         workflowService.getAllWorkflowTasks(parseInt(projectId)),
-        workflowService.getScrapingRuns(parseInt(projectId))
+        workflowService.getScrapingRuns(parseInt(projectId)),
+        apiFetch(`/api/track-accounts/source-folders/?project=${projectId}`)
       ]);
-      
+
       setTrackSourceCollections(collections);
       setWorkflowTasks(tasks);
-      
+
       // Separate regular runs from periodic runs
       const regularRuns = runs.filter(run => !run.configuration.period);
       const periodicRunsList = runs.filter(run => run.configuration.period);
-      
+
       setScrapingRuns(regularRuns);
       setPeriodicRuns(periodicRunsList);
-      
+
+      // Set folders
+      if (foldersResponse.ok) {
+        const foldersData = await foldersResponse.json();
+        setSourceFolders(foldersData.results || foldersData || []);
+      }
+
     } catch (err) {
       console.error('Error fetching data:', err);
       setError('Failed to load data');
@@ -257,10 +270,10 @@ const AutomatedBatchScraper = () => {
 
   const fetchConfigs = async () => {
     try {
-      const response = await apiFetch('/api/brightdata-integration/configs/');
+      const response = await apiFetch('/api/apify/configs/');
       if (response.ok) {
         const configs = await response.json();
-        console.log('BrightData configs:', configs);
+        console.log('Apify configs:', configs);
       }
     } catch (err) {
       console.error('Error fetching configs:', err);
@@ -394,6 +407,7 @@ const AutomatedBatchScraper = () => {
       const runData: CreateScrapingRunRequest = {
         project: parseInt(projectId),
         configuration: {
+          folder_id: globalConfigForm.folderId,
           num_of_posts: globalConfigForm.numOfPosts,
           start_date: formatDateForAPI(globalConfigForm.startDate),
           end_date: formatDateForAPI(globalConfigForm.endDate),
@@ -1120,6 +1134,41 @@ const AutomatedBatchScraper = () => {
 
             <LocalizationProvider dateAdapter={AdapterDayjs}>
               <Stack spacing={3} sx={{ mt: 2 }}>
+                <FormControl fullWidth>
+                  <InputLabel>Source Folder</InputLabel>
+                  <Select
+                    value={globalConfigForm.folderId ?? ''}
+                    label="Source Folder"
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setGlobalConfigForm({
+                        ...globalConfigForm,
+                        folderId: value === '' ? null : Number(value)
+                      });
+                    }}
+                  >
+                    <MenuItem value="">
+                      <em>All Sources</em>
+                    </MenuItem>
+                    {sourceFolders.map((folder) => (
+                      <MenuItem key={folder.id} value={folder.id}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box
+                            sx={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: '50%',
+                              bgcolor: folder.folder_type === 'company' ? '#3b82f6' : folder.folder_type === 'competitor' ? '#ef4444' : '#8b5cf6'
+                            }}
+                          />
+                          {folder.name} ({folder.folder_type_display})
+                        </Box>
+                      </MenuItem>
+                    ))}
+                  </Select>
+                  <FormHelperText>Choose a folder to run scraping for sources in that folder only, or select "All Sources" to run for all sources</FormHelperText>
+                </FormControl>
+
                 <Box sx={{ display: 'flex', gap: 2 }}>
                   <DatePicker
                     label="Start Date"

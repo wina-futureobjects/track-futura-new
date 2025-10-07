@@ -492,7 +492,8 @@ def load_linkedin_posts_from_file(file_path: str) -> List[Dict[str, Any]]:
 # Example usage
 if __name__ == "__main__":
     # Configuration
-    API_KEY = "your_pinecone_api_key_here"
+    # Configuration - Use environment variables instead of hardcoded keys
+    API_KEY = os.getenv('PINECONE_API_KEY', '')
     INDEX_NAME = "linkedin-content-db"
     
     # Initialize database handler

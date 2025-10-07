@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "description": "Track Futura application",
   "scripts": {
-    "start:frontend": "cd frontend && npm run dev",
-    "start:backend": "cd backend && .\\venv\\Scripts\\activate && python manage.py runserver",
+    "start:frontend": "cd frontend && npm run dev -- --port 5185",
+    "start:backend": "cd backend && .\\venv\\Scripts\\activate && python manage.py runserver 8080",
     "start": "concurrently \"npm run start:frontend\" \"npm run start:backend\""
   },
   "dependencies": {

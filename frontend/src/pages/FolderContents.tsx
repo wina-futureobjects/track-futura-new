@@ -73,6 +73,11 @@ const FolderContents = () => {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [jobCount, setJobCount] = useState<number | null>(null);
 
+  // Posts state
+  const [posts, setPosts] = useState<any[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+  const [postError, setPostError] = useState<string | null>(null);
+
   const platforms = [
     { key: 'instagram', label: 'Instagram', icon: <InstagramIcon />, color: '#E4405F' },
     { key: 'facebook', label: 'Facebook', icon: <FacebookIcon />, color: '#1877F2' },
@@ -241,11 +246,85 @@ const FolderContents = () => {
     }
   };
 
+  const fetchPosts = async (fId: string, platform: string) => {
+    setLoadingPosts(true);
+    setPostError(null);
+
+    try {
+      const response = await apiFetch(
+        `/api/${platform}-data/posts/?folder_id=${fId}&page_size=100`
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setPosts(data.results || []);
+      } else {
+        setPostError('Failed to load posts');
+        setPosts([]);
+      }
+    } catch (error) {
+      console.error('Error fetching posts:', error);
+      setPostError('Failed to load posts');
+      setPosts([]);
+    } finally {
+      setLoadingPosts(false);
+    }
+  };
+
+  const downloadPosts = (format: 'json' | 'csv') => {
+    if (posts.length === 0) return;
+
+    if (format === 'json') {
+      const dataStr = JSON.stringify(posts, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${currentFolder?.name || 'posts'}_${new Date().toISOString().split('T')[0]}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } else if (format === 'csv') {
+      const headers = ['User', 'Description', 'Likes', 'Comments', 'Views', 'Date', 'URL'];
+      const rows = posts.map(post => [
+        post.user_posted || '',
+        (post.description || '').replace(/"/g, '""'),
+        post.likes || 0,
+        post.num_comments || 0,
+        post.views || 0,
+        post.date_posted ? new Date(post.date_posted).toISOString() : '',
+        post.url || ''
+      ]);
+
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+      ].join('\n');
+
+      const dataBlob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${currentFolder?.name || 'posts'}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+  };
+
   useEffect(() => {
     if (projectId && folderId) {
       fetchFolderContents();
     }
   }, [projectId, folderId, folderType]);
+
+  useEffect(() => {
+    // Fetch posts when we have a current folder and it's a content folder
+    if (currentFolder && currentFolder.folder_type === 'content' && folderId) {
+      const platform = currentFolder.platform || folderType;
+      if (['instagram', 'facebook', 'linkedin', 'tiktok'].includes(platform)) {
+        fetchPosts(folderId, platform);
+      }
+    }
+  }, [currentFolder, folderId, folderType]);
 
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
@@ -558,6 +637,99 @@ const FolderContents = () => {
             }
           </Typography>
         </Paper>
+      )}
+
+      {/* Posts Table */}
+      {currentFolder?.folder_type === 'content' && (
+        <Box sx={{ mt: 4 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6">
+              Posts ({posts.length})
+            </Typography>
+            <Box>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => downloadPosts('json')}
+                sx={{ mr: 1 }}
+                disabled={posts.length === 0}
+              >
+                Download JSON
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => downloadPosts('csv')}
+                disabled={posts.length === 0}
+              >
+                Download CSV
+              </Button>
+            </Box>
+          </Box>
+
+          {loadingPosts ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : postError ? (
+            <Alert severity="error">{postError}</Alert>
+          ) : posts.length === 0 ? (
+            <Alert severity="info">No posts found in this folder</Alert>
+          ) : (
+            <TableContainer component={Paper}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>User</TableCell>
+                    <TableCell>Description</TableCell>
+                    <TableCell align="right">Likes</TableCell>
+                    <TableCell align="right">Comments</TableCell>
+                    <TableCell align="right">Views</TableCell>
+                    <TableCell>Date</TableCell>
+                    <TableCell>Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {posts.map((post) => (
+                    <TableRow key={post.id}>
+                      <TableCell>{post.user_posted || 'N/A'}</TableCell>
+                      <TableCell>
+                        <Tooltip title={post.description || ''}>
+                          <span>
+                            {post.description ? (
+                              post.description.length > 100 ?
+                                post.description.substring(0, 100) + '...' :
+                                post.description
+                            ) : 'No description'}
+                          </span>
+                        </Tooltip>
+                      </TableCell>
+                      <TableCell align="right">{post.likes?.toLocaleString() || 0}</TableCell>
+                      <TableCell align="right">{post.num_comments?.toLocaleString() || 0}</TableCell>
+                      <TableCell align="right">{post.views?.toLocaleString() || 0}</TableCell>
+                      <TableCell>
+                        {post.date_posted ?
+                          new Date(post.date_posted).toLocaleDateString() :
+                          'N/A'
+                        }
+                      </TableCell>
+                      <TableCell>
+                        <Tooltip title="View Post">
+                          <IconButton
+                            size="small"
+                            onClick={() => window.open(post.url, '_blank')}
+                          >
+                            <OpenInNewIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Box>
       )}
     </Box>
   );

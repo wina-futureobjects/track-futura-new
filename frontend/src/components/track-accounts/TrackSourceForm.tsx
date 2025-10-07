@@ -11,6 +11,10 @@ import {
   IconButton,
   Snackbar,
   Alert,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import FacebookIcon from '@mui/icons-material/Facebook';
@@ -184,6 +188,16 @@ interface TrackSourceFormProps {
   onSuccess?: (source: TrackSource) => void;
 }
 
+interface SourceFolder {
+  id: number;
+  name: string;
+  description: string | null;
+  folder_type: 'company' | 'competitor' | 'other';
+  folder_type_display: string;
+  project: number;
+  source_count: number;
+}
+
 interface TrackSource {
   id: number;
   name: string;
@@ -192,6 +206,7 @@ interface TrackSource {
   linkedin_link: string | null;
   tiktok_link: string | null;
   other_social_media: string | null;
+  folder?: number | null;
   project?: number | null;
   created_at?: string;
   updated_at?: string;
@@ -209,14 +224,15 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
   const theme = useTheme();
   const [loading, setLoading] = useState(false);
   const [loadingSource, setLoadingSource] = useState(!!sourceId);
-  
+  const [folders, setFolders] = useState<SourceFolder[]>([]);
+
   // Snackbar state
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
     severity: 'success' as 'success' | 'error'
   });
-  
+
   // Form state
   const [formData, setFormData] = useState<TrackSource>({
     id: 0,
@@ -226,6 +242,7 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
     linkedin_link: '',
     tiktok_link: '',
     other_social_media: '',
+    folder: null,
     project: projectId ? parseInt(projectId) : null,
     selectedPlatform: null,
     selectedService: null
@@ -288,8 +305,36 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
     }
   }, [sourceId, projectId]);
 
+  // Fetch folders for the project
+  useEffect(() => {
+    const fetchFolders = async () => {
+      if (!projectId) {
+        console.log('No projectId, skipping folder fetch');
+        return;
+      }
+
+      try {
+        console.log('Fetching folders for project:', projectId);
+        const response = await apiFetch(`/api/track-accounts/source-folders/?project=${projectId}`);
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Folders fetched:', data);
+          if (data && typeof data === 'object' && 'results' in data) {
+            setFolders(data.results || []);
+          } else if (Array.isArray(data)) {
+            setFolders(data);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching folders:', error);
+      }
+    };
+
+    fetchFolders();
+  }, [projectId]);
+
   // Handle form field changes
-  const handleFieldChange = (field: keyof TrackSource, value: string | null) => {
+  const handleFieldChange = (field: keyof TrackSource, value: string | number | null) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -395,11 +440,12 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
         }
       }
       
-      const requestData = { 
+      const requestData = {
         name: formData.name.trim(),
         project: projectId ? parseInt(projectId, 10) : formData.project,
         platform: formData.selectedPlatform,
         service_name: formData.selectedService,
+        folder: formData.folder,
         ...socialMediaLinks
       };
       
@@ -579,7 +625,7 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
                       } : {
                         borderColor: theme.palette.primary.main,
                         color: theme.palette.primary.main,
-                        '&:hover': { 
+                        '&:hover': {
                           bgcolor: theme.palette.primary.main,
                           color: 'white'
                         }
@@ -636,6 +682,57 @@ const TrackSourceForm: React.FC<TrackSourceFormProps> = ({
                 }
                 }}
               />
+            </Box>
+          )}
+
+          {/* Step 5: Folder Selection (only show if service is selected) */}
+          {(() => {
+            console.log('Step 5 condition check:', {
+              selectedPlatform: formData.selectedPlatform,
+              selectedService: formData.selectedService,
+              foldersCount: folders.length,
+              shouldShow: formData.selectedPlatform && formData.selectedService
+            });
+            return formData.selectedPlatform && formData.selectedService;
+          })() && (
+            <Box>
+              <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600, color: '#374151' }}>
+                Step 5: Select Folder (Optional)
+              </Typography>
+              <FormControl fullWidth>
+                <InputLabel>Select Folder</InputLabel>
+                <Select
+                  value={formData.folder ?? ''}
+                  label="Select Folder"
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '' || value === null) {
+                      handleFieldChange('folder', null);
+                    } else {
+                      handleFieldChange('folder', Number(value));
+                    }
+                  }}
+                >
+                  <MenuItem value="">
+                    <em>No Folder</em>
+                  </MenuItem>
+                  {folders.map((folder) => (
+                    <MenuItem key={folder.id} value={folder.id}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box
+                          sx={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: '50%',
+                            bgcolor: folder.folder_type === 'company' ? '#3b82f6' : folder.folder_type === 'competitor' ? '#ef4444' : '#8b5cf6'
+                          }}
+                        />
+                        {folder.name} ({folder.folder_type_display})
+                      </Box>
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </Box>
           )}
 

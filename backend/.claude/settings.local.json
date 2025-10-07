@@ -30,7 +30,9 @@
       "Bash(flyctl secrets set:*)",
       "Bash(flyctl deploy:*)",
       "Bash(flyctl status:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(netstat:*)",
+      "Bash(chcp:*)"
     ],
     "deny": [],
     "ask": []

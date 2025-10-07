@@ -52,14 +52,19 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
 
                     # Get project_id from request if available
                     project_id = None
-                    if hasattr(request, 'user') and request.user.is_authenticated:
-                        # Try to get project_id from query params or user context
-                        project_id = request.query_params.get('project_id') or request.data.get('project_id')
-                        if project_id:
-                            try:
-                                project_id = int(project_id)
-                            except (ValueError, TypeError):
-                                project_id = None
+                    print(f"[CHAT] Request data: {request.data}")
+                    print(f"[CHAT] Query params: {request.query_params}")
+                    # Try to get project_id from request data or query params
+                    project_id = request.data.get('project_id') or request.query_params.get('project_id')
+                    if project_id:
+                        try:
+                            project_id = int(project_id)
+                            print(f"[CHAT] ✅ Using project_id: {project_id}")
+                        except (ValueError, TypeError):
+                            project_id = None
+                            print(f"[CHAT] ❌ Invalid project_id format: {project_id}")
+                    else:
+                        print(f"[CHAT] ⚠️ No project_id found in request!")
 
                     # Generate AI response with real data
                     ai_response = openai_service.generate_response(
@@ -85,9 +90,22 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
                     }, status=status.HTTP_201_CREATED)
 
                 except Exception as e:
-                    # If AI fails, still return user message
-                    print(f"AI response failed: {str(e)}")
-                    return Response(serializer.data, status=status.HTTP_201_CREATED)
+                    # If AI fails, still return user message with error details
+                    print(f"❌ AI response failed: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
+
+                    # Create an error message for the user
+                    error_message = ChatMessage.objects.create(
+                        thread=thread,
+                        content=f"I encountered an error processing your request. Error: {str(e)}",
+                        sender='ai'
+                    )
+
+                    return Response({
+                        'user_message': ChatMessageSerializer(user_message).data,
+                        'ai_message': ChatMessageSerializer(error_message).data
+                    }, status=status.HTTP_201_CREATED)
 
             # Update thread's updated_at timestamp
             thread.save()
@@ -103,6 +121,19 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
         thread.is_active = False
         thread.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=False, methods=['POST'])
+    def clear_all_history(self, request):
+        """
+        Clear all chat history (archive all threads)
+        """
+        if hasattr(request, 'user') and request.user.is_authenticated:
+            threads = ChatThread.objects.filter(user=request.user, is_active=True)
+        else:
+            threads = ChatThread.objects.filter(is_active=True)
+        
+        threads.update(is_active=False)
+        return Response({'message': 'All chat history cleared'}, status=status.HTTP_200_OK)
 
 class ChatMessageViewSet(viewsets.ModelViewSet):
     """
