@@ -28,14 +28,9 @@ import os
 
 
 def serve_frontend(request):
-    """Serve the frontend application"""
-    # Check if this is a request for a static asset
-    if request.path.startswith('/assets/') or request.path.startswith('/static/'):
-        # Let Django's static file serving handle this
-        pass
-    
+    """Serve the frontend application"""    
     # Path to the frontend index.html file
-    frontend_path = os.path.join(settings.STATIC_ROOT or settings.BASE_DIR, 'index.html')
+    frontend_path = os.path.join(settings.STATIC_ROOT or os.path.join(settings.BASE_DIR, 'staticfiles'), 'index.html')
     
     try:
         with open(frontend_path, 'r', encoding='utf-8') as f:
@@ -47,7 +42,7 @@ def serve_frontend(request):
         <!DOCTYPE html>
         <html>
         <head>
-            <title>TrackFutura - Building...</title>
+            <title>TrackFutura - React Frontend Loading...</title>
             <style>
                 body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
                 .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
@@ -57,9 +52,15 @@ def serve_frontend(request):
         </head>
         <body>
             <div class="container">
-                <div class="building">🔧 Frontend is being built and deployed...</div>
+                <div class="building">⚠️ React Frontend Not Found</div>
                 <h1>TrackFutura - Social Media Analytics Platform</h1>
-                <p>The React frontend is currently being deployed. Please wait a moment and refresh.</p>
+                <p>The React frontend files are not available. Expected location: """ + frontend_path + """</p>
+                <p>Debug Info:</p>
+                <ul>
+                    <li>STATIC_ROOT: """ + str(settings.STATIC_ROOT) + """</li>
+                    <li>BASE_DIR: """ + str(settings.BASE_DIR) + """</li>
+                    <li>DEBUG: """ + str(settings.DEBUG) + """</li>
+                </ul>
                 <p><a href="/admin/">Access Admin Panel</a> | <a href="/api/">View API Documentation</a></p>
             </div>
         </body>
@@ -144,9 +145,12 @@ if settings.DEBUG or True:  # Always serve static files for frontend
     urlpatterns += staticfiles_urlpatterns()
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
     
+    # Handle frontend assets explicitly
+    urlpatterns += static('/assets/', document_root=os.path.join(settings.STATIC_ROOT or settings.BASE_DIR, 'staticfiles', 'assets'))
+    
     # Catch-all pattern for frontend routing (React Router)
     urlpatterns += [
-        re_path(r'^(?!api|admin|static|media).*$', serve_frontend, name="frontend_catchall"),
+        re_path(r'^(?!api|admin|static|media|assets).*$', serve_frontend, name="frontend_catchall"),
     ]
 
 if settings.DEBUG:
