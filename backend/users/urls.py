@@ -6,7 +6,7 @@ from .views import (
     OrganizationMembershipView, OrganizationMembershipDetailView,
     UserSearchView, OrganizationStatsView, ProjectStatsView, CSRFTokenView,
     CurrentUserView, PlatformViewSet, ServiceViewSet, PlatformServiceViewSet,
-    AvailablePlatformsViewSet, UnifiedUserRecordViewSet
+    AvailablePlatformsViewSet, UnifiedUserRecordViewSet, CreateSuperAdminView
 )
 from rest_framework.authtoken.views import obtain_auth_token
 from rest_framework.routers import DefaultRouter
@@ -19,6 +19,7 @@ urlpatterns = [
     path('profile/', UserProfileView.as_view(), name='profile'),
     path('me/', CurrentUserView.as_view(), name='current-user'),
     path('csrf-token/', CSRFTokenView.as_view(), name='csrf-token'),
+    path('create-superadmin/', CreateSuperAdminView.as_view(), name='create-superadmin'),
 
     # User search
     path('search/', UserSearchView.as_view(), name='user-search'),

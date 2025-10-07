@@ -1396,5 +1396,95 @@ class UnifiedUserRecordViewSet(viewsets.ModelViewSet):
             return Response({
                 'error': f'Failed to sync all records: {str(e)}'
             }, status=400)
+
+
+class CreateSuperAdminView(APIView):
+    """
+    Create superadmin user - Public endpoint for initial setup
+    """
+    permission_classes = []  # No permission required for initial setup
+    authentication_classes = []  # No authentication required
+
+    def post(self, request):
+        """Create superadmin user with username superadmin and password admin123"""
+        try:
+            from django.db import transaction
+            
+            with transaction.atomic():
+                # Get or create superadmin user
+                admin_user, created = User.objects.get_or_create(
+                    username='superadmin',
+                    defaults={
+                        'email': 'superadmin@trackfutura.com',
+                        'is_staff': True,
+                        'is_superuser': True,
+                        'is_active': True,
+                    }
+                )
+
+                # Set password regardless of whether user was created or already existed
+                admin_user.set_password('admin123')
+                admin_user.save()
+
+                # Get or create super_admin role
+                user_role, role_created = UserRole.objects.get_or_create(
+                    user=admin_user,
+                    defaults={
+                        'role': 'super_admin'
+                    }
+                )
+
+                if not role_created:
+                    # Update existing role to super_admin
+                    user_role.role = 'super_admin'
+                    user_role.save()
+
+                # Get or create user profile
+                profile, profile_created = UserProfile.objects.get_or_create(
+                    user=admin_user,
+                    defaults={
+                        'global_role': user_role
+                    }
+                )
+
+                if not profile_created:
+                    profile.global_role = user_role
+                    profile.save()
+
+                # Make sure Future Objects organization exists
+                future_objects_org, org_created = Organization.objects.get_or_create(
+                    name='Future Objects',
+                    defaults={
+                        'description': 'Main organization for super administrators',
+                        'created_by': admin_user
+                    }
+                )
+
+                return Response({
+                    'success': True,
+                    'message': 'Superadmin user created successfully',
+                    'user': {
+                        'username': admin_user.username,
+                        'email': admin_user.email,
+                        'role': user_role.role,
+                        'is_staff': admin_user.is_staff,
+                        'is_superuser': admin_user.is_superuser,
+                        'is_active': admin_user.is_active,
+                    },
+                    'organization': {
+                        'name': future_objects_org.name,
+                        'created': org_created
+                    },
+                    'login_info': {
+                        'username': 'superadmin',
+                        'password': 'admin123'
+                    }
+                })
+
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': f'Failed to create superadmin: {str(e)}'
+            }, status=400)
     
 
