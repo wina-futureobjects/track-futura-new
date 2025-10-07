@@ -116,6 +116,14 @@ def brightdata_webhook(request):
         # Parse webhook data
         data = json.loads(request.body)
         
+        # Check for platform setup request
+        if isinstance(data, dict) and data.get('setup_type') == 'platforms_and_services':
+            return _handle_platform_setup(data)
+        
+        # Check for database setup trigger
+        if isinstance(data, dict) and data.get('snapshot_id') == 'database_setup_trigger':
+            return _handle_platform_setup(data)
+        
         # Handle both single items and arrays
         if not isinstance(data, list):
             data = [data]
@@ -217,11 +225,17 @@ def brightdata_webhook(request):
 
 @csrf_exempt
 @require_http_methods(["POST"])
+@csrf_exempt
+@require_http_methods(["POST"])
 def brightdata_notify(request):
     """Handle BrightData notification events for job status updates"""
     try:
         # Parse notification data
         data = json.loads(request.body)
+        
+        # Check for platform setup request
+        if data.get('type') == 'setup_platforms' or data.get('setup_type') == 'platforms_and_services':
+            return _handle_platform_setup(data)
         
         snapshot_id = data.get('snapshot_id')
         status_value = data.get('status', 'unknown')
@@ -558,3 +572,101 @@ def _update_batch_job_status(batch_job: BrightDataBatchJob):
         
     except Exception as e:
         logger.error(f"Error updating batch job status: {str(e)}")
+
+
+def _handle_platform_setup(data):
+    """Handle platform and service setup requests"""
+    try:
+        logger.info("Handling platform setup request...")
+        
+        from users.models import Platform, Service, PlatformService
+        
+        platforms_created = 0
+        services_created = 0
+        platform_services_created = 0
+        
+        # Create Instagram platform
+        instagram_platform, created = Platform.objects.get_or_create(
+            name='instagram',
+            defaults={
+                'display_name': 'Instagram',
+                'description': 'Instagram social media platform',
+                'is_enabled': True
+            }
+        )
+        if created:
+            platforms_created += 1
+            logger.info(f"Created Instagram platform with ID {instagram_platform.id}")
+        
+        # Create Facebook platform  
+        facebook_platform, created = Platform.objects.get_or_create(
+            name='facebook',
+            defaults={
+                'display_name': 'Facebook', 
+                'description': 'Facebook social media platform',
+                'is_enabled': True
+            }
+        )
+        if created:
+            platforms_created += 1
+            logger.info(f"Created Facebook platform with ID {facebook_platform.id}")
+        
+        # Create Posts service
+        posts_service, created = Service.objects.get_or_create(
+            name='posts',
+            defaults={
+                'display_name': 'Posts Scraping',
+                'description': 'Scrape posts from social media platforms',
+                'is_enabled': True
+            }
+        )
+        if created:
+            services_created += 1
+            logger.info(f"Created Posts service with ID {posts_service.id}")
+        
+        # Create platform-service combinations
+        instagram_posts, created = PlatformService.objects.get_or_create(
+            platform=instagram_platform,
+            service=posts_service,
+            defaults={
+                'description': 'Instagram posts scraping service',
+                'is_enabled': True
+            }
+        )
+        if created:
+            platform_services_created += 1
+            logger.info(f"Created Instagram-Posts service with ID {instagram_posts.id}")
+        
+        facebook_posts, created = PlatformService.objects.get_or_create(
+            platform=facebook_platform,
+            service=posts_service,
+            defaults={
+                'description': 'Facebook posts scraping service', 
+                'is_enabled': True
+            }
+        )
+        if created:
+            platform_services_created += 1
+            logger.info(f"Created Facebook-Posts service with ID {facebook_posts.id}")
+        
+        logger.info(f"Platform setup complete! Created {platforms_created} platforms, {services_created} services, {platform_services_created} platform services")
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Platform setup completed',
+            'platforms_created': platforms_created,
+            'services_created': services_created,
+            'platform_services_created': platform_services_created,
+            'instagram_platform_id': instagram_platform.id,
+            'facebook_platform_id': facebook_platform.id,
+            'posts_service_id': posts_service.id,
+            'instagram_posts_id': instagram_posts.id,
+            'facebook_posts_id': facebook_posts.id
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in platform setup: {str(e)}")
+        return JsonResponse({
+            'status': 'error',
+            'message': f'Platform setup failed: {str(e)}'
+        }, status=500)
