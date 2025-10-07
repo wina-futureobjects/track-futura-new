@@ -354,19 +354,39 @@ class BrightDataAutomatedBatchScraper:
     def test_brightdata_connection(self, config: BrightDataConfig) -> Dict[str, Any]:
         """Test connection to BrightData API with a specific configuration"""
         try:
-            url = f"{self.base_url}/datasets/{config.dataset_id}"
+            # Use the trigger endpoint with a minimal test payload
+            url = f"{self.base_url}/trigger"
             headers = {
                 'Authorization': f'Bearer {config.api_token}',
                 'Content-Type': 'application/json'
             }
             
-            response = requests.get(url, headers=headers, timeout=10)
+            # Test with minimal parameters and payload
+            params = {
+                'dataset_id': config.dataset_id,
+                'include_errors': 'true',
+                'type': 'discover_new',
+                'discover_by': 'url'
+            }
+            
+            # Minimal test payload
+            test_payload = [{
+                "url": "https://www.instagram.com/test/",
+                "num_of_posts": 1,
+                "start_date": "",
+                "end_date": "",
+                "post_type": "Post"
+            }]
+            
+            response = requests.post(url, params=params, json=test_payload, headers=headers, timeout=10)
             
             if response.status_code == 200:
+                response_data = response.json()
                 return {
                     'success': True,
                     'message': 'Connection successful',
-                    'dataset_info': response.json()
+                    'snapshot_id': response_data.get('snapshot_id'),
+                    'test_result': response_data
                 }
             else:
                 return {
