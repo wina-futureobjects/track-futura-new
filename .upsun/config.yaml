@@ -16,40 +16,39 @@ applications:
     web:
       commands:
         start: "cd backend && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT"
-      locations:
-        "/":
-          root: "backend/staticfiles"
-          index: 
-            - "index.html"
-          rules:
-            '\.html$':
-              allow: true
-              expires: 3600
     
     hooks:
       build: |
         set -e
         
-        echo "Building frontend..."
+        echo "=== BUILDING TRACKFUTURA FRONTEND + BACKEND ==="
+        echo "Current directory: $(pwd)"
+        echo "Listing files: $(ls -la)"
+        
+        echo "=== Step 1: Build React Frontend ==="
         cd frontend
+        echo "Frontend directory contents: $(ls -la)"
         npm ci --production=false
         npm run build
+        echo "Frontend build completed, dist contents: $(ls -la dist/)"
         cd ..
         
-        echo "Installing Python dependencies..."
+        echo "=== Step 2: Install Python Dependencies ==="
         cd backend
         pip install -r requirements.txt
         cd ..
         
-        echo "Copying frontend build to Django static directory..."
+        echo "=== Step 3: Copy Frontend to Django Static ==="
         mkdir -p backend/staticfiles/
         cp -r frontend/dist/* backend/staticfiles/
+        echo "Copied frontend files to staticfiles: $(ls -la backend/staticfiles/)"
         
-        echo "Collecting Django static files..."
+        echo "=== Step 4: Collect Django Static Files ==="
         cd backend
         python manage.py collectstatic --noinput --clear
+        echo "Static files collection completed"
         
-        echo "Build completed successfully!"
+        echo "=== BUILD COMPLETED SUCCESSFULLY ==="
       
       deploy: |
         cd backend
