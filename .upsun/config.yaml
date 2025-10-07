@@ -22,6 +22,9 @@ applications:
       
       deploy: |
         python manage.py migrate --noinput
+    
+    relationships:
+      database: postgresql:postgresql
 
 services:
   postgresql:
