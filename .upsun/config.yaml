@@ -1,26 +1,58 @@
 applications:
   trackfutura:
     source:
-      root: backend
+      root: .
     type: python:3.12
     
     dependencies:
       python3:
         pip: ">=23.0"
+      nodejs:
+        npm: ">=18"
     
     build:
       flavor: none
     
     web:
       commands:
-        start: "gunicorn config.wsgi:application --bind 0.0.0.0:$PORT"
+        start: "cd backend && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT"
+      locations:
+        "/":
+          root: "backend/staticfiles"
+          index: 
+            - "index.html"
+          rules:
+            '\.html$':
+              allow: true
+              expires: 3600
     
     hooks:
       build: |
+        set -e
+        
+        echo "Building frontend..."
+        cd frontend
+        npm ci --production=false
+        npm run build
+        cd ..
+        
+        echo "Installing Python dependencies..."
+        cd backend
         pip install -r requirements.txt
-        python manage.py collectstatic --noinput
+        cd ..
+        
+        echo "Copying frontend build to Django static directory..."
+        mkdir -p backend/staticfiles/
+        cp -r frontend/dist/* backend/staticfiles/
+        
+        echo "Collecting Django static files..."
+        cd backend
+        python manage.py collectstatic --noinput --clear
+        
+        echo "Build completed successfully!"
       
       deploy: |
+        cd backend
         python manage.py migrate --noinput
     
     relationships:

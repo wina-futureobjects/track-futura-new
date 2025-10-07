@@ -69,7 +69,7 @@ MIDDLEWARE = [
     "users.middleware.CustomCsrfMiddleware",  # 🚨 CSRF BYPASS FIRST - OVERRIDES EVERYTHING
     "corsheaders.middleware.CorsMiddleware",  # CORS second
     "django.middleware.security.SecurityMiddleware",
-    # "whitenoise.middleware.WhiteNoiseMiddleware",  # Temporarily disable whitenoise
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # Enable WhiteNoise for static files
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     # "django.middleware.csrf.CsrfViewMiddleware",  # NEVER ENABLE - COMPLETELY DISABLED
@@ -194,8 +194,12 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-# Disable WhiteNoise configuration temporarily
-# STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+# Enable WhiteNoise for static file serving in production
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+# WhiteNoise configuration
+WHITENOISE_USE_FINDERS = True
+WHITENOISE_AUTOREFRESH = True
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

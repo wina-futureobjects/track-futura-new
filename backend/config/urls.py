@@ -30,30 +30,12 @@ import os
 def serve_frontend(request):
     """Serve the frontend application"""
     # Check if this is a request for a static asset
-    if request.path.startswith('/assets/'):
-        # Try to serve the actual static file
-        asset_path = os.path.join(settings.BASE_DIR, 'staticfiles', request.path.lstrip('/'))
-        try:
-            # Determine content type based on file extension
-            if request.path.endswith('.css'):
-                content_type = 'text/css'
-            elif request.path.endswith('.js'):
-                content_type = 'application/javascript'
-            elif request.path.endswith('.png'):
-                content_type = 'image/png'
-            elif request.path.endswith('.svg'):
-                content_type = 'image/svg+xml'
-            else:
-                content_type = 'application/octet-stream'
-            
-            with open(asset_path, 'rb') as f:
-                content = f.read()
-            return HttpResponse(content, content_type=content_type)
-        except FileNotFoundError:
-            pass  # Fall through to serve index.html
+    if request.path.startswith('/assets/') or request.path.startswith('/static/'):
+        # Let Django's static file serving handle this
+        pass
     
     # Path to the frontend index.html file
-    frontend_path = os.path.join(settings.BASE_DIR, 'staticfiles', 'index.html')
+    frontend_path = os.path.join(settings.STATIC_ROOT or settings.BASE_DIR, 'index.html')
     
     try:
         with open(frontend_path, 'r', encoding='utf-8') as f:
@@ -65,46 +47,20 @@ def serve_frontend(request):
         <!DOCTYPE html>
         <html>
         <head>
-            <title>TrackFutura - Social Media Analytics</title>
+            <title>TrackFutura - Building...</title>
             <style>
                 body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
                 .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
                 h1 { color: #2c3e50; text-align: center; }
-                .api-links { margin-top: 30px; }
-                .api-link { display: block; padding: 10px; margin: 10px 0; background: #3498db; color: white; text-decoration: none; border-radius: 5px; text-align: center; }
-                .api-link:hover { background: #2980b9; }
-                .status { background: #27ae60; color: white; padding: 10px; border-radius: 5px; text-align: center; margin-bottom: 20px; }
+                .building { background: #f39c12; color: white; padding: 10px; border-radius: 5px; text-align: center; margin-bottom: 20px; }
             </style>
         </head>
         <body>
             <div class="container">
-                <div class="status">✅ TrackFutura API is running successfully!</div>
+                <div class="building">🔧 Frontend is being built and deployed...</div>
                 <h1>TrackFutura - Social Media Analytics Platform</h1>
-                <p>Welcome to TrackFutura, your comprehensive social media analytics and tracking platform.</p>
-                
-                <h2>Available API Endpoints:</h2>
-                <div class="api-links">
-                    <a href="/admin/" class="api-link">🔧 Admin Panel</a>
-                    <a href="/api/users/" class="api-link">👥 Users API</a>
-                    <a href="/api/reports/" class="api-link">📊 Reports API</a>
-                    <a href="/api/analytics/" class="api-link">📈 Analytics API</a>
-                    <a href="/api/dashboard/" class="api-link">📱 Dashboard API</a>
-                    <a href="/api/health/" class="api-link">❤️ Health Check</a>
-                </div>
-                
-                <h2>Platform Features:</h2>
-                <ul>
-                    <li>📱 Multi-platform social media tracking (Facebook, Instagram, LinkedIn, TikTok)</li>
-                    <li>📊 Advanced analytics and reporting</li>
-                    <li>🤖 AI-powered insights</li>
-                    <li>📈 Real-time data collection</li>
-                    <li>💬 Interactive chat interface</li>
-                    <li>🔄 Automated workflow management</li>
-                </ul>
-                
-                <p style="text-align: center; margin-top: 30px; color: #7f8c8d;">
-                    <small>Deployed on Fly.io | Version 1.0</small>
-                </p>
+                <p>The React frontend is currently being deployed. Please wait a moment and refresh.</p>
+                <p><a href="/admin/">Access Admin Panel</a> | <a href="/api/">View API Documentation</a></p>
             </div>
         </body>
         </html>
