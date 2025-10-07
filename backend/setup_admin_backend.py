@@ -4,7 +4,7 @@ import sys
 import django
 
 # Set up Django settings
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'trackfutura.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
 
 # Now import Django models
