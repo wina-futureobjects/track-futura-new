@@ -79,7 +79,7 @@ DEBUG=False
 DJANGO_ALLOWED_HOSTS=your-domain.upsun.app,.upsun.app
 
 # API Keys (use your existing ones)
-OPENAI_API_KEY=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
+OPENAI_API_KEY=your-openai-api-key-here
 PINECONE_API_KEY=pcsk_4z4L5W_UAQtSjkCv4bnCqihgYQyEh2BaNfYRE6nBLJoCrF3i4ngDuNqGpqGQtpr43ZA3b7
 BRIGHTDATA_API_KEY=8af6995e-3baa-4b69-9df7-8d7671e621eb
 BRIGHTDATA_WEBHOOK_TOKEN=8n2YUVUUAxAXWWXyPdjzOZRA6pxXTC_611ritefmi9w

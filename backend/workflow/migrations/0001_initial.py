@@ -50,7 +50,7 @@ class Migration(migrations.Migration):
                 ('end_date', models.DateField(blank=True, null=True)),
                 ('auto_create_folders', models.BooleanField(default=True)),
                 ('apify_actor_id', models.CharField(default='default_actor_id', max_length=100)),
-                ('apify_api_token', models.CharField(default='apify_api_2ep4XhM2qSVPIPHU1AQPYLlKnrqqbL0cqR49', max_length=100)),
+                ('apify_api_token', models.CharField(default='your-apify-api-token-here', max_length=100)),
                 ('status', models.CharField(choices=[('active', 'Active'), ('paused', 'Paused'), ('error', 'Error')], default='active', max_length=20)),
                 ('total_runs', models.IntegerField(default=0)),
                 ('successful_runs', models.IntegerField(default=0)),

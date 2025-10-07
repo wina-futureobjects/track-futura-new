@@ -90,7 +90,7 @@ pc = Pinecone(api_key=api_key)
 
 **Before:**
 ```python
-api_token = 'apify_api_2ep4XhM2qSVPIPHU1AQPYLlKnrqqbL0cqR49'
+api_token = 'your-apify-api-token-here'
 ```
 
 **After:**
