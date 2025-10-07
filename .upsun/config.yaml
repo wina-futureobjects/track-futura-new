@@ -22,13 +22,10 @@ applications:
       
       deploy: |
         python manage.py migrate --noinput
-    
-    disk: 1024
 
 services:
   postgresql:
     type: postgresql:15
-    disk: 512
 
 routes:
   "https://{default}/":
