@@ -1,55 +1,115 @@
 applications:
-  trackfutura:
-    type: python:3.12
-    root: backend
+  backend:
     source:
       root: backend
+    type: python:3.12
+    size: S
+    
+    # Build process
     build:
-      flavor: django
-    runtime:
-      extensions:
-        - apache2
-      environment_variables:
-        DJANGO_SETTINGS_MODULE: config.settings_upsun
-        PYTHONPATH: /app
-    web:
-      commands:
-        start: "gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 3"
-      upstream:
-        socket_family: unix
-      document_root: backend
+      flavor: none
+    
+    # Dependencies
+    dependencies:
+      python3:
+        pip: "24.0"
+    
+    # Build hooks
     hooks:
       build: |
+        set -e
+        echo "🚀 Starting TrackFutura Upsun build..."
+        
+        # Install dependencies
+        pip install --upgrade pip
         pip install -r requirements.txt
-        python manage.py collectstatic --noinput
-        python manage.py migrate
-        python manage.py setup_apify_configs --api-token $APIFY_API_TOKEN
+        
+        # Set Django settings for build
+        export DJANGO_SETTINGS_MODULE=config.settings_upsun
+        
+        # Collect static files
+        echo "📊 Collecting static files..."
+        python manage.py collectstatic --noinput --clear --verbosity=2
+        
+        # Run migrations
+        echo "🗄️ Running migrations..."
+        python manage.py migrate --noinput --verbosity=2
+        
+        echo "✅ Build completed successfully!"
+    
+    # Web configuration
+    web:
+      commands:
+        start: "gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 300 --worker-class sync --preload --log-level info --access-logfile - --error-logfile -"
+      locations:
+        "/":
+          passthru: true
+          scripts: true
+        "/static":
+          root: "staticfiles"
+          expires: 86400
+          passthru: false
+        "/media":
+          root: "media"
+          expires: 3600
+          passthru: false
+    
+    # Disk space for uploads/media
     mounts:
-      - source: local
-        source_path: static
-        target: /app/static
-      - source: local
-        source_path: media
-        target: /app/media
-    relationships:
-      database:
-        service: postgresql
+      "media":
+        source: "local"
+        source_path: "media"
+      "logs":
+        source: "local" 
+        source_path: "logs"
+    
+    # Environment variables
     variables:
       env:
-        DEBUG: false
-        ALLOWED_HOSTS: "['*']"
-        CORS_ALLOW_ALL_ORIGINS: true
-        CORS_ALLOW_CREDENTIALS: true
-        CORS_ALLOWED_ORIGINS: "['https://trackfutura.com', 'https://www.trackfutura.com']"
-        CSRF_TRUSTED_ORIGINS: "['https://trackfutura.com', 'https://www.trackfutura.com']"
-        WEBHOOK_BASE_URL: "https://trackfutura.com"
+        DJANGO_SETTINGS_MODULE: "config.settings_upsun"
+        DEBUG: "False"
+        PYTHONPATH: "/app/backend"
+        SECRET_KEY: "upsun-trackfutura-production-key-2025"
+        
+    # Relationships to services
+    relationships:
+      database: "postgresql:postgresql"
 
+# Services (PostgreSQL database)
 services:
   postgresql:
     type: postgresql:15
+    size: S
     disk: 1024
-    variables:
-      env:
-        POSTGRES_DB: trackfutura
-        POSTGRES_USER: trackfutura
-        POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    configuration:
+      max_connections: 100
+
+# Routes configuration
+routes:
+  "https://{default}/":
+    type: upstream
+    upstream: "backend:http"
+    cache:
+      enabled: true
+      default_ttl: 0
+      cookies: ["*"]
+      headers: ["Authorization"]
+
+  "https://www.{default}/":
+    type: redirect
+    to: "https://{default}/"
+
+  # API routes with longer cache for static content
+  "https://{default}/static/":
+    type: upstream  
+    upstream: "backend:http"
+    cache:
+      enabled: true
+      default_ttl: 86400  # 24 hours for static files
+
+  "https://{default}/media/":
+    type: upstream
+    upstream: "backend:http" 
+    cache:
+      enabled: true
+      default_ttl: 3600   # 1 hour for media files
