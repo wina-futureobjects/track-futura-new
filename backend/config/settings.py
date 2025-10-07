@@ -103,6 +103,7 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 # Configure database based on environment
 import dj_database_url
+import json
 
 # Default to SQLite for development
 DATABASES = {
@@ -112,8 +113,29 @@ DATABASES = {
     }
 }
 
+# Upsun database configuration
+if 'PLATFORM_RELATIONSHIPS' in os.environ:
+    try:
+        import base64
+        relationships = json.loads(base64.b64decode(os.environ['PLATFORM_RELATIONSHIPS']).decode('utf-8'))
+        if 'database' in relationships:
+            db_settings = relationships['database'][0]
+            DATABASES['default'] = {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': db_settings['path'],
+                'USER': db_settings['username'],
+                'PASSWORD': db_settings['password'],
+                'HOST': db_settings['host'],
+                'PORT': db_settings['port'],
+                'OPTIONS': {
+                    'sslmode': 'require',
+                },
+            }
+    except (ValueError, KeyError, IndexError):
+        pass
+
 # Override with PostgreSQL if DATABASE_URL is provided (production)
-if os.getenv('DATABASE_URL'):
+elif os.getenv('DATABASE_URL'):
     DATABASES['default'] = dj_database_url.parse(os.getenv('DATABASE_URL'))
     # Add SSL requirement for production
     DATABASES['default']['OPTIONS'] = {
