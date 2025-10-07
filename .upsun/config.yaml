@@ -37,15 +37,10 @@ applications:
         pip install -r requirements.txt
         cd ..
         
-        echo "=== Step 3: Copy Frontend to Django Static ==="
-        mkdir -p backend/staticfiles/
-        cp -r frontend/dist/* backend/staticfiles/
-        echo "Copied frontend files to staticfiles: $(ls -la backend/staticfiles/)"
-        
-        echo "=== Step 4: Collect Django Static Files ==="
+        echo "=== Step 3: Collect Django Static Files (includes frontend) ==="
         cd backend
         python manage.py collectstatic --noinput --clear
-        echo "Static files collection completed"
+        echo "Static files collection completed: $(ls -la ../staticfiles/)"
         
         echo "=== BUILD COMPLETED SUCCESSFULLY ==="
       

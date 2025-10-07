@@ -194,6 +194,11 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
+# Frontend static files - include the built React app
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, '..', 'frontend', 'dist'),  # Include frontend build directory
+]
+
 # Enable WhiteNoise for static file serving in production
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
@@ -464,6 +469,11 @@ if (os.getenv('PLATFORM_APPLICATION_NAME') is not None):
 
     # Static files for production - match Upsun mount path
     STATIC_ROOT = '/app/staticfiles'
+    
+    # Frontend static files in production
+    STATICFILES_DIRS = [
+        '/app/frontend/dist',  # Include frontend build directory in production
+    ]
 
     # Secret Key.
     if (os.getenv('PLATFORM_PROJECT_ENTROPY') is not None):
