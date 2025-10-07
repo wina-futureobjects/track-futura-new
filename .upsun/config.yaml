@@ -28,7 +28,7 @@ applications:
         cd frontend
         echo "Frontend directory contents: $(ls -la)"
         npm ci --production=false
-        npm run build
+        NODE_ENV=production npm run build
         echo "Frontend build completed, dist contents: $(ls -la dist/)"
         cd ..
         
