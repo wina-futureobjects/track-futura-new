@@ -1400,56 +1400,92 @@ class UnifiedUserRecordViewSet(viewsets.ModelViewSet):
 
 class CreateSuperAdminView(APIView):
     """
-    Create superadmin user - Public endpoint for initial setup
+    Create or fix superadmin user - Public endpoint for initial setup
     """
     permission_classes = []  # No permission required for initial setup
     authentication_classes = []  # No authentication required
 
     def post(self, request):
-        """Create superadmin user using the demo data approach"""
+        """Create or fix superadmin user with proper super_admin role"""
         try:
-            from django.core.management import call_command
-            from io import StringIO
-            import sys
+            from django.db import transaction
             
-            # Capture command output
-            old_stdout = sys.stdout
-            sys.stdout = captured_output = StringIO()
-            
-            try:
-                # Call the seed_demo_data command to create admin users
-                call_command('seed_demo_data', '--users-count=5')
-                output = captured_output.getvalue()
-            finally:
-                sys.stdout = old_stdout
-            
-            # Get the created superadmin user
-            admin_user = User.objects.get(username='superadmin')
-            user_role = UserRole.objects.get(user=admin_user)
-            
-            return Response({
-                'success': True,
-                'message': 'Demo data and superadmin user created successfully',
-                'user': {
-                    'username': admin_user.username,
-                    'email': admin_user.email,
-                    'role': user_role.role,
-                    'is_staff': admin_user.is_staff,
-                    'is_superuser': admin_user.is_superuser,
-                    'is_active': admin_user.is_active,
-                },
-                'login_info': {
-                    'username': 'superadmin',
-                    'password': 'admin123!'
-                },
-                'note': 'Demo organizations and users also created',
-                'command_output': output[:500] + '...' if len(output) > 500 else output
-            })
+            with transaction.atomic():
+                # Get or create superadmin user
+                admin_user, created = User.objects.get_or_create(
+                    username='superadmin',
+                    defaults={
+                        'email': 'superadmin@trackfutura.com',
+                        'is_staff': True,
+                        'is_superuser': True,
+                        'is_active': True,
+                    }
+                )
+
+                # Always set password and privileges (in case they need fixing)
+                admin_user.set_password('admin123')
+                admin_user.is_staff = True
+                admin_user.is_superuser = True
+                admin_user.is_active = True
+                admin_user.save()
+
+                # Get or create super_admin role
+                user_role, role_created = UserRole.objects.get_or_create(
+                    user=admin_user,
+                    defaults={'role': 'super_admin'}
+                )
+
+                # Always ensure role is super_admin
+                user_role.role = 'super_admin'
+                user_role.save()
+
+                # Get or create user profile
+                profile, profile_created = UserProfile.objects.get_or_create(
+                    user=admin_user,
+                    defaults={'global_role': user_role}
+                )
+
+                # Always ensure profile has correct role
+                profile.global_role = user_role
+                profile.save()
+
+                # Make sure Future Objects organization exists
+                future_objects_org, org_created = Organization.objects.get_or_create(
+                    name='Future Objects',
+                    defaults={
+                        'description': 'Main organization for super administrators',
+                        'created_by': admin_user
+                    }
+                )
+
+                return Response({
+                    'success': True,
+                    'message': 'Superadmin user created/fixed successfully',
+                    'user': {
+                        'id': admin_user.id,
+                        'username': admin_user.username,
+                        'email': admin_user.email,
+                        'role': user_role.role,
+                        'is_staff': admin_user.is_staff,
+                        'is_superuser': admin_user.is_superuser,
+                        'is_active': admin_user.is_active,
+                    },
+                    'organization': {
+                        'name': future_objects_org.name,
+                        'created': org_created
+                    },
+                    'login_info': {
+                        'username': 'superadmin',
+                        'password': 'admin123',
+                        'dashboard_url': '/admin/super'
+                    },
+                    'note': 'User privileges and role updated. You can now access the SuperAdmin Dashboard.'
+                })
 
         except Exception as e:
             return Response({
                 'success': False,
-                'error': f'Failed to create superadmin: {str(e)}'
+                'error': f'Failed to create/fix superadmin: {str(e)}'
             }, status=400)
     
 
