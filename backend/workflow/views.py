@@ -15,7 +15,7 @@ from .serializers import (
 )
 from .services import WorkflowService
 from users.models import Platform, Service, PlatformService
-from apify_integration.services import ApifyAutomatedBatchScraper
+from brightdata_integration.services import BrightDataAutomatedBatchScraper
 
 logger = logging.getLogger(__name__)
 
@@ -316,9 +316,9 @@ class ScheduledScrapingTaskViewSet(viewsets.ModelViewSet):
                 )
             
             # Create a batch scraper job for this task
-            from apify_integration.models import ApifyBatchJob
+            from brightdata_integration.models import BrightDataBatchJob
             
-            batch_job = ApifyBatchJob.objects.create(
+            batch_job = BrightDataBatchJob.objects.create(
                 name=f"Scheduled_{task.name}_{timezone.now().strftime('%Y%m%d_%H%M%S')}",
                 project=task.project,
                 source_folder_ids=[],
@@ -474,7 +474,7 @@ class ScrapingRunViewSet(viewsets.ModelViewSet):
                         job.batch_job.save()
                         
                         # Execute the batch job
-                        scraper = ApifyAutomatedBatchScraper()
+                        scraper = BrightDataAutomatedBatchScraper()
                         success = scraper.execute_batch_job(job.batch_job.id)
                         
                         if success:
