@@ -2,7 +2,7 @@
 applications:
   trackfutura:
     source:
-      root: ..
+      root: .
     type: python:3.12
     
     dependencies:
