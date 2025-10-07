@@ -7,7 +7,7 @@ applications:
       python3:
         pip: ">=23.0"
       nodejs:
-        npm: ">=18"
+        npm: "10"
     
     build:
       flavor: none
