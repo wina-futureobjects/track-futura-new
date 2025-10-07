@@ -19,10 +19,12 @@ except User.DoesNotExist:
     user.save()
     print(f"Created new admin user: {user.username}")
 
-# Set/reset password
+# Set/reset password and make sure it's superuser
 user.set_password('admin123')
+user.is_staff = True
+user.is_superuser = True
 user.save()
-print(f"Password set for user: {user.username}")
+print(f"Password set for user: {user.username}, is_superuser: {user.is_superuser}")
 
 # Create a test user too
 try:
@@ -39,5 +41,33 @@ except User.DoesNotExist:
 test_user.set_password('test123')
 test_user.save()
 print(f"Password set for test user: {test_user.username}")
+
+# Now let's assign proper roles using the UserProfile model
+try:
+    from users.models import UserProfile, UserRole
+    
+    # Create or update admin user profile with super_admin role
+    admin_profile, created = UserProfile.objects.get_or_create(user=user)
+    super_admin_role, role_created = UserRole.objects.get_or_create(
+        role='super_admin',
+        defaults={'role_display': 'Super Administrator'}
+    )
+    admin_profile.global_role = super_admin_role
+    admin_profile.save()
+    print(f"Admin user role set to: {super_admin_role.role}")
+    
+    # Create or update test user profile with user role  
+    test_profile, created = UserProfile.objects.get_or_create(user=test_user)
+    user_role, role_created = UserRole.objects.get_or_create(
+        role='user',
+        defaults={'role_display': 'User'}
+    )
+    test_profile.global_role = user_role
+    test_profile.save()
+    print(f"Test user role set to: {user_role.role}")
+    
+except ImportError as e:
+    print(f"Could not import user models: {e}")
+    print("User roles not set - check if UserProfile and UserRole models exist")
 
 print(f"Total users in database: {User.objects.count()}")
