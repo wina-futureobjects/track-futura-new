@@ -215,19 +215,19 @@ class BrightDataAutomatedBatchScraper:
             username = self._extract_instagram_username(target_url)
             return [{
                 'url': f'https://www.instagram.com/{username}/',
-                'limit': batch_job.num_of_posts,
-                'include_posts': True,
-                'include_stories': False,
-                'include_highlights': False
+                'num_of_posts': batch_job.num_of_posts,
+                'start_date': batch_job.start_date.strftime('%Y-%m-%d') if batch_job.start_date else '',
+                'end_date': batch_job.end_date.strftime('%Y-%m-%d') if batch_job.end_date else '',
+                'post_type': 'Post'
             }]
             
         elif platform == 'facebook':
             return [{
                 'url': target_url,
-                'limit': batch_job.num_of_posts,
-                'include_posts': True,
-                'include_comments': True,
-                'max_comments': 50
+                'num_of_posts': batch_job.num_of_posts,
+                'start_date': batch_job.start_date.strftime('%Y-%m-%d') if batch_job.start_date else '',
+                'end_date': batch_job.end_date.strftime('%Y-%m-%d') if batch_job.end_date else '',
+                'post_type': 'Post'
             }]
             
         elif platform == 'tiktok':
@@ -235,9 +235,9 @@ class BrightDataAutomatedBatchScraper:
             username = self._extract_tiktok_username(target_url)
             return [{
                 'url': f'https://www.tiktok.com/@{username}',
-                'limit': batch_job.num_of_posts,
-                'include_videos': True,
-                'include_comments': True
+                'num_of_posts': batch_job.num_of_posts,
+                'start_date': batch_job.start_date.strftime('%Y-%m-%d') if batch_job.start_date else '',
+                'end_date': batch_job.end_date.strftime('%Y-%m-%d') if batch_job.end_date else ''
             }]
             
         elif platform == 'linkedin':
@@ -273,21 +273,23 @@ class BrightDataAutomatedBatchScraper:
                 'Content-Type': 'application/json'
             }
             
-            # Prepare request data
-            request_data = {
+            # Prepare URL parameters (this is the correct format for BrightData API)
+            params = {
                 'dataset_id': config.dataset_id,
-                'data': payload,
+                'include_errors': 'true',
+                'type': 'discover_new',
+                'discover_by': 'url',
                 'endpoint': f"{webhook_base_url}/api/brightdata/webhook/",
                 'notify': f"{webhook_base_url}/api/brightdata/notify/",
                 'format': 'json',
-                'uncompressed_webhook': True,
-                'include_errors': True
+                'uncompressed_webhook': 'true'
             }
             
-            # Make the request to start the scraping
+            # Make the request to start the scraping (payload goes in body, params in URL)
             response = requests.post(
                 url,
-                json=request_data,
+                params=params,
+                json=payload,
                 headers=headers,
                 timeout=30
             )
