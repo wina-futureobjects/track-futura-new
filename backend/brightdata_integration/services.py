@@ -134,11 +134,21 @@ class BrightDataAutomatedBatchScraper:
                     "tiktok": "2",
                     "linkedin": "3"
                 }
+                # Get API token from environment or existing config
+                api_token = os.getenv('BRIGHTDATA_API_KEY', '')
+                if not api_token:
+                    # Try to get from existing config
+                    existing_config = BrightDataConfig.objects.filter(is_active=True).first()
+                    if existing_config:
+                        api_token = existing_config.api_token
+                    else:
+                        api_token = 'c9f8b6d4b5d6c7a8b9c0d1e2f3g4h5i6j7k8l9m0'  # Fallback
+                
                 config = BrightDataConfig.objects.create(
                     name=f'{platform.title()} Posts Scraper',
                     platform=platform,
                     dataset_id=f'gd_l7q7dkf244hwps8lu{dataset_mapping.get(platform, "0")}',
-                    api_token='c9f8b6d4b5d6c7a8b9c0d1e2f3g4h5i6j7k8l9m0',  # Replace with actual
+                    api_token=api_token,
                     is_active=True
                 )
                 self.logger.info(f"Created missing config for platform: {platform}")
