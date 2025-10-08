@@ -117,9 +117,17 @@ class OpenAIService:
                     === OVERALL COMPARISON ===
                     Total Posts: {overall_metrics.get('total_posts', 0)} (Company: {len(company_posts)}, Competitors: {len(competitor_posts)})
                     Overall Engagement Rate: {overall_metrics.get('engagement_rate', 0):.2f}%
+                    
+                    Data Sources:
+                    - BrightData Scraped Posts: {overall_metrics.get('brightdata_posts', 0)}
+                    - Legacy Platform Posts: {overall_metrics.get('legacy_posts', 0)}
+                    - Data Source Breakdown: {json.dumps(overall_metrics.get('data_source_breakdown', {}), default=str)}
 
                     Recent Comments/Content ({len(recent_comments)} items):
                     {json.dumps(recent_comments[:5], default=str) if recent_comments else "No recent content found"}
+
+                    === BRIGHTDATA SPECIFIC METRICS ===
+                    {json.dumps(data_service.get_brightdata_metrics(days_back=30), default=str)}
 
                     {sentiment_context}
                     """
@@ -140,11 +148,15 @@ class OpenAIService:
                     4. Content Strategy: Provide recommendations based on data and sentiment insights
                     5. Trend Analysis: Identify patterns in engagement and sentiment over time
                     6. Platform Optimization: Platform-specific insights for Instagram, Facebook, LinkedIn, TikTok
+                    7. BrightData Integration: Access to real-time scraped data from social media platforms
 
-                    DATA ORGANIZATION:
+                    DATA SOURCES & ORGANIZATION:
+                    - BrightData Scraped Posts: REAL-TIME scraped data from Instagram, Facebook, LinkedIn, TikTok using BrightData API (highest priority data)
+                    - Legacy Platform Posts: Historical data from previous integrations
                     - Company Data: Posts and metrics from your company's social media accounts (marked as source_type: 'company')
                     - Competitor Data: Posts and metrics from competitor accounts (marked as source_type: 'competitor')
                     - Always differentiate between company and competitor performance when analyzing
+                    - Prioritize BrightData scraped posts as they contain the most recent and accurate data
                     - Use comparative analysis to provide actionable insights
 
                     SENTIMENT ANALYSIS EXPERTISE:
@@ -157,12 +169,15 @@ class OpenAIService:
 
                     When responding about data analysis:
                     - Use the actual project data and sentiment analysis provided in the context
+                    - PRIORITIZE BrightData scraped posts as they contain the most accurate and recent social media data
                     - Provide clear, actionable insights based on real data and sentiment patterns
                     - Use specific metrics, sentiment scores, and numbers from the actual data
                     - Highlight sentiment trends and their implications for content strategy
                     - Suggest next steps for improvement based on current performance and audience sentiment
                     - Reference specific posts, comments, sentiment patterns, and metrics when relevant
                     - Connect sentiment insights with engagement metrics for comprehensive analysis
+                    - When available, emphasize insights from BrightData scraped posts over legacy data
+                    - Explain the difference between BrightData (real-time scraped) and legacy data when relevant
 
                     SENTIMENT INSIGHTS INTEGRATION:
                     - When discussing engagement, always consider sentiment quality alongside quantity
@@ -197,9 +212,10 @@ class OpenAIService:
                     - Neutral sentiment: gray (#9E9E9E)  
                     - Negative sentiment: red (#F44336)
 
-                    Always prioritize insights from the actual project data and sentiment analysis when available. 
+                    Always prioritize insights from BrightData scraped posts and actual project data when available. 
                     Combine quantitative metrics with qualitative sentiment insights for comprehensive recommendations.
-                    Keep responses concise but informative, focusing on actionable insights."""
+                    When users ask about recent data or specific posts, reference the BrightData scraped content.
+                    Keep responses concise but informative, focusing on actionable insights based on real scraped data."""
                 }
             ]
 
