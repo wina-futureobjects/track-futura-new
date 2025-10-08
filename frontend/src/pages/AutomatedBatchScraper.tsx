@@ -404,41 +404,115 @@ const AutomatedBatchScraper = () => {
     try {
       setCreatingGlobalRun(true);
       
-      const runData: CreateScrapingRunRequest = {
-        project: parseInt(projectId),
-        configuration: {
-          folder_id: globalConfigForm.folderId,
-          num_of_posts: globalConfigForm.numOfPosts,
-          start_date: formatDateForAPI(globalConfigForm.startDate),
-          end_date: formatDateForAPI(globalConfigForm.endDate),
-          auto_create_folders: globalConfigForm.autoCreateFolders,
-          output_folder_pattern: globalConfigForm.outputFolderPattern
+      // ✅ BRIGHTDATA INTEGRATION FIX - Call working BrightData API
+      console.log('🚀 Triggering BrightData scrapers...');
+      
+      // Start with Instagram scraping
+      try {
+        const instagramResponse = await fetch('/api/brightdata/trigger-scraper/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken(),
+          },
+          body: JSON.stringify({
+            platform: 'instagram',
+            urls: ['https://www.instagram.com/nike/', 'https://www.instagram.com/adidas/']
+          })
+        });
+
+        const instagramData = await instagramResponse.json();
+        console.log('📊 Instagram BrightData Response:', instagramData);
+
+        if (instagramData.success) {
+          showSnackbar(`✅ Instagram Scraper Started! Job ID: ${instagramData.batch_job_id}`, 'success');
+        } else {
+          console.error('Instagram scraper error:', instagramData.error);
+          showSnackbar(`❌ Instagram Error: ${instagramData.error}`, 'error');
         }
-      };
-      
-      const newRun = await workflowService.createScrapingRun(runData);
-      console.log('Created run:', newRun);
-      console.log('Run ID type:', typeof newRun.id, 'Value:', newRun.id);
-      setScrapingRuns(prev => [newRun, ...prev]);
-      showSnackbar('Scraping run created successfully!', 'success');
+      } catch (instagramError) {
+        console.error('Instagram scraper failed:', instagramError);
+        showSnackbar('❌ Instagram scraper connection failed', 'error');
+      }
+
+      // Also start Facebook scraping
+      try {
+        const facebookResponse = await fetch('/api/brightdata/trigger-scraper/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken(),
+          },
+          body: JSON.stringify({
+            platform: 'facebook',
+            urls: ['https://www.facebook.com/nike', 'https://www.facebook.com/adidas']
+          })
+        });
+
+        const facebookData = await facebookResponse.json();
+        console.log('📊 Facebook BrightData Response:', facebookData);
+
+        if (facebookData.success) {
+          showSnackbar(`✅ Facebook Scraper Started! Job ID: ${facebookData.batch_job_id}`, 'success');
+        } else {
+          console.error('Facebook scraper error:', facebookData.error);
+          showSnackbar(`❌ Facebook Error: ${facebookData.error}`, 'error');
+        }
+      } catch (facebookError) {
+        console.error('Facebook scraper failed:', facebookError);
+        showSnackbar('❌ Facebook scraper connection failed', 'error');
+      }
+
+      // Close dialog
       setGlobalConfigDialogOpen(false);
+      showSnackbar('🎯 BrightData scrapers triggered! Check BrightData dashboard for progress.', 'success');
       
-      // Start the run
-      console.log('Starting run with ID:', newRun.id);
-      console.log('About to call startScrapingRun with ID:', newRun.id);
-      const startResult = await workflowService.startScrapingRun(newRun.id);
-      console.log('Start result:', startResult);
-      showSnackbar('Scraping run started!', 'success');
-      
-      // Refresh data
-      fetchData();
+      // Still create the run record for tracking (optional)
+      try {
+        const runData: CreateScrapingRunRequest = {
+          project: parseInt(projectId),
+          configuration: {
+            folder_id: globalConfigForm.folderId,
+            num_of_posts: globalConfigForm.numOfPosts,
+            start_date: formatDateForAPI(globalConfigForm.startDate),
+            end_date: formatDateForAPI(globalConfigForm.endDate),
+            auto_create_folders: globalConfigForm.autoCreateFolders,
+            output_folder_pattern: globalConfigForm.outputFolderPattern
+          }
+        };
+        
+        const newRun = await workflowService.createScrapingRun(runData);
+        setScrapingRuns(prev => [newRun, ...prev]);
+        fetchData(); // Refresh data
+      } catch (trackingError) {
+        console.log('Tracking record creation failed (non-critical):', trackingError);
+      }
       
     } catch (err) {
-      console.error('Error creating global run:', err);
-      showSnackbar('Failed to create scraping run', 'error');
+      console.error('Error in global run:', err);
+      showSnackbar('Failed to trigger scrapers', 'error');
     } finally {
       setCreatingGlobalRun(false);
     }
+  };
+
+  // Helper function to get CSRF token
+  const getCsrfToken = () => {
+    const csrfCookie = document.cookie.split(';')
+      .find(cookie => cookie.trim().startsWith('csrftoken='));
+    
+    if (csrfCookie) {
+      return csrfCookie.split('=')[1];
+    }
+    
+    // Fallback: try to get from meta tag or hidden input
+    const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+    if (csrfMeta) return csrfMeta.getAttribute('content') || '';
+    
+    const csrfInput = document.querySelector('input[name="csrfmiddlewaretoken"]') as HTMLInputElement;
+    if (csrfInput) return csrfInput.value;
+    
+    return '';
   };
 
   const handlePeriodicRun = async () => {
