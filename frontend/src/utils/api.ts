@@ -121,13 +121,13 @@ export const apiFetch = (endpoint: string, options?: RequestInit): Promise<Respo
   console.log('📡 API Fetch:', { endpoint, url, method: options?.method || 'GET' });
 
   // Get auth token from localStorage if available
-  const token = localStorage.getItem('authToken');
+  const token = localStorage.getItem('authToken') || 'temp-token-for-testing';
   console.log('🔑 Token from localStorage:', token ? `${token.substring(0, 10)}...` : 'NOT FOUND');
 
   // Prepare headers with minimal requirements for testing
   const headers = {
     ...(options?.headers || {}),
-    ...(token ? { 'Authorization': `Token ${token}` } : {}),
+    'Authorization': `Token ${token}`,  // Always include token for testing
     // Basic headers for cross-origin compatibility
     'Accept': 'application/json',
     // Only add Content-Type if it's not FormData (for file uploads)
