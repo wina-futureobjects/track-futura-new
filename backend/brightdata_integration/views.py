@@ -634,6 +634,29 @@ def _update_batch_job_status(batch_job: BrightDataBatchJob):
         logger.error(f"Error updating batch job status: {str(e)}")
 
 
+@csrf_exempt
+@require_http_methods(["POST"])
+def trigger_scraper_endpoint(request):
+    """Direct trigger scraper endpoint - Fixed for production"""
+    try:
+        data = json.loads(request.body)
+        platform = data.get('platform', 'instagram')
+        urls = data.get('urls', [])
+        
+        logger.info(f"🚀 Direct trigger endpoint called: platform={platform}, urls={urls}")
+        
+        from .services import BrightDataAutomatedBatchScraper
+        scraper = BrightDataAutomatedBatchScraper()
+        result = scraper.trigger_scraper(platform, urls)
+        
+        logger.info(f"✅ Scraper result: {result}")
+        return JsonResponse(result)
+        
+    except Exception as e:
+        logger.error(f"❌ Scraper trigger failed: {str(e)}")
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
 def _handle_platform_setup(data):
     """Handle platform and service setup requests"""
     try:

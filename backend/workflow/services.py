@@ -119,20 +119,48 @@ class WorkflowService:
                 status='pending'
             )
             
-            # Execute the batch job using BrightDataAutomatedBatchScraper
+            # Execute the batch job using BrightDataAutomatedBatchScraper (NEW METHOD)
             try:
                 scraper = BrightDataAutomatedBatchScraper()
-                execution_success = scraper.execute_batch_job(batch_job.id)
                 
-                if execution_success:
+                # Get platform and URLs from batch job
+                platform = batch_job.platforms_to_scrape[0] if batch_job.platforms_to_scrape else 'instagram'
+                # Convert platform to lowercase for BrightData API
+                platform = platform.lower()
+                
+                # Extract URLs from input collection data
+                urls = []
+                if hasattr(input_collection, 'data') and input_collection.data:
+                    if isinstance(input_collection.data, dict):
+                        urls = input_collection.data.get('urls', [])
+                    elif isinstance(input_collection.data, list):
+                        urls = [item.get('url') for item in input_collection.data if isinstance(item, dict) and 'url' in item]
+                
+                # If no URLs found, use a default test URL
+                if not urls:
+                    if platform == 'instagram':
+                        urls = ['https://www.instagram.com/nike/']
+                    elif platform == 'facebook':
+                        urls = ['https://www.facebook.com/nike/']
+                    else:
+                        urls = ['https://www.instagram.com/nike/']
+                
+                logger.info(f"Triggering BrightData scraper for platform: {platform}, URLs: {urls}")
+                
+                # Use NEW trigger_scraper method
+                result = scraper.trigger_scraper(platform, urls)
+                
+                if result.get('success'):
                     workflow_task.status = 'processing'
-                    logger.info(f"Successfully started BrightData execution for batch job {batch_job.id}")
+                    batch_job.status = 'processing'
+                    batch_job.save()
+                    logger.info(f"Successfully triggered BrightData scraper for batch job {batch_job.id}")
                 else:
                     workflow_task.status = 'failed'
                     batch_job.status = 'failed'
-                    batch_job.error_log = "Failed to execute batch job"
+                    batch_job.error_log = result.get('error', 'Failed to trigger scraper')
                     batch_job.save()
-                    logger.error(f"Failed to execute batch job {batch_job.id}")
+                    logger.error(f"Failed to trigger scraper for batch job {batch_job.id}: {result.get('error')}")
                 
                 workflow_task.save()
                     
@@ -774,13 +802,18 @@ class WorkflowService:
             
             # Find the corresponding PlatformService
             try:
-                platform_service = PlatformService.objects.get(
+                platform_service = PlatformService.objects.filter(
                     platform__name__iexact=platform_name,
                     service__name__iexact=service_name,
                     is_enabled=True
-                )
-            except PlatformService.DoesNotExist:
-                logger.warning(f"No PlatformService found for {platform_name} - {service_name}")
+                ).first()
+                
+                if not platform_service:
+                    logger.warning(f"No PlatformService found for {platform_name} - {service_name}")
+                    continue
+                    
+            except Exception as e:
+                logger.error(f"Error finding PlatformService for {platform_name} - {service_name}: {str(e)}")
                 continue
             
             # Extract URL for the specific platform

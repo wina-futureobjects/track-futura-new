@@ -43,43 +43,48 @@ class BrightDataAutomatedBatchScraper:
             self.logger.info(f"🚀 TRIGGERING {platform.upper()} SCRAPER - WORKING IMPLEMENTATION")
             self.logger.info(f"📋 URLs: {urls}")
             
-            # Get the dataset ID for this platform
-            dataset_id = self.platform_datasets.get(platform)
-            if not dataset_id:
-                return {'success': False, 'error': f'No dataset configured for platform: {platform}'}
+            # Normalize platform name to lowercase for dataset lookup
+            platform_lower = platform.lower()
             
-            # Create scraper request for tracking
+            # Get the dataset ID for this platform (try both original and lowercase)
+            dataset_id = self.platform_datasets.get(platform) or self.platform_datasets.get(platform_lower)
+            if not dataset_id:
+                return {'success': False, 'error': f'No dataset configured for platform: {platform} (also tried: {platform_lower})'}
+            
+            self.logger.info(f"✅ Found dataset ID: {dataset_id} for platform: {platform_lower}")
+            
+            # Create scraper request for tracking (use lowercase platform for consistency)
             try:
-                config = self._get_or_create_config(platform)
+                config = self._get_or_create_config(platform_lower)
                 if not config:
-                    return {'success': False, 'error': f'Could not get configuration for {platform}'}
+                    return {'success': False, 'error': f'Could not get configuration for {platform_lower}'}
                 
                 scraper_request = BrightDataScraperRequest.objects.create(
                     config=config,
-                    platform=f"{platform}_posts",
+                    platform=f"{platform_lower}_posts",
                     content_type='posts',
-                    target_url=urls[0] if urls else f"https://www.{platform}.com/nike/",
-                    source_name=f'{platform.title()} Batch Scraper',
+                    target_url=urls[0] if urls else f"https://www.{platform_lower}.com/nike/",
+                    source_name=f'{platform_lower.title()} Batch Scraper',
                     status='pending'
                 )
             except Exception as e:
                 self.logger.warning(f"Could not create scraper request: {str(e)}")
                 scraper_request = None
             
-            # Execute the actual BrightData request
-            success = self._make_brightdata_batch_request([scraper_request] if scraper_request else [], urls, platform)
+            # Execute the actual BrightData request (use lowercase platform)
+            success = self._make_brightdata_batch_request([scraper_request] if scraper_request else [], urls, platform_lower)
             
             if success:
                 return {
                     'success': True,
                     'batch_job_id': getattr(scraper_request, 'request_id', 'batch_created'),
-                    'platform': platform,
-                    'message': f'BrightData {platform} scraper triggered successfully!',
+                    'platform': platform_lower,  # Return normalized platform name
+                    'message': f'BrightData {platform_lower} scraper triggered successfully!',
                     'urls_count': len(urls),
                     'dataset_id': dataset_id
                 }
             else:
-                return {'success': False, 'error': f'Failed to trigger {platform} scraper'}
+                return {'success': False, 'error': f'Failed to trigger {platform_lower} scraper'}
                 
         except Exception as e:
             error_msg = f"Failed to trigger {platform} scraper: {str(e)}"

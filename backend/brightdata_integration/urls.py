@@ -20,6 +20,6 @@ urlpatterns = [
     path('webhook/', views.brightdata_webhook, name='brightdata_webhook'),
     path('notify/', views.brightdata_notify, name='brightdata_notify'),
     
-    # Direct trigger endpoint (maps to the action in BrightDataScraperRequestViewSet)
-    path('trigger-scraper/', views.BrightDataScraperRequestViewSet.as_view({'post': 'trigger_scraper'}), name='trigger_scraper'),
+    # Direct trigger endpoint (function-based view for better production compatibility)
+    path('trigger-scraper/', views.trigger_scraper_endpoint, name='trigger_scraper'),
 ]
