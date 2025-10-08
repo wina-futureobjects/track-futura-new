@@ -924,7 +924,7 @@ def brightdata_job_results(request, job_folder_id):
                     end_date=timezone.now()
                 )
                 
-                logger.info(f"🚨 Auto-created missing ReportFolder {job_folder_id}")
+                logger.info(f"🚨 Emergency auto-created missing ReportFolder {job_folder_id}")
             else:
                 return JsonResponse({
                     'success': False,
