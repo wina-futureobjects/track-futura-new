@@ -240,29 +240,8 @@ class BrightDataAutomatedBatchScraper:
             dataset_id = config.dataset_id  # This should be the scraper ID like hl_f7614f18
             api_token = config.api_token
             
-            # TEMPORARY: Log the request but don't fail while we debug API format
-            self.logger.info(f"🧪 TEMP DEBUG MODE: Would send BrightData request")
-            self.logger.info(f"Dataset ID: {dataset_id}")
-            self.logger.info(f"API Token: {api_token[:20]}...")
-            self.logger.info(f"Payload: {payload}")
-            self.logger.info(f"Target URL: {scraper_request.target_url}")
-            
-            # Mark as successful for testing workflow
-            scraper_request.status = 'sent'
-            scraper_request.response_data = {
-                "status": "debug_mode",
-                "message": "Request logged but not sent - debugging API format",
-                "dataset_id": dataset_id,
-                "payload": payload
-            }
-            scraper_request.save()
-            
-            self.logger.info(f"✅ TEMP: Marked request as sent for testing (dataset: {dataset_id})")
-            return True
-            
-            # TODO: Uncomment below when correct API format is found
-            """
-            # Correct BrightData API endpoint for triggering scrapers
+            # BrightData API endpoint for triggering scrapers
+            # Using the working format from yesterday
             url = f"https://api.brightdata.com/datasets/v3/{dataset_id}/trigger"
             
             headers = {
@@ -271,6 +250,8 @@ class BrightDataAutomatedBatchScraper:
             }
             
             self.logger.info(f"Sending request to BrightData: {url}")
+            self.logger.info(f"API Token: {api_token[:20]}...")
+            self.logger.info(f"Payload: {payload}")
             
             # Make the actual API call to BrightData
             response = requests.post(url, json=payload, headers=headers, timeout=30)
@@ -293,7 +274,6 @@ class BrightDataAutomatedBatchScraper:
                 
                 self.logger.error(f"❌ BrightData API error {response.status_code}: {response.text}")
                 return False
-            """
                 
         except requests.exceptions.RequestException as e:
             scraper_request.status = 'failed'
