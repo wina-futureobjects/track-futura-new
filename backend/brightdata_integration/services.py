@@ -127,13 +127,31 @@ class BrightDataAutomatedBatchScraper:
             ).first()
             
             if not config:
-                # Create default config if missing
-                dataset_mapping = {
-                    "instagram": "0",
-                    "facebook": "1", 
-                    "tiktok": "2",
-                    "linkedin": "3"
+                # Create default config if missing with CORRECT DATASET IDS
+                config_data = {
+                    "instagram": {
+                        "dataset_id": "gd_lk5ns7kz21pck8jpis",
+                        "name": "Instagram Posts Scraper"
+                    },
+                    "facebook": {
+                        "dataset_id": "gd_lkaxegm826bjpoo9m5", 
+                        "name": "Facebook Posts Scraper"
+                    },
+                    "tiktok": {
+                        "dataset_id": "gd_l7q7dkf244hwps8lu2",
+                        "name": "TikTok Posts Scraper"
+                    },
+                    "linkedin": {
+                        "dataset_id": "gd_l7q7dkf244hwps8lu3",
+                        "name": "LinkedIn Posts Scraper"
+                    }
                 }
+                
+                platform_config = config_data.get(platform, {
+                    "dataset_id": f"gd_default_{platform}",
+                    "name": f"{platform.title()} Posts Scraper"
+                })
+                
                 # Get API token from environment or existing config
                 api_token = os.getenv('BRIGHTDATA_API_KEY', '')
                 if not api_token:
@@ -142,16 +160,16 @@ class BrightDataAutomatedBatchScraper:
                     if existing_config:
                         api_token = existing_config.api_token
                     else:
-                        api_token = 'c9f8b6d4b5d6c7a8b9c0d1e2f3g4h5i6j7k8l9m0'  # Fallback
+                        api_token = '8af6995e-3baa-4b69-9df7-8d7671e621eb'  # Your working token
                 
                 config = BrightDataConfig.objects.create(
-                    name=f'{platform.title()} Posts Scraper',
+                    name=platform_config["name"],
                     platform=platform,
-                    dataset_id=f'gd_l7q7dkf244hwps8lu{dataset_mapping.get(platform, "0")}',
+                    dataset_id=platform_config["dataset_id"],
                     api_token=api_token,
                     is_active=True
                 )
-                self.logger.info(f"Created missing config for platform: {platform}")
+                self.logger.info(f"Created missing config for {platform}: {platform_config['dataset_id']}")
             
             # Enhanced URL extraction
             target_url = self._get_target_url_for_platform(batch_job, platform)
