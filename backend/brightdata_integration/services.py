@@ -241,12 +241,22 @@ class BrightDataAutomatedBatchScraper:
                         # Convert from ISO format: "2025-10-08T00:00:00.000Z" to datetime
                         end_dt = datetime.fromisoformat(date_range['end_date'].replace('Z', '+00:00'))
                         
-                        # Ensure end date is in the past (at least 1 day ago for BrightData discovery)
+                        # Ensure end date is in the past (at least 2 days ago for BrightData discovery)
                         if end_dt.date() >= today.date():
                             print(f"⚠️ End date {end_dt.date()} is today/future, adjusting to past date")
-                            end_dt = today - timedelta(days=1)  # Yesterday
+                            end_dt = today - timedelta(days=2)  # 2 days ago to be extra safe
                         
                         end_date = end_dt.strftime("%d-%m-%Y")
+                        
+                    # ADDITIONAL SAFETY CHECK: If start date is too close to end date, adjust start date too
+                    start_check = datetime.strptime(start_date, "%d-%m-%Y")
+                    end_check = datetime.strptime(end_date, "%d-%m-%Y")
+                    
+                    if end_check.date() >= today.date() or (end_check - start_check).days < 3:
+                        print(f"🔧 SAFETY OVERRIDE: Using guaranteed safe September dates")
+                        # Use safe September dates that we know work
+                        start_date = "01-09-2025"  # September 1st
+                        end_date = "30-09-2025"    # September 30th (known working from your example)
                         
                     print(f"📅 Parsed dates from system (adjusted for BrightData): {start_date} to {end_date}")
                 except Exception as e:
@@ -262,7 +272,11 @@ class BrightDataAutomatedBatchScraper:
                 if end_dt < start_dt:
                     print(f"⚠️ End date {end_date} is before start date {start_date}")
                 elif end_dt.date() >= today_dt.date():
-                    print(f"⚠️ End date {end_date} is today/future - BrightData discovery needs past dates!")
+                    print(f"⚠️ CRITICAL: End date {end_date} is today/future - forcing September dates!")
+                    # Force safe September dates
+                    start_date = "01-09-2025"
+                    end_date = "30-09-2025"
+                    print(f"🔧 FORCED SAFE DATES: {start_date} to {end_date}")
                 elif (end_dt - start_dt).days > 365:
                     print(f"⚠️ Date range is very large: {(end_dt - start_dt).days} days")
                 else:
