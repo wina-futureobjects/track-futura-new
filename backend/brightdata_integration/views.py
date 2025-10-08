@@ -637,7 +637,7 @@ def _update_batch_job_status(batch_job: BrightDataBatchJob):
 @csrf_exempt
 @require_http_methods(["POST", "OPTIONS"])
 def trigger_scraper_endpoint(request):
-    """Direct trigger scraper endpoint - CORS-friendly for frontend interface"""
+    """SYSTEM INTEGRATED trigger scraper endpoint - Uses TrackFutura data"""
     
     # Handle CORS preflight OPTIONS request
     if request.method == 'OPTIONS':
@@ -651,18 +651,46 @@ def trigger_scraper_endpoint(request):
     # Handle actual POST request
     try:
         data = json.loads(request.body)
-        platform = data.get('platform', 'instagram')
-        urls = data.get('urls', [])
         
-        logger.info(f"🚀 Direct trigger endpoint called: platform={platform}, urls={urls}")
-        print(f"🔥 INTERFACE TRIGGERED SCRAPER: {platform} -> {urls}")
+        # Extract system parameters from request
+        folder_id = data.get('folder_id', 1)  # Default to folder 1 (Nike)
+        user_id = data.get('user_id', 3)      # Default to superadmin (user 3)
+        num_of_posts = data.get('num_of_posts', 10)
         
-        from .services import BrightDataAutomatedBatchScraper
-        scraper = BrightDataAutomatedBatchScraper()
-        result = scraper.trigger_scraper(platform, urls)
+        # Extract date range from request
+        date_range = data.get('date_range', {
+            'start_date': '2025-10-01T00:00:00.000Z',
+            'end_date': '2025-10-08T00:00:00.000Z'
+        })
         
-        logger.info(f"✅ Scraper result: {result}")
-        print(f"✅ RESULT FOR INTERFACE: {result}")
+        # Support legacy direct URL format as fallback
+        input_url = data.get('input_url')
+        if input_url:
+            logger.info(f"� Legacy URL format detected: {input_url}")
+            # Extract platform from URL
+            platform = 'instagram' if 'instagram.com' in input_url else 'facebook'
+            from .services import BrightDataAutomatedBatchScraper
+            scraper = BrightDataAutomatedBatchScraper()
+            result = scraper.trigger_scraper_with_dates(platform, [input_url], date_range, num_of_posts)
+        else:
+            # Use system integrated approach
+            logger.info(f"� SYSTEM INTEGRATED trigger called")
+            logger.info(f"📁 Folder ID: {folder_id}")
+            logger.info(f"👤 User ID: {user_id}")
+            logger.info(f"📅 Date Range: {date_range}")
+            logger.info(f"📊 Posts per URL: {num_of_posts}")
+            
+            from .services import BrightDataAutomatedBatchScraper
+            scraper = BrightDataAutomatedBatchScraper()
+            result = scraper.trigger_scraper_from_system(
+                folder_id=folder_id,
+                date_range=date_range,
+                user_id=user_id,
+                num_of_posts=num_of_posts
+            )
+        
+        logger.info(f"✅ System scraper result: {result}")
+        print(f"✅ SYSTEM RESULT: {result}")
         
         # Create CORS-friendly response
         response = JsonResponse(result)
@@ -673,8 +701,10 @@ def trigger_scraper_endpoint(request):
         return response
         
     except Exception as e:
-        logger.error(f"❌ Scraper trigger failed: {str(e)}")
-        print(f"❌ INTERFACE ERROR: {str(e)}")
+        logger.error(f"❌ System scraper trigger failed: {str(e)}")
+        print(f"❌ SYSTEM ERROR: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         
         # Create CORS-friendly error response
         response = JsonResponse({'success': False, 'error': str(e)}, status=500)

@@ -404,70 +404,67 @@ const AutomatedBatchScraper = () => {
     try {
       setCreatingGlobalRun(true);
       
-      // ✅ BRIGHTDATA INTEGRATION FIX - Call working BrightData API
-      console.log('🚀 Triggering BrightData scrapers...');
+      // ✅ SYSTEM INTEGRATED BRIGHTDATA TRIGGER
+      console.log('� Triggering SYSTEM INTEGRATED BrightData scrapers...');
+      console.log('📁 Using Folder ID:', globalConfigForm.folderId);
+      console.log('📅 Date Range:', globalConfigForm.startDate.format('YYYY-MM-DD'), 'to', globalConfigForm.endDate.format('YYYY-MM-DD'));
+      console.log('📊 Posts per URL:', globalConfigForm.numOfPosts);
       
-      // Start with Instagram scraping
+      // Prepare system data for API call
+      const systemData = {
+        folder_id: globalConfigForm.folderId,
+        user_id: 3, // superadmin user ID
+        num_of_posts: globalConfigForm.numOfPosts,
+        date_range: {
+          start_date: formatDateForAPI(globalConfigForm.startDate),
+          end_date: formatDateForAPI(globalConfigForm.endDate)
+        }
+      };
+      
+      console.log('🎯 System Data:', systemData);
+      
+      // Call system integrated BrightData API
       try {
-        const instagramResponse = await fetch('/api/brightdata/trigger-scraper/', {
+        const response = await fetch('/api/brightdata/trigger-scraper/', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'X-CSRFToken': getCsrfToken(),
           },
-          body: JSON.stringify({
-            platform: 'instagram',
-            urls: ['https://www.instagram.com/nike/', 'https://www.instagram.com/adidas/']
-          })
+          body: JSON.stringify(systemData)
         });
 
-        const instagramData = await instagramResponse.json();
-        console.log('📊 Instagram BrightData Response:', instagramData);
+        const data = await response.json();
+        console.log('📊 System BrightData Response:', data);
 
-        if (instagramData.success) {
-          showSnackbar(`✅ Instagram Scraper Started! Job ID: ${instagramData.batch_job_id}`, 'success');
+        if (data.success) {
+          const platforms = data.platforms_scraped || [];
+          const platformsText = platforms.join(', ');
+          showSnackbar(`✅ System Scrapers Started! Platforms: ${platformsText} (${data.successful_platforms}/${data.total_platforms})`, 'success');
+          
+          // Show detailed results
+          if (data.results) {
+            Object.entries(data.results).forEach(([platform, result]: [string, any]) => {
+              if (result.success) {
+                console.log(`✅ ${platform}: ${result.snapshot_id}`);
+              } else {
+                console.error(`❌ ${platform}: ${result.error}`);
+              }
+            });
+          }
         } else {
-          console.error('Instagram scraper error:', instagramData.error);
-          showSnackbar(`❌ Instagram Error: ${instagramData.error}`, 'error');
+          console.error('System scraper error:', data.error);
+          showSnackbar(`❌ System Error: ${data.error}`, 'error');
         }
-      } catch (instagramError) {
-        console.error('Instagram scraper failed:', instagramError);
-        showSnackbar('❌ Instagram scraper connection failed', 'error');
-      }
-
-      // Also start Facebook scraping
-      try {
-        const facebookResponse = await fetch('/api/brightdata/trigger-scraper/', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCsrfToken(),
-          },
-          body: JSON.stringify({
-            platform: 'facebook',
-            urls: ['https://www.facebook.com/nike', 'https://www.facebook.com/adidas']
-          })
-        });
-
-        const facebookData = await facebookResponse.json();
-        console.log('📊 Facebook BrightData Response:', facebookData);
-
-        if (facebookData.success) {
-          showSnackbar(`✅ Facebook Scraper Started! Job ID: ${facebookData.batch_job_id}`, 'success');
-        } else {
-          console.error('Facebook scraper error:', facebookData.error);
-          showSnackbar(`❌ Facebook Error: ${facebookData.error}`, 'error');
-        }
-      } catch (facebookError) {
-        console.error('Facebook scraper failed:', facebookError);
-        showSnackbar('❌ Facebook scraper connection failed', 'error');
+      } catch (apiError) {
+        console.error('System scraper API failed:', apiError);
+        showSnackbar('❌ System scraper connection failed', 'error');
       }
 
       // Close dialog
       setGlobalConfigDialogOpen(false);
-      showSnackbar('🎯 BrightData scrapers triggered! Check BrightData dashboard for progress.', 'success');
       
-      // Still create the run record for tracking (optional)
+      // Create the run record for tracking
       try {
         const runData: CreateScrapingRunRequest = {
           project: parseInt(projectId),
@@ -484,8 +481,10 @@ const AutomatedBatchScraper = () => {
         const newRun = await workflowService.createScrapingRun(runData);
         setScrapingRuns(prev => [newRun, ...prev]);
         fetchData(); // Refresh data
+        showSnackbar('🎯 System scraper triggered using your sources and date filters!', 'success');
       } catch (trackingError) {
         console.log('Tracking record creation failed (non-critical):', trackingError);
+        showSnackbar('⚠️ Scraper started but tracking record failed', 'warning');
       }
       
     } catch (err) {

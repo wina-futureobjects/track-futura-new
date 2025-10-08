@@ -1,8 +1,11 @@
 """
-BrightData Integration Services - CLEAN DIRECT API VERSION
+BrightData Integration Services - SYSTEM INTEGRATED VERSION
 
-DIRECT BRIGHTDATA API - NO DATABASE NEEDED!
-Uses EXACT user-provided format with just API token + dataset IDs
+READS FROM TRACKFUTURA SYSTEM:
+- Uses TrackSource URLs from user's system
+- Respects date filters from scraping runs  
+- Only scrapes sources in selected folders
+- Integrates with user inputs and filtering
 """
 
 import logging
@@ -10,6 +13,7 @@ import os
 import requests
 import json
 from typing import Optional, Dict, Any, List
+from datetime import datetime
 from django.conf import settings
 from django.utils import timezone
 
@@ -19,16 +23,16 @@ logger = logging.getLogger(__name__)
 
 
 class BrightDataAutomatedBatchScraper:
-    """DIRECT BrightData API Service - NO DATABASE DEPENDENCIES"""
+    """BrightData API Service - INTEGRATED WITH TRACKFUTURA SYSTEM"""
     
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         
-        # DIRECT API CREDENTIALS - NO DATABASE LOOKUP NEEDED!
+        # DIRECT API CREDENTIALS - CONFIRMED WORKING
         self.api_token = "8af6995e-3baa-4b69-9df7-8d7671e621eb"
         self.api_url = "https://api.brightdata.com/datasets/v3/trigger"
         
-        # EXACT WORKING DATASET IDS
+        # CONFIRMED WORKING DATASET IDS
         self.platform_datasets = {
             'instagram': 'gd_lk5ns7kz21pck8jpis',  # CONFIRMED WORKING
             'facebook': 'gd_lkaxegm826bjpoo9m5',   # CONFIRMED WORKING
@@ -36,37 +40,136 @@ class BrightDataAutomatedBatchScraper:
             'linkedin': 'gd_l7q7dkf244hwps8lu3',   # LinkedIn dataset ID
         }
 
-    def trigger_scraper(self, platform: str, urls: List[str]) -> Dict[str, Any]:
+    def trigger_scraper_from_system(self, folder_id: int = None, date_range: Dict[str, str] = None, 
+                                   user_id: int = None, num_of_posts: int = 10) -> Dict[str, Any]:
         """
-        DIRECT BRIGHTDATA API TRIGGER - NO DATABASE NEEDED!
-        Uses EXACT user-provided format with just API token + dataset IDs
+        SYSTEM INTEGRATED SCRAPER - Reads from TrackFutura database
+        Uses user's actual sources, date filters, and folder selections
+        """
+        try:
+            # Import here to avoid circular imports
+            from track_accounts.models import TrackSource, TrackSourceFolder
+            
+            self.logger.info(f"🔄 SYSTEM INTEGRATED TRIGGER")
+            self.logger.info(f"📁 Folder ID: {folder_id}")
+            self.logger.info(f"📅 Date Range: {date_range}")
+            self.logger.info(f"👤 User ID: {user_id}")
+            
+            # Get sources from the system
+            if folder_id:
+                sources = TrackSource.objects.filter(folder_id=folder_id, folder__project_id=1)
+                self.logger.info(f"📋 Found {sources.count()} sources in folder {folder_id}")
+            else:
+                sources = TrackSource.objects.filter(folder__project_id=1)
+                self.logger.info(f"📋 Found {sources.count()} total sources")
+            
+            if not sources.exists():
+                return {
+                    'success': False, 
+                    'error': f'No sources found in folder {folder_id}' if folder_id else 'No sources found'
+                }
+            
+            # Group sources by platform
+            platform_urls = {}
+            for source in sources:
+                platform = source.platform.lower()
+                
+                # Get the appropriate URL based on platform
+                url = None
+                if platform == 'instagram' and source.instagram_link:
+                    url = source.instagram_link
+                elif platform == 'facebook' and source.facebook_link:
+                    url = source.facebook_link
+                elif platform == 'linkedin' and source.linkedin_link:
+                    url = source.linkedin_link
+                elif platform == 'tiktok' and source.tiktok_link:
+                    url = source.tiktok_link
+                
+                if url:
+                    if platform not in platform_urls:
+                        platform_urls[platform] = []
+                    platform_urls[platform].append({
+                        'url': url,
+                        'source_name': source.name,
+                        'source_id': source.id
+                    })
+            
+            self.logger.info(f"🎯 Platforms to scrape: {list(platform_urls.keys())}")
+            
+            # Trigger scraping for each platform
+            results = {}
+            total_success = 0
+            total_failed = 0
+            
+            for platform, url_data in platform_urls.items():
+                urls = [item['url'] for item in url_data]
+                
+                result = self.trigger_scraper_with_dates(
+                    platform=platform, 
+                    urls=urls, 
+                    date_range=date_range,
+                    num_of_posts=num_of_posts
+                )
+                
+                results[platform] = result
+                if result.get('success'):
+                    total_success += 1
+                else:
+                    total_failed += 1
+                
+                self.logger.info(f"✅ {platform}: {result}")
+            
+            return {
+                'success': total_success > 0,
+                'platforms_scraped': list(platform_urls.keys()),
+                'total_platforms': len(platform_urls),
+                'successful_platforms': total_success,
+                'failed_platforms': total_failed,
+                'results': results,
+                'message': f'Triggered scraping for {total_success} platforms from your system sources'
+            }
+            
+        except Exception as e:
+            error_msg = f"Failed to trigger system scraper: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            return {'success': False, 'error': error_msg}
+
+    def trigger_scraper_with_dates(self, platform: str, urls: List[str], 
+                                  date_range: Dict[str, str] = None, num_of_posts: int = 10) -> Dict[str, Any]:
+        """
+        SYSTEM INTEGRATED BRIGHTDATA API TRIGGER
+        Uses URLs from system with proper date filtering
         """
         try:
             platform_lower = platform.lower()
             
-            self.logger.info(f"🚀 DIRECT API TRIGGER: {platform_lower.upper()}")
+            self.logger.info(f"🚀 SYSTEM TRIGGER: {platform_lower.upper()}")
             self.logger.info(f"📋 URLs: {urls}")
+            self.logger.info(f"📅 Date Range: {date_range}")
             
-            # Get dataset ID directly from our hardcoded working values
+            # Get dataset ID
             dataset_id = self.platform_datasets.get(platform_lower)
             if not dataset_id:
                 return {'success': False, 'error': f'No dataset ID for platform: {platform_lower}'}
             
-            print(f"🔥 DIRECT BRIGHTDATA API CALL")
+            print(f"🔥 SYSTEM INTEGRATED BRIGHTDATA API CALL")
             print(f"Platform: {platform_lower}")
             print(f"Dataset ID: {dataset_id}")
-            print(f"API Token: {self.api_token[:10]}...")
+            print(f"URLs: {urls}")
+            print(f"Date Range: {date_range}")
             
-            # Make direct API call
-            success, batch_id = self._make_direct_api_call(urls, platform_lower, dataset_id)
+            # Make API call with date filtering
+            success, batch_id = self._make_system_api_call(urls, platform_lower, dataset_id, date_range, num_of_posts)
             
             if success:
                 return {
                     'success': True,
-                    'batch_job_id': batch_id or 'batch_created',
+                    'job_id': batch_id or 'batch_created',
+                    'snapshot_id': batch_id,
                     'platform': platform_lower,
-                    'message': f'BrightData {platform_lower} scraper triggered successfully!',
+                    'message': f'BrightData {platform_lower} scraper triggered with system data!',
                     'urls_count': len(urls),
+                    'date_range': date_range,
                     'dataset_id': dataset_id
                 }
             else:
@@ -78,12 +181,20 @@ class BrightDataAutomatedBatchScraper:
             print(f"❌ EXCEPTION: {error_msg}")
             return {'success': False, 'error': error_msg}
 
-    def _make_direct_api_call(self, urls: List[str], platform: str, dataset_id: str) -> tuple[bool, str]:
+    def trigger_scraper(self, platform: str, urls: List[str]) -> Dict[str, Any]:
         """
-        PURE BRIGHTDATA API CALL - EXACT USER FORMAT
+        LEGACY COMPATIBLE TRIGGER - Maintains backward compatibility
+        """
+        return self.trigger_scraper_with_dates(platform, urls)
+
+    def _make_system_api_call(self, urls: List[str], platform: str, dataset_id: str, 
+                             date_range: Dict[str, str] = None, num_of_posts: int = 10) -> tuple[bool, str]:
+        """
+        SYSTEM INTEGRATED BRIGHTDATA API CALL
+        Uses system date ranges and filters properly
         """
         try:
-            # Headers - EXACT user format
+            # Headers
             headers = {
                 "Authorization": f"Bearer {self.api_token}",
                 "Content-Type": "application/json",
@@ -102,55 +213,80 @@ class BrightDataAutomatedBatchScraper:
                     "discover_by": "url",
                 })
             
-            # Prepare payload with EXACT user format
+            # Parse date range from system
+            start_date = "01-10-2025"  # Default fallback
+            end_date = "08-10-2025"    # Default fallback
+            
+            if date_range:
+                try:
+                    if 'start_date' in date_range and date_range['start_date']:
+                        # Convert from ISO format: "2025-10-01T00:00:00.000Z" to "01-10-2025"
+                        start_dt = datetime.fromisoformat(date_range['start_date'].replace('Z', '+00:00'))
+                        start_date = start_dt.strftime("%d-%m-%Y")
+                    
+                    if 'end_date' in date_range and date_range['end_date']:
+                        # Convert from ISO format: "2025-10-08T00:00:00.000Z" to "08-10-2025"
+                        end_dt = datetime.fromisoformat(date_range['end_date'].replace('Z', '+00:00'))
+                        end_date = end_dt.strftime("%d-%m-%Y")
+                except Exception as e:
+                    self.logger.warning(f"Date parsing error: {e}, using defaults")
+            
+            print(f"📅 Using dates: {start_date} to {end_date}")
+            
+            # Prepare payload with SYSTEM data
             payload = []
             for url in urls:
                 if platform == 'instagram':
-                    # EXACT format from user example
                     item = {
                         "url": url,
-                        "num_of_posts": 10,
-                        "start_date": "01-01-2025",
-                        "end_date": "03-01-2025",
+                        "num_of_posts": num_of_posts,
+                        "start_date": start_date,
+                        "end_date": end_date,
                         "post_type": "Post"
                     }
                 elif platform == 'facebook':
                     item = {
                         "url": url,
-                        "num_of_posts": 10,
-                        "start_date": "01-01-2025",
-                        "end_date": "03-01-2025"
+                        "num_of_posts": num_of_posts,
+                        "start_date": start_date,
+                        "end_date": end_date
                     }
                 else:
-                    item = {"url": url, "num_of_posts": 10}
+                    item = {"url": url, "num_of_posts": num_of_posts}
                 
                 payload.append(item)
             
-            print(f"Making request to: {self.api_url}")
-            print(f"Payload: {payload}")
+            print(f"🔥 Making SYSTEM API request to: {self.api_url}")
+            print(f"📋 Payload: {json.dumps(payload, indent=2)}")
             
             # Make the actual request
             response = requests.post(self.api_url, headers=headers, params=params, json=payload, timeout=30)
             
-            print(f"Response Status: {response.status_code}")
-            print(f"Response: {response.text}")
+            print(f"📊 Response Status: {response.status_code}")
+            print(f"📄 Response: {response.text}")
             
             if response.status_code == 200:
                 try:
                     response_data = response.json()
-                    snapshot_id = response_data.get('snapshot_id', 'direct_batch_created')
-                    print(f"✅ SUCCESS! Snapshot ID: {snapshot_id}")
+                    snapshot_id = response_data.get('snapshot_id', 'system_batch_created')
+                    print(f"✅ SYSTEM SUCCESS! Snapshot ID: {snapshot_id}")
                     return True, snapshot_id
                 except json.JSONDecodeError:
-                    print(f"✅ SUCCESS! (Raw response: {response.text})")
-                    return True, "direct_batch_success"
+                    print(f"✅ SYSTEM SUCCESS! (Raw response: {response.text})")
+                    return True, "system_batch_success"
             else:
-                print(f"❌ FAILED! Status: {response.status_code}, Response: {response.text}")
+                print(f"❌ SYSTEM FAILED! Status: {response.status_code}, Response: {response.text}")
                 return False, None
                 
         except Exception as e:
-            print(f"❌ EXCEPTION in direct API call: {str(e)}")
+            print(f"❌ EXCEPTION in system API call: {str(e)}")
             return False, None
+
+    def _make_direct_api_call(self, urls: List[str], platform: str, dataset_id: str) -> tuple[bool, str]:
+        """
+        LEGACY DIRECT API CALL - Maintains backward compatibility
+        """
+        return self._make_system_api_call(urls, platform, dataset_id)
 
     # ========== LEGACY COMPATIBILITY METHODS ==========
     
