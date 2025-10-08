@@ -53,23 +53,9 @@ class BrightDataAutomatedBatchScraper:
             
             self.logger.info(f"✅ Found dataset ID: {dataset_id} for platform: {platform_lower}")
             
-            # Create scraper request for tracking (use lowercase platform for consistency)
-            try:
-                config = self._get_or_create_config(platform_lower)
-                if not config:
-                    return {'success': False, 'error': f'Could not get configuration for {platform_lower}'}
-                
-                scraper_request = BrightDataScraperRequest.objects.create(
-                    config=config,
-                    platform=f"{platform_lower}_posts",
-                    content_type='posts',
-                    target_url=urls[0] if urls else f"https://www.{platform_lower}.com/nike/",
-                    source_name=f'{platform_lower.title()} Batch Scraper',
-                    status='pending'
-                )
-            except Exception as e:
-                self.logger.warning(f"Could not create scraper request: {str(e)}")
-                scraper_request = None
+            # No database configuration needed! Just use API token directly
+            self.logger.info(f"✅ Using direct BrightData API - no database config required")
+            scraper_request = None  # Optional tracking
             
             # Execute the actual BrightData request (use lowercase platform)
             success = self._make_brightdata_batch_request([scraper_request] if scraper_request else [], urls, platform_lower)
@@ -94,18 +80,22 @@ class BrightDataAutomatedBatchScraper:
     def _make_brightdata_batch_request(self, scraper_requests: List[BrightDataScraperRequest], 
                                      urls: List[str], platform: str) -> bool:
         """
-        Make a batch API request to BrightData - EXACT WORKING IMPLEMENTATION FROM OLD PROJECT
+        Make a batch API request to BrightData - EXACT USER PROVIDED FORMAT
+        Uses the BrightData API token directly, no database lookup needed!
         """
         try:
             self.logger.info(f"🔄 Making BrightData batch request for {platform}")
             
-            # Get dataset ID and API token
+            # Get dataset ID and use the API token directly (no database needed!)
             dataset_id = self.platform_datasets.get(platform)
-            api_token = "8af6995e-3baa-4b69-9df7-8d7671e621eb"  # WORKING TOKEN
+            api_token = "8af6995e-3baa-4b69-9df7-8d7671e621eb"  # DIRECT API TOKEN
             
             if not dataset_id:
                 self.logger.error(f"No dataset ID for platform: {platform}")
                 return False
+            
+            self.logger.info(f"✅ Using direct API token (no database config needed)")
+            self.logger.info(f"✅ Dataset ID: {dataset_id}")
             
             # Prepare the request
             url = "https://api.brightdata.com/datasets/v3/trigger"
@@ -148,38 +138,31 @@ class BrightDataAutomatedBatchScraper:
                     "discover_by": "profile_url",
                 })
 
-            # Prepare payload - EXACT FORMAT FROM OLD PROJECT
+            # Prepare payload - EXACT USER PROVIDED FORMAT
             payload = []
             for url in urls:
                 if platform == 'instagram':
-                    # Instagram Posts API format - EXACT WORKING FORMAT
+                    # Instagram Posts API format - EXACT USER PROVIDED FORMAT
                     item = {
                         "url": url,
                         "num_of_posts": 10,
                         "start_date": "01-01-2025",
                         "end_date": "03-01-2025",
-                        "post_type": "Post",
-                        "posts_to_not_include": [],
+                        "post_type": "Post"
                     }
                 elif platform == 'facebook':
-                    # Facebook Posts API format - EXACT WORKING FORMAT
+                    # Facebook Posts API format
                     item = {
                         "url": url,
                         "num_of_posts": 50,
                         "start_date": "01-01-2025", 
-                        "end_date": "02-28-2025",
-                        "posts_to_not_include": [],
-                    }
-                elif platform == 'tiktok':
-                    # TikTok batch API needs URL field with uppercase "URL"
-                    item = {
-                        "URL": url,
+                        "end_date": "02-28-2025"
                     }
                 else:
                     # Generic format
                     item = {
                         "url": url,
-                        "num_of_posts": 10,
+                        "num_of_posts": 10
                     }
                 
                 payload.append(item)
