@@ -213,7 +213,7 @@ class BrightDataAutomatedBatchScraper:
                     "discover_by": "url",
                 })
             
-            # Parse date range from system
+            # Parse date range from system - FIXED DATE FORMAT
             start_date = "01-10-2025"  # Default fallback
             end_date = "08-10-2025"    # Default fallback
             
@@ -225,45 +225,83 @@ class BrightDataAutomatedBatchScraper:
                         start_date = start_dt.strftime("%d-%m-%Y")
                     
                     if 'end_date' in date_range and date_range['end_date']:
-                        # Convert from ISO format: "2025-10-08T00:00:00.000Z" to "08-10-2025"
+                        # Convert from ISO format: "2025-10-08T00:00:00.000Z" to "08-10-2025"  
                         end_dt = datetime.fromisoformat(date_range['end_date'].replace('Z', '+00:00'))
                         end_date = end_dt.strftime("%d-%m-%Y")
+                        
+                    print(f"📅 Parsed dates from system: {start_date} to {end_date}")
                 except Exception as e:
                     self.logger.warning(f"Date parsing error: {e}, using defaults")
+                    print(f"⚠️ Date parsing failed: {e}")
+            
+            # Validate date range makes sense
+            try:
+                start_dt = datetime.strptime(start_date, "%d-%m-%Y")
+                end_dt = datetime.strptime(end_date, "%d-%m-%Y")
+                if end_dt < start_dt:
+                    print(f"⚠️ End date {end_date} is before start date {start_date}")
+                elif (end_dt - start_dt).days > 365:
+                    print(f"⚠️ Date range is very large: {(end_dt - start_dt).days} days")
+                else:
+                    print(f"✅ Date range validated: {(end_dt - start_dt).days} days")
+            except Exception as e:
+                print(f"⚠️ Date validation failed: {e}")
             
             print(f"📅 Using dates: {start_date} to {end_date}")
             
-            # Prepare payload with SYSTEM data
+            # Prepare payload with SYSTEM data - FIXED FORMAT
             payload = []
             for url in urls:
+                # Ensure URL has trailing slash for Instagram
+                formatted_url = url
+                if platform == 'instagram' and not url.endswith('/'):
+                    formatted_url = url + '/'
+                
                 if platform == 'instagram':
+                    # Match EXACT expected format for Instagram
                     item = {
-                        "url": url,
-                        "num_of_posts": num_of_posts,
+                        "url": formatted_url,
+                        "num_of_posts": num_of_posts if num_of_posts and num_of_posts > 0 else "",
+                        "posts_to_not_include": "",  # Empty field as per your format
                         "start_date": start_date,
                         "end_date": end_date,
                         "post_type": "Post"
                     }
                 elif platform == 'facebook':
+                    # Facebook format
                     item = {
-                        "url": url,
-                        "num_of_posts": num_of_posts,
+                        "url": formatted_url,
+                        "num_of_posts": num_of_posts if num_of_posts and num_of_posts > 0 else "",
+                        "posts_to_not_include": "",  # Empty field as per your format
                         "start_date": start_date,
                         "end_date": end_date
                     }
                 else:
-                    item = {"url": url, "num_of_posts": num_of_posts}
+                    item = {
+                        "url": formatted_url, 
+                        "num_of_posts": num_of_posts if num_of_posts and num_of_posts > 0 else ""
+                    }
                 
                 payload.append(item)
             
             print(f"🔥 Making SYSTEM API request to: {self.api_url}")
+            print(f"📋 Headers: {headers}")
+            print(f"📋 Params: {params}")
             print(f"📋 Payload: {json.dumps(payload, indent=2)}")
+            
+            # Show expected format comparison
+            print(f"🎯 Expected CSV format would be:")
+            for item in payload:
+                if platform == 'instagram':
+                    csv_line = f"{item['url']},{item.get('num_of_posts', '')},{item.get('posts_to_not_include', '')},{item['start_date']},{item['end_date']},{item['post_type']}"
+                    print(f"   {csv_line}")
             
             # Make the actual request
             response = requests.post(self.api_url, headers=headers, params=params, json=payload, timeout=30)
             
             print(f"📊 Response Status: {response.status_code}")
             print(f"📄 Response: {response.text}")
+            print(f"📄 Response Headers: {dict(response.headers)}")
             
             if response.status_code == 200:
                 try:
