@@ -66,10 +66,14 @@ class BrightDataAutomatedBatchScraper:
                 start_date=kwargs.get('start_date'),
                 end_date=kwargs.get('end_date'),
                 platform_params=kwargs.get('platform_params', {}),
-                created_by=kwargs.get('created_by'),
-                # Store URLs in platform_params for later use
-                additional_data={'urls': kwargs.get('urls', [])}
+                created_by=kwargs.get('created_by')
+                # Store URLs in platform_params instead of additional_data for compatibility
             )
+            
+            # Store URLs in platform_params for later use (compatibility fix)
+            if kwargs.get('urls'):
+                batch_job.platform_params['urls'] = kwargs.get('urls', [])
+                batch_job.save()
             
             self.logger.info(f"Created batch job: {batch_job.id} - {name} with {len(kwargs.get('urls', []))} URLs")
             return batch_job
@@ -379,12 +383,12 @@ class BrightDataAutomatedBatchScraper:
     def _get_target_url_for_platform(self, batch_job, platform):
         """Get target URL for a specific platform with URL support"""
         try:
-            # First, check if URLs were passed directly to the batch job
-            additional_data = getattr(batch_job, 'additional_data', {})
-            if additional_data and 'urls' in additional_data:
-                urls = additional_data['urls']
+            # First, check if URLs were passed in platform_params
+            platform_params = getattr(batch_job, 'platform_params', {})
+            if platform_params and 'urls' in platform_params:
+                urls = platform_params['urls']
                 if urls and len(urls) > 0:
-                    self.logger.info(f"Found URL from batch job data: {urls[0]}")
+                    self.logger.info(f"Found URL from batch job platform_params: {urls[0]}")
                     return urls[0]
             
             # Try to get URL from source folders
