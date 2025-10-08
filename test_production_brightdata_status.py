@@ -13,7 +13,7 @@ def test_production_brightdata():
     print("🧪 TESTING PRODUCTION BRIGHTDATA DEPLOYMENT")
     print("=" * 60)
     
-    production_url = "https://trackfutura.futureobjects.io"
+    production_url = "https://main-bvxea6i-inhoolfrqniuu.eu-5.platformsh.site"
     
     # Test 1: Check if API endpoint is accessible
     print("\n1. Testing API endpoint accessibility...")
