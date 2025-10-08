@@ -27,6 +27,16 @@ from django.template.response import TemplateResponse
 import os
 
 
+def serve_brightdata_trigger(request):
+    """Serve the BrightData trigger page"""
+    static_file_path = os.path.join(settings.BASE_DIR, 'static', 'brightdata_trigger.html')
+    if os.path.exists(static_file_path):
+        with open(static_file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        return HttpResponse(content, content_type='text/html')
+    else:
+        return HttpResponse('BrightData trigger page not found', status=404)
+
 def serve_frontend(request):
     """Serve the frontend application"""    
     # Path to the frontend index.html file
@@ -114,6 +124,7 @@ def api_status(request):
 
 urlpatterns = [
     path("", serve_frontend, name="frontend"),  # Serve frontend at root
+    path("brightdata-trigger/", serve_brightdata_trigger, name="brightdata_trigger"),  # BrightData trigger page
     path("api/health/", health_check, name="health_check"),  # Health check endpoint
     path("favicon.ico", favicon_view, name="favicon"),  # Handle favicon
     path("admin/", admin.site.urls),
