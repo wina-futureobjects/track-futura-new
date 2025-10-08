@@ -1049,9 +1049,42 @@ def brightdata_job_results(request, job_folder_id):
                     'job_folder_id': job_folder_id
                 })
         
-        # First, try to get saved posts from database
+        # 🚀 PRIORITY 1: Try to fetch FRESH data from BrightData API first
+        from .services import BrightDataAutomatedBatchScraper
         from .models import BrightDataScrapedPost
         
+        # Try to fetch real data from BrightData for each scraper request
+        fresh_data_fetched = False
+        for scraper_request in scraper_requests:
+            if scraper_request.snapshot_id:
+                try:
+                    # Fetch fresh data from BrightData
+                    scraper_service = BrightDataAutomatedBatchScraper()
+                    
+                    # Try to get results using the snapshot ID
+                    results = scraper_service.get_dataset_results(scraper_request.snapshot_id)
+                    
+                    if results and len(results) > 0:
+                        logger.info(f"🚀 Fetched {len(results)} fresh results from BrightData for snapshot {scraper_request.snapshot_id}")
+                        
+                        # Clear old sample data for this folder
+                        BrightDataScrapedPost.objects.filter(folder_id=job_folder_id).delete()
+                        
+                        # Process and save the fresh results
+                        from .services import parse_brightdata_csv_results, save_scraped_data_to_database
+                        
+                        parsed_data = parse_brightdata_csv_results(results, scraper_request.platform)
+                        if parsed_data:
+                            save_scraped_data_to_database(parsed_data, scraper_request)
+                            fresh_data_fetched = True
+                            logger.info(f"✅ Saved {len(parsed_data)} fresh posts to database for folder {job_folder_id}")
+                            break  # We got fresh data, no need to check other requests
+                            
+                except Exception as e:
+                    logger.error(f"Error fetching fresh BrightData results: {str(e)}")
+                    continue
+        
+        # Get saved posts from database (now includes fresh data if available)
         saved_posts = BrightDataScrapedPost.objects.filter(
             folder_id=job_folder_id
         ).order_by('-date_posted', '-created_at')
@@ -1082,14 +1115,19 @@ def brightdata_job_results(request, job_folder_id):
                     'mentions': post.mentions,
                 })
             
+            # Determine data source
+            data_source = 'fresh_from_brightdata' if fresh_data_fetched else 'database'
+            
             return JsonResponse({
                 'success': True,
                 'job_folder_id': job_folder_id,
                 'job_folder_name': job_folder.name,
                 'total_results': len(posts_data),
                 'data': posts_data,
-                'source': 'database',
-                'saved_posts_count': len(posts_data)
+                'source': data_source,
+                'fresh_data_fetched': fresh_data_fetched,
+                'saved_posts_count': len(posts_data),
+                'message': f'Showing {len(posts_data)} posts from {data_source}'
             })
         
         # No saved posts - try to fetch and save from BrightData

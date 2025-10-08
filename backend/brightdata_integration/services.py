@@ -674,3 +674,50 @@ class BrightDataAutomatedBatchScraper:
     def execute_batch_job(self, batch_job_id: int) -> bool:
         """Legacy method for executing batch jobs"""
         return True
+
+    def get_dataset_results(self, snapshot_id: str) -> Optional[List[Dict]]:
+        """
+        Fetch results from BrightData using snapshot ID
+        Returns the actual scraped data from BrightData API
+        """
+        try:
+            # BrightData results API endpoint
+            results_url = f"https://api.brightdata.com/datasets/v3/snapshot/{snapshot_id}"
+            
+            headers = {
+                'Authorization': f'Bearer {self.api_token}',
+                'Content-Type': 'application/json'
+            }
+            
+            self.logger.info(f"🚀 Fetching BrightData results for snapshot: {snapshot_id}")
+            
+            response = requests.get(results_url, headers=headers, timeout=30)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Handle different response formats
+                if isinstance(data, list):
+                    results = data
+                elif isinstance(data, dict):
+                    # Check for different possible keys
+                    results = data.get('data', data.get('results', data.get('items', [])))
+                else:
+                    results = []
+                
+                self.logger.info(f"✅ Successfully fetched {len(results)} results from BrightData")
+                return results
+                
+            elif response.status_code == 404:
+                self.logger.warning(f"⚠️ Snapshot {snapshot_id} not found or not ready yet")
+                return None
+            else:
+                self.logger.error(f"❌ BrightData API error: {response.status_code} - {response.text}")
+                return None
+                
+        except requests.exceptions.Timeout:
+            self.logger.error(f"⏰ Timeout fetching results for snapshot {snapshot_id}")
+            return None
+        except Exception as e:
+            self.logger.error(f"❌ Error fetching BrightData results: {str(e)}")
+            return None
