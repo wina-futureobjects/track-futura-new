@@ -660,9 +660,25 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
       if (response.ok) {
         const result = await response.json();
         setWebhookStatus(result);
+      } else if (response.status === 404 || response.status === 500) {
+        // Handle missing folder gracefully - don't crash the app
+        console.warn(`Folder ${folder.id} webhook status not available:`, response.status);
+        setWebhookStatus({
+          folder_id: folder.id,
+          status: 'unavailable',
+          message: 'Webhook status not available for this folder'
+        });
+      } else {
+        console.warn('Unexpected webhook status response:', response.status);
       }
     } catch (error) {
       console.error('Error fetching webhook status:', error);
+      // Set a default status instead of crashing
+      setWebhookStatus({
+        folder_id: folder?.id || 'unknown',
+        status: 'error',
+        message: 'Failed to load webhook status'
+      });
     }
   };
 
