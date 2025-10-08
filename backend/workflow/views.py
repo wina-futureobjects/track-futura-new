@@ -216,6 +216,92 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    @action(detail=True, methods=['post'])
+    def start(self, request, pk=None):
+        """Start scraping for an input collection"""
+        try:
+            logger.info(f"Starting scraping for input collection {pk}")
+            
+            input_collection = get_object_or_404(InputCollection, pk=pk)
+            logger.info(f"Found input collection: {input_collection.id}")
+            
+            # Check if there's an existing workflow task
+            workflow_task = WorkflowTask.objects.filter(input_collection=input_collection).first()
+            
+            if not workflow_task:
+                # Create a new workflow task
+                workflow_service = WorkflowService()
+                workflow_task = workflow_service.create_scraper_task(input_collection)
+                
+                if not workflow_task:
+                    return Response(
+                        {'error': 'Failed to create workflow task'}, 
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+                    
+                logger.info(f"Created new workflow task: {workflow_task.id}")
+            
+            # Check if there's a batch job
+            batch_job = workflow_task.batch_job
+            
+            if not batch_job:
+                # Create a batch job with default configuration
+                workflow_service = WorkflowService()
+                batch_job = workflow_service.create_brightdata_batch_job(
+                    input_collection_id=input_collection.id,
+                    job_config={
+                        'name': f"Auto-started job for {input_collection.name}",
+                        'num_of_posts': 10,
+                        'auto_create_folders': True
+                    }
+                )
+                
+                if not batch_job:
+                    return Response(
+                        {'error': 'Failed to create batch job'}, 
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+                    
+                logger.info(f"Created new batch job: {batch_job.id}")
+            
+            # Now try to execute the batch job using BrightData
+            try:
+                scraper = BrightDataAutomatedBatchScraper()
+                execution_success = scraper.execute_batch_job(batch_job.id)
+                
+                if execution_success:
+                    # Update input collection status
+                    input_collection.status = 'processing'
+                    input_collection.save()
+                    
+                    logger.info(f"Successfully started BrightData execution for batch job {batch_job.id}")
+                    return Response({
+                        'message': 'Scraping started successfully',
+                        'batch_job_id': batch_job.id,
+                        'status': 'processing'
+                    }, status=status.HTTP_200_OK)
+                else:
+                    return Response(
+                        {'error': 'Failed to start BrightData execution'}, 
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+                    
+            except Exception as scraper_error:
+                logger.error(f"BrightData execution error: {str(scraper_error)}")
+                return Response(
+                    {'error': f'BrightData execution failed: {str(scraper_error)}'}, 
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+                
+        except Exception as e:
+            logger.error(f"Error starting scraping for input collection: {str(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return Response(
+                {'error': f'Failed to start scraping: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 class WorkflowTaskViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet for workflow task management (read-only)"""
     permission_classes = [AllowAny]  # For testing, use IsAuthenticated in production
