@@ -692,6 +692,31 @@ def trigger_scraper_endpoint(request):
         logger.info(f"✅ System scraper result: {result}")
         print(f"✅ SYSTEM RESULT: {result}")
         
+        # Store job reference if successful
+        if result.get('success') and folder_id:
+            try:
+                # Create BrightData scraper request records for job tracking
+                for platform, platform_result in result.get('results', {}).items():
+                    if platform_result.get('success'):
+                        job_id = platform_result.get('job_id')
+                        snapshot_id = platform_result.get('snapshot_id')
+                        
+                        if job_id and snapshot_id:
+                            # Create a scraper request record linked to the folder
+                            scraper_request = BrightDataScraperRequest.objects.create(
+                                platform=platform,
+                                target_url=f"System folder {folder_id}",
+                                snapshot_id=snapshot_id,
+                                request_id=job_id,
+                                status='processing',
+                                folder_id=folder_id,  # Link to the job folder
+                                user_id=user_id
+                            )
+                            logger.info(f"Created scraper request {scraper_request.id} for folder {folder_id}")
+                            
+            except Exception as e:
+                logger.warning(f"Failed to create job tracking record: {str(e)}")
+        
         # Create CORS-friendly response
         response = JsonResponse(result)
         response['Access-Control-Allow-Origin'] = '*'
@@ -810,4 +835,131 @@ def _handle_platform_setup(data):
         return JsonResponse({
             'status': 'error',
             'message': f'Platform setup failed: {str(e)}'
+        }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def fetch_brightdata_results(request, snapshot_id):
+    """
+    Fetch and display results from a completed BrightData job
+    """
+    try:
+        scraper = BrightDataAutomatedBatchScraper()
+        results = scraper.fetch_brightdata_results(snapshot_id)
+        
+        if results['success']:
+            # If we got text/CSV data, parse it
+            if results.get('format') == 'text':
+                csv_data = scraper.parse_brightdata_csv_results(results['data'])
+                return JsonResponse({
+                    'success': True,
+                    'snapshot_id': snapshot_id,
+                    'count': len(csv_data),
+                    'data': csv_data,
+                    'format': 'parsed_csv',
+                    'raw_text': results['data'][:500] + '...' if len(results['data']) > 500 else results['data']
+                })
+            else:
+                # JSON data
+                return JsonResponse({
+                    'success': True,
+                    'snapshot_id': snapshot_id,
+                    'count': results['count'],
+                    'data': results['data'],
+                    'format': 'json'
+                })
+        else:
+            return JsonResponse({
+                'success': False,
+                'snapshot_id': snapshot_id,
+                'error': results['error'],
+                'status': results.get('status', 'unknown')
+            }, status=400 if results.get('status') == 'running' else 500)
+            
+    except Exception as e:
+        logger.error(f"Error fetching BrightData results for {snapshot_id}: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'snapshot_id': snapshot_id,
+            'error': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def brightdata_job_results(request, job_folder_id):
+    """
+    Fetch BrightData results for a specific job folder and link them to the job
+    """
+    try:
+        # Get the job folder
+        from track_accounts.models import Folder
+        
+        try:
+            job_folder = Folder.objects.get(id=job_folder_id, folder_type='job')
+        except Folder.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': f'Job folder {job_folder_id} not found'
+            }, status=404)
+        
+        # Look for BrightData scraper requests related to this job
+        scraper_requests = BrightDataScraperRequest.objects.filter(
+            batch_job__folder_id=job_folder_id
+        ).exclude(snapshot_id__isnull=True).exclude(snapshot_id='')
+        
+        if not scraper_requests.exists():
+            return JsonResponse({
+                'success': False,
+                'error': 'No BrightData snapshots found for this job',
+                'job_folder_id': job_folder_id
+            })
+        
+        # Fetch results from all snapshots
+        scraper = BrightDataAutomatedBatchScraper()
+        all_results = []
+        successful_snapshots = []
+        failed_snapshots = []
+        
+        for request in scraper_requests:
+            snapshot_id = request.snapshot_id
+            results = scraper.fetch_brightdata_results(snapshot_id)
+            
+            if results['success']:
+                successful_snapshots.append(snapshot_id)
+                
+                # Parse data based on format
+                if results.get('format') == 'text':
+                    parsed_data = scraper.parse_brightdata_csv_results(results['data'])
+                    all_results.extend(parsed_data)
+                elif isinstance(results.get('data'), list):
+                    all_results.extend(results['data'])
+                    
+            else:
+                failed_snapshots.append({
+                    'snapshot_id': snapshot_id,
+                    'error': results['error']
+                })
+        
+        return JsonResponse({
+            'success': True,
+            'job_folder_id': job_folder_id,
+            'job_folder_name': job_folder.name,
+            'total_results': len(all_results),
+            'successful_snapshots': len(successful_snapshots),
+            'failed_snapshots': len(failed_snapshots),
+            'data': all_results,
+            'snapshots': {
+                'successful': successful_snapshots,
+                'failed': failed_snapshots
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching job results for folder {job_folder_id}: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'job_folder_id': job_folder_id,
+            'error': str(e)
         }, status=500)

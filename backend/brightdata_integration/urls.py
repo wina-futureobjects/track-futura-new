@@ -22,4 +22,8 @@ urlpatterns = [
     
     # Direct trigger endpoint (function-based view for better production compatibility)
     path('trigger-scraper/', views.trigger_scraper_endpoint, name='trigger_scraper'),
+    
+    # Results endpoints
+    path('results/<str:snapshot_id>/', views.fetch_brightdata_results, name='fetch_brightdata_results'),
+    path('job-results/<int:job_folder_id>/', views.brightdata_job_results, name='brightdata_job_results'),
 ]

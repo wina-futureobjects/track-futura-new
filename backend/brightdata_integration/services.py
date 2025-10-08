@@ -366,6 +366,126 @@ class BrightDataAutomatedBatchScraper:
         """
         return self._make_system_api_call(urls, platform, dataset_id)
 
+    def fetch_brightdata_results(self, snapshot_id: str) -> Dict[str, Any]:
+        """
+        Fetch results from a completed BrightData job
+        """
+        try:
+            # BrightData API endpoint for fetching snapshot results
+            results_url = f"https://api.brightdata.com/datasets/v3/snapshot/{snapshot_id}?format=json"
+            
+            headers = {
+                "Authorization": f"Bearer {self.api_token}",
+                "Content-Type": "application/json",
+            }
+            
+            print(f"🔍 Fetching BrightData results for snapshot: {snapshot_id}")
+            
+            response = requests.get(results_url, headers=headers, timeout=30)
+            
+            print(f"📊 Results fetch status: {response.status_code}")
+            
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    
+                    # If data is a list, it means we got the actual results
+                    if isinstance(data, list):
+                        print(f"✅ Successfully fetched {len(data)} results")
+                        return {
+                            'success': True,
+                            'data': data,
+                            'count': len(data),
+                            'snapshot_id': snapshot_id
+                        }
+                    # If data is a dict with status, job might still be running
+                    elif isinstance(data, dict):
+                        job_status = data.get('status', 'unknown')
+                        if job_status == 'completed':
+                            # Try to get the data from a different endpoint or format
+                            return {
+                                'success': True,
+                                'data': [],
+                                'count': 0,
+                                'snapshot_id': snapshot_id,
+                                'status': 'completed_no_data'
+                            }
+                        else:
+                            return {
+                                'success': False,
+                                'error': f'Job status: {job_status}',
+                                'snapshot_id': snapshot_id,
+                                'status': job_status
+                            }
+                    
+                except json.JSONDecodeError:
+                    # Raw text response - might be CSV or other format
+                    text_data = response.text
+                    if text_data and len(text_data) > 0:
+                        print(f"✅ Got text response: {len(text_data)} characters")
+                        return {
+                            'success': True,
+                            'data': text_data,
+                            'count': len(text_data.split('\n')) - 1,  # Approximate row count
+                            'snapshot_id': snapshot_id,
+                            'format': 'text'
+                        }
+            
+            elif response.status_code == 202:
+                # Job still running
+                return {
+                    'success': False,
+                    'error': 'Job still running',
+                    'snapshot_id': snapshot_id,
+                    'status': 'running'
+                }
+            
+            else:
+                print(f"❌ Failed to fetch results: {response.status_code} - {response.text}")
+                return {
+                    'success': False,
+                    'error': f'HTTP {response.status_code}: {response.text}',
+                    'snapshot_id': snapshot_id
+                }
+                
+        except Exception as e:
+            print(f"❌ Exception fetching results: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e),
+                'snapshot_id': snapshot_id
+            }
+
+    def parse_brightdata_csv_results(self, csv_text: str) -> List[Dict[str, Any]]:
+        """
+        Parse CSV text results from BrightData into structured data
+        """
+        try:
+            import csv
+            from io import StringIO
+            
+            # Parse CSV
+            csv_file = StringIO(csv_text)
+            reader = csv.DictReader(csv_file)
+            
+            results = []
+            for row in reader:
+                # Clean and structure the data
+                cleaned_row = {}
+                for key, value in row.items():
+                    if key and value:  # Skip empty keys/values
+                        cleaned_row[key.strip()] = value.strip()
+                
+                if cleaned_row:  # Only add non-empty rows
+                    results.append(cleaned_row)
+            
+            print(f"✅ Parsed {len(results)} rows from CSV")
+            return results
+            
+        except Exception as e:
+            print(f"❌ Error parsing CSV: {str(e)}")
+            return []
+
     # ========== LEGACY COMPATIBILITY METHODS ==========
     
     def _make_brightdata_batch_request(self, scraper_requests: List[BrightDataScraperRequest], 

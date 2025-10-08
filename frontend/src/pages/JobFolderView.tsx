@@ -107,26 +107,52 @@ const JobFolderView = () => {
 
   // Download functions
   const downloadData = async (format: 'csv' | 'json') => {
-    const jobId = actualBatchJobId || folderId;
-    if (!jobId) return;
+    if (posts.length === 0) return;
     
     setDownloading(prev => ({ ...prev, [format]: true }));
     
     try {
-      const response = await apiFetch(`/api/apify/batch-jobs/${jobId}/export/?format=${format}`);
-      if (!response.ok) {
-        throw new Error(`Failed to download ${format.toUpperCase()} data`);
-      }
+      const filename = `brightdata_job_${folderId}_results.${format}`;
       
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `batch_job_${jobId}_results.${format}`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      if (format === 'json') {
+        // Create JSON download
+        const jsonData = JSON.stringify(posts, null, 2);
+        const blob = new Blob([jsonData], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+      } else if (format === 'csv') {
+        // Create CSV download
+        const headers = ['post_id', 'url', 'user_posted', 'content', 'likes', 'num_comments', 'date_posted'];
+        const csvRows = [
+          headers.join(','),
+          ...posts.map(post => [
+            `"${post.post_id}"`,
+            `"${post.url}"`,
+            `"${post.user_posted}"`,
+            `"${post.content.replace(/"/g, '""')}"`,
+            post.likes,
+            post.num_comments,
+            `"${post.date_posted}"`
+          ].join(','))
+        ];
+        
+        const csvData = csvRows.join('\n');
+        const blob = new Blob([csvData], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+      }
     } catch (error) {
       console.error(`Error downloading ${format}:`, error);
       setError(`Failed to download ${format.toUpperCase()} file. Please try again.`);
@@ -140,7 +166,72 @@ const JobFolderView = () => {
     setError(null);
 
     try {
-      // Fetch the job folder from unified folders API
+      // First, try to fetch BrightData results directly
+      const brightDataResponse = await apiFetch(`/api/brightdata/job-results/${folderId}/`);
+      
+      if (brightDataResponse.ok) {
+        const brightDataResults = await brightDataResponse.json();
+        console.log('BrightData results:', brightDataResults);
+        
+        if (brightDataResults.success && brightDataResults.data.length > 0) {
+          // We have BrightData results! Transform them to our format
+          const transformedPosts: Post[] = brightDataResults.data.map((item: any, index: number) => ({
+            id: index + 1,
+            post_id: item.post_id || item.shortcode || item.id || `post_${index}`,
+            url: item.url || item.post_url || item.link || '',
+            user_posted: item.user_username || item.username || item.ownerUsername || item.user || 'Unknown',
+            content: item.caption || item.description || item.text || item.content || '',
+            description: item.caption || item.description || item.text || '',
+            likes: parseInt(item.likes_count || item.likesCount || item.likes || '0') || 0,
+            num_comments: parseInt(item.comments_count || item.commentsCount || item.comments || '0') || 0,
+            date_posted: item.timestamp || item.date_posted || item.date || new Date().toISOString(),
+            created_at: item.timestamp || item.date_posted || new Date().toISOString(),
+            is_verified: item.is_verified || false
+          }));
+          
+          setPosts(transformedPosts);
+          
+          // Create job folder data
+          const jobFolderData: JobFolder = {
+            id: parseInt(folderId || '0'),
+            name: brightDataResults.job_folder_name || `BrightData Job ${folderId}`,
+            description: `Scraped ${brightDataResults.total_results} posts from BrightData`,
+            category: 'posts',
+            category_display: 'Posts',
+            platform: 'instagram',
+            folder_type: 'job',
+            post_count: transformedPosts.length,
+            created_at: new Date().toISOString()
+          };
+          
+          setJobFolder(jobFolderData);
+          
+          // Create UniversalFolder object
+          const universalFolderData: UniversalFolder = {
+            id: parseInt(folderId || '0'),
+            name: jobFolderData.name,
+            description: jobFolderData.description || 'BrightData scraped posts',
+            category: 'posts',
+            category_display: 'Posts',
+            platform: 'instagram',
+            job_id: parseInt(folderId || '0'),
+            created_at: jobFolderData.created_at,
+            updated_at: jobFolderData.created_at,
+            action_type: 'collect_posts'
+          };
+          setUniversalFolder(universalFolderData);
+          
+          setJobStatus({
+            status: 'completed',
+            message: `Successfully loaded ${transformedPosts.length} posts from BrightData`
+          });
+          
+          setLoading(false);
+          return; // Exit early - we have BrightData results
+        }
+      }
+      
+      // Fallback: Fetch the job folder from unified folders API
       const jobFolderResponse = await apiFetch(`/api/track-accounts/report-folders/${folderId}/`);
       if (!jobFolderResponse.ok) {
         throw new Error('Failed to fetch job folder');

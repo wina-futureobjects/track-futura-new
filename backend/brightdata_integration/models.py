@@ -99,12 +99,16 @@ class BrightDataScraperRequest(models.Model):
         ('cancelled', 'Cancelled'),
     ]
     
-    config = models.ForeignKey(BrightDataConfig, on_delete=models.CASCADE, related_name='scraper_requests')
-    batch_job = models.ForeignKey(BrightDataBatchJob, on_delete=models.CASCADE, related_name='scraper_requests')
+    config = models.ForeignKey(BrightDataConfig, on_delete=models.CASCADE, related_name='scraper_requests', null=True, blank=True)
+    batch_job = models.ForeignKey(BrightDataBatchJob, on_delete=models.CASCADE, related_name='scraper_requests', null=True, blank=True)
     platform = models.CharField(max_length=50)
-    content_type = models.CharField(max_length=50)
-    target_url = models.URLField()
-    source_name = models.CharField(max_length=200)
+    content_type = models.CharField(max_length=50, default='posts')
+    target_url = models.CharField(max_length=500)  # Changed to CharField to allow non-URLs
+    source_name = models.CharField(max_length=200, default='Unknown')
+    
+    # Job linking fields  
+    folder_id = models.IntegerField(null=True, blank=True, help_text='Associated job folder ID')
+    user_id = models.IntegerField(null=True, blank=True, help_text='User who triggered the job')
     
     # BrightData specific fields
     request_id = models.CharField(max_length=255, blank=True, null=True, help_text='BrightData request ID')
