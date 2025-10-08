@@ -13,7 +13,7 @@ import os
 import requests
 import json
 from typing import Optional, Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timedelta
 from django.conf import settings
 from django.utils import timezone
 
@@ -213,37 +213,63 @@ class BrightDataAutomatedBatchScraper:
                     "discover_by": "url",
                 })
             
-            # Parse date range from system - FIXED DATE FORMAT
-            start_date = "01-10-2025"  # Default fallback
-            end_date = "08-10-2025"    # Default fallback
+            # Parse date range from system - FIXED FOR BRIGHTDATA DISCOVERY PHASE
+            # BrightData discovery phase needs PAST dates only (no current/future dates)
+            today = datetime.now()
+            
+            # Default to past 30 days ending 2 days ago (safe range)
+            default_end = today - timedelta(days=2)  # 2 days ago to be safe
+            default_start = default_end - timedelta(days=30)  # 30 days before that
+            
+            start_date = default_start.strftime("%d-%m-%Y")
+            end_date = default_end.strftime("%d-%m-%Y")
             
             if date_range:
                 try:
                     if 'start_date' in date_range and date_range['start_date']:
-                        # Convert from ISO format: "2025-10-01T00:00:00.000Z" to "01-10-2025"
+                        # Convert from ISO format: "2025-10-01T00:00:00.000Z" to datetime
                         start_dt = datetime.fromisoformat(date_range['start_date'].replace('Z', '+00:00'))
+                        
+                        # Ensure start date is in the past
+                        if start_dt.date() >= today.date():
+                            print(f"⚠️ Start date {start_dt.date()} is today/future, using past date")
+                            start_dt = today - timedelta(days=30)
+                        
                         start_date = start_dt.strftime("%d-%m-%Y")
                     
                     if 'end_date' in date_range and date_range['end_date']:
-                        # Convert from ISO format: "2025-10-08T00:00:00.000Z" to "08-10-2025"  
+                        # Convert from ISO format: "2025-10-08T00:00:00.000Z" to datetime
                         end_dt = datetime.fromisoformat(date_range['end_date'].replace('Z', '+00:00'))
+                        
+                        # Ensure end date is in the past (at least 1 day ago for BrightData discovery)
+                        if end_dt.date() >= today.date():
+                            print(f"⚠️ End date {end_dt.date()} is today/future, adjusting to past date")
+                            end_dt = today - timedelta(days=1)  # Yesterday
+                        
                         end_date = end_dt.strftime("%d-%m-%Y")
                         
-                    print(f"📅 Parsed dates from system: {start_date} to {end_date}")
+                    print(f"📅 Parsed dates from system (adjusted for BrightData): {start_date} to {end_date}")
                 except Exception as e:
-                    self.logger.warning(f"Date parsing error: {e}, using defaults")
+                    self.logger.warning(f"Date parsing error: {e}, using safe defaults")
                     print(f"⚠️ Date parsing failed: {e}")
             
-            # Validate date range makes sense
+            # Validate date range makes sense and is in the past
             try:
                 start_dt = datetime.strptime(start_date, "%d-%m-%Y")
                 end_dt = datetime.strptime(end_date, "%d-%m-%Y")
+                today_dt = datetime.now()
+                
                 if end_dt < start_dt:
                     print(f"⚠️ End date {end_date} is before start date {start_date}")
+                elif end_dt.date() >= today_dt.date():
+                    print(f"⚠️ End date {end_date} is today/future - BrightData discovery needs past dates!")
                 elif (end_dt - start_dt).days > 365:
                     print(f"⚠️ Date range is very large: {(end_dt - start_dt).days} days")
                 else:
-                    print(f"✅ Date range validated: {(end_dt - start_dt).days} days")
+                    days_diff = (end_dt - start_dt).days
+                    days_ago = (today_dt - end_dt).days
+                    print(f"✅ Date range validated: {days_diff} days, ending {days_ago} days ago")
+                    print(f"✅ Safe for BrightData discovery phase!")
             except Exception as e:
                 print(f"⚠️ Date validation failed: {e}")
             
