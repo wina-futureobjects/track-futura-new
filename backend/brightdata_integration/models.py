@@ -114,6 +114,7 @@ class BrightDataScraperRequest(models.Model):
     # Status and tracking
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     error_message = models.TextField(blank=True, null=True)
+    response_data = models.JSONField(null=True, blank=True, help_text='BrightData response data')
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
