@@ -48,7 +48,7 @@ class BrightDataAutomatedBatchScraper:
         """
         try:
             # Import here to avoid circular imports
-            from track_accounts.models import TrackSource, TrackSourceFolder
+            from track_accounts.models import TrackSource, SourceFolder
             
             self.logger.info(f"🔄 SYSTEM INTEGRATED TRIGGER")
             self.logger.info(f"📁 Folder ID: {folder_id}")
