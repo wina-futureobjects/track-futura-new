@@ -19,18 +19,19 @@ def restore_brightdata_setup():
     
     # 1. Create Platforms
     platforms_data = [
-        {'name': 'instagram', 'description': 'Instagram social media platform'},
-        {'name': 'facebook', 'description': 'Facebook social media platform'},
-        {'name': 'tiktok', 'description': 'TikTok social media platform'},
-        {'name': 'linkedin', 'description': 'LinkedIn professional network'},
+        {'name': 'instagram', 'display_name': 'Instagram', 'description': 'Instagram social media platform'},
+        {'name': 'facebook', 'display_name': 'Facebook', 'description': 'Facebook social media platform'},
+        {'name': 'tiktok', 'display_name': 'TikTok', 'description': 'TikTok social media platform'},
+        {'name': 'linkedin', 'display_name': 'LinkedIn', 'description': 'LinkedIn professional network'},
     ]
     
     for platform_data in platforms_data:
         platform, created = Platform.objects.get_or_create(
             name=platform_data['name'],
             defaults={
+                'display_name': platform_data['display_name'],
                 'description': platform_data['description'],
-                'is_active': True
+                'is_enabled': True
             }
         )
         if created:
@@ -40,17 +41,17 @@ def restore_brightdata_setup():
     
     # 2. Create Services
     services_data = [
-        {'name': 'posts', 'description': 'Post scraping service'},
-        {'name': 'profiles', 'description': 'Profile scraping service'},
-        {'name': 'hashtags', 'description': 'Hashtag scraping service'},
+        {'name': 'posts', 'display_name': 'Posts', 'description': 'Post scraping service'},
+        {'name': 'profiles', 'display_name': 'Profiles', 'description': 'Profile scraping service'},
+        {'name': 'hashtags', 'display_name': 'Hashtags', 'description': 'Hashtag scraping service'},
     ]
     
     for service_data in services_data:
         service, created = Service.objects.get_or_create(
             name=service_data['name'],
             defaults={
-                'description': service_data['description'],
-                'is_active': True
+                'display_name': service_data['display_name'],
+                'description': service_data['description']
             }
         )
         if created:
@@ -75,8 +76,7 @@ def restore_brightdata_setup():
                 platform=platform,
                 service=service,
                 defaults={
-                    'is_enabled': True,
-                    'configuration': {}
+                    'is_enabled': True
                 }
             )
             
@@ -91,11 +91,13 @@ def restore_brightdata_setup():
     # 4. Create BrightData Configurations
     brightdata_configs = [
         {
+            'name': 'Instagram Scraper',
             'platform': 'instagram',
             'dataset_id': 'hl_f7614f18',  # Your actual scraper ID
             'api_token': '8af6995e-3baa-4b69-9df7-8d7671e621eb'  # Your real token
         },
         {
+            'name': 'Facebook Scraper',
             'platform': 'facebook',
             'dataset_id': 'hl_f7614f18',  # Same scraper for now
             'api_token': '8af6995e-3baa-4b69-9df7-8d7671e621eb'
@@ -106,6 +108,7 @@ def restore_brightdata_setup():
         config, created = BrightDataConfig.objects.get_or_create(
             platform=config_data['platform'],
             defaults={
+                'name': config_data['name'],
                 'dataset_id': config_data['dataset_id'],
                 'api_token': config_data['api_token'],
                 'is_active': True
@@ -114,6 +117,7 @@ def restore_brightdata_setup():
         
         if not created:
             # Update existing config
+            config.name = config_data['name']
             config.dataset_id = config_data['dataset_id']
             config.api_token = config_data['api_token']
             config.is_active = True
