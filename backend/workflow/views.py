@@ -264,32 +264,46 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                     
                 logger.info(f"Created new batch job: {batch_job.id}")
             
-            # Now try to execute the batch job using BrightData
+            # Now trigger the working BrightData scraper directly
             try:
-                scraper = BrightDataAutomatedBatchScraper()
-                execution_success = scraper.execute_batch_job(batch_job.id)
+                # Use the new working BrightData trigger endpoint logic
+                platform = input_collection.platform_service.platform.name
+                urls = input_collection.urls
                 
-                if execution_success:
+                # Import the working BrightData scraper
+                from brightdata_integration.services import BrightDataAutomatedBatchScraper
+                scraper = BrightDataAutomatedBatchScraper()
+                
+                # Create and execute batch job with the working format
+                batch_job_result = scraper.trigger_scraper(
+                    platform=platform,
+                    urls=urls
+                )
+                
+                if batch_job_result and batch_job_result.get('success'):
                     # Update input collection status
                     input_collection.status = 'processing'
                     input_collection.save()
                     
-                    logger.info(f"Successfully started BrightData execution for batch job {batch_job.id}")
+                    logger.info(f"Successfully triggered BrightData scraper: {batch_job_result}")
                     return Response({
-                        'message': 'Scraping started successfully',
-                        'batch_job_id': batch_job.id,
-                        'status': 'processing'
+                        'message': f'BrightData {platform} scraper triggered successfully!',
+                        'batch_job_id': batch_job_result.get('batch_job_id'),
+                        'platform': platform,
+                        'status': 'processing',
+                        'urls_count': len(urls)
                     }, status=status.HTTP_200_OK)
                 else:
+                    error_msg = batch_job_result.get('error', 'Unknown error') if batch_job_result else 'Failed to trigger scraper'
                     return Response(
-                        {'error': 'Failed to start BrightData execution'}, 
+                        {'error': f'Failed to trigger BrightData scraper: {error_msg}'}, 
                         status=status.HTTP_500_INTERNAL_SERVER_ERROR
                     )
                     
             except Exception as scraper_error:
-                logger.error(f"BrightData execution error: {str(scraper_error)}")
+                logger.error(f"BrightData trigger error: {str(scraper_error)}")
                 return Response(
-                    {'error': f'BrightData execution failed: {str(scraper_error)}'}, 
+                    {'error': f'BrightData trigger failed: {str(scraper_error)}'}, 
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
                 

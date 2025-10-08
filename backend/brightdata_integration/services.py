@@ -447,3 +447,70 @@ class BrightDataAutomatedBatchScraper:
         except Exception as e:
             self.logger.error(f"Error getting/creating config for {platform}: {str(e)}")
             return None
+    
+    def trigger_scraper(self, platform: str, urls: List[str]) -> Dict[str, Any]:
+        """
+        Quick trigger method for workflow compatibility
+        Uses the exact working BrightData Dataset API format
+        """
+        try:
+            self.logger.info(f"🚀 Triggering {platform} scraper for {len(urls)} URLs")
+            
+            # Get the dataset ID for this platform
+            dataset_id = self.platform_datasets.get(platform)
+            if not dataset_id:
+                return {'success': False, 'error': f'No dataset configured for platform: {platform}'}
+            
+            # Use the exact working format from your successful tests
+            if platform == 'instagram':
+                payload = {
+                    "url": urls[0],  # Instagram takes single URL
+                    "num_of_posts": 10,
+                    "start_date": "01-01-2025", 
+                    "end_date": "03-01-2025",
+                    "post_type": "Post"
+                }
+            elif platform == 'facebook':
+                payload = {
+                    "url": urls[0],  # Facebook takes single URL
+                    "num_of_posts": 50,
+                    "start_date": "01-01-2025",
+                    "end_date": "02-28-2025"
+                }
+            else:
+                return {'success': False, 'error': f'Unsupported platform: {platform}'}
+            
+            # Make the API request using the exact working format
+            api_token = "8af6995e-3baa-4b69-9df7-8d7671e621eb"
+            headers = {
+                'Authorization': f'Bearer {api_token}',
+                'Content-Type': 'application/json'
+            }
+            
+            url = f"https://api.brightdata.com/datasets/v3/trigger?dataset_id={dataset_id}"
+            
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                batch_job_id = result.get('snapshot_id', result.get('job_id', 'unknown'))
+                
+                self.logger.info(f"✅ {platform} scraper triggered successfully! Batch job: {batch_job_id}")
+                
+                return {
+                    'success': True,
+                    'batch_job_id': batch_job_id,
+                    'platform': platform,
+                    'message': f'BrightData {platform} scraper triggered successfully!',
+                    'urls_count': len(urls),
+                    'posts_per_url': 10 if platform == 'instagram' else 50
+                }
+            else:
+                error_msg = f"BrightData API error: {response.status_code} - {response.text}"
+                self.logger.error(error_msg)
+                return {'success': False, 'error': error_msg}
+                
+        except Exception as e:
+            error_msg = f"Failed to trigger {platform} scraper: {str(e)}"
+            self.logger.error(error_msg)
+            return {'success': False, 'error': error_msg}
