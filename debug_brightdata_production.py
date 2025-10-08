@@ -13,8 +13,8 @@ def check_brightdata_config():
         # Try to authenticate
         login_url = f"{BASE_URL}/api/users/login/"
         login_data = {
-            'username': 'test',
-            'password': 'test123'
+            'username': 'winam',
+            'password': 'Sniped@10'
         }
         
         session = requests.Session()
