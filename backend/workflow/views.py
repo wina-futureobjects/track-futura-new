@@ -56,8 +56,8 @@ class WorkflowViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Create input collection and trigger workflow"""
         try:
-            # Create input collection
-            input_collection = serializer.save()
+            # Create input collection with proper user
+            input_collection = serializer.save(created_by=self.request.user if self.request.user.is_authenticated else None)
             
             # Create workflow task using service
             workflow_service = WorkflowService()
