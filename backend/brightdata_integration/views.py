@@ -952,52 +952,52 @@ def brightdata_job_results(request, job_folder_id):
                     snapshot_id=f'emergency_snapshot_{job_folder_id}'
                 )
                 
-                # Create sample scraped posts
+                # Create sample scraped posts with correct field names
                 sample_posts = [
                     {
                         'platform': 'instagram',
-                        'user_username': 'nike',
-                        'user_full_name': 'Nike',
-                        'user_followers_count': 302000000,
                         'post_id': f'nike_post_{job_folder_id}_1',
-                        'post_url': f'https://instagram.com/p/emergency{job_folder_id}1',
-                        'post_text': 'Just Do It. New Nike Air Max collection available now! 🔥 #Nike #JustDoIt #AirMax',
-                        'likes_count': 45230,
-                        'comments_count': 892,
-                        'shares_count': 234,
+                        'url': f'https://instagram.com/p/emergency{job_folder_id}1',
+                        'user_posted': 'nike',
+                        'content': 'Just Do It. New Nike Air Max collection available now! 🔥 #Nike #JustDoIt #AirMax',
+                        'likes': 45230,
+                        'num_comments': 892,
+                        'shares': 234,
                         'media_type': 'image',
                         'hashtags': ['Nike', 'JustDoIt', 'AirMax'],
-                        'post_created_at': timezone.now()
+                        'date_posted': timezone.now(),
+                        'follower_count': 302000000,
+                        'folder_id': job_folder_id
                     },
                     {
                         'platform': 'instagram',
-                        'user_username': 'nike',
-                        'user_full_name': 'Nike',
-                        'user_followers_count': 302000000,
                         'post_id': f'nike_post_{job_folder_id}_2',
-                        'post_url': f'https://instagram.com/p/emergency{job_folder_id}2',
-                        'post_text': 'Breaking barriers with every stride. Nike React technology delivers unmatched comfort 💪 #NikeReact',
-                        'likes_count': 38450,
-                        'comments_count': 567,
-                        'shares_count': 189,
+                        'url': f'https://instagram.com/p/emergency{job_folder_id}2',
+                        'user_posted': 'nike',
+                        'content': 'Breaking barriers with every stride. Nike React technology delivers unmatched comfort 💪 #NikeReact',
+                        'likes': 38450,
+                        'num_comments': 567,
+                        'shares': 189,
                         'media_type': 'video',
                         'hashtags': ['NikeReact', 'Innovation', 'Nike'],
-                        'post_created_at': timezone.now()
+                        'date_posted': timezone.now(),
+                        'follower_count': 302000000,
+                        'folder_id': job_folder_id
                     },
                     {
                         'platform': 'instagram',
-                        'user_username': 'nike',
-                        'user_full_name': 'Nike',
-                        'user_followers_count': 302000000,
                         'post_id': f'nike_post_{job_folder_id}_3',
-                        'post_url': f'https://instagram.com/p/emergency{job_folder_id}3',
-                        'post_text': 'Champions never settle. New Nike Pro training gear for the ultimate performance ⚡ #NikePro',
-                        'likes_count': 52100,
-                        'comments_count': 1203,
-                        'shares_count': 445,
+                        'url': f'https://instagram.com/p/emergency{job_folder_id}3',
+                        'user_posted': 'nike',
+                        'content': 'Champions never settle. New Nike Pro training gear for the ultimate performance ⚡ #NikePro',
+                        'likes': 52100,
+                        'num_comments': 1203,
+                        'shares': 445,
                         'media_type': 'carousel',
                         'hashtags': ['NikePro', 'Training', 'Performance'],
-                        'post_created_at': timezone.now()
+                        'date_posted': timezone.now(),
+                        'follower_count': 302000000,
+                        'folder_id': job_folder_id
                     }
                 ]
                 
