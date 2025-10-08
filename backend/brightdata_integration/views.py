@@ -914,12 +914,14 @@ def brightdata_job_results(request, job_folder_id):
                 )
                 
                 # Create the missing folder
+                from django.utils import timezone
                 job_folder = ReportFolder.objects.create(
                     id=job_folder_id,
                     name=f'Auto-created Folder {job_folder_id}',
                     description=f'Emergency auto-created folder for BrightData results',
                     project=project,
-                    folder_type='data_storage'
+                    start_date=timezone.now() - timezone.timedelta(days=30),
+                    end_date=timezone.now()
                 )
                 
                 logger.info(f"🚨 Auto-created missing ReportFolder {job_folder_id}")
