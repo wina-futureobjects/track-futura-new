@@ -8,7 +8,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
 
 from django.contrib.auth.models import User
-from users.models import Organization, Project, GlobalRole
+from users.models import Organization, Project, UserRole
 
 def create_test_environment():
     print("=== CREATING TEST AUTHENTICATION ENVIRONMENT ===")
@@ -59,14 +59,14 @@ def create_test_environment():
     
     # 4. Set user role
     try:
-        global_role = GlobalRole.objects.get(user=user)
-        print(f"✅ User role already exists: {global_role.role}")
-    except GlobalRole.DoesNotExist:
-        global_role = GlobalRole.objects.create(
+        user_role = UserRole.objects.get(user=user)
+        print(f"✅ User role already exists: {user_role.role}")
+    except UserRole.DoesNotExist:
+        user_role = UserRole.objects.create(
             user=user,
             role='super_admin'
         )
-        print(f"✅ Created user role: {global_role.role}")
+        print(f"✅ Created user role: {user_role.role}")
     
     # 5. Test authentication token generation
     from rest_framework.authtoken.models import Token
