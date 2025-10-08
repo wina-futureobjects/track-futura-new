@@ -372,6 +372,65 @@ class FolderViewSet(viewsets.ModelViewSet):
         serializer = InstagramPostSerializer(posts, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['get'], url_path='webhook-status')
+    def webhook_status(self, request, pk=None):
+        """
+        Get webhook status for a specific folder
+        Endpoint: /api/instagram-data/folders/{id}/webhook-status/
+        """
+        try:
+            folder = self.get_object()
+            
+            # Check for any related scraping jobs or webhook activity
+            from brightdata_integration.models import BrightDataBatchJob, BrightDataScraperRequest
+            
+            # Look for batch jobs related to this folder
+            batch_jobs = BrightDataBatchJob.objects.filter(
+                name__icontains=folder.name
+            ).order_by('-created_at')[:5]
+            
+            # Look for scraper requests
+            scraper_requests = BrightDataScraperRequest.objects.filter(
+                platform='instagram'
+            ).order_by('-created_at')[:5]
+            
+            # Check folder status and recent activity
+            posts_count = InstagramPost.objects.filter(folder=folder).count()
+            
+            webhook_status = {
+                'folder_id': folder.id,
+                'folder_name': folder.name,
+                'posts_count': posts_count,
+                'last_updated': folder.created_at.isoformat() if hasattr(folder, 'created_at') else None,
+                'status': 'active' if posts_count > 0 else 'pending',
+                'recent_batch_jobs': [
+                    {
+                        'id': job.id,
+                        'name': job.name,
+                        'status': job.status,
+                        'created_at': job.created_at.isoformat(),
+                        'platform': 'instagram'
+                    } for job in batch_jobs
+                ],
+                'recent_requests': [
+                    {
+                        'id': req.id,
+                        'platform': req.platform,
+                        'status': req.status,
+                        'created_at': req.created_at.isoformat() if hasattr(req, 'created_at') else None
+                    } for req in scraper_requests
+                ]
+            }
+            
+            return Response(webhook_status)
+            
+        except Exception as e:
+            return Response({
+                'error': f'Failed to get webhook status: {str(e)}',
+                'folder_id': pk,
+                'status': 'error'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 class InstagramPostViewSet(viewsets.ModelViewSet):
     """
     API endpoint for Instagram Posts
