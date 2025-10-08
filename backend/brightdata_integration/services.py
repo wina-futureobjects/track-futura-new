@@ -36,35 +36,32 @@ class BrightDataAutomatedBatchScraper:
 
     def trigger_scraper(self, platform: str, urls: List[str]) -> Dict[str, Any]:
         """
-        Main scraper trigger method - EXACT WORKING IMPLEMENTATION
-        Uses the proven BrightData Dataset API format from old project
+        DIRECT BRIGHTDATA API TRIGGER - NO DATABASE NEEDED!
+        Uses EXACT user-provided format with just API token + dataset IDs
         """
         try:
-            self.logger.info(f"🚀 TRIGGERING {platform.upper()} SCRAPER - WORKING IMPLEMENTATION")
+            self.logger.info(f"🚀 DIRECT API TRIGGER: {platform.upper()} SCRAPER")
             self.logger.info(f"📋 URLs: {urls}")
             
             # Normalize platform name to lowercase for dataset lookup
             platform_lower = platform.lower()
             
-            # Get the dataset ID for this platform (try both original and lowercase)
-            dataset_id = self.platform_datasets.get(platform) or self.platform_datasets.get(platform_lower)
+            # Get the dataset ID directly from our hardcoded working values
+            dataset_id = self.platform_datasets.get(platform_lower)
             if not dataset_id:
-                return {'success': False, 'error': f'No dataset configured for platform: {platform} (also tried: {platform_lower})'}
+                return {'success': False, 'error': f'No dataset ID for platform: {platform_lower}'}
             
-            self.logger.info(f"✅ Found dataset ID: {dataset_id} for platform: {platform_lower}")
+            self.logger.info(f"✅ Using direct API - Dataset ID: {dataset_id}")
+            self.logger.info(f"✅ API Token: 8af6995e-3baa-4b69-9df7-8d7671e621eb")
             
-            # No database configuration needed! Just use API token directly
-            self.logger.info(f"✅ Using direct BrightData API - no database config required")
-            scraper_request = None  # Optional tracking
-            
-            # Execute the actual BrightData request (use lowercase platform)
-            success = self._make_brightdata_batch_request([scraper_request] if scraper_request else [], urls, platform_lower)
+            # DIRECT API CALL - NO DATABASE LOOKUP!
+            success, batch_id = self._make_direct_brightdata_request(urls, platform_lower, dataset_id)
             
             if success:
                 return {
                     'success': True,
-                    'batch_job_id': getattr(scraper_request, 'request_id', 'batch_created'),
-                    'platform': platform_lower,  # Return normalized platform name
+                    'batch_job_id': batch_id or 'batch_created',
+                    'platform': platform_lower,
                     'message': f'BrightData {platform_lower} scraper triggered successfully!',
                     'urls_count': len(urls),
                     'dataset_id': dataset_id
@@ -77,25 +74,102 @@ class BrightDataAutomatedBatchScraper:
             self.logger.error(error_msg)
             return {'success': False, 'error': error_msg}
 
+    def _make_direct_brightdata_request(self, urls: List[str], platform: str, dataset_id: str) -> tuple[bool, str]:
+        """
+        DIRECT BRIGHTDATA API REQUEST - EXACT USER PROVIDED FORMAT!
+        No database, no complex logic - just pure API call with token + dataset ID
+        """
+        try:
+            self.logger.info(f"🔄 DIRECT BrightData API call for {platform}")
+            
+            # EXACT USER PROVIDED FORMAT
+            api_url = "https://api.brightdata.com/datasets/v3/trigger"
+            api_token = "8af6995e-3baa-4b69-9df7-8d7671e621eb"
+            
+            headers = {
+                "Authorization": f"Bearer {api_token}",
+                "Content-Type": "application/json",
+            }
+            
+            # Base parameters for all platforms
+            params = {
+                "dataset_id": dataset_id,
+                "include_errors": "true",
+            }
+            
+            # Add platform-specific parameters
+            if platform == 'instagram':
+                params.update({
+                    "type": "discover_new",
+                    "discover_by": "url",
+                })
+            
+            # Prepare payload with EXACT user format
+            payload = []
+            for url in urls:
+                if platform == 'instagram':
+                    # EXACT format from user
+                    item = {
+                        "url": url,
+                        "num_of_posts": 10,
+                        "start_date": "01-01-2025",
+                        "end_date": "03-01-2025",
+                        "post_type": "Post"
+                    }
+                elif platform == 'facebook':
+                    item = {
+                        "url": url,
+                        "num_of_posts": 10,
+                        "start_date": "01-01-2025",
+                        "end_date": "03-01-2025"
+                    }
+                else:
+                    item = {"url": url, "num_of_posts": 10}
+                
+                payload.append(item)
+            
+            # DEBUG OUTPUT
+            print(f"\n🔥 DIRECT BRIGHTDATA API CALL")
+            print(f"Platform: {platform}")
+            print(f"Dataset ID: {dataset_id}")
+            print(f"API Token: {api_token[:10]}...")
+            print(f"Payload: {payload}")
+            print(f"URL: {api_url}")
+            
+            # Make the actual request
+            response = requests.post(api_url, headers=headers, params=params, json=payload, timeout=30)
+            
+            print(f"Response Status: {response.status_code}")
+            print(f"Response: {response.text}")
+            
+            if response.status_code == 200:
+                try:
+                    response_data = response.json()
+                    snapshot_id = response_data.get('snapshot_id', 'direct_batch_created')
+                    print(f"✅ SUCCESS! Snapshot ID: {snapshot_id}")
+                    return True, snapshot_id
+                except json.JSONDecodeError:
+                    print(f"✅ SUCCESS! (Raw response: {response.text})")
+                    return True, "direct_batch_success"
+            else:
+                print(f"❌ FAILED! Status: {response.status_code}, Response: {response.text}")
+                return False, None
+                
+        except Exception as e:
+            print(f"❌ EXCEPTION in direct API call: {str(e)}")
+            return False, None
+
     def _make_brightdata_batch_request(self, scraper_requests: List[BrightDataScraperRequest], 
                                      urls: List[str], platform: str) -> bool:
         """
-        Make a batch API request to BrightData - EXACT USER PROVIDED FORMAT
-        Uses the BrightData API token directly, no database lookup needed!
+        LEGACY METHOD - Redirects to direct API
         """
-        try:
-            self.logger.info(f"🔄 Making BrightData batch request for {platform}")
-            
-            # Get dataset ID and use the API token directly (no database needed!)
-            dataset_id = self.platform_datasets.get(platform)
-            api_token = "8af6995e-3baa-4b69-9df7-8d7671e621eb"  # DIRECT API TOKEN
-            
-            if not dataset_id:
-                self.logger.error(f"No dataset ID for platform: {platform}")
-                return False
-            
-            self.logger.info(f"✅ Using direct API token (no database config needed)")
-            self.logger.info(f"✅ Dataset ID: {dataset_id}")
+        dataset_id = self.platform_datasets.get(platform)
+        if not dataset_id:
+            return False
+        
+        success, _ = self._make_direct_brightdata_request(urls, platform, dataset_id)
+        return success
             
             # Prepare the request
             url = "https://api.brightdata.com/datasets/v3/trigger"
