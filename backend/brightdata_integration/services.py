@@ -37,7 +37,7 @@ class BrightDataAutomatedBatchScraper:
                         platforms_to_scrape: List[str], content_types_to_scrape: Dict[str, List[str]], 
                         num_of_posts: int = 10, **kwargs) -> Optional[BrightDataBatchJob]:
         """
-        Create a new batch scraping job
+        Create a new batch scraping job with URL support
         
         Args:
             name: Job name
@@ -46,7 +46,7 @@ class BrightDataAutomatedBatchScraper:
             platforms_to_scrape: List of platforms to scrape
             content_types_to_scrape: Dict mapping platforms to content types
             num_of_posts: Number of posts to scrape per source
-            **kwargs: Additional configuration parameters
+            **kwargs: Additional configuration parameters including 'urls'
             
         Returns:
             BrightDataBatchJob: Created batch job or None if failed
@@ -66,10 +66,12 @@ class BrightDataAutomatedBatchScraper:
                 start_date=kwargs.get('start_date'),
                 end_date=kwargs.get('end_date'),
                 platform_params=kwargs.get('platform_params', {}),
-                created_by=kwargs.get('created_by')
+                created_by=kwargs.get('created_by'),
+                # Store URLs in platform_params for later use
+                additional_data={'urls': kwargs.get('urls', [])}
             )
             
-            self.logger.info(f"Created batch job: {batch_job.id} - {name}")
+            self.logger.info(f"Created batch job: {batch_job.id} - {name} with {len(kwargs.get('urls', []))} URLs")
             return batch_job
             
         except Exception as e:
@@ -375,8 +377,16 @@ class BrightDataAutomatedBatchScraper:
             return False
 
     def _get_target_url_for_platform(self, batch_job, platform):
-        """Get target URL for a specific platform"""
+        """Get target URL for a specific platform with URL support"""
         try:
+            # First, check if URLs were passed directly to the batch job
+            additional_data = getattr(batch_job, 'additional_data', {})
+            if additional_data and 'urls' in additional_data:
+                urls = additional_data['urls']
+                if urls and len(urls) > 0:
+                    self.logger.info(f"Found URL from batch job data: {urls[0]}")
+                    return urls[0]
+            
             # Try to get URL from source folders
             from workflow.models import InputCollection
             input_collections = InputCollection.objects.filter(
@@ -392,7 +402,7 @@ class BrightDataAutomatedBatchScraper:
             # Fallback URLs for testing
             default_urls = {
                 'instagram': 'https://www.instagram.com/nike/',
-                'facebook': 'https://www.facebook.com/nike',
+                'facebook': 'https://www.facebook.com/nike/',
                 'tiktok': 'https://www.tiktok.com/@nike',
                 'linkedin': 'https://www.linkedin.com/company/nike'
             }

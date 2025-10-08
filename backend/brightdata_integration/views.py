@@ -107,13 +107,14 @@ class BrightDataScraperRequestViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'])
     def trigger_scraper(self, request):
-        """Trigger BrightData scraper directly - MISSING ENDPOINT FIX"""
+        """Trigger BrightData scraper - SUPPORTS INSTAGRAM & FACEBOOK"""
         try:
-            platform = request.data.get('platform', 'instagram')
+            platform = request.data.get('platform', 'instagram').lower()
             urls = request.data.get('urls', [])
             input_collection_id = request.data.get('input_collection_id')
+            folder_id = request.data.get('folder_id', 1)  # Default folder
             
-            logger.info(f"🚀 Triggering BrightData scraper for {platform} with URLs: {urls}")
+            logger.info(f"🚀 Triggering BrightData {platform} scraper with URLs: {urls}")
             
             # Get or create project
             from users.models import Project
@@ -121,38 +122,45 @@ class BrightDataScraperRequestViewSet(viewsets.ModelViewSet):
             if not project:
                 return Response({'error': 'No project found'}, status=status.HTTP_400_BAD_REQUEST)
             
-            # Create batch job
+            # Create batch job with platform-specific settings
             scraper = BrightDataAutomatedBatchScraper()
+            
+            # Platform-specific number of posts (matching your examples)
+            num_posts = 50 if platform == 'facebook' else 10
+            
             batch_job = scraper.create_batch_job(
-                name=f"Direct trigger {timezone.now().strftime('%Y%m%d_%H%M%S')}",
+                name=f"{platform.title()} scraper {timezone.now().strftime('%Y%m%d_%H%M%S')}",
                 project_id=project.id,
-                source_folder_ids=[],
+                source_folder_ids=[folder_id],
                 platforms_to_scrape=[platform],
                 content_types_to_scrape={platform: ['posts']},
-                num_of_posts=5
+                num_of_posts=num_posts,
+                urls=urls  # Pass URLs to batch job
             )
             
             if batch_job:
-                logger.info(f"✅ Created batch job {batch_job.id}")
+                logger.info(f"✅ Created {platform} batch job {batch_job.id}")
                 # Execute immediately
                 success = scraper.execute_batch_job(batch_job.id)
                 if success:
-                    logger.info(f"✅ BrightData scraper executed successfully for batch job {batch_job.id}")
+                    logger.info(f"✅ BrightData {platform} scraper executed successfully for batch job {batch_job.id}")
                     return Response({
-                        'message': 'BrightData scraper triggered successfully!',
+                        'message': f'BrightData {platform} scraper triggered successfully!',
                         'batch_job_id': batch_job.id,
                         'platform': platform,
-                        'status': 'processing'
+                        'status': 'processing',
+                        'urls_count': len(urls),
+                        'posts_per_url': num_posts
                     })
                 else:
-                    logger.error(f"❌ Failed to execute BrightData job {batch_job.id}")
-                    return Response({'error': 'Failed to execute BrightData job'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                    logger.error(f"❌ Failed to execute BrightData {platform} job {batch_job.id}")
+                    return Response({'error': f'Failed to execute BrightData {platform} job'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             else:
-                logger.error("❌ Failed to create BrightData batch job")
-                return Response({'error': 'Failed to create BrightData batch job'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                logger.error(f"❌ Failed to create BrightData {platform} batch job")
+                return Response({'error': f'Failed to create BrightData {platform} batch job'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
                 
         except Exception as e:
-            logger.error(f"❌ Error triggering scraper: {str(e)}")
+            logger.error(f"❌ Error triggering {platform} scraper: {str(e)}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
             return Response({'error': f'Scraper trigger failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
