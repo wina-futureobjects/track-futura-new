@@ -486,6 +486,148 @@ class BrightDataAutomatedBatchScraper:
             print(f"❌ Error parsing CSV: {str(e)}")
             return []
 
+    def save_scraped_data_to_database(self, scraper_request, results_data: List[Dict[str, Any]]) -> int:
+        """
+        Save scraped results to the database
+        """
+        try:
+            from .models import BrightDataScrapedPost
+            from django.utils.dateparse import parse_datetime
+            import re
+            
+            saved_count = 0
+            
+            for item in results_data:
+                try:
+                    # Extract post data with multiple possible field names
+                    post_id = (item.get('post_id') or item.get('shortcode') or 
+                              item.get('id') or item.get('url', '').split('/')[-2] if item.get('url') else str(saved_count))
+                    
+                    # Skip if we already have this post
+                    if BrightDataScrapedPost.objects.filter(
+                        post_id=post_id,
+                        platform=scraper_request.platform,
+                        scraper_request=scraper_request
+                    ).exists():
+                        continue
+                    
+                    # Parse date
+                    date_posted = None
+                    date_str = item.get('timestamp') or item.get('date_posted') or item.get('date')
+                    if date_str:
+                        try:
+                            date_posted = parse_datetime(date_str)
+                        except:
+                            pass
+                    
+                    # Parse numeric values
+                    def safe_int(value, default=0):
+                        if not value:
+                            return default
+                        # Remove commas and non-numeric characters except digits
+                        clean_value = re.sub(r'[^\d]', '', str(value))
+                        return int(clean_value) if clean_value else default
+                    
+                    # Create post record
+                    post = BrightDataScrapedPost.objects.create(
+                        scraper_request=scraper_request,
+                        folder_id=scraper_request.folder_id or 0,
+                        post_id=post_id,
+                        url=item.get('url') or item.get('post_url') or '',
+                        platform=scraper_request.platform,
+                        
+                        # Content
+                        user_posted=item.get('user_username') or item.get('username') or item.get('ownerUsername') or 'Unknown',
+                        content=item.get('caption') or item.get('description') or item.get('text') or item.get('content') or '',
+                        description=item.get('caption') or item.get('description') or item.get('text') or '',
+                        
+                        # Metrics
+                        likes=safe_int(item.get('likes_count') or item.get('likesCount') or item.get('likes')),
+                        num_comments=safe_int(item.get('comments_count') or item.get('commentsCount') or item.get('comments')),
+                        shares=safe_int(item.get('shares_count') or item.get('shares')),
+                        
+                        # Metadata
+                        date_posted=date_posted,
+                        location=item.get('location') or '',
+                        hashtags=item.get('hashtags') or [],
+                        mentions=item.get('mentions') or [],
+                        
+                        # Media
+                        media_type=item.get('media_type') or item.get('type') or 'post',
+                        media_url=item.get('media_url') or item.get('display_url') or '',
+                        
+                        # User info
+                        is_verified=bool(item.get('is_verified') or item.get('verified')),
+                        follower_count=safe_int(item.get('follower_count') or item.get('user_followers')),
+                        
+                        # Raw data backup
+                        raw_data=item
+                    )
+                    
+                    saved_count += 1
+                    print(f"✅ Saved post {post_id} by {post.user_posted}")
+                    
+                except Exception as e:
+                    print(f"❌ Error saving post: {str(e)}")
+                    continue
+            
+            print(f"✅ Saved {saved_count} posts to database")
+            return saved_count
+            
+        except Exception as e:
+            print(f"❌ Error saving scraped data: {str(e)}")
+            return 0
+
+    def fetch_and_save_brightdata_results(self, snapshot_id: str, scraper_request) -> Dict[str, Any]:
+        """
+        Fetch results from BrightData and save them to database
+        """
+        try:
+            # Fetch results from BrightData
+            results = self.fetch_brightdata_results(snapshot_id)
+            
+            if not results['success']:
+                return results
+            
+            # Parse data if needed
+            parsed_data = []
+            if results.get('format') == 'text':
+                parsed_data = self.parse_brightdata_csv_results(results['data'])
+            elif isinstance(results.get('data'), list):
+                parsed_data = results['data']
+            
+            if not parsed_data:
+                return {
+                    'success': False,
+                    'error': 'No data to save',
+                    'snapshot_id': snapshot_id
+                }
+            
+            # Save to database
+            saved_count = self.save_scraped_data_to_database(scraper_request, parsed_data)
+            
+            # Update scraper request status
+            if saved_count > 0:
+                scraper_request.status = 'completed'
+                scraper_request.completed_at = timezone.now()
+                scraper_request.save()
+                print(f"✅ Updated scraper request {scraper_request.id} to completed")
+            
+            return {
+                'success': True,
+                'snapshot_id': snapshot_id,
+                'saved_count': saved_count,
+                'total_fetched': len(parsed_data)
+            }
+            
+        except Exception as e:
+            print(f"❌ Error in fetch_and_save: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e),
+                'snapshot_id': snapshot_id
+            }
+
     # ========== LEGACY COMPATIBILITY METHODS ==========
     
     def _make_brightdata_batch_request(self, scraper_requests: List[BrightDataScraperRequest], 

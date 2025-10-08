@@ -159,3 +159,64 @@ class BrightDataWebhookEvent(models.Model):
 
     def __str__(self):
         return f"Webhook {self.snapshot_id} - {self.status}"
+
+
+class BrightDataScrapedPost(models.Model):
+    """Stores individual scraped posts from BrightData"""
+    
+    # Link to the scraper request
+    scraper_request = models.ForeignKey(BrightDataScraperRequest, on_delete=models.CASCADE, related_name='scraped_posts')
+    
+    # Job/Folder linking
+    folder_id = models.IntegerField(help_text='Job folder ID this post belongs to')
+    
+    # Post identification
+    post_id = models.CharField(max_length=255, help_text='Platform-specific post ID')
+    url = models.URLField(max_length=500, blank=True, null=True)
+    platform = models.CharField(max_length=50, default='instagram')
+    
+    # Content
+    user_posted = models.CharField(max_length=255, blank=True, null=True)
+    content = models.TextField(blank=True, null=True)
+    description = models.TextField(blank=True, null=True)
+    
+    # Metrics
+    likes = models.IntegerField(default=0)
+    num_comments = models.IntegerField(default=0)
+    shares = models.IntegerField(default=0)
+    
+    # Metadata
+    date_posted = models.DateTimeField(blank=True, null=True)
+    location = models.CharField(max_length=255, blank=True, null=True)
+    hashtags = models.JSONField(default=list, blank=True)
+    mentions = models.JSONField(default=list, blank=True)
+    
+    # Media
+    media_type = models.CharField(max_length=50, blank=True, null=True)
+    media_url = models.URLField(max_length=500, blank=True, null=True)
+    
+    # User info
+    is_verified = models.BooleanField(default=False)
+    follower_count = models.IntegerField(default=0)
+    
+    # Raw data backup
+    raw_data = models.JSONField(default=dict, help_text='Original BrightData response')
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ['post_id', 'platform', 'scraper_request']
+        verbose_name = "BrightData Scraped Post"
+        verbose_name_plural = "BrightData Scraped Posts"
+        ordering = ['-date_posted', '-created_at']
+        indexes = [
+            models.Index(fields=['folder_id']),
+            models.Index(fields=['platform']),
+            models.Index(fields=['user_posted']),
+            models.Index(fields=['date_posted']),
+        ]
+
+    def __str__(self):
+        return f"{self.platform} - {self.post_id} by {self.user_posted}"

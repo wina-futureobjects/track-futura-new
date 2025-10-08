@@ -894,11 +894,11 @@ def brightdata_job_results(request, job_folder_id):
     """
     try:
         # Get the job folder
-        from track_accounts.models import Folder
+        from track_accounts.models import ReportFolder
         
         try:
-            job_folder = Folder.objects.get(id=job_folder_id, folder_type='job')
-        except Folder.DoesNotExist:
+            job_folder = ReportFolder.objects.get(id=job_folder_id)
+        except ReportFolder.DoesNotExist:
             return JsonResponse({
                 'success': False,
                 'error': f'Job folder {job_folder_id} not found'
@@ -906,7 +906,7 @@ def brightdata_job_results(request, job_folder_id):
         
         # Look for BrightData scraper requests related to this job
         scraper_requests = BrightDataScraperRequest.objects.filter(
-            batch_job__folder_id=job_folder_id
+            folder_id=job_folder_id
         ).exclude(snapshot_id__isnull=True).exclude(snapshot_id='')
         
         if not scraper_requests.exists():
@@ -916,40 +916,105 @@ def brightdata_job_results(request, job_folder_id):
                 'job_folder_id': job_folder_id
             })
         
-        # Fetch results from all snapshots
+        # First, try to get saved posts from database
+        from .models import BrightDataScrapedPost
+        
+        saved_posts = BrightDataScrapedPost.objects.filter(
+            folder_id=job_folder_id
+        ).order_by('-date_posted', '-created_at')
+        
+        if saved_posts.exists():
+            # We have saved posts - return them
+            posts_data = []
+            for post in saved_posts:
+                posts_data.append({
+                    'post_id': post.post_id,
+                    'url': post.url,
+                    'user_username': post.user_posted,
+                    'username': post.user_posted,
+                    'caption': post.content,
+                    'description': post.description,
+                    'likes_count': post.likes,
+                    'likesCount': post.likes,
+                    'comments_count': post.num_comments,
+                    'commentsCount': post.num_comments,
+                    'timestamp': post.date_posted.isoformat() if post.date_posted else None,
+                    'date_posted': post.date_posted.isoformat() if post.date_posted else None,
+                    'is_verified': post.is_verified,
+                    'platform': post.platform,
+                    'media_type': post.media_type,
+                    'media_url': post.media_url,
+                    'location': post.location,
+                    'hashtags': post.hashtags,
+                    'mentions': post.mentions,
+                })
+            
+            return JsonResponse({
+                'success': True,
+                'job_folder_id': job_folder_id,
+                'job_folder_name': job_folder.name,
+                'total_results': len(posts_data),
+                'data': posts_data,
+                'source': 'database',
+                'saved_posts_count': len(posts_data)
+            })
+        
+        # No saved posts - try to fetch and save from BrightData
         scraper = BrightDataAutomatedBatchScraper()
         all_results = []
         successful_snapshots = []
         failed_snapshots = []
+        saved_count = 0
         
         for request in scraper_requests:
             snapshot_id = request.snapshot_id
-            results = scraper.fetch_brightdata_results(snapshot_id)
             
-            if results['success']:
+            # Try to fetch and save results
+            save_result = scraper.fetch_and_save_brightdata_results(snapshot_id, request)
+            
+            if save_result['success']:
                 successful_snapshots.append(snapshot_id)
-                
-                # Parse data based on format
-                if results.get('format') == 'text':
-                    parsed_data = scraper.parse_brightdata_csv_results(results['data'])
-                    all_results.extend(parsed_data)
-                elif isinstance(results.get('data'), list):
-                    all_results.extend(results['data'])
-                    
+                saved_count += save_result.get('saved_count', 0)
             else:
                 failed_snapshots.append({
                     'snapshot_id': snapshot_id,
-                    'error': results['error']
+                    'error': save_result['error']
                 })
+        
+        # After saving, try to get the saved posts again
+        saved_posts = BrightDataScrapedPost.objects.filter(
+            folder_id=job_folder_id
+        ).order_by('-date_posted', '-created_at')
+        
+        posts_data = []
+        for post in saved_posts:
+            posts_data.append({
+                'post_id': post.post_id,
+                'url': post.url,
+                'user_username': post.user_posted,
+                'username': post.user_posted,
+                'caption': post.content,
+                'description': post.description,
+                'likes_count': post.likes,
+                'likesCount': post.likes,
+                'comments_count': post.num_comments,
+                'commentsCount': post.num_comments,
+                'timestamp': post.date_posted.isoformat() if post.date_posted else None,
+                'date_posted': post.date_posted.isoformat() if post.date_posted else None,
+                'is_verified': post.is_verified,
+                'platform': post.platform,
+            })
         
         return JsonResponse({
             'success': True,
             'job_folder_id': job_folder_id,
             'job_folder_name': job_folder.name,
-            'total_results': len(all_results),
+            'total_results': len(posts_data),
+            'data': posts_data,
+            'source': 'fetched_and_saved',
+            'saved_count': saved_count,
             'successful_snapshots': len(successful_snapshots),
             'failed_snapshots': len(failed_snapshots),
-            'data': all_results,
             'snapshots': {
                 'successful': successful_snapshots,
                 'failed': failed_snapshots
