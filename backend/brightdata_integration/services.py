@@ -25,10 +25,10 @@ class BrightDataAutomatedBatchScraper:
         self.logger = logging.getLogger(__name__)
         self.base_url = "https://api.brightdata.com/datasets/v3"
         
-        # Platform-specific dataset configurations
+        # Platform-specific dataset configurations - EXACT DATASET IDS
         self.platform_datasets = {
-            'instagram': 'gd_l7q7dkf244hwps8lu0',  # Instagram dataset ID
-            'facebook': 'gd_l7q7dkf244hwps8lu1',   # Facebook dataset ID
+            'instagram': 'gd_lk5ns7kz21pck8jpis',  # Instagram dataset ID (your exact ID)
+            'facebook': 'gd_lkaxegm826bjpoo9m5',   # Facebook dataset ID (your exact ID)
             'tiktok': 'gd_l7q7dkf244hwps8lu2',     # TikTok dataset ID
             'linkedin': 'gd_l7q7dkf244hwps8lu3',   # LinkedIn dataset ID
         }
@@ -231,10 +231,11 @@ class BrightDataAutomatedBatchScraper:
             return {"url": "https://example.com", "platform": platform}
     
     def _execute_brightdata_request(self, scraper_request, payload: dict) -> bool:
-        """Execute BrightData Dataset API request - CORRECT FORMAT"""
+        """Execute BrightData Dataset API request - EXACT FORMAT FOR INSTAGRAM & FACEBOOK"""
         try:
             config = scraper_request.config
             api_token = config.api_token
+            platform = scraper_request.platform.lower()
             
             # Use DATASET API format as per BrightData documentation
             url = "https://api.brightdata.com/datasets/v3/trigger"
@@ -243,31 +244,60 @@ class BrightDataAutomatedBatchScraper:
                 "Content-Type": "application/json",
             }
             
-            # Get your Instagram dataset ID
-            dataset_id = "gd_lk5ns7kz21pck8jpis"  # Your Instagram dataset
+            # Get correct dataset ID for platform
+            dataset_id = self.platform_datasets.get(platform)
+            if not dataset_id:
+                self.logger.error(f"No dataset ID configured for platform: {platform}")
+                return False
             
-            params = {
-                "dataset_id": dataset_id,
-                "include_errors": "true",
-                "type": "discover_new",
-                "discover_by": "url",
-            }
+            # Platform-specific parameters and data formatting
+            if platform == 'instagram':
+                # INSTAGRAM FORMAT - EXACT MATCH TO YOUR EXAMPLE
+                params = {
+                    "dataset_id": dataset_id,  # gd_lk5ns7kz21pck8jpis
+                    "include_errors": "true",
+                    "type": "discover_new",
+                    "discover_by": "url",
+                }
+                
+                target_url = payload.get("url", "https://www.instagram.com/nike/")
+                data = [{
+                    "url": target_url,
+                    "num_of_posts": 10,
+                    "start_date": "01-01-2025",
+                    "end_date": "03-01-2025",
+                    "post_type": "Post"
+                }]
+                
+            elif platform == 'facebook':
+                # FACEBOOK FORMAT - EXACT MATCH TO YOUR EXAMPLE
+                params = {
+                    "dataset_id": dataset_id,  # gd_lkaxegm826bjpoo9m5
+                    "include_errors": "true",
+                }
+                
+                target_url = payload.get("url", "https://www.facebook.com/nike/")
+                data = [{
+                    "url": target_url,
+                    "num_of_posts": 50,
+                    "start_date": "01-01-2025",
+                    "end_date": "02-28-2025"
+                }]
+                
+            else:
+                # Generic format for other platforms
+                params = {
+                    "dataset_id": dataset_id,
+                    "include_errors": "true",
+                }
+                target_url = payload.get("url", "https://example.com")
+                data = [{"url": target_url, "num_of_posts": 10}]
             
-            # Format data according to BrightData Instagram API specification
-            target_url = payload.get("url", "https://www.instagram.com/nike/")
-            
-            data = [{
-                "url": target_url,
-                "num_of_posts": 10,
-                "start_date": "01-01-2025",
-                "end_date": "08-01-2025",
-                "post_type": "Post"
-            }]
-            
-            self.logger.info(f"🚀 BrightData Dataset API Request:")
+            self.logger.info(f"🚀 BrightData {platform.upper()} Dataset API Request:")
             self.logger.info(f"   URL: {url}")
             self.logger.info(f"   Dataset ID: {dataset_id}")
             self.logger.info(f"   Target URL: {target_url}")
+            self.logger.info(f"   Params: {params}")
             self.logger.info(f"   Data: {data}")
             
             # Make the actual API request
@@ -285,7 +315,7 @@ class BrightDataAutomatedBatchScraper:
                 scraper_request.response_data = response_data
                 scraper_request.save()
                 
-                self.logger.info(f"✅ SUCCESS! BrightData scraper triggered: {scraper_request.request_id}")
+                self.logger.info(f"✅ SUCCESS! BrightData {platform} scraper triggered: {scraper_request.request_id}")
                 return True
             else:
                 scraper_request.status = 'failed'
