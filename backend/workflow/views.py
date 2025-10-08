@@ -606,3 +606,84 @@ class ScrapingJobViewSet(viewsets.ReadOnlyModelViewSet):
                 {'error': 'Failed to retry job'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class DirectWorkflowAPIViewSet(viewsets.ViewSet):
+    """Direct API endpoints for workflow management"""
+    permission_classes = [AllowAny]
+    
+    @action(detail=False, methods=['get'], url_path='available-platforms')
+    def available_platforms(self, request):
+        """Get available platforms for workflow"""
+        try:
+            platforms = Platform.objects.filter(is_active=True)
+            
+            platform_data = []
+            for platform in platforms:
+                # Get available services for this platform
+                services = Service.objects.filter(
+                    platformservice__platform=platform,
+                    platformservice__is_enabled=True
+                ).distinct()
+                
+                platform_info = {
+                    'id': platform.id,
+                    'name': platform.name,
+                    'description': platform.description,
+                    'is_active': platform.is_active,
+                    'services': [
+                        {
+                            'id': service.id,
+                            'name': service.name,
+                            'description': service.description
+                        }
+                        for service in services
+                    ]
+                }
+                platform_data.append(platform_info)
+            
+            return Response({
+                'platforms': platform_data,
+                'count': len(platform_data)
+            })
+            
+        except Exception as e:
+            logger.error(f"Error getting available platforms: {str(e)}")
+            return Response(
+                {'error': 'Failed to get available platforms'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['get'], url_path='platform-services')
+    def platform_services(self, request):
+        """Get available platform-service combinations"""
+        try:
+            platform_services = PlatformService.objects.filter(
+                is_enabled=True
+            ).select_related('platform', 'service')
+            
+            results = [
+                {
+                    'id': ps.id,
+                    'platform': ps.platform.name,
+                    'service': ps.service.name,
+                    'platform_id': ps.platform.id,
+                    'service_id': ps.service.id,
+                    'name': f"{ps.platform.name} - {ps.service.name}",
+                    'is_enabled': ps.is_enabled,
+                    'description': f"{ps.service.description} for {ps.platform.name}" if ps.service.description else f"{ps.platform.name} {ps.service.name}"
+                }
+                for ps in platform_services
+            ]
+            
+            return Response({
+                'platform_services': results,
+                'count': len(results)
+            })
+            
+        except Exception as e:
+            logger.error(f"Error getting platform services: {str(e)}")
+            return Response(
+                {'error': 'Failed to get platform services'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
