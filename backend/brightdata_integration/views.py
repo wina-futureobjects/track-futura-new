@@ -635,26 +635,54 @@ def _update_batch_job_status(batch_job: BrightDataBatchJob):
 
 
 @csrf_exempt
-@require_http_methods(["POST"])
+@require_http_methods(["POST", "OPTIONS"])
 def trigger_scraper_endpoint(request):
-    """Direct trigger scraper endpoint - Fixed for production"""
+    """Direct trigger scraper endpoint - CORS-friendly for frontend interface"""
+    
+    # Handle CORS preflight OPTIONS request
+    if request.method == 'OPTIONS':
+        response = JsonResponse({'status': 'ok'})
+        response['Access-Control-Allow-Origin'] = '*'
+        response['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        response['Access-Control-Max-Age'] = '86400'
+        return response
+    
+    # Handle actual POST request
     try:
         data = json.loads(request.body)
         platform = data.get('platform', 'instagram')
         urls = data.get('urls', [])
         
         logger.info(f"🚀 Direct trigger endpoint called: platform={platform}, urls={urls}")
+        print(f"🔥 INTERFACE TRIGGERED SCRAPER: {platform} -> {urls}")
         
         from .services import BrightDataAutomatedBatchScraper
         scraper = BrightDataAutomatedBatchScraper()
         result = scraper.trigger_scraper(platform, urls)
         
         logger.info(f"✅ Scraper result: {result}")
-        return JsonResponse(result)
+        print(f"✅ RESULT FOR INTERFACE: {result}")
+        
+        # Create CORS-friendly response
+        response = JsonResponse(result)
+        response['Access-Control-Allow-Origin'] = '*'
+        response['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        
+        return response
         
     except Exception as e:
         logger.error(f"❌ Scraper trigger failed: {str(e)}")
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        print(f"❌ INTERFACE ERROR: {str(e)}")
+        
+        # Create CORS-friendly error response
+        response = JsonResponse({'success': False, 'error': str(e)}, status=500)
+        response['Access-Control-Allow-Origin'] = '*'
+        response['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        
+        return response
 
 
 def _handle_platform_setup(data):
