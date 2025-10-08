@@ -211,3 +211,95 @@ class BrightDataAutomatedBatchScraper:
         except Exception as e:
             self.logger.error(f"Error processing platform {platform}: {str(e)}")
             return False
+    
+    def _prepare_request_payload(self, platform: str, batch_job, scraper_request) -> dict:
+        """Prepare the request payload for BrightData API"""
+        try:
+            payload = {
+                "url": scraper_request.target_url,
+                "format": "json",
+                "include_posts": True,
+                "max_posts": batch_job.num_of_posts or 50,
+                "metadata": {
+                    "batch_job_id": batch_job.id,
+                    "scraper_request_id": scraper_request.id,
+                    "platform": platform,
+                    "project": batch_job.project.name if batch_job.project else "Unknown"
+                }
+            }
+            
+            # Add platform-specific parameters
+            if platform == 'instagram':
+                payload.update({
+                    "include_stories": False,
+                    "include_highlights": False
+                })
+            elif platform == 'facebook':
+                payload.update({
+                    "include_comments": True,
+                    "include_reactions": True
+                })
+            
+            self.logger.info(f"Prepared payload for {platform}: {payload}")
+            return payload
+            
+        except Exception as e:
+            self.logger.error(f"Error preparing payload: {str(e)}")
+            return {}
+    
+    def _execute_brightdata_request(self, scraper_request, payload: dict) -> bool:
+        """Execute the actual BrightData API request"""
+        try:
+            config = scraper_request.config
+            dataset_id = config.dataset_id
+            api_token = config.api_token
+            
+            # BrightData API endpoint
+            url = f"https://brightdata.com/api/datasets/{dataset_id}/trigger"
+            
+            headers = {
+                'Authorization': f'Bearer {api_token}',
+                'Content-Type': 'application/json'
+            }
+            
+            self.logger.info(f"Sending request to BrightData: {url}")
+            self.logger.info(f"API Token: {api_token[:20]}...")
+            self.logger.info(f"Payload: {payload}")
+            
+            # Make the actual API call to BrightData
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
+            
+            self.logger.info(f"BrightData response status: {response.status_code}")
+            self.logger.info(f"BrightData response: {response.text}")
+            
+            # Update scraper request status
+            if response.status_code in [200, 201, 202]:
+                scraper_request.status = 'sent'
+                scraper_request.response_data = response.json() if response.text else {}
+                scraper_request.save()
+                
+                self.logger.info(f"✅ Successfully sent request to BrightData for {scraper_request.platform}")
+                return True
+            else:
+                scraper_request.status = 'failed'
+                scraper_request.error_message = f"API Error {response.status_code}: {response.text}"
+                scraper_request.save()
+                
+                self.logger.error(f"❌ BrightData API error {response.status_code}: {response.text}")
+                return False
+                
+        except requests.exceptions.RequestException as e:
+            scraper_request.status = 'failed'
+            scraper_request.error_message = f"Request Exception: {str(e)}"
+            scraper_request.save()
+            
+            self.logger.error(f"❌ Request exception: {str(e)}")
+            return False
+            
+        except Exception as e:
+            scraper_request.status = 'failed'
+            scraper_request.error_message = f"Unexpected error: {str(e)}"
+            scraper_request.save()
+            
+            self.logger.error(f"❌ Unexpected error: {str(e)}")
+            return False
