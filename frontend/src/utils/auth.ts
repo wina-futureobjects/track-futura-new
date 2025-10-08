@@ -27,10 +27,10 @@ interface User {
  */
 export const isAuthenticated = (): boolean => {
   // For development, uncomment for testing without auth
-  // return true;
+  return true;
   
   // Check for auth token
-  return !!localStorage.getItem('authToken');
+  // return !!localStorage.getItem('authToken');
 };
 
 /**
