@@ -215,32 +215,18 @@ class BrightDataAutomatedBatchScraper:
     def _prepare_request_payload(self, platform: str, batch_job, scraper_request) -> dict:
         """Prepare the request payload for BrightData API"""
         try:
+            # Simple BrightData payload format
             payload = {
                 "url": scraper_request.target_url,
-                "format": "json",
-                "include_posts": True,
-                "max_posts": batch_job.num_of_posts or 50,
-                "metadata": {
-                    "batch_job_id": batch_job.id,
-                    "scraper_request_id": scraper_request.id,
-                    "platform": platform,
-                    "project": batch_job.project.name if batch_job.project else "Unknown"
-                }
+                # Remove unsupported fields based on error messages
+                "post_type": "all"  # Use this instead of include_posts, include_stories etc
             }
             
-            # Add platform-specific parameters
-            if platform == 'instagram':
-                payload.update({
-                    "include_stories": False,
-                    "include_highlights": False
-                })
-            elif platform == 'facebook':
-                payload.update({
-                    "include_comments": True,
-                    "include_reactions": True
-                })
+            # Add metadata as separate fields rather than nested
+            payload["project_id"] = str(batch_job.id)
+            payload["platform"] = platform
             
-            self.logger.info(f"Prepared payload for {platform}: {payload}")
+            self.logger.info(f"Prepared BrightData payload for {platform}: {payload}")
             return payload
             
         except Exception as e:
@@ -251,11 +237,11 @@ class BrightDataAutomatedBatchScraper:
         """Execute the actual BrightData API request"""
         try:
             config = scraper_request.config
-            dataset_id = config.dataset_id
+            dataset_id = config.dataset_id  # This should be the scraper ID like hl_f7614f18
             api_token = config.api_token
             
-            # BrightData API endpoint
-            url = f"https://brightdata.com/api/datasets/{dataset_id}/trigger"
+            # Correct BrightData API endpoint for triggering scrapers
+            url = f"https://api.brightdata.com/datasets/v3/{dataset_id}/trigger"
             
             headers = {
                 'Authorization': f'Bearer {api_token}',
