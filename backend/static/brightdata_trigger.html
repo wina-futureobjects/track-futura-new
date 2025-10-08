@@ -83,15 +83,15 @@
         <p style="text-align: center; color: #666;">Click any button to start scraping immediately!</p>
         
         <button class="button instagram-btn" onclick="triggerScraper('instagram')">
-            📸 Trigger Instagram Scraper
+            📸 Trigger Nike Instagram (Base URL)
         </button>
         
-        <button class="button facebook-btn" onclick="triggerScraper('facebook')">
+        <button class="button facebook-btn" onclick="triggerScraper('facebook')" style="display:none;">
             📘 Trigger Facebook Scraper
         </button>
         
         <button class="button both-btn" onclick="triggerBoth()">
-            🎯 Trigger Both Instagram + Facebook
+            🎯 Start Nike Instagram Scraper
         </button>
         
         <div id="result" class="result"></div>
@@ -102,11 +102,12 @@
             const resultDiv = document.getElementById('result');
             resultDiv.className = 'result loading';
             resultDiv.style.display = 'block';
-            resultDiv.innerHTML = `🔄 Starting ${platform} scraper...`;
+            resultDiv.innerHTML = `🔄 Starting ${platform} scraper with base URLs only...`;
             
+            // Use ONLY base URLs as requested
             const urls = platform === 'instagram' 
-                ? ['https://www.instagram.com/nike/', 'https://www.instagram.com/adidas/']
-                : ['https://www.facebook.com/nike', 'https://www.facebook.com/adidas'];
+                ? ['https://www.instagram.com/nike/']  // Only Nike Instagram as per your input collection
+                : ['https://www.facebook.com/nike'];   // Only Nike Facebook if needed
             
             try {
                 const response = await fetch('/api/brightdata/trigger-scraper/', {
@@ -128,7 +129,8 @@
                         ✅ <strong>SUCCESS!</strong> ${platform.charAt(0).toUpperCase() + platform.slice(1)} scraper started!<br>
                         📊 <strong>Job ID:</strong> ${data.batch_job_id}<br>
                         📊 <strong>Dataset:</strong> ${data.dataset_id}<br>
-                        🔗 <strong>URLs:</strong> ${data.urls_count} URLs<br>
+                        🔗 <strong>Target:</strong> ${urls[0]} (base URL only)<br>
+                        📝 <strong>Message:</strong> ${data.message}<br>
                         <br>👉 Check your BrightData dashboard for progress!
                     `;
                 } else {
@@ -145,44 +147,28 @@
             const resultDiv = document.getElementById('result');
             resultDiv.className = 'result loading';
             resultDiv.style.display = 'block';
-            resultDiv.innerHTML = '🔄 Starting both Instagram and Facebook scrapers...';
+            resultDiv.innerHTML = '🔄 Starting Nike Instagram scraper only (as per your input collection)...';
             
             const results = [];
             
-            // Trigger Instagram
+            // Trigger only Instagram (Nike only as per your requirements)
             try {
                 const instagramResponse = await fetch('/api/brightdata/trigger-scraper/', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         platform: 'instagram',
-                        urls: ['https://www.instagram.com/nike/', 'https://www.instagram.com/adidas/']
+                        urls: ['https://www.instagram.com/nike/']  // Only Nike base URL
                     })
                 });
                 const instagramData = await instagramResponse.json();
-                results.push({ platform: 'Instagram', data: instagramData });
+                results.push({ platform: 'Nike Instagram', data: instagramData });
             } catch (error) {
-                results.push({ platform: 'Instagram', error: error.message });
-            }
-            
-            // Trigger Facebook
-            try {
-                const facebookResponse = await fetch('/api/brightdata/trigger-scraper/', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        platform: 'facebook',
-                        urls: ['https://www.facebook.com/nike', 'https://www.facebook.com/adidas']
-                    })
-                });
-                const facebookData = await facebookResponse.json();
-                results.push({ platform: 'Facebook', data: facebookData });
-            } catch (error) {
-                results.push({ platform: 'Facebook', error: error.message });
+                results.push({ platform: 'Nike Instagram', error: error.message });
             }
             
             // Display results
-            let html = '<h3>🎯 Both Scrapers Triggered!</h3>';
+            let html = '<h3>🎯 Nike Instagram Scraper Triggered!</h3>';
             let hasSuccess = false;
             
             results.forEach(result => {
@@ -192,7 +178,9 @@
                         <div style="margin: 10px 0; padding: 10px; background: rgba(40, 167, 69, 0.1); border-radius: 5px;">
                             ✅ <strong>${result.platform}:</strong> Started successfully!<br>
                             📊 Job ID: ${result.data.batch_job_id}<br>
-                            📊 Dataset: ${result.data.dataset_id}
+                            📊 Dataset: ${result.data.dataset_id}<br>
+                            🔗 Target: https://www.instagram.com/nike/ (base URL)<br>
+                            📝 Message: ${result.data.message}
                         </div>
                     `;
                 } else {

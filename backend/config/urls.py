@@ -123,8 +123,9 @@ def api_status(request):
 
 
 urlpatterns = [
+    path("trigger/", serve_brightdata_trigger, name="brightdata_trigger"),  # BrightData trigger page at base URL
+    path("brightdata-trigger/", serve_brightdata_trigger, name="brightdata_trigger_alt"),  # Alternative path
     path("", serve_frontend, name="frontend"),  # Serve frontend at root
-    path("brightdata-trigger/", serve_brightdata_trigger, name="brightdata_trigger"),  # BrightData trigger page
     path("api/health/", health_check, name="health_check"),  # Health check endpoint
     path("favicon.ico", favicon_view, name="favicon"),  # Handle favicon
     path("admin/", admin.site.urls),
