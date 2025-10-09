@@ -16,7 +16,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from .models import BrightDataConfig, BrightDataBatchJob, BrightDataScraperRequest, BrightDataWebhookEvent
+from .models import BrightDataConfig, BrightDataBatchJob, BrightDataScraperRequest, BrightDataWebhookEvent, BrightDataScrapedPost
 from .serializers import BrightDataConfigSerializer, BrightDataBatchJobSerializer, BrightDataScraperRequestSerializer
 from .services import BrightDataAutomatedBatchScraper
 
@@ -931,14 +931,60 @@ def brightdata_job_results(request, job_folder_id):
                     'error': f'Job folder {job_folder_id} not found'
                 }, status=404)
         
+        # 🚨 PRIORITY: Check for existing scraped data FIRST before any fallbacks
+        existing_scraped_posts = BrightDataScrapedPost.objects.filter(
+            folder_id=job_folder_id
+        ).exclude(
+            post_id__startswith='sample_post_'  # Exclude old sample data
+        ).order_by('-date_posted', '-created_at')
+        
+        if existing_scraped_posts.exists():
+            logger.info(f"✅ Found {existing_scraped_posts.count()} real scraped posts for folder {job_folder_id}")
+            
+            # Return real scraped data immediately
+            posts_data = []
+            for post in existing_scraped_posts:
+                posts_data.append({
+                    'post_id': post.post_id,
+                    'url': post.url,
+                    'user_username': post.user_posted,
+                    'username': post.user_posted,
+                    'caption': post.content,
+                    'description': post.description,
+                    'likes_count': post.likes,
+                    'likesCount': post.likes,
+                    'comments_count': post.num_comments,
+                    'commentsCount': post.num_comments,
+                    'shares_count': post.shares,
+                    'timestamp': post.date_posted.isoformat() if post.date_posted else post.created_at.isoformat(),
+                    'date_posted': post.date_posted.isoformat() if post.date_posted else post.created_at.isoformat(),
+                    'is_verified': post.is_verified,
+                    'platform': post.platform,
+                    'media_type': post.media_type,
+                    'media_url': post.media_url,
+                    'location': post.location,
+                    'hashtags': post.hashtags,
+                    'mentions': post.mentions,
+                })
+            
+            return JsonResponse({
+                'success': True,
+                'job_folder_id': job_folder_id,
+                'job_folder_name': job_folder.name,
+                'total_results': len(posts_data),
+                'data': posts_data,
+                'source': 'real_brightdata_scraped_data',
+                'message': f'Showing {len(posts_data)} real scraped posts from BrightData'
+            })
+        
         # Look for BrightData scraper requests related to this job
         scraper_requests = BrightDataScraperRequest.objects.filter(
             folder_id=job_folder_id
         ).exclude(snapshot_id__isnull=True).exclude(snapshot_id='')
         
         if not scraper_requests.exists():
-            # 🚨 AUTO-POPULATE: Create sample data for ANY job folder
-            if True:  # Enable for all job folders
+            # NO SAMPLE DATA GENERATION - Only return empty result
+            if False:  # DISABLED - no more sample data generation
                 from django.utils import timezone
                 
                 # Create a sample scraper request
@@ -1031,27 +1077,20 @@ def brightdata_job_results(request, job_folder_id):
                     }
                 ]
                 
-                from .models import BrightDataScrapedPost
-                for post_data in sample_posts:
-                    BrightDataScrapedPost.objects.create(
-                        scraper_request=scraper_request,
-                        **post_data
-                    )
-                
-                # Update scraper_requests to include the new one
-                scraper_requests = BrightDataScraperRequest.objects.filter(folder_id=job_folder_id)
-                
-                logger.info(f"🚨 Created emergency sample data for folder {job_folder_id}")
+                # SAMPLE DATA GENERATION DISABLED
+                pass
             else:
+                # No scraper requests found - return helpful message
                 return JsonResponse({
                     'success': False,
-                    'error': 'No BrightData snapshots found for this job',
-                    'job_folder_id': job_folder_id
-                })
+                    'error': 'No BrightData scraping data found for this job folder',
+                    'job_folder_id': job_folder_id,
+                    'message': 'Please run a scraping job first to see data here',
+                    'suggestion': 'Go to Workflow Management to start a new scraping job'
+                }, status=404)
         
         # 🚀 PRIORITY 1: Try to fetch FRESH data from BrightData API first
         from .services import BrightDataAutomatedBatchScraper
-        from .models import BrightDataScrapedPost
         
         # Try to fetch real data from BrightData for each scraper request
         fresh_data_fetched = False
