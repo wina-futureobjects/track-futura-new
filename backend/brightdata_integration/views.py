@@ -5,6 +5,7 @@ This module provides API views for BrightData integration,
 including configuration management and webhook handling.
 """
 
+import gzip
 import json
 import logging
 import time
@@ -178,12 +179,61 @@ class BrightDataScraperRequestViewSet(viewsets.ModelViewSet):
 @csrf_exempt
 @require_http_methods(["POST"])
 def brightdata_webhook(request):
-    """Handle BrightData webhook events for data delivery"""
+    """
+    Handle BrightData webhook events for data delivery
+    Enhanced with compression support to fix gzip decompression errors
+    """
     start_time = time.time()
     
     try:
-        # Parse webhook data
-        data = json.loads(request.body)
+        # Enhanced webhook data parsing with compression support
+        logger.info(f"🌐 BrightData webhook received")
+        logger.info(f"📋 Content-Type: {request.content_type}")
+        logger.info(f"📋 Content-Encoding: {request.META.get('HTTP_CONTENT_ENCODING', 'none')}")
+        logger.info(f"📊 Body size: {len(request.body)} bytes")
+        
+        # Check authorization header
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        expected_token = "Bearer 8af6995e-3baa-4b69-9df7-8d7671e621eb"
+        
+        if auth_header and auth_header != expected_token:
+            logger.warning(f"❌ Authorization mismatch: received={auth_header[:20]}...")
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+        
+        # Handle compressed data - Fix for gzip decompression error
+        raw_body = request.body
+        
+        # Check if data is gzip compressed (0x8b is gzip magic number)
+        is_compressed = (
+            raw_body.startswith(b'\x1f\x8b') or  # gzip magic number
+            request.META.get('HTTP_CONTENT_ENCODING') == 'gzip'
+        )
+        
+        if is_compressed:
+            logger.info(f"📦 Decompressing gzip data...")
+            try:
+                import gzip
+                decompressed_body = gzip.decompress(raw_body)
+                body_text = decompressed_body.decode('utf-8')
+                logger.info(f"✅ Successfully decompressed {len(raw_body)} bytes to {len(body_text)} characters")
+            except Exception as e:
+                logger.error(f"❌ Decompression failed: {e}")
+                return JsonResponse({'error': f'Decompression failed: {str(e)}'}, status=400)
+        else:
+            logger.info(f"📄 Processing uncompressed data...")
+            try:
+                body_text = raw_body.decode('utf-8')
+            except UnicodeDecodeError as e:
+                logger.error(f"❌ UTF-8 decode failed: {e}")
+                return JsonResponse({'error': f'UTF-8 decode failed: {str(e)}'}, status=400)
+        
+        # Parse JSON data
+        try:
+            data = json.loads(body_text)
+            logger.info(f"✅ Successfully parsed JSON data")
+        except json.JSONDecodeError as e:
+            logger.error(f"❌ JSON parsing failed: {e}")
+            return JsonResponse({'error': f'JSON parsing failed: {str(e)}'}, status=400)
         
         # Check for platform setup request
         if isinstance(data, dict) and data.get('setup_type') == 'platforms_and_services':
