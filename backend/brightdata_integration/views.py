@@ -212,7 +212,6 @@ def brightdata_webhook(request):
         if is_compressed:
             logger.info(f"📦 Decompressing gzip data...")
             try:
-                import gzip
                 decompressed_body = gzip.decompress(raw_body)
                 body_text = decompressed_body.decode('utf-8')
                 logger.info(f"✅ Successfully decompressed {len(raw_body)} bytes to {len(body_text)} characters")
