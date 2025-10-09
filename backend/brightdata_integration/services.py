@@ -161,16 +161,44 @@ class BrightDataAutomatedBatchScraper:
             # Make API call with date filtering
             success, batch_id = self._make_system_api_call(urls, platform_lower, dataset_id, date_range, num_of_posts)
             
-            if success:
+            if success and batch_id:
+                # Start monitoring the job in background (non-blocking)
+                try:
+                    print(f"🕐 Job submitted successfully! Snapshot ID: {batch_id}")
+                    print(f"⏱️ Expected completion time: 2-5 minutes for {num_of_posts} posts")
+                    print(f"🔍 You can check status at: https://api.brightdata.com/datasets/v3/snapshot/{batch_id}")
+                    
+                    # Optional: Start a background thread to monitor (non-blocking)
+                    # This won't delay the response but will log progress
+                    import threading
+                    
+                    def background_monitor():
+                        monitor_result = self.monitor_job_with_timeout(batch_id, timeout_minutes=10)
+                        if monitor_result['timeout']:
+                            self.logger.error(f"❌ Job {batch_id} timed out after 10 minutes")
+                        elif monitor_result['success']:
+                            self.logger.info(f"✅ Job {batch_id} completed successfully")
+                        else:
+                            self.logger.error(f"❌ Job {batch_id} failed: {monitor_result.get('error')}")
+                    
+                    monitor_thread = threading.Thread(target=background_monitor)
+                    monitor_thread.daemon = True
+                    monitor_thread.start()
+                    
+                except Exception as e:
+                    print(f"⚠️ Could not start background monitoring: {e}")
+                
                 return {
                     'success': True,
-                    'job_id': batch_id or 'batch_created',
+                    'job_id': batch_id,
                     'snapshot_id': batch_id,
                     'platform': platform_lower,
-                    'message': f'BrightData {platform_lower} scraper triggered with system data!',
+                    'message': f'BrightData {platform_lower} scraper triggered! Expected completion: 2-5 minutes',
                     'urls_count': len(urls),
                     'date_range': date_range,
-                    'dataset_id': dataset_id
+                    'dataset_id': dataset_id,
+                    'estimated_completion': '2-5 minutes',
+                    'monitoring': 'Background monitoring started'
                 }
             else:
                 return {'success': False, 'error': f'Failed to trigger {platform_lower} scraper'}
@@ -213,7 +241,7 @@ class BrightDataAutomatedBatchScraper:
                     "discover_by": "url",
                 })
             
-            # Parse date range from system - FIXED FOR BRIGHTDATA DISCOVERY PHASE
+            # Parse date range from system - IMPROVED DATE HANDLING
             # BrightData discovery phase needs PAST dates only (no current/future dates)
             today = datetime.now()
             
@@ -226,76 +254,125 @@ class BrightDataAutomatedBatchScraper:
             
             if date_range:
                 try:
-                    if 'start_date' in date_range and date_range['start_date']:
-                        # Convert from ISO format: "2025-10-01T00:00:00.000Z" to datetime
-                        start_dt = datetime.fromisoformat(date_range['start_date'].replace('Z', '+00:00'))
-                        
-                        # Ensure start date is in the past
-                        if start_dt.date() >= today.date():
-                            print(f"⚠️ Start date {start_dt.date()} is today/future, using past date")
-                            start_dt = today - timedelta(days=30)
-                        
-                        start_date = start_dt.strftime("%d-%m-%Y")
+                    start_str = date_range.get('start_date', '')
+                    end_str = date_range.get('end_date', '')
                     
-                    if 'end_date' in date_range and date_range['end_date']:
-                        # Convert from ISO format: "2025-10-08T00:00:00.000Z" to datetime
-                        end_dt = datetime.fromisoformat(date_range['end_date'].replace('Z', '+00:00'))
+                    # Handle different date formats
+                    def parse_flexible_date(date_str):
+                        """Parse dates in multiple formats"""
+                        if not date_str:
+                            return None
                         
-                        # Ensure end date is in the past (at least 2 days ago for BrightData discovery)
-                        if end_dt.date() >= today.date():
-                            print(f"⚠️ End date {end_dt.date()} is today/future, adjusting to past date")
-                            end_dt = today - timedelta(days=2)  # 2 days ago to be extra safe
+                        # Try ISO format first: "2025-10-01T00:00:00.000Z"
+                        try:
+                            if 'T' in date_str or 'Z' in date_str:
+                                return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                        except:
+                            pass
                         
-                        end_date = end_dt.strftime("%d-%m-%Y")
+                        # Try DD-MM-YYYY format: "01-09-2025"
+                        try:
+                            return datetime.strptime(date_str, "%d-%m-%Y")
+                        except:
+                            pass
                         
-                    # ADDITIONAL SAFETY CHECK: If start date is too close to end date, adjust start date too
-                    start_check = datetime.strptime(start_date, "%d-%m-%Y")
-                    end_check = datetime.strptime(end_date, "%d-%m-%Y")
+                        # Try YYYY-MM-DD format: "2025-09-01"
+                        try:
+                            return datetime.strptime(date_str, "%Y-%m-%d")
+                        except:
+                            pass
+                        
+                        print(f"⚠️ Could not parse date: {date_str}")
+                        return None
                     
-                    if end_check.date() >= today.date() or (end_check - start_check).days < 3:
-                        print(f"🔧 SAFETY OVERRIDE: Using guaranteed safe September dates")
-                        # Use safe September dates that we know work
-                        start_date = "01-09-2025"  # September 1st
-                        end_date = "30-09-2025"    # September 30th (known working from your example)
+                    # Parse start date
+                    if start_str:
+                        start_dt = parse_flexible_date(start_str)
+                        if start_dt:
+                            # Ensure start date is in the past
+                            if start_dt.date() >= today.date():
+                                print(f"⚠️ Start date {start_dt.date()} is today/future, using past date")
+                                start_dt = today - timedelta(days=30)
+                            start_date = start_dt.strftime("%d-%m-%Y")
+                    
+                    # Parse end date
+                    if end_str:
+                        end_dt = parse_flexible_date(end_str)
+                        if end_dt:
+                            # Ensure end date is in the past (at least 1 day ago for BrightData discovery)
+                            if end_dt.date() >= today.date():
+                                print(f"⚠️ End date {end_dt.date()} is today/future, adjusting to past date")
+                                end_dt = today - timedelta(days=1)  # 1 day ago should be safe
+                            end_date = end_dt.strftime("%d-%m-%Y")
                         
-                    print(f"📅 Parsed dates from system (adjusted for BrightData): {start_date} to {end_date}")
+                    print(f"📅 Parsed dates from system: {start_date} to {end_date}")
+                    
                 except Exception as e:
                     self.logger.warning(f"Date parsing error: {e}, using safe defaults")
                     print(f"⚠️ Date parsing failed: {e}")
             
-            # Validate date range makes sense and is in the past
+            # Final validation and safety checks
             try:
                 start_dt = datetime.strptime(start_date, "%d-%m-%Y")
                 end_dt = datetime.strptime(end_date, "%d-%m-%Y")
                 today_dt = datetime.now()
                 
+                # Basic validation
                 if end_dt < start_dt:
-                    print(f"⚠️ End date {end_date} is before start date {start_date}")
-                elif end_dt.date() >= today_dt.date():
-                    print(f"⚠️ CRITICAL: End date {end_date} is today/future - forcing September dates!")
-                    # Force safe September dates
-                    start_date = "01-09-2025"
-                    end_date = "30-09-2025"
-                    print(f"🔧 FORCED SAFE DATES: {start_date} to {end_date}")
-                elif (end_dt - start_dt).days > 365:
-                    print(f"⚠️ Date range is very large: {(end_dt - start_dt).days} days")
-                else:
-                    days_diff = (end_dt - start_dt).days
-                    days_ago = (today_dt - end_dt).days
-                    print(f"✅ Date range validated: {days_diff} days, ending {days_ago} days ago")
-                    print(f"✅ Safe for BrightData discovery phase!")
+                    print(f"⚠️ End date {end_date} is before start date {start_date}, swapping...")
+                    start_date, end_date = end_date, start_date
+                    start_dt, end_dt = end_dt, start_dt
+                
+                # Future date check
+                if end_dt.date() >= today_dt.date():
+                    print(f"⚠️ CRITICAL: End date {end_date} is today/future - adjusting!")
+                    end_dt = today_dt - timedelta(days=1)
+                    end_date = end_dt.strftime("%d-%m-%Y")
+                    print(f"🔧 ADJUSTED END DATE: {end_date}")
+                
+                # Very large range check
+                days_diff = (end_dt - start_dt).days
+                if days_diff > 365:
+                    print(f"⚠️ Date range is very large: {days_diff} days, limiting to 60 days")
+                    start_dt = end_dt - timedelta(days=60)
+                    start_date = start_dt.strftime("%d-%m-%Y")
+                elif days_diff < 1:
+                    print(f"⚠️ Date range too small: {days_diff} days, extending to 7 days")
+                    start_dt = end_dt - timedelta(days=7)
+                    start_date = start_dt.strftime("%d-%m-%Y")
+                
+                days_ago = (today_dt - end_dt).days
+                print(f"✅ Date range validated: {days_diff} days, ending {days_ago} days ago")
+                print(f"✅ Safe for BrightData discovery phase!")
+                
             except Exception as e:
-                print(f"⚠️ Date validation failed: {e}")
+                print(f"⚠️ Date validation failed: {e}, using emergency safe dates")
+                # Emergency fallback to known good dates
+                start_date = "01-09-2025"
+                end_date = "30-09-2025"
             
-            print(f"📅 Using dates: {start_date} to {end_date}")
+            print(f"📅 Final dates: {start_date} to {end_date}")
             
-            # Prepare payload with SYSTEM data - FIXED FORMAT
+            # Prepare payload with SYSTEM data - IMPROVED URL HANDLING
             payload = []
             for url in urls:
-                # Ensure URL has trailing slash for Instagram
+                # Clean and format URL for Instagram
                 formatted_url = url
-                if platform == 'instagram' and not url.endswith('/'):
-                    formatted_url = url + '/'
+                if platform == 'instagram':
+                    # Remove www. prefix if present
+                    if 'www.' in formatted_url:
+                        formatted_url = formatted_url.replace('www.', '')
+                        print(f"🔧 Removed www. prefix: {formatted_url}")
+                    
+                    # Ensure URL has trailing slash for Instagram
+                    if not formatted_url.endswith('/'):
+                        formatted_url = formatted_url + '/'
+                        print(f"🔧 Added trailing slash: {formatted_url}")
+                    
+                    # Ensure proper protocol
+                    if not formatted_url.startswith('http'):
+                        formatted_url = 'https://' + formatted_url
+                        print(f"🔧 Added protocol: {formatted_url}")
                 
                 if platform == 'instagram':
                     # Match EXACT expected format for Instagram
@@ -336,8 +413,19 @@ class BrightDataAutomatedBatchScraper:
                     csv_line = f"{item['url']},{item.get('num_of_posts', '')},{item.get('posts_to_not_include', '')},{item['start_date']},{item['end_date']},{item['post_type']}"
                     print(f"   {csv_line}")
             
-            # Make the actual request
-            response = requests.post(self.api_url, headers=headers, params=params, json=payload, timeout=30)
+            # Make the actual request with improved timeout handling
+            try:
+                print(f"⏱️ Making API request with 30-second timeout...")
+                response = requests.post(self.api_url, headers=headers, params=params, json=payload, timeout=30)
+            except requests.exceptions.Timeout:
+                print(f"⏰ TIMEOUT: BrightData API call exceeded 30 seconds")
+                return False, None
+            except requests.exceptions.ConnectionError:
+                print(f"🔌 CONNECTION ERROR: Could not connect to BrightData API")
+                return False, None
+            except Exception as e:
+                print(f"🚨 REQUEST ERROR: {str(e)}")
+                return False, None
             
             print(f"📊 Response Status: {response.status_code}")
             print(f"📄 Response: {response.text}")
@@ -721,3 +809,145 @@ class BrightDataAutomatedBatchScraper:
         except Exception as e:
             self.logger.error(f"❌ Error fetching BrightData results: {str(e)}")
             return None
+
+    def monitor_job_with_timeout(self, snapshot_id: str, timeout_minutes: int = 10) -> Dict[str, Any]:
+        """
+        Monitor a BrightData job with timeout to prevent infinite waiting
+        
+        Args:
+            snapshot_id: BrightData snapshot ID to monitor
+            timeout_minutes: Maximum time to wait in minutes (default: 10)
+            
+        Returns:
+            Dict with status, results, and timing information
+        """
+        import time
+        
+        start_time = time.time()
+        timeout_seconds = timeout_minutes * 60
+        check_interval = 30  # Check every 30 seconds
+        
+        self.logger.info(f"🕐 Starting job monitoring for {snapshot_id} (timeout: {timeout_minutes} minutes)")
+        
+        while time.time() - start_time < timeout_seconds:
+            try:
+                # Check job status
+                status_result = self.check_job_status(snapshot_id)
+                
+                if status_result['completed']:
+                    elapsed_time = time.time() - start_time
+                    self.logger.info(f"✅ Job completed in {elapsed_time:.1f} seconds")
+                    
+                    # Fetch results
+                    results = self.get_dataset_results(snapshot_id)
+                    
+                    return {
+                        'success': True,
+                        'status': 'completed',
+                        'results': results,
+                        'elapsed_time': elapsed_time,
+                        'timeout': False
+                    }
+                
+                elif status_result['failed']:
+                    elapsed_time = time.time() - start_time
+                    self.logger.error(f"❌ Job failed after {elapsed_time:.1f} seconds")
+                    
+                    return {
+                        'success': False,
+                        'status': 'failed',
+                        'error': status_result.get('error', 'Job failed'),
+                        'elapsed_time': elapsed_time,
+                        'timeout': False
+                    }
+                
+                # Job still running, wait before next check
+                elapsed_time = time.time() - start_time
+                remaining_time = timeout_seconds - elapsed_time
+                
+                if remaining_time > check_interval:
+                    self.logger.info(f"⏳ Job still running ({elapsed_time:.1f}s elapsed, {remaining_time:.1f}s remaining)")
+                    time.sleep(check_interval)
+                else:
+                    break
+                    
+            except Exception as e:
+                self.logger.error(f"Error monitoring job: {str(e)}")
+                time.sleep(check_interval)
+        
+        # Timeout reached
+        elapsed_time = time.time() - start_time
+        self.logger.error(f"⏰ TIMEOUT: Job exceeded {timeout_minutes} minutes ({elapsed_time:.1f}s)")
+        
+        return {
+            'success': False,
+            'status': 'timeout',
+            'error': f'Job exceeded {timeout_minutes} minute timeout',
+            'elapsed_time': elapsed_time,
+            'timeout': True
+        }
+
+    def check_job_status(self, snapshot_id: str) -> Dict[str, Any]:
+        """
+        Check the status of a BrightData job
+        
+        Returns:
+            Dict with completed, failed, and error status
+        """
+        try:
+            # BrightData status API endpoint
+            status_url = f"https://api.brightdata.com/datasets/v3/snapshot/{snapshot_id}/status"
+            
+            headers = {
+                'Authorization': f'Bearer {self.api_token}',
+                'Content-Type': 'application/json'
+            }
+            
+            response = requests.get(status_url, headers=headers, timeout=15)
+            
+            if response.status_code == 200:
+                status_data = response.json()
+                status_value = status_data.get('status', 'unknown').lower()
+                
+                return {
+                    'completed': status_value in ['completed', 'finished', 'done'],
+                    'failed': status_value in ['failed', 'error', 'cancelled'],
+                    'running': status_value in ['running', 'processing', 'in_progress'],
+                    'status': status_value,
+                    'data': status_data
+                }
+            
+            elif response.status_code == 404:
+                # Job not found - might be very new or completed
+                # Try to fetch results directly to check if it's completed
+                results = self.get_dataset_results(snapshot_id)
+                if results is not None:
+                    return {'completed': True, 'failed': False, 'running': False, 'status': 'completed'}
+                else:
+                    return {'completed': False, 'failed': False, 'running': True, 'status': 'not_found'}
+            
+            else:
+                return {
+                    'completed': False,
+                    'failed': True,
+                    'running': False,
+                    'status': 'api_error',
+                    'error': f'HTTP {response.status_code}: {response.text}'
+                }
+                
+        except requests.exceptions.Timeout:
+            return {
+                'completed': False,
+                'failed': False,
+                'running': True,
+                'status': 'timeout',
+                'error': 'Status check timeout'
+            }
+        except Exception as e:
+            return {
+                'completed': False,
+                'failed': True,
+                'running': False,
+                'status': 'error',
+                'error': str(e)
+            }
