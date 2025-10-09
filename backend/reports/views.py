@@ -1183,6 +1183,7 @@ from django.shortcuts import get_object_or_404
 
 class EngagementMetricsReportView(APIView):
     """Dedicated endpoint for Engagement Metrics reports with unique visualization"""
+    permission_classes = [IsAuthenticated]
     
     def get(self, request, report_id):
         report = get_object_or_404(GeneratedReport, id=report_id, template__template_type='engagement_metrics')
@@ -1201,6 +1202,7 @@ class EngagementMetricsReportView(APIView):
 
 class SentimentAnalysisReportView(APIView):
     """Dedicated endpoint for Sentiment Analysis reports with pie chart visualization"""
+    permission_classes = [IsAuthenticated]
     
     def get(self, request, report_id):
         report = get_object_or_404(GeneratedReport, id=report_id, template__template_type='sentiment_analysis')
@@ -1218,6 +1220,7 @@ class SentimentAnalysisReportView(APIView):
 
 class ContentAnalysisReportView(APIView):
     """Dedicated endpoint for Content Analysis reports with hashtag visualization"""
+    permission_classes = [IsAuthenticated]
     
     def get(self, request, report_id):
         report = get_object_or_404(GeneratedReport, id=report_id, template__template_type='content_analysis')
@@ -1235,6 +1238,7 @@ class ContentAnalysisReportView(APIView):
 
 class TrendAnalysisReportView(APIView):
     """Dedicated endpoint for Trend Analysis reports with trend line visualization"""
+    permission_classes = [IsAuthenticated]
     
     def get(self, request, report_id):
         report = get_object_or_404(GeneratedReport, id=report_id, template__template_type='trend_analysis')
@@ -1252,6 +1256,7 @@ class TrendAnalysisReportView(APIView):
 
 class CompetitiveAnalysisReportView(APIView):
     """Dedicated endpoint for Competitive Analysis reports with comparison visualization"""
+    permission_classes = [IsAuthenticated]
     
     def get(self, request, report_id):
         report = get_object_or_404(GeneratedReport, id=report_id, template__template_type='competitive_analysis')
@@ -1269,6 +1274,7 @@ class CompetitiveAnalysisReportView(APIView):
 
 class UserBehaviorReportView(APIView):
     """Dedicated endpoint for User Behavior reports with user engagement visualization"""
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, report_id):
         report = get_object_or_404(GeneratedReport, id=report_id, template__template_type='user_behavior')

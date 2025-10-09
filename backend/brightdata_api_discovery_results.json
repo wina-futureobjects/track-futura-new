@@ -1,0 +1,1572 @@
+{
+  "https://api.brightdata.com": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:04:32 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.io": {
+    "status": "error",
+    "message": "HTTPSConnectionPool(host='api.brightdata.io', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x000001FB820A2120>: Failed to resolve 'api.brightdata.io' ([Errno 11001] getaddrinfo failed)\"))"
+  },
+  "https://brightdata.com/api": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Date": "Thu, 09 Oct 2025 09:04:33 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Server": "cloudflare",
+      "content-security-policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "cross-origin-opener-policy": "same-origin",
+      "cross-origin-resource-policy": "same-origin",
+      "origin-agent-cluster": "?1",
+      "referrer-policy": "no-referrer",
+      "strict-transport-security": "max-age=31536000; preload",
+      "x-content-type-options": "nosniff",
+      "x-dns-prefetch-control": "off",
+      "x-download-options": "noopen",
+      "x-frame-options": "DENY",
+      "x-permitted-cross-domain-policies": "none",
+      "x-xss-protection": "0",
+      "vary": "Accept-Encoding",
+      "cf-cache-status": "DYNAMIC",
+      "Content-Encoding": "gzip",
+      "CF-RAY": "98bcb612bf04f004-KUL",
+      "alt-svc": "h3=\":443\"; ma=86400"
+    }
+  },
+  "https://dataset-api.brightdata.com": {
+    "status": "error",
+    "message": "HTTPSConnectionPool(host='dataset-api.brightdata.com', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x000001FB820A2BA0>: Failed to resolve 'dataset-api.brightdata.com' ([Errno 11001] getaddrinfo failed)\"))"
+  },
+  "https://data-api.brightdata.com": {
+    "status": "error",
+    "message": "HTTPSConnectionPool(host='data-api.brightdata.com', port=443): Max retries exceeded with url: / (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x000001FB820A2FC0>: Failed to resolve 'data-api.brightdata.com' ([Errno 11001] getaddrinfo failed)\"))"
+  },
+  "https://api.brightdata.com/datasets": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:04:35 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "148",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list": {
+    "status": "success",
+    "code": 200,
+    "content": "[{\"id\":\"gd_l1vijqt9jfj7olije\",\"name\":\"Crunchbase companies information\",\"size\":2300000},{\"id\":\"gd_l1vikfch901nx3by4\",\"name\":\"Instagram - Profiles\",\"size\":620000000},{\"id\":\"gd_l1vil1d81g0u8763b2\",\"name\":\"Manta businesses \",\"size\":5600000},{\"id\":\"gd_l1vil5n11okchcbvax\",\"name\":\"US lawyers directory\",\"size\":1429324},{\"id\":\"gd_l1vikfnt1wgvvqz95w\",\"name\":\"LinkedIn company information\",\"size\":55000000},{\"id\":\"gd_l1viktl72bvl7bjuj0\",\"name\":\"LinkedIn people profiles\",\"size\":115000000},{\"id\":\"gd_l1villgoi",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:04:36 GMT",
+      "Content-Type": "application/json; charset=utf-8",
+      "Content-Length": "10774",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "frame-ancestors 'self'",
+      "ETag": "W/\"2a16-KKwJdbrNJZI+BtJi8hWxZIjTXM0\""
+    }
+  },
+  "https://api.brightdata.com/v1/datasets": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:04:38 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.com/api/v1/datasets": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:04:39 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.io/datasets": {
+    "status": "error",
+    "message": "HTTPSConnectionPool(host='api.brightdata.io', port=443): Max retries exceeded with url: /datasets (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x000001FB820A3E00>: Failed to resolve 'api.brightdata.io' ([Errno 11001] getaddrinfo failed)\"))"
+  },
+  "https://api.brightdata.io/datasets/list": {
+    "status": "error",
+    "message": "HTTPSConnectionPool(host='api.brightdata.io', port=443): Max retries exceeded with url: /datasets/list (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x000001FB820E0D10>: Failed to resolve 'api.brightdata.io' ([Errno 11001] getaddrinfo failed)\"))"
+  },
+  "https://api.brightdata.io/v1/datasets": {
+    "status": "error",
+    "message": "HTTPSConnectionPool(host='api.brightdata.io', port=443): Max retries exceeded with url: /v1/datasets (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x000001FB820E15E0>: Failed to resolve 'api.brightdata.io' ([Errno 11001] getaddrinfo failed)\"))"
+  },
+  "https://api.brightdata.io/api/v1/datasets": {
+    "status": "error",
+    "message": "HTTPSConnectionPool(host='api.brightdata.io', port=443): Max retries exceeded with url: /api/v1/datasets (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x000001FB820A3BC0>: Failed to resolve 'api.brightdata.io' ([Errno 11001] getaddrinfo failed)\"))"
+  },
+  "https://brightdata.com/api/datasets": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Date": "Thu, 09 Oct 2025 09:04:41 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Server": "cloudflare",
+      "content-security-policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "cross-origin-opener-policy": "same-origin",
+      "cross-origin-resource-policy": "same-origin",
+      "origin-agent-cluster": "?1",
+      "referrer-policy": "no-referrer",
+      "strict-transport-security": "max-age=31536000; preload",
+      "x-content-type-options": "nosniff",
+      "x-dns-prefetch-control": "off",
+      "x-download-options": "noopen",
+      "x-frame-options": "DENY",
+      "x-permitted-cross-domain-policies": "none",
+      "x-xss-protection": "0",
+      "vary": "Accept-Encoding",
+      "cf-cache-status": "DYNAMIC",
+      "Content-Encoding": "gzip",
+      "CF-RAY": "98bcb63f5aac1be4-KUL",
+      "alt-svc": "h3=\":443\"; ma=86400"
+    }
+  },
+  "https://brightdata.com/api/datasets/list": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Date": "Thu, 09 Oct 2025 09:04:41 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Server": "cloudflare",
+      "content-security-policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "cross-origin-opener-policy": "same-origin",
+      "cross-origin-resource-policy": "same-origin",
+      "origin-agent-cluster": "?1",
+      "referrer-policy": "no-referrer",
+      "strict-transport-security": "max-age=31536000; preload",
+      "x-content-type-options": "nosniff",
+      "x-dns-prefetch-control": "off",
+      "x-download-options": "noopen",
+      "x-frame-options": "DENY",
+      "x-permitted-cross-domain-policies": "none",
+      "x-xss-protection": "0",
+      "vary": "Accept-Encoding",
+      "cf-cache-status": "DYNAMIC",
+      "Content-Encoding": "gzip",
+      "CF-RAY": "98bcb64228a98e0c-KUL",
+      "alt-svc": "h3=\":443\"; ma=86400"
+    }
+  },
+  "https://brightdata.com/api/v1/datasets": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Date": "Thu, 09 Oct 2025 09:04:43 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Server": "cloudflare",
+      "content-security-policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "cross-origin-opener-policy": "same-origin",
+      "cross-origin-resource-policy": "same-origin",
+      "origin-agent-cluster": "?1",
+      "referrer-policy": "no-referrer",
+      "strict-transport-security": "max-age=31536000; preload",
+      "x-content-type-options": "nosniff",
+      "x-dns-prefetch-control": "off",
+      "x-download-options": "noopen",
+      "x-frame-options": "DENY",
+      "x-permitted-cross-domain-policies": "none",
+      "x-xss-protection": "0",
+      "vary": "Accept-Encoding",
+      "cf-cache-status": "DYNAMIC",
+      "Content-Encoding": "gzip",
+      "CF-RAY": "98bcb64c3ce3c0c2-KUL",
+      "alt-svc": "h3=\":443\"; ma=86400"
+    }
+  },
+  "https://brightdata.com/api/api/v1/datasets": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Date": "Thu, 09 Oct 2025 09:04:43 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Server": "cloudflare",
+      "content-security-policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "cross-origin-opener-policy": "same-origin",
+      "cross-origin-resource-policy": "same-origin",
+      "origin-agent-cluster": "?1",
+      "referrer-policy": "no-referrer",
+      "strict-transport-security": "max-age=31536000; preload",
+      "x-content-type-options": "nosniff",
+      "x-dns-prefetch-control": "off",
+      "x-download-options": "noopen",
+      "x-frame-options": "DENY",
+      "x-permitted-cross-domain-policies": "none",
+      "x-xss-protection": "0",
+      "vary": "Accept-Encoding",
+      "cf-cache-status": "DYNAMIC",
+      "Content-Encoding": "gzip",
+      "CF-RAY": "98bcb6513b1ce41e-KUL",
+      "alt-svc": "h3=\":443\"; ma=86400"
+    }
+  },
+  "https://dataset-api.brightdata.com/datasets": {
+    "status": "error",
+    "message": "HTTPSConnectionPool(host='dataset-api.brightdata.com', port=443): Max retries exceeded with url: /datasets (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x000001FB820A3830>: Failed to resolve 'dataset-api.brightdata.com' ([Errno 11001] getaddrinfo failed)\"))"
+  },
+  "https://dataset-api.brightdata.com/datasets/list": {
+    "status": "error",
+    "message": "HTTPSConnectionPool(host='dataset-api.brightdata.com', port=443): Max retries exceeded with url: /datasets/list (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x000001FB820E0D40>: Failed to resolve 'dataset-api.brightdata.com' ([Errno 11001] getaddrinfo failed)\"))"
+  },
+  "https://dataset-api.brightdata.com/v1/datasets": {
+    "status": "error",
+    "message": "HTTPSConnectionPool(host='dataset-api.brightdata.com', port=443): Max retries exceeded with url: /v1/datasets (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x000001FB820E2030>: Failed to resolve 'dataset-api.brightdata.com' ([Errno 11001] getaddrinfo failed)\"))"
+  },
+  "https://dataset-api.brightdata.com/api/v1/datasets": {
+    "status": "error",
+    "message": "HTTPSConnectionPool(host='dataset-api.brightdata.com', port=443): Max retries exceeded with url: /api/v1/datasets (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x000001FB820E2930>: Failed to resolve 'dataset-api.brightdata.com' ([Errno 11001] getaddrinfo failed)\"))"
+  },
+  "https://data-api.brightdata.com/datasets": {
+    "status": "error",
+    "message": "HTTPSConnectionPool(host='data-api.brightdata.com', port=443): Max retries exceeded with url: /datasets (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x000001FB820E3200>: Failed to resolve 'data-api.brightdata.com' ([Errno 11001] getaddrinfo failed)\"))"
+  },
+  "https://data-api.brightdata.com/datasets/list": {
+    "status": "error",
+    "message": "HTTPSConnectionPool(host='data-api.brightdata.com', port=443): Max retries exceeded with url: /datasets/list (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x000001FB820A2F60>: Failed to resolve 'data-api.brightdata.com' ([Errno 11001] getaddrinfo failed)\"))"
+  },
+  "https://data-api.brightdata.com/v1/datasets": {
+    "status": "error",
+    "message": "HTTPSConnectionPool(host='data-api.brightdata.com', port=443): Max retries exceeded with url: /v1/datasets (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x000001FBFF759940>: Failed to resolve 'data-api.brightdata.com' ([Errno 11001] getaddrinfo failed)\"))"
+  },
+  "https://data-api.brightdata.com/api/v1/datasets": {
+    "status": "error",
+    "message": "HTTPSConnectionPool(host='data-api.brightdata.com', port=443): Max retries exceeded with url: /api/v1/datasets (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x000001FB820E2C90>: Failed to resolve 'data-api.brightdata.com' ([Errno 11001] getaddrinfo failed)\"))"
+  },
+  "https://api.brightdata.com/datasets/list/datasets/gd_lkaxegm826bjpoo9m5": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/datasets/gd_lkaxegm826bjpoo9m5</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:04:47 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "183",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list/datasets/gd_lkaxegm826bjpoo9m5/trigger": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/datasets/gd_lkaxegm826bjpoo9m5/trigger</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:04:48 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "191",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list/datasets/gd_lkaxegm826bjpoo9m5/snapshots": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/datasets/gd_lkaxegm826bjpoo9m5/snapshots</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:04:51 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "193",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list/datasets/gd_lkaxegm826bjpoo9m5/download": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/datasets/gd_lkaxegm826bjpoo9m5/download</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:04:53 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "192",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list/v1/datasets/gd_lkaxegm826bjpoo9m5/trigger": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/v1/datasets/gd_lkaxegm826bjpoo9m5/trigger</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:04:54 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "194",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list/v1/datasets/gd_lkaxegm826bjpoo9m5/snapshots": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/v1/datasets/gd_lkaxegm826bjpoo9m5/snapshots</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:04:55 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "196",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list/v2/datasets/gd_lkaxegm826bjpoo9m5/trigger": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/v2/datasets/gd_lkaxegm826bjpoo9m5/trigger</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:04:56 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "194",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list/v2/datasets/gd_lkaxegm826bjpoo9m5/snapshots": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/v2/datasets/gd_lkaxegm826bjpoo9m5/snapshots</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:04:58 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "196",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list/api/v1/datasets/gd_lkaxegm826bjpoo9m5/trigger": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/api/v1/datasets/gd_lkaxegm826bjpoo9m5/trigger</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:04:59 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "198",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list/api/v1/datasets/gd_lkaxegm826bjpoo9m5/snapshots": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/api/v1/datasets/gd_lkaxegm826bjpoo9m5/snapshots</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:01 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "200",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list/collect/gd_lkaxegm826bjpoo9m5/trigger": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/collect/gd_lkaxegm826bjpoo9m5/trigger</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:03 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "190",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list/trigger/gd_lkaxegm826bjpoo9m5": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/trigger/gd_lkaxegm826bjpoo9m5</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:04 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "182",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list/snapshot/gd_lkaxegm826bjpoo9m5": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/snapshot/gd_lkaxegm826bjpoo9m5</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:07 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "183",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list/data/gd_lkaxegm826bjpoo9m5": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/data/gd_lkaxegm826bjpoo9m5</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:08 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "179",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list/datasets/gd_lk5ns7kz21pck8jpis": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/datasets/gd_lk5ns7kz21pck8jpis</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:09 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "183",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list/datasets/gd_lk5ns7kz21pck8jpis/trigger": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/datasets/gd_lk5ns7kz21pck8jpis/trigger</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:10 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "191",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list/datasets/gd_lk5ns7kz21pck8jpis/snapshots": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/datasets/gd_lk5ns7kz21pck8jpis/snapshots</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:11 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "193",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list/datasets/gd_lk5ns7kz21pck8jpis/download": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/datasets/gd_lk5ns7kz21pck8jpis/download</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:12 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "192",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list/v1/datasets/gd_lk5ns7kz21pck8jpis/trigger": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/v1/datasets/gd_lk5ns7kz21pck8jpis/trigger</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:13 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "194",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list/v1/datasets/gd_lk5ns7kz21pck8jpis/snapshots": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/v1/datasets/gd_lk5ns7kz21pck8jpis/snapshots</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:15 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "196",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list/v2/datasets/gd_lk5ns7kz21pck8jpis/trigger": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/v2/datasets/gd_lk5ns7kz21pck8jpis/trigger</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:16 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "194",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list/v2/datasets/gd_lk5ns7kz21pck8jpis/snapshots": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/v2/datasets/gd_lk5ns7kz21pck8jpis/snapshots</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:17 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "196",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list/api/v1/datasets/gd_lk5ns7kz21pck8jpis/trigger": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/api/v1/datasets/gd_lk5ns7kz21pck8jpis/trigger</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:18 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "198",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list/api/v1/datasets/gd_lk5ns7kz21pck8jpis/snapshots": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/api/v1/datasets/gd_lk5ns7kz21pck8jpis/snapshots</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:19 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "200",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list/collect/gd_lk5ns7kz21pck8jpis/trigger": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/collect/gd_lk5ns7kz21pck8jpis/trigger</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:20 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "190",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list/trigger/gd_lk5ns7kz21pck8jpis": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/trigger/gd_lk5ns7kz21pck8jpis</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:21 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "182",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list/snapshot/gd_lk5ns7kz21pck8jpis": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/snapshot/gd_lk5ns7kz21pck8jpis</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:22 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "183",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/list/data/gd_lk5ns7kz21pck8jpis": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /datasets/list/data/gd_lk5ns7kz21pck8jpis</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:23 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "179",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/gd_lkaxegm826bjpoo9m5/trigger_{\"url\": \"nike\"}": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot POST /datasets/gd_lkaxegm826bjpoo9m5/trigger</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:24 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "178",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/gd_lkaxegm826bjpoo9m5/trigger_{\"search_term\": \"nike\"}": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot POST /datasets/gd_lkaxegm826bjpoo9m5/trigger</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:25 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "178",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/gd_lkaxegm826bjpoo9m5/trigger_{\"query\": \"nike\"}": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot POST /datasets/gd_lkaxegm826bjpoo9m5/trigger</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:26 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "178",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/gd_lkaxegm826bjpoo9m5/trigger_{\"keywords\": [\"nike\"]}": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot POST /datasets/gd_lkaxegm826bjpoo9m5/trigger</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:27 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "178",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/gd_lkaxegm826bjpoo9m5/trigger_{\"target\": \"nike\"}": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot POST /datasets/gd_lkaxegm826bjpoo9m5/trigger</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:28 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "178",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/gd_lkaxegm826bjpoo9m5/trigger_{\"input\": {\"url\": \"nike\"}}": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot POST /datasets/gd_lkaxegm826bjpoo9m5/trigger</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:30 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "178",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/gd_lkaxegm826bjpoo9m5/trigger_{\"input\": {\"search_term\": \"nike\"}}": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot POST /datasets/gd_lkaxegm826bjpoo9m5/trigger</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:31 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "178",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/gd_lkaxegm826bjpoo9m5/trigger_{\"parameters\": {\"url\": \"nike\"}}": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot POST /datasets/gd_lkaxegm826bjpoo9m5/trigger</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:32 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "178",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/datasets/gd_lkaxegm826bjpoo9m5/trigger_{\"config\": {\"search_term\": \"nike\"}}": {
+    "status": "error",
+    "code": 404,
+    "content": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot POST /datasets/gd_lkaxegm826bjpoo9m5/trigger</pre>\n</body>\n</html>\n",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:33 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "178",
+      "Connection": "keep-alive",
+      "Vary": "Origin",
+      "Content-Security-Policy": "default-src 'none'",
+      "X-Content-Type-Options": "nosniff"
+    }
+  },
+  "https://api.brightdata.com/v1/datasets/gd_lkaxegm826bjpoo9m5/trigger_{\"url\": \"nike\"}": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:34 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.com/v1/datasets/gd_lkaxegm826bjpoo9m5/trigger_{\"search_term\": \"nike\"}": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:35 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.com/v1/datasets/gd_lkaxegm826bjpoo9m5/trigger_{\"query\": \"nike\"}": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:37 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.com/v1/datasets/gd_lkaxegm826bjpoo9m5/trigger_{\"keywords\": [\"nike\"]}": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:38 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.com/v1/datasets/gd_lkaxegm826bjpoo9m5/trigger_{\"target\": \"nike\"}": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:39 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.com/v1/datasets/gd_lkaxegm826bjpoo9m5/trigger_{\"input\": {\"url\": \"nike\"}}": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:40 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.com/v1/datasets/gd_lkaxegm826bjpoo9m5/trigger_{\"input\": {\"search_term\": \"nike\"}}": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:41 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.com/v1/datasets/gd_lkaxegm826bjpoo9m5/trigger_{\"parameters\": {\"url\": \"nike\"}}": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:42 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.com/v1/datasets/gd_lkaxegm826bjpoo9m5/trigger_{\"config\": {\"search_term\": \"nike\"}}": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:43 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.com/collect/gd_lkaxegm826bjpoo9m5/trigger_{\"url\": \"nike\"}": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:44 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.com/collect/gd_lkaxegm826bjpoo9m5/trigger_{\"search_term\": \"nike\"}": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:45 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.com/collect/gd_lkaxegm826bjpoo9m5/trigger_{\"query\": \"nike\"}": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:46 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.com/collect/gd_lkaxegm826bjpoo9m5/trigger_{\"keywords\": [\"nike\"]}": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:47 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.com/collect/gd_lkaxegm826bjpoo9m5/trigger_{\"target\": \"nike\"}": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:47 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.com/collect/gd_lkaxegm826bjpoo9m5/trigger_{\"input\": {\"url\": \"nike\"}}": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:48 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.com/collect/gd_lkaxegm826bjpoo9m5/trigger_{\"input\": {\"search_term\": \"nike\"}}": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:50 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.com/collect/gd_lkaxegm826bjpoo9m5/trigger_{\"parameters\": {\"url\": \"nike\"}}": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:51 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.com/collect/gd_lkaxegm826bjpoo9m5/trigger_{\"config\": {\"search_term\": \"nike\"}}": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:52 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.com/trigger/gd_lkaxegm826bjpoo9m5_{\"url\": \"nike\"}": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:53 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.com/trigger/gd_lkaxegm826bjpoo9m5_{\"search_term\": \"nike\"}": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:54 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.com/trigger/gd_lkaxegm826bjpoo9m5_{\"query\": \"nike\"}": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:55 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.com/trigger/gd_lkaxegm826bjpoo9m5_{\"keywords\": [\"nike\"]}": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:56 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.com/trigger/gd_lkaxegm826bjpoo9m5_{\"target\": \"nike\"}": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:57 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.com/trigger/gd_lkaxegm826bjpoo9m5_{\"input\": {\"url\": \"nike\"}}": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:05:58 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.com/trigger/gd_lkaxegm826bjpoo9m5_{\"input\": {\"search_term\": \"nike\"}}": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:06:00 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.com/trigger/gd_lkaxegm826bjpoo9m5_{\"parameters\": {\"url\": \"nike\"}}": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:06:01 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  },
+  "https://api.brightdata.com/trigger/gd_lkaxegm826bjpoo9m5_{\"config\": {\"search_term\": \"nike\"}}": {
+    "status": "error",
+    "code": 404,
+    "content": "Not found",
+    "headers": {
+      "Server": "nginx",
+      "Date": "Thu, 09 Oct 2025 09:06:03 GMT",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "9",
+      "Connection": "keep-alive",
+      "Content-Security-Policy": "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "Origin-Agent-Cluster": "?1",
+      "Referrer-Policy": "no-referrer",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Content-Type-Options": "nosniff",
+      "X-DNS-Prefetch-Control": "off",
+      "X-Download-Options": "noopen",
+      "X-Frame-Options": "DENY",
+      "X-Permitted-Cross-Domain-Policies": "none",
+      "X-XSS-Protection": "0",
+      "Vary": "Accept-Encoding"
+    }
+  }
+}

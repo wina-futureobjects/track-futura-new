@@ -1,153 +1,76 @@
-#!/usr/bin/env python3
-"""
-Test BrightData API with real tokens from environment
-"""
-import os
 import requests
-from dotenv import load_dotenv
+import json
 
-# Load environment variables
-load_dotenv('.env')
+print("🌐 TESTING REAL BRIGHTDATA API ENDPOINTS")
+print("=" * 50)
 
-def test_brightdata_api_with_real_tokens():
-    print("=== TESTING BRIGHTDATA API WITH REAL TOKENS ===")
-    print()
-    
-    api_key = os.getenv('BRIGHTDATA_API_KEY')
-    webhook_token = os.getenv('BRIGHTDATA_WEBHOOK_TOKEN')
-    
-    if not api_key:
-        print("❌ BRIGHTDATA_API_KEY not found in environment!")
-        return False
-        
-    print(f"✅ API Key found: {api_key[:15]}...")
-    print(f"✅ Webhook Token: {webhook_token[:15]}..." if webhook_token else "⚠️  No webhook token")
-    print()
-    
-    # Test various BrightData API endpoints
-    base_urls = [
-        "https://brightdata.com/api",
-        "https://api.brightdata.com",
-        "https://brightdata.com/cp/api"
-    ]
-    
-    endpoints = [
-        "/datasets",
-        "/collections", 
-        "/zones",
-        "/account",
-        "/status"
-    ]
-    
-    headers = {
-        'Authorization': f'Bearer {api_key}',
-        'Content-Type': 'application/json'
-    }
-    
-    success_found = False
-    
-    for base_url in base_urls:
-        print(f"🔍 Testing base URL: {base_url}")
-        
-        for endpoint in endpoints:
-            url = f"{base_url}{endpoint}"
-            try:
-                response = requests.get(url, headers=headers, timeout=10)
-                status = response.status_code
-                
-                if status == 200:
-                    print(f"   ✅ {endpoint}: {status} - SUCCESS!")
-                    print(f"      Response: {response.text[:200]}...")
-                    success_found = True
-                elif status == 401:
-                    print(f"   🔐 {endpoint}: {status} - Unauthorized (check API key)")
-                elif status == 404:
-                    print(f"   ❌ {endpoint}: {status} - Not Found")
-                else:
-                    print(f"   ⚠️  {endpoint}: {status} - {response.text[:100]}")
-                    
-            except requests.exceptions.RequestException as e:
-                print(f"   💥 {endpoint}: Connection error - {str(e)[:100]}")
-        
-        print()
-    
-    if success_found:
-        print("🎉 BrightData API is responding! Your credentials are working.")
-    else:
-        print("❌ No successful API responses found.")
-        print("   This might indicate:")
-        print("   - Incorrect API key format")
-        print("   - Wrong API endpoints")
-        print("   - BrightData API structure has changed")
-    
-    return success_found
+# Test credentials
+api_token = "8af6995e-3baa-4b69-9df7-8d7671e621eb"
+facebook_dataset = "gd_lkaxegm826bjpoo9m5"
+instagram_dataset = "gd_lk5ns7kz21pck8jpis"
 
-def test_scraping_request():
-    """Test creating a scraping request similar to what the Django app would do"""
-    print("=== TESTING SCRAPING REQUEST ===")
-    
-    api_key = os.getenv('BRIGHTDATA_API_KEY')
-    
-    # Try to create a simple scraping job
-    test_data = {
-        "urls": ["https://www.instagram.com/nike/"],
-        "format": "json"
-    }
-    
-    # Test different possible endpoints for creating scraping jobs
-    possible_endpoints = [
-        "https://brightdata.com/api/datasets/gd_lk5ns7kz21pck8jpis/trigger",
-        "https://brightdata.com/api/collections/gd_lk5ns7kz21pck8jpis/trigger",
-        "https://api.brightdata.com/datasets/gd_lk5ns7kz21pck8jpis/run",
-        "https://brightdata.com/cp/api/datasets/gd_lk5ns7kz21pck8jpis/run"
-    ]
-    
-    headers = {
-        'Authorization': f'Bearer {api_key}',
-        'Content-Type': 'application/json'
-    }
-    
-    for endpoint in possible_endpoints:
-        print(f"🧪 Testing scraping endpoint: {endpoint}")
-        try:
-            response = requests.post(endpoint, headers=headers, json=test_data, timeout=10)
-            print(f"   Status: {response.status_code}")
-            print(f"   Response: {response.text[:300]}")
+headers = {
+    'Authorization': f'Bearer {api_token}',
+    'Content-Type': 'application/json'
+}
+
+# Test different endpoint variations
+endpoints_to_test = [
+    f"https://api.brightdata.com/datasets/v3/{facebook_dataset}",
+    f"https://api.brightdata.com/datasets/v3/{facebook_dataset}/snapshot", 
+    f"https://api.brightdata.com/datasets/v3/{facebook_dataset}/snapshots",
+    f"https://api.brightdata.com/dca-api/get_dataset_data?dataset_id={facebook_dataset}",
+    f"https://api.brightdata.com/datasets/{facebook_dataset}",
+    "https://api.brightdata.com/datasets/v3/trigger",
+    "https://api.brightdata.com/datasets/list",
+    "https://brightdata.com/cp/scrapers/api",
+    f"https://brightdata.com/cp/api/dataset/{facebook_dataset}"
+]
+
+for endpoint in endpoints_to_test:
+    try:
+        print(f"\n🔍 Testing: {endpoint}")
+        response = requests.get(endpoint, headers=headers, timeout=10)
+        print(f"   Status: {response.status_code}")
+        
+        if response.status_code == 200:
+            print("   ✅ SUCCESS!")
+            data = response.json() if response.headers.get('content-type', '').startswith('application/json') else response.text[:200]
+            print(f"   Response: {data}")
+        elif response.status_code == 401:
+            print("   ❌ Unauthorized - Check API token")
+        elif response.status_code == 404:
+            print("   ❌ Not Found - Wrong endpoint")
+        else:
+            print(f"   ⚠️  Error: {response.text[:100]}")
             
-            if response.status_code in [200, 201, 202]:
-                print("   ✅ Scraping request accepted!")
-                return True
-            elif response.status_code == 401:
-                print("   🔐 Unauthorized - API key issue")
-            elif response.status_code == 404:
-                print("   ❌ Endpoint not found")
-            else:
-                print(f"   ⚠️  Unexpected status: {response.status_code}")
-                
-        except requests.exceptions.RequestException as e:
-            print(f"   💥 Connection error: {str(e)[:100]}")
-        print()
-    
-    return False
+    except Exception as e:
+        print(f"   ❌ Exception: {str(e)}")
 
-if __name__ == "__main__":
-    print("🚀 Starting BrightData API testing with real credentials...")
-    print()
+# Test trigger endpoint with POST
+print(f"\n🚀 Testing Trigger Endpoint (POST):")
+try:
+    trigger_url = "https://api.brightdata.com/datasets/v3/trigger"
+    trigger_data = {
+        "dataset_id": facebook_dataset,
+        "inputs": [
+            {"url": "nike"}
+        ]
+    }
     
-    # Test basic API connectivity
-    api_works = test_brightdata_api_with_real_tokens()
-    print()
+    response = requests.post(trigger_url, headers=headers, json=trigger_data, timeout=10)
+    print(f"   Status: {response.status_code}")
     
-    # Test scraping request creation
-    scraping_works = test_scraping_request()
-    print()
-    
-    if api_works or scraping_works:
-        print("🎉 SUCCESS! BrightData API is accessible with your credentials!")
-        print("   The integration should now work properly.")
+    if response.status_code in [200, 201]:
+        print("   ✅ Trigger successful!")
+        print(f"   Response: {response.json()}")
     else:
-        print("❌ ISSUE: Unable to connect to BrightData API")
-        print("   Please check:")
-        print("   1. API key is correct and active")
-        print("   2. BrightData account has necessary permissions")
-        print("   3. Check BrightData documentation for current API endpoints")
+        print(f"   ❌ Error: {response.text[:200]}")
+        
+except Exception as e:
+    print(f"   ❌ Exception: {str(e)}")
+
+print(f"\n� Summary:")
+print(f"API Token: {api_token[:20]}...")
+print(f"Facebook Dataset: {facebook_dataset}")
+print(f"Instagram Dataset: {instagram_dataset}")

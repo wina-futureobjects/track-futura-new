@@ -1,0 +1,17 @@
+{
+  "test_date": "2025-10-09T17:09:39.004229",
+  "working_endpoints": [
+    "https://api.brightdata.com/datasets/list"
+  ],
+  "snapshots_found": [],
+  "datasets_tested": [
+    [
+      "Facebook",
+      "gd_lkaxegm826bjpoo9m5"
+    ],
+    [
+      "Instagram",
+      "gd_lk5ns7kz21pck8jpis"
+    ]
+  ]
+}
