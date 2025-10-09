@@ -11,10 +11,13 @@ import time
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, authentication_classes, permission_classes
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 
 from .models import BrightDataConfig, BrightDataBatchJob, BrightDataScraperRequest, BrightDataWebhookEvent, BrightDataScrapedPost
 from .serializers import BrightDataConfigSerializer, BrightDataBatchJobSerializer, BrightDataScraperRequestSerializer
@@ -27,6 +30,8 @@ class BrightDataConfigViewSet(viewsets.ModelViewSet):
     """ViewSet for BrightData configuration management"""
     queryset = BrightDataConfig.objects.all()
     serializer_class = BrightDataConfigSerializer
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
 
     @action(detail=True, methods=['post'])
     def test_connection(self, request, pk=None):
@@ -42,6 +47,8 @@ class BrightDataBatchJobViewSet(viewsets.ModelViewSet):
     """ViewSet for BrightData batch job management"""
     queryset = BrightDataBatchJob.objects.all()
     serializer_class = BrightDataBatchJobSerializer
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -97,6 +104,8 @@ class BrightDataScraperRequestViewSet(viewsets.ModelViewSet):
     """ViewSet for BrightData scraper request management"""
     queryset = BrightDataScraperRequest.objects.all()
     serializer_class = BrightDataScraperRequestSerializer
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -636,6 +645,8 @@ def _update_batch_job_status(batch_job: BrightDataBatchJob):
 
 @csrf_exempt
 @require_http_methods(["POST", "OPTIONS"])
+@authentication_classes([TokenAuthentication, SessionAuthentication])
+@permission_classes([IsAuthenticated])
 def trigger_scraper_endpoint(request):
     """SYSTEM INTEGRATED trigger scraper endpoint - Uses TrackFutura data"""
     
@@ -840,6 +851,8 @@ def _handle_platform_setup(data):
 
 @csrf_exempt
 @require_http_methods(["GET"])
+@authentication_classes([TokenAuthentication, SessionAuthentication])
+@permission_classes([IsAuthenticated])
 def fetch_brightdata_results(request, snapshot_id):
     """
     Fetch and display results from a completed BrightData job
@@ -888,6 +901,8 @@ def fetch_brightdata_results(request, snapshot_id):
 
 @csrf_exempt
 @require_http_methods(["GET"])
+@authentication_classes([TokenAuthentication, SessionAuthentication])
+@permission_classes([IsAuthenticated])
 def brightdata_job_results(request, job_folder_id):
     """
     Fetch BrightData results for a specific job folder and link them to the job
