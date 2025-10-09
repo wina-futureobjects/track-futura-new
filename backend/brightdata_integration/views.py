@@ -255,6 +255,19 @@ def brightdata_webhook(request):
                     scraper_request.completed_at = timezone.now()
                     scraper_request.save()
                     
+                    # 🚀 AUTOMATIC JOB CREATION - Trigger job creation from webhook
+                    try:
+                        from .services import BrightDataAutomatedBatchScraper
+                        scraper_service = BrightDataAutomatedBatchScraper()
+                        job_result = scraper_service.create_automatic_job_for_completed_scraper(scraper_request)
+                        if job_result:
+                            logger.info(f"🎉 WEBHOOK: Auto-created Job {job_result['job_number']} with {job_result['moved_posts']} posts")
+                            logger.info(f"🌐 Data storage URL: {job_result['data_storage_url']}")
+                        else:
+                            logger.warning("⚠️ WEBHOOK: Automatic job creation failed, but data was processed")
+                    except Exception as job_error:
+                        logger.error(f"❌ WEBHOOK: Error in automatic job creation: {job_error}")
+                    
                     # Update batch job status
                     _update_batch_job_status(scraper_request.batch_job)
                     

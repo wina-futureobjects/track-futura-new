@@ -845,6 +845,18 @@ class BrightDataAutomatedBatchScraper:
                 scraper_request.completed_at = timezone.now()
                 scraper_request.save()
                 print(f"✅ Updated scraper request {scraper_request.id} to completed")
+                
+                # 🚀 AUTOMATIC JOB CREATION - Create job folder when scraping completes
+                try:
+                    job_result = self.create_automatic_job_for_completed_scraper(scraper_request)
+                    if job_result:
+                        print(f"🎉 AUTO-CREATED Job {job_result['job_number']} with {job_result['moved_posts']} posts")
+                        print(f"🌐 Data storage URL: {job_result['data_storage_url']}")
+                    else:
+                        print("⚠️ Automatic job creation failed, but data was saved to BrightData tables")
+                except Exception as e:
+                    print(f"❌ Error in automatic job creation: {e}")
+                    # Don't fail the whole process if job creation fails
             
             return {
                 'success': True,
@@ -860,6 +872,268 @@ class BrightDataAutomatedBatchScraper:
                 'error': str(e),
                 'snapshot_id': snapshot_id
             }
+
+    def create_automatic_job_for_completed_scraper(self, scraper_request):
+        """
+        🚀 AUTOMATIC JOB CREATION - Create job folder when BrightData scraping completes
+        This is what the user wants: automatically create job folders with incremental numbers
+        """
+        try:
+            from django.db import transaction
+            from track_accounts.models import UnifiedRunFolder
+            
+            print(f"🚀 Creating automatic job for scraper request {scraper_request.id}")
+            
+            # Check if we have scraped data
+            from .models import BrightDataScrapedPost
+            scraped_count = BrightDataScrapedPost.objects.filter(scraper_request=scraper_request).count()
+            if scraped_count == 0:
+                print(f"⚠️ No scraped posts found for request {scraper_request.id}")
+                return None
+            
+            print(f"📊 Found {scraped_count} scraped posts to organize into job folder")
+            
+            # Get next job number
+            job_number = self._get_next_job_number()
+            
+            # Create job folder hierarchy with transaction
+            with transaction.atomic():
+                job_folder = self._create_job_folder_hierarchy(job_number, scraper_request.platform)
+                if not job_folder:
+                    return None
+                
+                # Create platform-specific folder
+                platform_folder = self._create_platform_specific_folder(job_folder, scraper_request.platform)
+                
+                # Move scraped data to job folder
+                moved_count = self._move_scraped_data_to_job_folder(job_folder, platform_folder, scraper_request)
+                
+                # Update scraper request with job folder reference
+                scraper_request.folder_id = job_folder.id
+                scraper_request.save()
+                
+                return {
+                    'job_number': job_number,
+                    'job_folder_id': job_folder.id,
+                    'moved_posts': moved_count,
+                    'data_storage_url': f'/data-storage/job/{job_number}'
+                }
+                
+        except Exception as e:
+            print(f"❌ Error creating automatic job: {e}")
+            return None
+
+    def _get_next_job_number(self, project_id=1):
+        """Get the next job number by finding the highest existing job number"""
+        try:
+            from track_accounts.models import UnifiedRunFolder
+            import re
+            
+            # Find all job folders for this project
+            job_folders = UnifiedRunFolder.objects.filter(
+                project_id=project_id,
+                folder_type='job'
+            ).values_list('name', flat=True)
+            
+            # Extract job numbers
+            job_numbers = []
+            for name in job_folders:
+                match = re.search(r'(\d+)', name)
+                if match:
+                    job_numbers.append(int(match.group(1)))
+            
+            # Get next number
+            if job_numbers:
+                next_number = max(job_numbers) + 1
+            else:
+                next_number = 1
+                
+            print(f"📊 Found {len(job_numbers)} existing jobs, next number: {next_number}")
+            return next_number
+            
+        except Exception as e:
+            print(f"❌ Error getting next job number: {e}")
+            return 196  # Safe fallback
+
+    def _create_job_folder_hierarchy(self, job_number, platform, project_id=1):
+        """Create the complete folder hierarchy for a new job"""
+        try:
+            from track_accounts.models import UnifiedRunFolder
+            from users.models import Project
+            
+            project = Project.objects.get(id=project_id)
+            
+            # 1. Get or create Run folder
+            run_folder, created = UnifiedRunFolder.objects.get_or_create(
+                project=project,
+                folder_type='run',
+                name=f'BrightData Scraping Run',
+                defaults={
+                    'description': 'Automated BrightData scraping runs',
+                    'category': 'posts'
+                }
+            )
+            
+            # 2. Get or create Platform folder under Run  
+            platform_folder, created = UnifiedRunFolder.objects.get_or_create(
+                project=project,
+                folder_type='platform',
+                platform_code=platform,
+                parent_folder=run_folder,
+                name=f'{platform.title()} Platform',
+                defaults={
+                    'description': f'All {platform} data collection',
+                    'category': 'posts'
+                }
+            )
+            
+            # 3. Get or create Service folder under Platform
+            service_folder, created = UnifiedRunFolder.objects.get_or_create(
+                project=project,
+                folder_type='service',
+                platform_code=platform,
+                service_code='posts',
+                parent_folder=platform_folder,
+                name=f'{platform.title()} Posts Service',
+                defaults={
+                    'description': f'{platform} posts scraping service',
+                    'category': 'posts'
+                }
+            )
+            
+            # 4. Create new Job folder
+            job_folder = UnifiedRunFolder.objects.create(
+                project=project,
+                folder_type='job',
+                platform_code=platform,
+                service_code='posts',
+                parent_folder=service_folder,
+                name=f'Job {job_number}',
+                description=f'Automated job {job_number} - {platform} posts scraping',
+                category='posts'
+            )
+            print(f"🎯 Created Job folder: {job_folder.name} (ID: {job_folder.id})")
+            
+            return job_folder
+            
+        except Exception as e:
+            print(f"❌ Error creating folder hierarchy: {e}")
+            return None
+
+    def _create_platform_specific_folder(self, job_folder, platform):
+        """Create platform-specific folder linked to the unified job folder"""
+        try:
+            if platform == 'instagram':
+                from instagram_data.models import Folder as IGFolder
+                ig_folder = IGFolder.objects.create(
+                    name=f'Job {job_folder.name.split()[-1]} - Instagram Posts',
+                    description=f'Instagram posts for {job_folder.name}',
+                    category='posts',
+                    project=job_folder.project,
+                    folder_type='run',
+                    unified_job_folder=job_folder
+                )
+                print(f"✅ Created Instagram folder: {ig_folder.name} (ID: {ig_folder.id})")
+                return ig_folder
+                
+            elif platform == 'facebook':
+                from facebook_data.models import Folder as FBFolder
+                fb_folder = FBFolder.objects.create(
+                    name=f'Job {job_folder.name.split()[-1]} - Facebook Posts',
+                    description=f'Facebook posts for {job_folder.name}',
+                    category='posts',
+                    project=job_folder.project,
+                    folder_type='run',
+                    unified_job_folder=job_folder
+                )
+                print(f"✅ Created Facebook folder: {fb_folder.name} (ID: {fb_folder.id})")
+                return fb_folder
+                
+            return None
+            
+        except Exception as e:
+            print(f"❌ Error creating platform-specific folder: {e}")
+            return None
+
+    def _move_scraped_data_to_job_folder(self, job_folder, platform_folder, scraper_request):
+        """Move scraped posts from BrightData to the new job folder"""
+        try:
+            from .models import BrightDataScrapedPost
+            scraped_posts = BrightDataScrapedPost.objects.filter(scraper_request=scraper_request)
+            
+            if not scraped_posts.exists():
+                return 0
+            
+            moved_count = 0
+            
+            if scraper_request.platform == 'instagram' and platform_folder:
+                from instagram_data.models import InstagramPost
+                
+                for scraped_post in scraped_posts:
+                    try:
+                        # Create Instagram post in the job folder (no separate account model)
+                        instagram_post, created = InstagramPost.objects.get_or_create(
+                            post_id=scraped_post.post_id,
+                            folder=platform_folder,
+                            defaults={
+                                'url': scraped_post.url or '',
+                                'user_posted': scraped_post.user_posted or 'Unknown',
+                                'description': scraped_post.content or '',
+                                'hashtags': scraped_post.hashtags or [],
+                                'num_comments': scraped_post.num_comments or 0,
+                                'date_posted': scraped_post.date_posted,
+                                'likes': scraped_post.likes or 0,
+                                'shortcode': scraped_post.post_id,
+                                'content_type': scraped_post.media_type or 'post',
+                                'views': 0,
+                                'video_play_count': 0,
+                            }
+                        )
+                        
+                        if created:
+                            moved_count += 1
+                        
+                    except Exception as e:
+                        print(f"❌ Error moving post {scraped_post.post_id}: {e}")
+                        continue
+            
+            elif scraper_request.platform == 'facebook' and platform_folder:
+                from facebook_data.models import FacebookPost
+                
+                for scraped_post in scraped_posts:
+                    try:
+                        # Create Facebook post in the job folder (no separate account model)
+                        facebook_post, created = FacebookPost.objects.get_or_create(
+                            post_id=scraped_post.post_id,
+                            folder=platform_folder,
+                            defaults={
+                                'url': scraped_post.url or '',
+                                'user_posted': scraped_post.user_posted or 'Unknown',
+                                'content': scraped_post.content or '',
+                                'description': scraped_post.content or '',
+                                'hashtags': ', '.join(scraped_post.hashtags) if scraped_post.hashtags else '',
+                                'date_posted': scraped_post.date_posted,
+                                'num_comments': scraped_post.num_comments or 0,
+                                'num_shares': scraped_post.shares or 0,
+                                'likes': scraped_post.likes or 0,
+                                'page_name': scraped_post.user_posted or 'Unknown',
+                                'video_view_count': 0,
+                            }
+                        )
+                        
+                        if created:
+                            moved_count += 1
+                        
+                    except Exception as e:
+                        print(f"❌ Error moving post {scraped_post.post_id}: {e}")
+                        continue
+            
+            print(f"📊 Moved {moved_count} posts to job folder {job_folder.name}")
+            return moved_count
+            
+        except Exception as e:
+            print(f"❌ Error moving scraped data: {e}")
+            return 0
 
     # ========== LEGACY COMPATIBILITY METHODS ==========
     
