@@ -1080,14 +1080,16 @@ def brightdata_job_results(request, job_folder_id):
                 # SAMPLE DATA GENERATION DISABLED
                 pass
             else:
-                # No scraper requests found - return helpful message
+                # No scraper requests found - return helpful message with 200 status
                 return JsonResponse({
                     'success': False,
                     'error': 'No BrightData scraping data found for this job folder',
                     'job_folder_id': job_folder_id,
                     'message': 'Please run a scraping job first to see data here',
-                    'suggestion': 'Go to Workflow Management to start a new scraping job'
-                }, status=404)
+                    'suggestion': 'Go to Workflow Management to start a new scraping job',
+                    'total_results': 0,
+                    'data': []
+                }, status=200)
         
         # 🚀 PRIORITY 1: Try to fetch FRESH data from BrightData API first
         from .services import BrightDataAutomatedBatchScraper
