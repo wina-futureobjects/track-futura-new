@@ -456,11 +456,11 @@ class BrightDataAutomatedBatchScraper:
 
     def fetch_brightdata_results(self, snapshot_id: str) -> Dict[str, Any]:
         """
-        Fetch results from a completed BrightData job
+        Fetch results from a completed BrightData job using REAL API endpoints
         """
         try:
-            # BrightData API endpoint for fetching snapshot results
-            results_url = f"https://api.brightdata.com/datasets/v3/snapshot/{snapshot_id}?format=json"
+            # REAL BrightData API endpoint for fetching snapshot results
+            results_url = f"https://api.brightdata.com/datasets/v3/snapshot/{snapshot_id}"
             
             headers = {
                 "Authorization": f"Bearer {self.api_token}",
@@ -511,13 +511,26 @@ class BrightDataAutomatedBatchScraper:
                     text_data = response.text
                     if text_data and len(text_data) > 0:
                         print(f"✅ Got text response: {len(text_data)} characters")
-                        return {
-                            'success': True,
-                            'data': text_data,
-                            'count': len(text_data.split('\n')) - 1,  # Approximate row count
-                            'snapshot_id': snapshot_id,
-                            'format': 'text'
-                        }
+                        
+                        # Try to parse as CSV
+                        parsed_data = self.parse_brightdata_csv_results(text_data)
+                        if parsed_data:
+                            print(f"✅ Parsed {len(parsed_data)} items from CSV")
+                            return {
+                                'success': True,
+                                'data': parsed_data,
+                                'count': len(parsed_data),
+                                'snapshot_id': snapshot_id,
+                                'format': 'csv_parsed'
+                            }
+                        else:
+                            return {
+                                'success': True,
+                                'data': text_data,
+                                'count': len(text_data.split('\n')) - 1,  # Approximate row count
+                                'snapshot_id': snapshot_id,
+                                'format': 'text'
+                            }
             
             elif response.status_code == 202:
                 # Job still running
@@ -543,6 +556,114 @@ class BrightDataAutomatedBatchScraper:
                 'error': str(e),
                 'snapshot_id': snapshot_id
             }
+    
+    def get_available_snapshots(self, platform: str, status: str = "ready") -> Dict[str, Any]:
+        """
+        Get list of available snapshots using REAL API endpoints from dashboard
+        """
+        try:
+            dataset_id = self.platform_datasets.get(platform.lower())
+            if not dataset_id:
+                return {'success': False, 'error': f'No dataset ID for platform: {platform}'}
+            
+            # REAL snapshots endpoint from dashboard
+            snapshots_url = "https://api.brightdata.com/datasets/v3/snapshots"
+            
+            headers = {
+                "Authorization": f"Bearer {self.api_token}",
+                "Content-Type": "application/json"
+            }
+            
+            params = {
+                "dataset_id": dataset_id,
+                "status": status
+            }
+            
+            print(f"🔍 Getting {platform} snapshots with status: {status}")
+            
+            response = requests.get(snapshots_url, headers=headers, params=params, timeout=30)
+            
+            print(f"📊 Snapshots fetch status: {response.status_code}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if isinstance(data, list):
+                    print(f"✅ Found {len(data)} {status} snapshots for {platform}")
+                    
+                    # Filter snapshots with actual data
+                    data_snapshots = [s for s in data if s.get('dataset_size', 0) > 0]
+                    print(f"📦 {len(data_snapshots)} snapshots have data")
+                    
+                    return {
+                        'success': True,
+                        'snapshots': data,
+                        'data_snapshots': data_snapshots,
+                        'total_count': len(data),
+                        'data_count': len(data_snapshots),
+                        'platform': platform
+                    }
+                else:
+                    return {
+                        'success': False,
+                        'error': 'Unexpected response format',
+                        'platform': platform
+                    }
+            else:
+                print(f"❌ Failed to get snapshots: {response.status_code} - {response.text}")
+                return {
+                    'success': False,
+                    'error': f'HTTP {response.status_code}: {response.text}',
+                    'platform': platform
+                }
+                
+        except Exception as e:
+            print(f"❌ Exception getting snapshots: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e),
+                'platform': platform
+            }
+    
+    def monitor_progress(self) -> Dict[str, Any]:
+        """
+        Monitor progress of all running jobs using REAL API endpoints
+        """
+        try:
+            # REAL progress endpoint from dashboard
+            progress_url = "https://api.brightdata.com/datasets/v3/progress/"
+            
+            headers = {
+                "Authorization": f"Bearer {self.api_token}",
+                "Content-Type": "application/json"
+            }
+            
+            print(f"🔍 Monitoring BrightData progress")
+            
+            response = requests.get(progress_url, headers=headers, timeout=30)
+            
+            print(f"📊 Progress fetch status: {response.status_code}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                print(f"✅ Progress data received")
+                return {
+                    'success': True,
+                    'progress_data': data
+                }
+            else:
+                print(f"❌ Failed to get progress: {response.status_code} - {response.text}")
+                return {
+                    'success': False,
+                    'error': f'HTTP {response.status_code}: {response.text}'
+                }
+                
+        except Exception as e:
+            print(f"❌ Exception monitoring progress: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
 
     def parse_brightdata_csv_results(self, csv_text: str) -> List[Dict[str, Any]]:
         """
@@ -552,26 +673,50 @@ class BrightDataAutomatedBatchScraper:
             import csv
             from io import StringIO
             
+            if not csv_text or not csv_text.strip():
+                return []
+            
+            # Clean the CSV text
+            csv_text = csv_text.strip()
+            
             # Parse CSV
             csv_file = StringIO(csv_text)
             reader = csv.DictReader(csv_file)
             
             results = []
-            for row in reader:
+            for row_num, row in enumerate(reader):
+                if row_num >= 1000:  # Limit to prevent memory issues
+                    break
+                    
                 # Clean and structure the data
                 cleaned_row = {}
                 for key, value in row.items():
-                    if key and value:  # Skip empty keys/values
-                        cleaned_row[key.strip()] = value.strip()
+                    if key and key.strip():  # Only process non-empty keys
+                        clean_key = key.strip()
+                        clean_value = value.strip() if value else ""
+                        
+                        # Skip completely empty values
+                        if clean_value or clean_key in ['url', 'post_id', 'username']:  # Keep important fields even if empty
+                            cleaned_row[clean_key] = clean_value
                 
                 if cleaned_row:  # Only add non-empty rows
                     results.append(cleaned_row)
             
-            print(f"✅ Parsed {len(results)} rows from CSV")
+            print(f"✅ Parsed {len(results)} rows from CSV ({len(csv_text)} characters)")
+            
+            # Show sample of what we parsed
+            if results:
+                sample_keys = list(results[0].keys())[:5]
+                print(f"📄 Sample fields: {sample_keys}")
+            
             return results
             
         except Exception as e:
             print(f"❌ Error parsing CSV: {str(e)}")
+            # Try to show some of the raw data for debugging
+            if csv_text:
+                lines = csv_text.split('\n')[:3]
+                print(f"📄 Raw data sample: {lines}")
             return []
 
     def save_scraped_data_to_database(self, scraper_request, results_data: List[Dict[str, Any]]) -> int:
@@ -769,7 +914,7 @@ class BrightDataAutomatedBatchScraper:
         Returns the actual scraped data from BrightData API
         """
         try:
-            # BrightData results API endpoint
+            # BrightData results API endpoint - REAL ENDPOINT
             results_url = f"https://api.brightdata.com/datasets/v3/snapshot/{snapshot_id}"
             
             headers = {
@@ -809,6 +954,109 @@ class BrightDataAutomatedBatchScraper:
         except Exception as e:
             self.logger.error(f"❌ Error fetching BrightData results: {str(e)}")
             return None
+    
+    def get_real_data_from_available_snapshots(self, platform: str, limit: int = 50) -> Dict[str, Any]:
+        """
+        Get real scraped data from available snapshots with data
+        This uses the REAL API endpoints discovered from the dashboard
+        """
+        try:
+            print(f"🔍 Getting real data for {platform} platform")
+            
+            # First, get available snapshots with data
+            snapshots_result = self.get_available_snapshots(platform, status="ready")
+            
+            if not snapshots_result['success']:
+                return snapshots_result
+            
+            data_snapshots = snapshots_result.get('data_snapshots', [])
+            
+            if not data_snapshots:
+                return {
+                    'success': False,
+                    'error': f'No snapshots with data found for {platform}',
+                    'total_snapshots': snapshots_result.get('total_count', 0)
+                }
+            
+            print(f"📦 Found {len(data_snapshots)} snapshots with data")
+            
+            # Try to get data from the most recent snapshots
+            all_results = []
+            successful_snapshots = []
+            
+            for snapshot in data_snapshots[:5]:  # Try up to 5 snapshots
+                snapshot_id = snapshot.get('id')
+                dataset_size = snapshot.get('dataset_size', 0)
+                
+                if not snapshot_id:
+                    continue
+                
+                print(f"🔍 Trying snapshot {snapshot_id} (size: {dataset_size})")
+                
+                # Fetch data from this snapshot
+                result = self.fetch_brightdata_results(snapshot_id)
+                
+                if result['success'] and result.get('data'):
+                    data = result['data']
+                    
+                    if isinstance(data, list) and len(data) > 0:
+                        all_results.extend(data)
+                        successful_snapshots.append({
+                            'snapshot_id': snapshot_id,
+                            'data_count': len(data),
+                            'dataset_size': dataset_size
+                        })
+                        print(f"✅ Got {len(data)} items from snapshot {snapshot_id}")
+                        
+                        # Stop if we have enough data
+                        if len(all_results) >= limit:
+                            break
+                    elif isinstance(data, str) and result.get('format') == 'text':
+                        # Handle text/CSV format
+                        parsed_data = self.parse_brightdata_csv_results(data)
+                        if parsed_data:
+                            all_results.extend(parsed_data)
+                            successful_snapshots.append({
+                                'snapshot_id': snapshot_id,
+                                'data_count': len(parsed_data),
+                                'dataset_size': dataset_size
+                            })
+                            print(f"✅ Parsed {len(parsed_data)} items from CSV snapshot {snapshot_id}")
+                            
+                            # Stop if we have enough data
+                            if len(all_results) >= limit:
+                                break
+                    
+                if len(all_results) >= limit:
+                    break
+            
+            if all_results:
+                # Limit results to requested amount
+                final_results = all_results[:limit]
+                
+                return {
+                    'success': True,
+                    'data': final_results,
+                    'count': len(final_results),
+                    'platform': platform,
+                    'successful_snapshots': successful_snapshots,
+                    'total_available_snapshots': len(data_snapshots)
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': f'Could not retrieve data from any {platform} snapshots',
+                    'attempted_snapshots': len(data_snapshots),
+                    'platform': platform
+                }
+                
+        except Exception as e:
+            print(f"❌ Exception getting real data: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e),
+                'platform': platform
+            }
 
     def monitor_job_with_timeout(self, snapshot_id: str, timeout_minutes: int = 10) -> Dict[str, Any]:
         """
