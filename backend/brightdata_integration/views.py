@@ -419,11 +419,22 @@ def _create_brightdata_scraped_post(item_data, platform, folder_id=None, scraper
         from django.utils import timezone
         import time
         
+        # DEBUG: Log all input parameters
+        logger.info(f"🔍 _create_brightdata_scraped_post called:")
+        logger.info(f"   item_data keys: {list(item_data.keys()) if item_data else 'None'}")
+        logger.info(f"   platform: {platform}")
+        logger.info(f"   folder_id param: {folder_id}")
+        logger.info(f"   scraper_request: {scraper_request}")
+        
         # Extract folder_id from various sources
         if not folder_id:
             folder_id = item_data.get('folder_id')
+            logger.info(f"   folder_id from item_data: {folder_id}")
         if not folder_id and scraper_request:
             folder_id = scraper_request.folder_id
+            logger.info(f"   folder_id from scraper_request: {folder_id}")
+            
+        logger.info(f"   final folder_id: {folder_id}")
             
         # Create the BrightDataScrapedPost record
         post_data = {
@@ -447,25 +458,33 @@ def _create_brightdata_scraped_post(item_data, platform, folder_id=None, scraper
             'date_posted': timezone.now()
         }
         
+        # DEBUG: Log the post_data being created
+        logger.info(f"📝 Creating post_data: {post_data}")
+        
         # Get or create the scraped post
+        logger.info(f"💾 Attempting to get_or_create BrightDataScrapedPost...")
         scraped_post, created = BrightDataScrapedPost.objects.get_or_create(
             post_id=post_data['post_id'],
             defaults=post_data
         )
         
         if created:
-            logger.info(f"Created BrightDataScrapedPost: {scraped_post.post_id} -> Folder {folder_id}")
+            logger.info(f"✅ Created BrightDataScrapedPost: {scraped_post.post_id} -> Folder {folder_id}")
         else:
+            logger.info(f"♻️ Found existing BrightDataScrapedPost: {scraped_post.post_id}")
             # Update folder_id if it wasn't set before
             if not scraped_post.folder_id and folder_id:
                 scraped_post.folder_id = folder_id
                 scraped_post.save()
-                logger.info(f"Updated folder link: {scraped_post.post_id} -> Folder {folder_id}")
+                logger.info(f"🔗 Updated folder link: {scraped_post.post_id} -> Folder {folder_id}")
         
+        logger.info(f"🎉 Successfully processed BrightDataScrapedPost: {scraped_post.id}")
         return scraped_post
         
     except Exception as e:
-        logger.error(f"Error creating BrightDataScrapedPost: {e}")
+        logger.error(f"❌ Error creating BrightDataScrapedPost: {e}")
+        import traceback
+        logger.error(f"❌ Full traceback: {traceback.format_exc()}")
         return None
 
 
