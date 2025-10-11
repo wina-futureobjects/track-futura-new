@@ -164,8 +164,8 @@ class BrightDataWebhookEvent(models.Model):
 class BrightDataScrapedPost(models.Model):
     """Stores individual scraped posts from BrightData"""
     
-    # Link to the scraper request
-    scraper_request = models.ForeignKey(BrightDataScraperRequest, on_delete=models.CASCADE, related_name='scraped_posts')
+    # Link to the scraper request (FIXED: Made optional for webhook processing)
+    scraper_request = models.ForeignKey(BrightDataScraperRequest, on_delete=models.CASCADE, related_name='scraped_posts', null=True, blank=True)
     
     # Job/Folder linking
     folder_id = models.IntegerField(help_text='Job folder ID this post belongs to')
