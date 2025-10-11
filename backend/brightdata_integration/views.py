@@ -287,9 +287,32 @@ def brightdata_webhook(request):
                 if scraper_request:
                     webhook_event.platform = scraper_request.platform
                     webhook_event.save()
-                    logger.info(f"Found associated scraper request: {scraper_request.id}")
+                    logger.info(f"Found associated scraper request by snapshot_id: {scraper_request.id}")
             except Exception as e:
-                logger.error(f"Error finding scraper request: {str(e)}")
+                logger.error(f"Error finding scraper request by snapshot_id: {str(e)}")
+        
+        # If no scraper request found by snapshot_id, try to find by platform and recent processing status
+        if not scraper_request and platform != 'unknown':
+            try:
+                # Look for recent processing requests for this platform
+                recent_processing = BrightDataScraperRequest.objects.filter(
+                    platform=platform,
+                    status='processing',
+                    created_at__gte=timezone.now() - timezone.timedelta(hours=24)
+                ).order_by('-created_at').first()
+                
+                if recent_processing:
+                    scraper_request = recent_processing
+                    logger.info(f"Found associated scraper request by platform: {scraper_request.id}")
+                    
+                    # Update with snapshot_id if we have it
+                    if snapshot_id and not scraper_request.snapshot_id:
+                        scraper_request.snapshot_id = snapshot_id
+                        scraper_request.save()
+                        logger.info(f"Updated scraper request {scraper_request.id} with snapshot_id: {snapshot_id}")
+                        
+            except Exception as e:
+                logger.error(f"Error finding scraper request by platform: {str(e)}")
         
         # Process the webhook data
         try:
@@ -510,6 +533,7 @@ def _process_brightdata_results(data: list, platform: str, scraper_request=None)
     """
     Process BrightData results and store them in appropriate models
     PRODUCTION FIX: Now creates BrightDataScrapedPost records for job folder linking
+    ENHANCED: Updates scraper request status when processing data
     """
     try:
         logger.info(f"Processing {len(data)} items for platform {platform}")
@@ -530,6 +554,19 @@ def _process_brightdata_results(data: list, platform: str, scraper_request=None)
                 processed_count += 1
         
         logger.info(f"Created {processed_count} BrightDataScrapedPost records with folder links")
+        
+        # ENHANCED: Update scraper request status if we processed data successfully
+        if scraper_request and processed_count > 0:
+            logger.info(f"🔄 Updating scraper request {scraper_request.id} status to completed")
+            scraper_request.status = 'completed'
+            scraper_request.completed_at = timezone.now()
+            
+            # Set started_at if not already set
+            if not scraper_request.started_at:
+                scraper_request.started_at = scraper_request.created_at
+                
+            scraper_request.save()
+            logger.info(f"✅ Updated scraper request {scraper_request.id} to completed with {processed_count} posts")
         
         # Also process results based on platform (keep existing logic)
         if platform == 'instagram':
@@ -890,17 +927,48 @@ def trigger_scraper_endpoint(request):
                         snapshot_id = platform_result.get('snapshot_id')
                         
                         if job_id and snapshot_id:
+                            # Get real URLs from TrackSource for better target_url
+                            target_url = f"System folder {folder_id}"
+                            source_name = "Unknown"
+                            
+                            try:
+                                from track_accounts.models import TrackSource
+                                sources = TrackSource.objects.filter(
+                                    folder_id=folder_id,
+                                    platform__iexact=platform
+                                )
+                                
+                                if sources.exists():
+                                    source = sources.first()
+                                    source_name = source.name
+                                    
+                                    # Get platform-specific URL
+                                    if platform.lower() == 'instagram' and source.instagram_link:
+                                        target_url = source.instagram_link
+                                    elif platform.lower() == 'facebook' and source.facebook_link:
+                                        target_url = source.facebook_link
+                                    elif platform.lower() == 'linkedin' and source.linkedin_link:
+                                        target_url = source.linkedin_link
+                                    elif platform.lower() == 'tiktok' and source.tiktok_link:
+                                        target_url = source.tiktok_link
+                                    
+                                    logger.info(f"Found real URL for {platform}: {target_url}")
+                            except Exception as e:
+                                logger.warning(f"Could not get real URL for folder {folder_id}: {e}")
+                            
                             # Create a scraper request record linked to the folder
                             scraper_request = BrightDataScraperRequest.objects.create(
                                 platform=platform,
-                                target_url=f"System folder {folder_id}",
+                                target_url=target_url,
+                                source_name=source_name,
                                 snapshot_id=snapshot_id,
                                 request_id=job_id,
                                 status='processing',
                                 folder_id=folder_id,  # Link to the job folder
-                                user_id=user_id
+                                user_id=user_id,
+                                started_at=timezone.now()  # Set start time
                             )
-                            logger.info(f"Created scraper request {scraper_request.id} for folder {folder_id}")
+                            logger.info(f"Created scraper request {scraper_request.id} for folder {folder_id} with URL: {target_url}")
                             
             except Exception as e:
                 logger.warning(f"Failed to create job tracking record: {str(e)}")
