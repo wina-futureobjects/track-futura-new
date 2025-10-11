@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import BrightDataConfig, BrightDataBatchJob, BrightDataScraperRequest, BrightDataWebhookEvent
+from .models import BrightDataConfig, BrightDataBatchJob, BrightDataScraperRequest, BrightDataWebhookEvent, BrightDataScrapedPost
 
 
 @admin.register(BrightDataConfig)
@@ -35,3 +35,12 @@ class BrightDataWebhookEventAdmin(admin.ModelAdmin):
     search_fields = ['event_id', 'snapshot_id', 'platform']
     ordering = ['-created_at']
     readonly_fields = ['created_at', 'processed_at']
+
+
+@admin.register(BrightDataScrapedPost)
+class BrightDataScrapedPostAdmin(admin.ModelAdmin):
+    list_display = ['post_id', 'platform', 'folder_id', 'likes', 'num_comments', 'created_at']
+    list_filter = ['platform', 'folder_id', 'created_at']
+    search_fields = ['post_id', 'content', 'user_posted', 'platform']
+    ordering = ['-created_at']
+    readonly_fields = ['created_at', 'updated_at']
