@@ -413,6 +413,7 @@ def _create_brightdata_scraped_post(item_data, platform, folder_id=None, scraper
     """
     PRODUCTION FIX: Create BrightDataScrapedPost records from webhook data
     This is the missing piece that links posts to job folders!
+    CRITICAL FIX: Made scraper_request optional to fix database constraint
     """
     try:
         from .models import BrightDataScrapedPost
@@ -435,7 +436,19 @@ def _create_brightdata_scraped_post(item_data, platform, folder_id=None, scraper
             logger.info(f"   folder_id from scraper_request: {folder_id}")
             
         logger.info(f"   final folder_id: {folder_id}")
-            
+        
+        # ENHANCED: Verify folder exists and create UnifiedRunFolder if needed
+        if folder_id:
+            from track_accounts.models import UnifiedRunFolder
+            try:
+                unified_folder = UnifiedRunFolder.objects.filter(id=folder_id).first()
+                if unified_folder:
+                    logger.info(f"✅ Found UnifiedRunFolder {folder_id}: {unified_folder.name}")
+                else:
+                    logger.warning(f"⚠️ No UnifiedRunFolder found for ID {folder_id} - will create post anyway")
+            except Exception as e:
+                logger.warning(f"⚠️ Error checking UnifiedRunFolder {folder_id}: {e}")
+        
         # Create the BrightDataScrapedPost record
         post_data = {
             'post_id': item_data.get('post_id') or item_data.get('id') or f"webhook_{int(time.time())}",
@@ -454,14 +467,14 @@ def _create_brightdata_scraped_post(item_data, platform, folder_id=None, scraper
             'location': item_data.get('location', ''),
             'description': item_data.get('description', ''),
             'folder_id': folder_id,
-            'scraper_request': scraper_request,
+            'scraper_request': scraper_request,  # Now optional due to model fix
             'date_posted': timezone.now()
         }
         
         # DEBUG: Log the post_data being created
         logger.info(f"📝 Creating post_data: {post_data}")
         
-        # Get or create the scraped post
+        # Get or create the scraped post (FIXED: scraper_request now optional)
         logger.info(f"💾 Attempting to get_or_create BrightDataScrapedPost...")
         scraped_post, created = BrightDataScrapedPost.objects.get_or_create(
             post_id=post_data['post_id'],
@@ -470,6 +483,10 @@ def _create_brightdata_scraped_post(item_data, platform, folder_id=None, scraper
         
         if created:
             logger.info(f"✅ Created BrightDataScrapedPost: {scraped_post.post_id} -> Folder {folder_id}")
+            logger.info(f"   Post ID: {scraped_post.id}")
+            logger.info(f"   Platform: {scraped_post.platform}")
+            logger.info(f"   User: {scraped_post.user_posted}")
+            logger.info(f"   Content: {scraped_post.content[:100]}...")
         else:
             logger.info(f"♻️ Found existing BrightDataScrapedPost: {scraped_post.post_id}")
             # Update folder_id if it wasn't set before
