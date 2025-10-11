@@ -271,6 +271,19 @@ const JobFolderView = () => {
         }
       }
 
+      // For service folders, if BrightData failed and we have empty subfolders, show appropriate message
+      if (jobFolderData.folder_type === 'service' && platformFolders.length > 0) {
+        const hasPostsInSubfolders = platformFolders.some(folder => (folder.post_count || 0) > 0);
+        if (!hasPostsInSubfolders) {
+          setJobStatus({
+            status: 'completed',
+            message: 'No posts found in this service folder. The scraping jobs may not have completed successfully.'
+          });
+          setLoading(false);
+          return;
+        }
+      }
+
       if (platformFolders.length === 0) {
         setJobStatus({
           status: 'warning',
@@ -287,9 +300,26 @@ const JobFolderView = () => {
         const platform = platformFolder.platform || 'instagram';
         const platformFolderId = platformFolder.id;
 
+        console.log('Processing platform folder:', platformFolder);
+        console.log('Platform:', platform, 'Folder ID:', platformFolderId);
+
+        // Skip if we don't have a valid folder ID
+        if (!platformFolderId) {
+          console.warn('Skipping platform folder without ID:', platformFolder);
+          continue;
+        }
+
         try {
           // Fetch posts from the platform-specific API (with project parameter for security)
           const postsEndpoint = `/api/${platform}-data/folders/${platformFolderId}/posts/?project=${projectId}`;
+          console.log('Fetching from endpoint:', postsEndpoint);
+          
+          // Validate the endpoint before making the request
+          if (postsEndpoint.includes('/f_/') || postsEndpoint.includes('/undefined/')) {
+            console.error('Invalid endpoint detected, skipping:', postsEndpoint);
+            continue;
+          }
+          
           const postsResponse = await apiFetch(postsEndpoint);
 
           if (postsResponse.ok) {
@@ -321,12 +351,19 @@ const JobFolderView = () => {
       setPosts(allPosts);
 
       // Handle case where folder claims to have posts but none were found
-      if (allPosts.length === 0 && jobFolderData.post_count > 0) {
-        setJobStatus({
-          status: 'warning',
-          message: `Folder indicates ${jobFolderData.post_count} posts but none are accessible. The data may be in a different format or the scraping didn't complete properly.`
-        });
-      } else if (allPosts.length > 0) {
+      if (allPosts.length === 0) {
+        if (jobFolderData.post_count > 0) {
+          setJobStatus({
+            status: 'warning',
+            message: `This folder indicates ${jobFolderData.post_count} posts but none are accessible. The scraping may not have completed properly or the data is in a different format.`
+          });
+        } else {
+          setJobStatus({
+            status: 'completed',
+            message: 'No posts found. This job may not have completed successfully or no data was scraped.'
+          });
+        }
+      } else {
         setJobStatus({
           status: 'completed',
           message: `Successfully loaded ${allPosts.length} posts`
