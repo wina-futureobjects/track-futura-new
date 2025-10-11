@@ -246,6 +246,31 @@ const JobFolderView = () => {
       const platformFolders = jobFolderData.subfolders || [];
       console.log('Platform folders:', platformFolders);
 
+      // For service folders with post_count > 0, try BrightData integration first
+      if (jobFolderData.folder_type === 'service' && jobFolderData.post_count > 0) {
+        try {
+          console.log('Trying BrightData integration for service folder...');
+          const brightDataResponse = await apiFetch(`/api/brightdata/job-results/${folderId}/`);
+          if (brightDataResponse.ok) {
+            const brightDataResult = await brightDataResponse.json();
+            if (brightDataResult.success && brightDataResult.total_results > 0) {
+              console.log('Found BrightData posts:', brightDataResult.total_results);
+              // Use BrightData posts
+              const brightDataPosts = brightDataResult.data.posts || [];
+              setPosts(brightDataPosts);
+              setJobStatus({
+                status: 'completed',
+                message: `Successfully loaded ${brightDataPosts.length} posts from BrightData`
+              });
+              setLoading(false);
+              return;
+            }
+          }
+        } catch (err) {
+          console.log('BrightData integration not available for service folder, trying subfolders...');
+        }
+      }
+
       if (platformFolders.length === 0) {
         setJobStatus({
           status: 'warning',
@@ -294,6 +319,19 @@ const JobFolderView = () => {
       }
 
       setPosts(allPosts);
+
+      // Handle case where folder claims to have posts but none were found
+      if (allPosts.length === 0 && jobFolderData.post_count > 0) {
+        setJobStatus({
+          status: 'warning',
+          message: `Folder indicates ${jobFolderData.post_count} posts but none are accessible. The data may be in a different format or the scraping didn't complete properly.`
+        });
+      } else if (allPosts.length > 0) {
+        setJobStatus({
+          status: 'completed',
+          message: `Successfully loaded ${allPosts.length} posts`
+        });
+      }
 
       // Create UniversalFolder object for UniversalDataDisplay
       const universalFolderData: UniversalFolder = {
