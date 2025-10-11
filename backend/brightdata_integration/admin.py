@@ -44,3 +44,4 @@ class BrightDataScrapedPostAdmin(admin.ModelAdmin):
     search_fields = ['post_id', 'content', 'user_posted', 'platform']
     ordering = ['-created_at']
     readonly_fields = ['created_at', 'updated_at']
+    # Force deployment update
