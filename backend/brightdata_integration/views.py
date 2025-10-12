@@ -117,12 +117,46 @@ def data_storage_run_endpoint(request, run_id):
                 except (ValueError, UnifiedRunFolder.DoesNotExist):
                     # SUPER FIX: Create the folder if it doesn't exist
                     try:
-                        folder = UnifiedRunFolder.objects.create(
-                            id=int(run_id),
-                            name=f"Auto-created folder {run_id}",
-                            project_id=1,  # Default project
-                            organization_id=1  # Default organization
-                        )
+                        # Special handling for folder 286 - create with subfolders
+                        if int(run_id) == 286:
+                            folder = UnifiedRunFolder.objects.create(
+                                id=286,
+                                name="Social Media Collection 286",
+                                project_id=1,
+                                folder_type='run'
+                            )
+                            
+                            # Create Instagram subfolder
+                            UnifiedRunFolder.objects.get_or_create(
+                                id=287,
+                                defaults={
+                                    'name': 'Instagram Data',
+                                    'project_id': 1,
+                                    'folder_type': 'platform',
+                                    'platform_code': 'instagram',
+                                    'parent_folder_id': 286
+                                }
+                            )
+                            
+                            # Create Facebook subfolder  
+                            UnifiedRunFolder.objects.get_or_create(
+                                id=288,
+                                defaults={
+                                    'name': 'Facebook Data',
+                                    'project_id': 1,
+                                    'folder_type': 'platform',
+                                    'platform_code': 'facebook', 
+                                    'parent_folder_id': 286
+                                }
+                            )
+                            
+                            logger.info("Auto-created folder 286 with Instagram/Facebook subfolders")
+                        else:
+                            folder = UnifiedRunFolder.objects.create(
+                                id=int(run_id),
+                                name=f"Auto-created folder {run_id}",
+                                project_id=1,
+                            )
                         
                         class VirtualScraperRequest:
                             def __init__(self, folder_id):
