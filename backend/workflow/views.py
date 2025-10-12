@@ -269,41 +269,95 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                 # Use the new working BrightData trigger endpoint logic
                 platform = input_collection.platform_service.platform.name
                 urls = input_collection.urls
-                
+
+                # CRITICAL FIX: Create UnifiedRunFolder BEFORE triggering scraper
+                from track_accounts.models import UnifiedRunFolder
+
+                # Create a folder for this scraping run
+                folder = UnifiedRunFolder.objects.create(
+                    name=f"{platform.title()} Data - {input_collection.project.name}",
+                    project=input_collection.project,
+                    folder_type='job',
+                    platform_code=platform.lower(),
+                    description=f"Scraped data from {len(urls)} {platform} URL(s)"
+                )
+                logger.info(f"Created UnifiedRunFolder {folder.id}: {folder.name}")
+
                 # Import the working BrightData scraper
                 from brightdata_integration.services import BrightDataAutomatedBatchScraper
+                from brightdata_integration.models import BrightDataScraperRequest
                 scraper = BrightDataAutomatedBatchScraper()
-                
+
+                # CRITICAL FIX: Create scraper request with folder_id BEFORE triggering
+                # This ensures webhook can find and link data properly
+                scraper_requests = []
+                for url in urls:
+                    scraper_request = BrightDataScraperRequest.objects.create(
+                        platform=platform.lower(),
+                        target_url=url,
+                        folder_id=folder.id,  # Link to the folder we just created
+                        batch_job=batch_job,
+                        status='processing',
+                        started_at=timezone.now()
+                    )
+                    scraper_requests.append(scraper_request)
+                    logger.info(f"Created BrightDataScraperRequest {scraper_request.id} for folder {folder.id}")
+
                 # Create and execute batch job with the working format
                 batch_job_result = scraper.trigger_scraper(
                     platform=platform,
                     urls=urls
                 )
-                
+
                 if batch_job_result and batch_job_result.get('success'):
                     # Update input collection status
                     input_collection.status = 'processing'
                     input_collection.save()
-                    
+
+                    # Update scraper requests with snapshot_id from response
+                    snapshot_id = batch_job_result.get('snapshot_id')
+                    if snapshot_id:
+                        for scraper_request in scraper_requests:
+                            scraper_request.snapshot_id = snapshot_id
+                            scraper_request.save()
+
                     logger.info(f"Successfully triggered BrightData scraper: {batch_job_result}")
                     return Response({
                         'message': f'BrightData {platform} scraper triggered successfully!',
                         'batch_job_id': batch_job_result.get('batch_job_id'),
+                        'folder_id': folder.id,
+                        'folder_name': folder.name,
                         'platform': platform,
                         'status': 'processing',
-                        'urls_count': len(urls)
+                        'urls_count': len(urls),
+                        'data_storage_url': f'/organizations/{input_collection.project.organization_id}/projects/{input_collection.project.id}/data-storage'
                     }, status=status.HTTP_200_OK)
                 else:
+                    # Clean up folder if scraper failed
+                    folder.delete()
+                    for scraper_request in scraper_requests:
+                        scraper_request.delete()
+
                     error_msg = batch_job_result.get('error', 'Unknown error') if batch_job_result else 'Failed to trigger scraper'
                     return Response(
-                        {'error': f'Failed to trigger BrightData scraper: {error_msg}'}, 
+                        {'error': f'Failed to trigger BrightData scraper: {error_msg}'},
                         status=status.HTTP_500_INTERNAL_SERVER_ERROR
                     )
                     
             except Exception as scraper_error:
                 logger.error(f"BrightData trigger error: {str(scraper_error)}")
+                # Clean up folder and scraper requests on error
+                try:
+                    if 'folder' in locals():
+                        folder.delete()
+                    if 'scraper_requests' in locals():
+                        for sr in scraper_requests:
+                            sr.delete()
+                except Exception as cleanup_error:
+                    logger.error(f"Cleanup error: {str(cleanup_error)}")
+
                 return Response(
-                    {'error': f'BrightData trigger failed: {str(scraper_error)}'}, 
+                    {'error': f'BrightData trigger failed: {str(scraper_error)}'},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
                 
