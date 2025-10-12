@@ -108,6 +108,7 @@ class BrightDataScraperRequest(models.Model):
     
     # Job linking fields  
     folder_id = models.IntegerField(null=True, blank=True, help_text='Associated job folder ID')
+    scrape_number = models.IntegerField(default=1, help_text='Incremental scrape number for this folder')
     user_id = models.IntegerField(null=True, blank=True, help_text='User who triggered the job')
     
     # BrightData specific fields
@@ -130,6 +131,9 @@ class BrightDataScraperRequest(models.Model):
         ordering = ['-created_at']
         verbose_name = "BrightData Scraper Request"
         verbose_name_plural = "BrightData Scraper Requests"
+        indexes = [
+            models.Index(fields=['folder_id', 'scrape_number']),
+        ]
 
     def __str__(self):
         return f"{self.platform} - {self.target_url} ({self.status})"

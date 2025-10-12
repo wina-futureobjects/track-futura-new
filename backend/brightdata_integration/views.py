@@ -1,3 +1,213 @@
+from track_accounts.models import UnifiedRunFolder
+
+# New endpoints for human-friendly data storage URLs
+from django.shortcuts import get_object_or_404
+from django.http import JsonResponse
+
+def data_storage_folder_scrape(request, folder_name, scrape_num):
+    """
+    Return all data for a given folder name and scrape number.
+    """
+    try:
+        # Find folder by name (case-insensitive)
+        folder = UnifiedRunFolder.objects.filter(name__iexact=folder_name).first()
+        if not folder:
+            return JsonResponse({
+                'success': False,
+                'error': f'Folder "{folder_name}" not found'
+            }, status=404)
+        
+        # Find scraper request for this folder and scrape number
+        scraper_request = BrightDataScraperRequest.objects.filter(
+            folder_id=folder.id,
+            scrape_number=scrape_num
+        ).first()
+        
+        if not scraper_request:
+            return JsonResponse({
+                'success': False,
+                'error': f'No scrape #{scrape_num} found for folder "{folder_name}"'
+            }, status=404)
+        
+        # Get scraped posts for this scraper request
+        scraped_posts = BrightDataScrapedPost.objects.filter(
+            folder_id=folder.id,
+            scraper_request=scraper_request
+        ).order_by('-date_posted', '-created_at')
+        
+        posts_data = []
+        for post in scraped_posts:
+            posts_data.append({
+                'post_id': post.post_id,
+                'url': post.url,
+                'user_posted': post.user_posted,
+                'content': post.content,
+                'platform': post.platform,
+                'likes': post.likes,
+                'num_comments': post.num_comments,
+                'shares': post.shares,
+                'date_posted': post.date_posted.isoformat() if post.date_posted else None,
+                'media_type': post.media_type,
+                'hashtags': post.hashtags,
+                'is_verified': post.is_verified,
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'folder_name': folder.name,
+            'scrape_number': scrape_num,
+            'total_results': len(posts_data),
+            'data': posts_data,
+            'message': f'Data for folder {folder_name}, scrape {scrape_num}'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in data_storage_folder_scrape: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+def data_storage_folder_scrape_platform(request, folder_name, scrape_num, platform):
+    """
+    Return all data for a given folder, scrape, and platform.
+    """
+    try:
+        # Find folder by name (case-insensitive)
+        folder = UnifiedRunFolder.objects.filter(name__iexact=folder_name).first()
+        if not folder:
+            return JsonResponse({
+                'success': False,
+                'error': f'Folder "{folder_name}" not found'
+            }, status=404)
+        
+        # Find scraper request for this folder and scrape number
+        scraper_request = BrightDataScraperRequest.objects.filter(
+            folder_id=folder.id,
+            scrape_number=scrape_num
+        ).first()
+        
+        if not scraper_request:
+            return JsonResponse({
+                'success': False,
+                'error': f'No scrape #{scrape_num} found for folder "{folder_name}"'
+            }, status=404)
+        
+        # Get scraped posts for this platform only
+        scraped_posts = BrightDataScrapedPost.objects.filter(
+            folder_id=folder.id,
+            scraper_request=scraper_request,
+            platform__iexact=platform
+        ).order_by('-date_posted', '-created_at')
+        
+        posts_data = []
+        for post in scraped_posts:
+            posts_data.append({
+                'post_id': post.post_id,
+                'url': post.url,
+                'user_posted': post.user_posted,
+                'content': post.content,
+                'platform': post.platform,
+                'likes': post.likes,
+                'num_comments': post.num_comments,
+                'shares': post.shares,
+                'date_posted': post.date_posted.isoformat() if post.date_posted else None,
+                'media_type': post.media_type,
+                'hashtags': post.hashtags,
+                'is_verified': post.is_verified,
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'folder_name': folder.name,
+            'scrape_number': scrape_num,
+            'platform': platform,
+            'total_results': len(posts_data),
+            'data': posts_data,
+            'message': f'Data for folder {folder_name}, scrape {scrape_num}, platform {platform}'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in data_storage_folder_scrape_platform: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+def data_storage_folder_scrape_platform_post(request, folder_name, scrape_num, platform):
+    """
+    Return all posts for a given folder, scrape, and platform.
+    """
+    # This is the same as the platform endpoint since we're already filtering posts
+    return data_storage_folder_scrape_platform(request, folder_name, scrape_num, platform)
+
+def data_storage_folder_scrape_platform_post_account(request, folder_name, scrape_num, platform, account):
+    """
+    Return all posts for a given folder, scrape, platform, and account.
+    """
+    try:
+        # Find folder by name (case-insensitive)
+        folder = UnifiedRunFolder.objects.filter(name__iexact=folder_name).first()
+        if not folder:
+            return JsonResponse({
+                'success': False,
+                'error': f'Folder "{folder_name}" not found'
+            }, status=404)
+        
+        # Find scraper request for this folder and scrape number
+        scraper_request = BrightDataScraperRequest.objects.filter(
+            folder_id=folder.id,
+            scrape_number=scrape_num
+        ).first()
+        
+        if not scraper_request:
+            return JsonResponse({
+                'success': False,
+                'error': f'No scrape #{scrape_num} found for folder "{folder_name}"'
+            }, status=404)
+        
+        # Get scraped posts for this platform and account only
+        scraped_posts = BrightDataScrapedPost.objects.filter(
+            folder_id=folder.id,
+            scraper_request=scraper_request,
+            platform__iexact=platform,
+            user_posted__iexact=account
+        ).order_by('-date_posted', '-created_at')
+        
+        posts_data = []
+        for post in scraped_posts:
+            posts_data.append({
+                'post_id': post.post_id,
+                'url': post.url,
+                'user_posted': post.user_posted,
+                'content': post.content,
+                'platform': post.platform,
+                'likes': post.likes,
+                'num_comments': post.num_comments,
+                'shares': post.shares,
+                'date_posted': post.date_posted.isoformat() if post.date_posted else None,
+                'media_type': post.media_type,
+                'hashtags': post.hashtags,
+                'is_verified': post.is_verified,
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'folder_name': folder.name,
+            'scrape_number': scrape_num,
+            'platform': platform,
+            'account': account,
+            'total_results': len(posts_data),
+            'data': posts_data,
+            'message': f'Posts for folder {folder_name}, scrape {scrape_num}, platform {platform}, account {account}'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in data_storage_folder_scrape_platform_post_account: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
 """
 BrightData Integration Views
 
@@ -138,6 +348,15 @@ class BrightDataScraperRequestViewSet(viewsets.ModelViewSet):
             # Platform-specific number of posts (matching your examples)
             num_posts = 50 if platform == 'facebook' else 10
             
+            # Get next scrape number for this folder
+            from django.db import models
+            next_scrape_number = BrightDataScraperRequest.objects.filter(
+                folder_id=folder_id
+            ).aggregate(
+                max_scrape=models.Max('scrape_number')
+            )['max_scrape'] or 0
+            next_scrape_number += 1
+            
             batch_job = scraper.create_batch_job(
                 name=f"{platform.title()} scraper {timezone.now().strftime('%Y%m%d_%H%M%S')}",
                 project_id=project.id,
@@ -145,7 +364,8 @@ class BrightDataScraperRequestViewSet(viewsets.ModelViewSet):
                 platforms_to_scrape=[platform],
                 content_types_to_scrape={platform: ['posts']},
                 num_of_posts=num_posts,
-                urls=urls  # Pass URLs to batch job
+                urls=urls,  # Pass URLs to batch job
+                scrape_number=next_scrape_number  # Pass scrape number
             )
             
             if batch_job:

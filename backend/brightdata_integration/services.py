@@ -1231,10 +1231,20 @@ class BrightDataAutomatedBatchScraper:
 
     def create_batch_job(self, name: str, project_id: int, source_folder_ids: List[int], 
                         platforms_to_scrape: List[str], content_types_to_scrape: Dict[str, List[str]], 
-                        num_of_posts: int = 10, **kwargs) -> Optional[BrightDataBatchJob]:
+                        num_of_posts: int = 10, scrape_number: int = 1, **kwargs) -> Optional[BrightDataBatchJob]:
         """Legacy method for creating batch jobs"""
         urls = kwargs.get('urls', [])
+        
+        # Create scraper requests with scrape_number
         for platform in platforms_to_scrape:
+            for url in urls:
+                BrightDataScraperRequest.objects.create(
+                    platform=platform,
+                    target_url=url,
+                    folder_id=source_folder_ids[0] if source_folder_ids else None,
+                    scrape_number=scrape_number,
+                    status='pending'
+                )
             self.trigger_scraper(platform, urls)
         return None
 
