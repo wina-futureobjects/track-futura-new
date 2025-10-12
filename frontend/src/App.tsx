@@ -269,6 +269,15 @@ function App() {
                 </ProtectedRoute>
               } />
               
+              {/* CRITICAL: Direct /run/ endpoint route for immediate data access */}
+              <Route path="/organizations/:organizationId/projects/:projectId/run/:runId" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <JobFolderView />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+              
               {/* Smart Data Storage Router - handles all /data-storage/X/Y patterns intelligently */}
               <Route path="/organizations/:organizationId/projects/:projectId/data-storage/:segment1/:segment2" element={
                 <ProtectedRoute>

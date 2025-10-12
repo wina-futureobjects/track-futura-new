@@ -271,40 +271,89 @@ const JobFolderView = () => {
           }
         }
       }
-      // Handle /data-storage/run/N pattern - redirect to correct folder/scrape URL
+      // Handle /run/N pattern - DIRECTLY access scraped data via new endpoint
       if (runId) {
-        console.log(`Handling run ID: ${runId}`);
+        console.log(`🚀 DIRECT RUN ACCESS: Handling run ID ${runId}`);
         
-        // Try to find the scraper request by run ID or snapshot ID
+        // Use the new direct data-storage/run endpoint - NO REDIRECTS!
         try {
-          const runResponse = await apiFetch(`/api/brightdata/run-info/${runId}/`);
-          if (runResponse.ok) {
-            const runData = await runResponse.json();
-            if (runData.folder_name && runData.scrape_number) {
-              // Redirect to proper human-friendly URL
-              const correctUrl = `/organizations/${organizationId}/projects/${projectId}/data-storage/${encodeURIComponent(runData.folder_name)}/${runData.scrape_number}`;
-              console.log(`Redirecting to correct URL: ${correctUrl}`);
-              navigate(correctUrl, { replace: true });
+          console.log(`📡 Making direct API call to: /api/brightdata/data-storage/run/${runId}/`);
+          const runDataResponse = await apiFetch(`/api/brightdata/data-storage/run/${runId}/`);
+          
+          if (runDataResponse.ok) {
+            const runResults = await runDataResponse.json();
+            console.log('✅ Direct run data received:', runResults);
+            
+            if (runResults.success && runResults.data && runResults.data.length > 0) {
+              // Transform and set posts directly
+              const transformedPosts: Post[] = runResults.data.map((item: any, index: number) => ({
+                id: index + 1,
+                post_id: item.post_id || item.shortcode || item.id || `post_${index}`,
+                url: item.url || item.post_url || item.link || '',
+                user_posted: item.user_posted || item.user_username || item.username || item.ownerUsername || item.user || 'Unknown',
+                content: item.content || item.caption || item.description || item.text || '',
+                description: item.content || item.caption || item.description || item.text || '',
+                likes: parseInt(item.likes || item.likes_count || item.likesCount || '0') || 0,
+                num_comments: parseInt(item.num_comments || item.comments_count || item.commentsCount || item.comments || '0') || 0,
+                date_posted: item.date_posted || item.timestamp || item.date || new Date().toISOString(),
+                created_at: item.date_posted || item.timestamp || new Date().toISOString(),
+                is_verified: item.is_verified || false
+              }));
+              
+              setPosts(transformedPosts);
+              
+              // Create job folder data
+              const jobFolderData: JobFolder = {
+                id: runResults.folder_id || 0,
+                name: runResults.folder_name || `Run ${runId}`,
+                description: `Scraped ${runResults.total_results} posts from BrightData (Run #${runId})`,
+                category: 'posts',
+                category_display: 'Posts',
+                platform: 'instagram',
+                folder_type: 'job',
+                post_count: transformedPosts.length,
+                created_at: new Date().toISOString()
+              };
+              
+              setJobFolder(jobFolderData);
+              
+              // Create universal folder data
+              const universalFolderData: UniversalFolder = {
+                id: runResults.folder_id || 0,
+                name: runResults.folder_name || `Run ${runId}`,
+                description: `Scraped data from Run ${runId}`,
+                category: 'posts',
+                category_display: 'Posts',
+                platform: 'instagram',
+                job_id: runResults.folder_id || 0,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                action_type: 'collect_posts'
+              };
+              setUniversalFolder(universalFolderData);
+              
+              setJobStatus({
+                status: 'completed',
+                message: `✅ Successfully loaded ${transformedPosts.length} posts from Run ${runId}`
+              });
+              
+              setLoading(false);
               return;
+            } else {
+              setJobStatus({
+                status: 'warning',
+                message: `Run ${runId} found but contains no scraped data.`
+              });
             }
+          } else {
+            console.log(`❌ Run data API call failed with status: ${runDataResponse.status}`);
+            setError(`Run ${runId} not found. The scraping job may not exist or has been removed.`);
           }
         } catch (err) {
-          console.log('Run info lookup failed, trying direct folder lookup...');
+          console.error('❌ Error accessing run data:', err);
+          setError(`Error loading Run ${runId}: ${err}`);
         }
         
-        // Fallback: treat runId as folderId
-        const tempFolderId = runId;
-        const folderResponse = await apiFetch(`/api/track-accounts/unified-run-folders/${tempFolderId}/`);
-        if (folderResponse.ok) {
-          const folderData = await folderResponse.json();
-          const correctUrl = `/organizations/${organizationId}/projects/${projectId}/data-storage/${encodeURIComponent(folderData.name)}/1`;
-          console.log(`Redirecting to folder-based URL: ${correctUrl}`);
-          navigate(correctUrl, { replace: true });
-          return;
-        }
-        
-        // If all else fails, show error
-        setError(`Run ID ${runId} not found. The scraping job may not exist or has been removed.`);
         setLoading(false);
         return;
       }
