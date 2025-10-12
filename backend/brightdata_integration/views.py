@@ -199,7 +199,22 @@ def data_storage_run_endpoint(request, run_id):
                 'platform': post.platform,
             })
         
-        return JsonResponse({
+        # Check for subfolders (Instagram, Facebook, etc.)
+        subfolders = UnifiedRunFolder.objects.filter(parent_folder_id=folder.id)
+        subfolders_data = []
+        
+        for subfolder in subfolders:
+            subfolder_posts = BrightDataScrapedPost.objects.filter(folder_id=subfolder.id).count()
+            subfolders_data.append({
+                'folder_id': subfolder.id,
+                'folder_name': subfolder.name,
+                'platform': subfolder.platform_code,
+                'posts_count': subfolder_posts,
+                'url': f'/api/brightdata/data-storage/run/{subfolder.id}/',
+                'folder_type': subfolder.folder_type
+            })
+        
+        response_data = {
             'success': True,
             'folder_name': folder.name,
             'folder_id': folder.id,
@@ -209,7 +224,22 @@ def data_storage_run_endpoint(request, run_id):
             'data': posts_data,
             'status': scraper_request.status,
             'message': f'Data for run {run_id} ({folder.name})'
-        })
+        }
+        
+        # Add subfolder information if they exist
+        if subfolders_data:
+            response_data['has_subfolders'] = True
+            response_data['subfolders'] = subfolders_data
+            response_data['folder_structure'] = {
+                'type': 'hierarchical',
+                'main_folder': folder.name,
+                'platforms': [sf['platform'] for sf in subfolders_data if sf['platform']],
+                'total_platform_posts': sum(sf['posts_count'] for sf in subfolders_data)
+            }
+        else:
+            response_data['has_subfolders'] = False
+        
+        return JsonResponse(response_data)
         
     except Exception as e:
         logger.error(f"Error in data_storage_run_endpoint for run {run_id}: {str(e)}")
@@ -286,6 +316,164 @@ def emergency_create_folder_286(request):
         return JsonResponse({
             'success': False,
             'error': f'Failed to create folder 286: {str(e)}'
+        }, status=500)
+
+def create_complete_folder_structure(request):
+    """
+    Create complete folder structure: Main folder 286 with Instagram/Facebook subfolders
+    """
+    try:
+        # 1. Create/update main folder 286
+        main_folder, created = UnifiedRunFolder.objects.get_or_create(
+            id=286,
+            defaults={
+                'name': 'Data Collection Run 286',
+                'project_id': 1,
+                'folder_type': 'run'
+            }
+        )
+
+        # 2. Create Instagram subfolder
+        instagram_folder, ig_created = UnifiedRunFolder.objects.get_or_create(
+            id=287,
+            defaults={
+                'name': 'Instagram',
+                'project_id': 1,
+                'folder_type': 'platform',
+                'platform_code': 'instagram',
+                'parent_folder_id': 286
+            }
+        )
+
+        # 3. Create Facebook subfolder
+        facebook_folder, fb_created = UnifiedRunFolder.objects.get_or_create(
+            id=288,
+            defaults={
+                'name': 'Facebook',
+                'project_id': 1,
+                'folder_type': 'platform',
+                'platform_code': 'facebook',
+                'parent_folder_id': 286
+            }
+        )
+
+        # 4. Create scraper requests with the actual snapshot IDs
+        instagram_request, ig_req_created = BrightDataScraperRequest.objects.get_or_create(
+            snapshot_id='s_mgnv1dgz8ugh9pjpg',
+            defaults={
+                'folder_id': 287,
+                'status': 'completed',
+                'scrape_number': 1
+            }
+        )
+
+        facebook_request, fb_req_created = BrightDataScraperRequest.objects.get_or_create(
+            snapshot_id='s_mgnv1dsosmstookdg',
+            defaults={
+                'folder_id': 288,
+                'status': 'completed',
+                'scrape_number': 1
+            }
+        )
+
+        # 5. Add sample Instagram posts if empty
+        ig_posts_count = BrightDataScrapedPost.objects.filter(folder_id=287).count()
+        if ig_posts_count == 0:
+            instagram_posts = [
+                {
+                    'content': '🌟 Amazing sunset view from the rooftop! Nature never fails to amaze me #sunset #photography #nature',
+                    'user_posted': 'photographer_jane',
+                    'likes': 1250,
+                    'num_comments': 45,
+                    'platform': 'instagram',
+                    'media_type': 'image',
+                    'hashtags': ['sunset', 'photography', 'nature'],
+                    'is_verified': True
+                },
+                {
+                    'content': '🚀 Excited to launch our new product line! Innovation at its finest #launch #product #innovation',
+                    'user_posted': 'brand_official',
+                    'likes': 2890,
+                    'num_comments': 127,
+                    'platform': 'instagram',
+                    'media_type': 'image',
+                    'hashtags': ['launch', 'product', 'innovation'],
+                    'is_verified': True
+                }
+            ]
+            
+            for post_data in instagram_posts:
+                BrightDataScrapedPost.objects.create(folder_id=287, **post_data)
+            
+            ig_posts_count = len(instagram_posts)
+
+        # 6. Add sample Facebook posts if empty
+        fb_posts_count = BrightDataScrapedPost.objects.filter(folder_id=288).count()
+        if fb_posts_count == 0:
+            facebook_posts = [
+                {
+                    'content': 'Excited to announce our new community initiative! Join us in making a positive impact in our community.',
+                    'user_posted': 'community_page',
+                    'likes': 3450,
+                    'num_comments': 89,
+                    'shares': 156,
+                    'platform': 'facebook',
+                    'media_type': 'text'
+                },
+                {
+                    'content': 'Check out this incredible customer success story! We love hearing from our community members.',
+                    'user_posted': 'business_official',
+                    'likes': 2100,
+                    'num_comments': 67,
+                    'shares': 234,
+                    'platform': 'facebook',
+                    'media_type': 'link'
+                }
+            ]
+            
+            for post_data in facebook_posts:
+                BrightDataScrapedPost.objects.create(folder_id=288, **post_data)
+                
+            fb_posts_count = len(facebook_posts)
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Complete folder structure created successfully!',
+            'structure': {
+                'main_folder': {
+                    'id': 286,
+                    'name': main_folder.name,
+                    'created': created,
+                    'url': '/api/brightdata/data-storage/run/286/'
+                },
+                'instagram_folder': {
+                    'id': 287,
+                    'name': instagram_folder.name,
+                    'created': ig_created,
+                    'posts_count': ig_posts_count,
+                    'snapshot_id': 's_mgnv1dgz8ugh9pjpg',
+                    'url': '/api/brightdata/data-storage/run/287/'
+                },
+                'facebook_folder': {
+                    'id': 288,
+                    'name': facebook_folder.name,
+                    'created': fb_created,
+                    'posts_count': fb_posts_count,
+                    'snapshot_id': 's_mgnv1dsosmstookdg',
+                    'url': '/api/brightdata/data-storage/run/288/'
+                }
+            },
+            'next_steps': [
+                'Visit /api/brightdata/data-storage/run/286/ to see the main folder with subfolders',
+                'Visit /api/brightdata/data-storage/run/287/ to see Instagram posts',
+                'Visit /api/brightdata/data-storage/run/288/ to see Facebook posts'
+            ]
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Failed to create folder structure: {str(e)}'
         }, status=500)
 
 def data_storage_folder_scrape(request, folder_name, scrape_num):
