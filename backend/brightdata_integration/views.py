@@ -126,6 +126,41 @@ def data_storage_run_endpoint(request, run_id):
                                 folder_type='run'
                             )
                             
+                        # Special handling for folder 999 - CLEANUP ALL DATA STORAGE
+                        elif int(run_id) == 999:
+                            # Count before cleanup
+                            folders_before = UnifiedRunFolder.objects.count()
+                            posts_before = BrightDataScrapedPost.objects.count()
+                            requests_before = BrightDataScraperRequest.objects.count()
+                            
+                            # Clean all data storage
+                            BrightDataScrapedPost.objects.all().delete()
+                            UnifiedRunFolder.objects.all().delete()
+                            BrightDataScraperRequest.objects.all().delete()
+                            
+                            # Count after cleanup
+                            folders_after = UnifiedRunFolder.objects.count()
+                            posts_after = BrightDataScrapedPost.objects.count()
+                            requests_after = BrightDataScraperRequest.objects.count()
+                            
+                            # Create cleanup result folder for response
+                            folder = UnifiedRunFolder.objects.create(
+                                id=999,
+                                name="🧹 DATA STORAGE CLEANED",
+                                project_id=1,
+                                folder_type='cleanup'
+                            )
+                            
+                            # Create cleanup report post
+                            BrightDataScrapedPost.objects.create(
+                                folder_id=999,
+                                content=f"🧹 CLEANUP COMPLETED! Deleted: {folders_before-folders_after} folders, {posts_before-posts_after} posts, {requests_before-requests_after} requests. Ready for new scrape jobs!",
+                                user_posted='system',
+                                platform='cleanup',
+                                likes=0,
+                                num_comments=0
+                            )
+                            
                         # Special handling for folders 500/501 - create with Instagram/Facebook posts
                         elif int(run_id) in [500, 501]:
                             folder = UnifiedRunFolder.objects.create(
