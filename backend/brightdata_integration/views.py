@@ -3,6 +3,10 @@ from track_accounts.models import UnifiedRunFolder
 # New endpoints for human-friendly data storage URLs
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
+from .models import BrightDataScraperRequest, BrightDataScrapedPost
+import logging
+
+logger = logging.getLogger(__name__)
 
 def data_storage_folder_scrape(request, folder_name, scrape_num):
     """
