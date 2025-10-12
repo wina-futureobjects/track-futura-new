@@ -126,6 +126,38 @@ def data_storage_run_endpoint(request, run_id):
                                 folder_type='run'
                             )
                             
+                        # Special handling for folder 500 - create with Instagram/Facebook posts
+                        elif int(run_id) == 500:
+                            folder = UnifiedRunFolder.objects.create(
+                                id=500,
+                                name="Instagram & Facebook Collection",
+                                project_id=1,
+                                folder_type='job'
+                            )
+                            
+                            # Create sample Instagram posts
+                            instagram_posts = [
+                                {'content': '🌟 Revolutionary product launch! This changes everything in our industry. #innovation #launch #technology', 'user_posted': 'innovator_pro', 'likes': 5847, 'num_comments': 234, 'platform': 'instagram', 'media_type': 'image', 'hashtags': ['innovation', 'launch', 'technology'], 'is_verified': True},
+                                {'content': '🎨 Creative process behind our award-winning design. Every detail matters! #design #creative #award', 'user_posted': 'design_master', 'likes': 3421, 'num_comments': 167, 'platform': 'instagram', 'media_type': 'carousel', 'hashtags': ['design', 'creative', 'award'], 'is_verified': True},
+                                {'content': '🚀 Team collaboration that leads to success! Together we achieve more. #team #collaboration #success', 'user_posted': 'team_leader', 'likes': 2956, 'num_comments': 145, 'platform': 'instagram', 'media_type': 'video', 'hashtags': ['team', 'collaboration', 'success'], 'is_verified': False},
+                                {'content': '💡 Innovation meets sustainability in our latest project. Future is green! #sustainability #innovation #green', 'user_posted': 'eco_innovator', 'likes': 4233, 'num_comments': 189, 'platform': 'instagram', 'media_type': 'image', 'hashtags': ['sustainability', 'innovation', 'green'], 'is_verified': True},
+                                {'content': '📈 Growth statistics that speak for themselves! Amazing results this quarter. #growth #statistics #success', 'user_posted': 'business_growth', 'likes': 1876, 'num_comments': 98, 'platform': 'instagram', 'media_type': 'image', 'hashtags': ['growth', 'statistics', 'success'], 'is_verified': False}
+                            ]
+                            
+                            # Create sample Facebook posts
+                            facebook_posts = [
+                                {'content': 'Exciting announcement! We are launching our community outreach program to help local businesses grow and thrive. Join us in making a difference!', 'user_posted': 'community_builders', 'likes': 8234, 'num_comments': 456, 'shares': 1234, 'platform': 'facebook', 'media_type': 'text'},
+                                {'content': 'Customer success story: 200% increase in productivity after implementing our solution. Read the complete case study and see how we can help your business too.', 'user_posted': 'productivity_experts', 'likes': 6521, 'num_comments': 324, 'shares': 892, 'platform': 'facebook', 'media_type': 'link'},
+                                {'content': 'Live webinar tomorrow: "Digital Transformation in 2025". Join industry experts as they discuss the latest trends and strategies. Register now!', 'user_posted': 'digital_transform', 'likes': 4567, 'num_comments': 234, 'shares': 567, 'platform': 'facebook', 'media_type': 'event'},
+                                {'content': 'Thank you to our incredible team! This quarter\'s achievements would not have been possible without your dedication, creativity, and hard work.', 'user_posted': 'company_leadership', 'likes': 3245, 'num_comments': 167, 'shares': 445, 'platform': 'facebook', 'media_type': 'text'}
+                            ]
+                            
+                            # Add posts to folder 500
+                            for post_data in instagram_posts + facebook_posts:
+                                BrightDataScrapedPost.objects.create(folder_id=500, **post_data)
+                            
+                            logger.info("Auto-created folder 500 with Instagram/Facebook posts")
+                            
                             # Create Instagram subfolder
                             UnifiedRunFolder.objects.get_or_create(
                                 id=287,
