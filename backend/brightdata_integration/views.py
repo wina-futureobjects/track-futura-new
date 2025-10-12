@@ -510,6 +510,94 @@ def create_complete_folder_structure(request):
             'error': f'Failed to create folder structure: {str(e)}'
         }, status=500)
 
+def update_folder_286_structure(request):
+    """
+    Update existing folder 286 to add Instagram/Facebook subfolders
+    """
+    try:
+        # Update existing folder 286 
+        try:
+            main_folder = UnifiedRunFolder.objects.get(id=286)
+            main_folder.name = 'Social Media Collection 286'
+            main_folder.folder_type = 'run'
+            main_folder.save()
+            main_updated = True
+        except UnifiedRunFolder.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'Folder 286 does not exist. Visit /api/brightdata/data-storage/run/286/ first to create it.'
+            }, status=404)
+        
+        # Create Instagram subfolder 287
+        ig_folder, ig_created = UnifiedRunFolder.objects.get_or_create(
+            id=287,
+            defaults={
+                'name': 'Instagram Data',
+                'project_id': 1,
+                'folder_type': 'platform',
+                'platform_code': 'instagram',
+                'parent_folder_id': 286
+            }
+        )
+        
+        # Create Facebook subfolder 288  
+        fb_folder, fb_created = UnifiedRunFolder.objects.get_or_create(
+            id=288,
+            defaults={
+                'name': 'Facebook Data',
+                'project_id': 1,
+                'folder_type': 'platform',
+                'platform_code': 'facebook',
+                'parent_folder_id': 286
+            }
+        )
+        
+        # Create scraper requests with real snapshot IDs
+        ig_request, ig_req_created = BrightDataScraperRequest.objects.get_or_create(
+            snapshot_id='s_mgnv1dgz8ugh9pjpg',
+            defaults={
+                'folder_id': 287,
+                'status': 'completed',
+                'scrape_number': 1
+            }
+        )
+        
+        fb_request, fb_req_created = BrightDataScraperRequest.objects.get_or_create(
+            snapshot_id='s_mgnv1dsosmstookdg',
+            defaults={
+                'folder_id': 288,
+                'status': 'completed', 
+                'scrape_number': 1
+            }
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Folder 286 updated with Instagram/Facebook structure!',
+            'updated': {
+                'main_folder_286': 'Updated to Social Media Collection 286',
+                'instagram_folder_287': f'{"Created" if ig_created else "Already exists"}: {ig_folder.name}',
+                'facebook_folder_288': f'{"Created" if fb_created else "Already exists"}: {fb_folder.name}',
+                'instagram_scraper': f'{"Created" if ig_req_created else "Already exists"}: {ig_request.snapshot_id}',
+                'facebook_scraper': f'{"Created" if fb_req_created else "Already exists"}: {fb_request.snapshot_id}'
+            },
+            'test_urls': [
+                '/api/brightdata/data-storage/run/286/ (main folder with subfolders)',
+                '/api/brightdata/data-storage/run/287/ (Instagram data)',
+                '/api/brightdata/data-storage/run/288/ (Facebook data)'
+            ],
+            'snapshots': {
+                'instagram': 's_mgnv1dgz8ugh9pjpg',
+                'facebook': 's_mgnv1dsosmstookdg'
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Failed to update folder 286: {str(e)}'
+        }, status=500)
+
 def data_storage_folder_scrape(request, folder_name, scrape_num):
     """
     Return all data for a given folder name and scrape number.

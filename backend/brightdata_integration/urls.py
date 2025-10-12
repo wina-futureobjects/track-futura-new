@@ -22,6 +22,9 @@ urlpatterns = [
     # EMERGENCY FIX - Create folder 286 on production
     path('debug/create-folder-286/', views.emergency_create_folder_286, name='create_folder_286'),
     
+    # UPDATE FOLDER 286 - Add Instagram/Facebook subfolders to existing folder
+    path('update-286/', views.update_folder_286_structure, name='update_folder_286'),
+    
     # FOLDER STRUCTURE - Create complete folder structure with Instagram/Facebook
     path('setup-folders/', views.create_complete_folder_structure, name='create_folder_structure'),
     
