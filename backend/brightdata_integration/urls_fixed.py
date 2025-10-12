@@ -29,9 +29,6 @@ urlpatterns = [
 
     # New human-friendly endpoints
     path('data-storage/<str:folder_name>/<int:scrape_num>/', views.data_storage_folder_scrape, name='data_storage_folder_scrape'),
-    
-    # Run info lookup endpoint for continuity
-    path('run-info/<str:run_id>/', views.run_info_lookup, name='run_info_lookup'),
     path('data-storage/<str:folder_name>/<int:scrape_num>/<str:platform>/', views.data_storage_folder_scrape_platform, name='data_storage_folder_scrape_platform'),
     path('data-storage/<str:folder_name>/<int:scrape_num>/<str:platform>/post/', views.data_storage_folder_scrape_platform_post, name='data_storage_folder_scrape_platform_post'),
     path('data-storage/<str:folder_name>/<int:scrape_num>/<str:platform>/post/<str:account>/', views.data_storage_folder_scrape_platform_post_account, name='data_storage_folder_scrape_platform_post_account'),

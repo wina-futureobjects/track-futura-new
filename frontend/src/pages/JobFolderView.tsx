@@ -87,12 +87,13 @@ const postToUniversalData = (posts: Post[]): UniversalDataItem[] => {
 };
 
 const JobFolderView = () => {
-  const { organizationId, projectId, folderId, folderName, scrapeNumber } = useParams<{ 
+  const { organizationId, projectId, folderId, folderName, scrapeNumber, runId } = useParams<{ 
     organizationId: string; 
     projectId: string; 
     folderId?: string;
     folderName?: string;
     scrapeNumber?: string;
+    runId?: string;
   }>();
   const navigate = useNavigate();
   
@@ -168,6 +169,44 @@ const JobFolderView = () => {
     setError(null);
 
     try {
+      // Handle /data-storage/run/N pattern - redirect to correct folder/scrape URL
+      if (runId) {
+        console.log(`Handling run ID: ${runId}`);
+        
+        // Try to find the scraper request by run ID or snapshot ID
+        try {
+          const runResponse = await apiFetch(`/api/brightdata/run-info/${runId}/`);
+          if (runResponse.ok) {
+            const runData = await runResponse.json();
+            if (runData.folder_name && runData.scrape_number) {
+              // Redirect to proper human-friendly URL
+              const correctUrl = `/organizations/${organizationId}/projects/${projectId}/data-storage/${encodeURIComponent(runData.folder_name)}/${runData.scrape_number}`;
+              console.log(`Redirecting to correct URL: ${correctUrl}`);
+              navigate(correctUrl, { replace: true });
+              return;
+            }
+          }
+        } catch (err) {
+          console.log('Run info lookup failed, trying direct folder lookup...');
+        }
+        
+        // Fallback: treat runId as folderId
+        const tempFolderId = runId;
+        const folderResponse = await apiFetch(`/api/track-accounts/unified-run-folders/${tempFolderId}/`);
+        if (folderResponse.ok) {
+          const folderData = await folderResponse.json();
+          const correctUrl = `/organizations/${organizationId}/projects/${projectId}/data-storage/${encodeURIComponent(folderData.name)}/1`;
+          console.log(`Redirecting to folder-based URL: ${correctUrl}`);
+          navigate(correctUrl, { replace: true });
+          return;
+        }
+        
+        // If all else fails, show error
+        setError(`Run ID ${runId} not found. The scraping job may not exist or has been removed.`);
+        setLoading(false);
+        return;
+      }
+
       // If we're using the new route format (folderName + scrapeNumber)
       if (folderName && scrapeNumber) {
         console.log(`Using new human-friendly route: ${folderName}/${scrapeNumber}`);

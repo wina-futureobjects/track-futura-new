@@ -292,6 +292,15 @@ function App() {
                   </Layout>
                 </ProtectedRoute>
               } />
+
+              {/* Run-based URLs for continuity - handles /data-storage/run/N patterns */}
+              <Route path="/organizations/:organizationId/projects/:projectId/data-storage/run/:runId" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <JobFolderView />
+                  </Layout>
+                </ProtectedRoute>
+              } />
               
               <Route path="/organizations/:organizationId/projects/:projectId/data/:platform/:folderId" element={
                 <ProtectedRoute>

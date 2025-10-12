@@ -8,6 +8,77 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+def run_info_lookup(request, run_id):
+    """
+    Look up run information by run ID, snapshot ID, or folder ID
+    Returns folder name and scrape number for proper URL routing
+    """
+    try:
+        # Try to find by scraper request ID first
+        try:
+            scraper_request = BrightDataScraperRequest.objects.get(id=run_id)
+            if scraper_request.folder_id:
+                folder = UnifiedRunFolder.objects.get(id=scraper_request.folder_id)
+                return JsonResponse({
+                    'success': True,
+                    'folder_name': folder.name,
+                    'folder_id': folder.id,
+                    'scrape_number': scraper_request.scrape_number or 1,
+                    'snapshot_id': scraper_request.snapshot_id,
+                    'status': scraper_request.status
+                })
+        except BrightDataScraperRequest.DoesNotExist:
+            pass
+        
+        # Try to find by snapshot ID
+        try:
+            scraper_request = BrightDataScraperRequest.objects.filter(snapshot_id=f"snapshot_{run_id}").first()
+            if scraper_request and scraper_request.folder_id:
+                folder = UnifiedRunFolder.objects.get(id=scraper_request.folder_id)
+                return JsonResponse({
+                    'success': True,
+                    'folder_name': folder.name,
+                    'folder_id': folder.id,
+                    'scrape_number': scraper_request.scrape_number or 1,
+                    'snapshot_id': scraper_request.snapshot_id,
+                    'status': scraper_request.status
+                })
+        except Exception:
+            pass
+        
+        # Try to treat run_id as folder_id directly
+        try:
+            folder = UnifiedRunFolder.objects.get(id=run_id)
+            # Find the latest scrape for this folder
+            latest_scrape = BrightDataScraperRequest.objects.filter(
+                folder_id=folder.id
+            ).order_by('-scrape_number').first()
+            
+            scrape_number = latest_scrape.scrape_number if latest_scrape else 1
+            
+            return JsonResponse({
+                'success': True,
+                'folder_name': folder.name,
+                'folder_id': folder.id,
+                'scrape_number': scrape_number,
+                'snapshot_id': latest_scrape.snapshot_id if latest_scrape else None,
+                'status': latest_scrape.status if latest_scrape else 'unknown'
+            })
+        except UnifiedRunFolder.DoesNotExist:
+            pass
+        
+        return JsonResponse({
+            'success': False,
+            'error': f'No run information found for ID: {run_id}'
+        }, status=404)
+        
+    except Exception as e:
+        logger.error(f"Error looking up run info for {run_id}: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': f'Server error while looking up run info: {str(e)}'
+        }, status=500)
+
 def data_storage_folder_scrape(request, folder_name, scrape_num):
     """
     Return all data for a given folder name and scrape number.
