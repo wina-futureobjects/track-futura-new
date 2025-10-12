@@ -23,7 +23,7 @@ urlpatterns = [
     path('debug/create-folder-286/', views.emergency_create_folder_286, name='create_folder_286'),
     
     # FOLDER STRUCTURE - Create complete folder structure with Instagram/Facebook
-    path('debug/create-folder-structure/', views.create_complete_folder_structure, name='create_folder_structure'),
+    path('setup-folders/', views.create_complete_folder_structure, name='create_folder_structure'),
     
     # Webhook endpoints
     path('webhook/', views.brightdata_webhook, name='brightdata_webhook'),
