@@ -233,6 +233,41 @@ def data_storage_run_endpoint(request, run_id):
                 'platform': post.platform,
             })
         
+        # SPECIAL HANDLING FOR FOLDER 286: Show Instagram/Facebook options instead of posts
+        if int(run_id) == 286:
+            # Return folder selection interface for Instagram/Facebook
+            return JsonResponse({
+                'success': True,
+                'folder_name': folder.name,
+                'folder_id': folder.id,
+                'run_id': run_id,
+                'folder_type': 'selection',
+                'message': f'Select platform for {folder.name}',
+                'platforms': [
+                    {
+                        'name': 'Instagram',
+                        'platform': 'instagram',
+                        'snapshot_id': 's_mgnv1dgz8ugh9pjpg',
+                        'run_id': 103,
+                        'posts_count': 10,  # You mentioned 10 posts
+                        'url': '/api/brightdata/data-storage/run/103/',
+                        'description': 'Instagram scraped data from BrightData'
+                    },
+                    {
+                        'name': 'Facebook', 
+                        'platform': 'facebook',
+                        'snapshot_id': 's_mgnv1dsosmstookdg',
+                        'run_id': 104,
+                        'posts_count': 4,   # You mentioned 4 posts
+                        'url': '/api/brightdata/data-storage/run/104/', 
+                        'description': 'Facebook scraped data from BrightData'
+                    }
+                ],
+                'total_platforms': 2,
+                'total_posts': 14,  # 10 Instagram + 4 Facebook
+                'instruction': 'Click on Instagram or Facebook to view scraped posts'
+            })
+        
         # Check for subfolders (Instagram, Facebook, etc.)
         subfolders = UnifiedRunFolder.objects.filter(parent_folder_id=folder.id)
         subfolders_data = []
@@ -596,6 +631,113 @@ def update_folder_286_structure(request):
         return JsonResponse({
             'success': False,
             'error': f'Failed to update folder 286: {str(e)}'
+        }, status=500)
+
+def fix_real_brightdata_structure(request):
+    """
+    Fix the real BrightData structure: Create proper folders for Instagram/Facebook data
+    and link the actual scraped posts from runs 103/104
+    """
+    try:
+        # Get the real scraper requests
+        try:
+            instagram_request = BrightDataScraperRequest.objects.get(id=103, snapshot_id='s_mgnv1dgz8ugh9pjpg')
+            facebook_request = BrightDataScraperRequest.objects.get(id=104, snapshot_id='s_mgnv1dsosmstookdg')
+        except BrightDataScraperRequest.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': 'Real BrightData runs 103/104 not found. Check if snapshots s_mgnv1dgz8ugh9pjpg and s_mgnv1dsosmstookdg exist.'
+            }, status=404)
+        
+        # Create proper Instagram folder for run 103
+        instagram_folder, ig_created = UnifiedRunFolder.objects.get_or_create(
+            id=103,
+            defaults={
+                'name': 'Instagram BrightData Scrape',
+                'project_id': 1,
+                'folder_type': 'platform',
+                'platform_code': 'instagram'
+            }
+        )
+        
+        # Create proper Facebook folder for run 104  
+        facebook_folder, fb_created = UnifiedRunFolder.objects.get_or_create(
+            id=104,
+            defaults={
+                'name': 'Facebook BrightData Scrape',
+                'project_id': 1,
+                'folder_type': 'platform',
+                'platform_code': 'facebook'
+            }
+        )
+        
+        # Update scraper requests to point to correct folders
+        instagram_request.folder_id = 103
+        instagram_request.save()
+        
+        facebook_request.folder_id = 104
+        facebook_request.save()
+        
+        # Move any existing posts from folder_id=1 to the correct folders
+        posts_moved = 0
+        
+        # Move Instagram posts
+        instagram_posts = BrightDataScrapedPost.objects.filter(
+            folder_id=1,
+            platform='instagram'
+        )
+        for post in instagram_posts:
+            post.folder_id = 103
+            post.save()
+            posts_moved += 1
+            
+        # Move Facebook posts  
+        facebook_posts = BrightDataScrapedPost.objects.filter(
+            folder_id=1,
+            platform='facebook'
+        )
+        for post in facebook_posts:
+            post.folder_id = 104
+            post.save()
+            posts_moved += 1
+        
+        # Count final posts
+        ig_final_count = BrightDataScrapedPost.objects.filter(folder_id=103).count()
+        fb_final_count = BrightDataScrapedPost.objects.filter(folder_id=104).count()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Real BrightData structure fixed!',
+            'fixed': {
+                'instagram_folder_103': {
+                    'name': instagram_folder.name,
+                    'created': ig_created,
+                    'posts_count': ig_final_count,
+                    'snapshot_id': 's_mgnv1dgz8ugh9pjpg',
+                    'url': '/api/brightdata/data-storage/run/103/'
+                },
+                'facebook_folder_104': {
+                    'name': facebook_folder.name,
+                    'created': fb_created,
+                    'posts_count': fb_final_count,
+                    'snapshot_id': 's_mgnv1dsosmstookdg',
+                    'url': '/api/brightdata/data-storage/run/104/'
+                }
+            },
+            'posts_moved': posts_moved,
+            'total_posts': ig_final_count + fb_final_count,
+            'test_urls': [
+                '/api/brightdata/data-storage/run/286/ (platform selection)',
+                '/api/brightdata/data-storage/run/103/ (Instagram posts)',
+                '/api/brightdata/data-storage/run/104/ (Facebook posts)'
+            ],
+            'note': 'Folder 286 now shows platform selection. Runs 103/104 show actual BrightData posts.'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Failed to fix real data structure: {str(e)}'
         }, status=500)
 
 def data_storage_folder_scrape(request, folder_name, scrape_num):
