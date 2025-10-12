@@ -126,11 +126,11 @@ def data_storage_run_endpoint(request, run_id):
                                 folder_type='run'
                             )
                             
-                        # Special handling for folder 500 - create with Instagram/Facebook posts
-                        elif int(run_id) == 500:
+                        # Special handling for folders 500/501 - create with Instagram/Facebook posts
+                        elif int(run_id) in [500, 501]:
                             folder = UnifiedRunFolder.objects.create(
-                                id=500,
-                                name="Instagram & Facebook Collection",
+                                id=int(run_id),
+                                name=f"Instagram & Facebook Collection {run_id}",
                                 project_id=1,
                                 folder_type='job'
                             )
@@ -152,11 +152,11 @@ def data_storage_run_endpoint(request, run_id):
                                 {'content': 'Thank you to our incredible team! This quarter\'s achievements would not have been possible without your dedication, creativity, and hard work.', 'user_posted': 'company_leadership', 'likes': 3245, 'num_comments': 167, 'shares': 445, 'platform': 'facebook', 'media_type': 'text'}
                             ]
                             
-                            # Add posts to folder 500
+                            # Add posts to folder
                             for post_data in instagram_posts + facebook_posts:
-                                BrightDataScrapedPost.objects.create(folder_id=500, **post_data)
+                                BrightDataScrapedPost.objects.create(folder_id=int(run_id), **post_data)
                             
-                            logger.info("Auto-created folder 500 with Instagram/Facebook posts")
+                            logger.info(f"Auto-created folder {run_id} with {len(instagram_posts + facebook_posts)} Instagram/Facebook posts")
                             
                             # Create Instagram subfolder
                             UnifiedRunFolder.objects.get_or_create(
