@@ -40,6 +40,18 @@ urlpatterns = [
     # 🧹 CLEAN DATA STORAGE - Remove all folders and posts for fresh start
     path('clean-data-storage/', views.clean_data_storage, name='clean_data_storage'),
     
+    # 🧹 EMERGENCY CLEANUP - Simple GET endpoint for immediate cleanup
+    path('emergency-cleanup/', lambda request: JsonResponse({
+        'success': True,
+        'deleted': {
+            'folders': __import__('brightdata_integration.models', fromlist=['UnifiedRunFolder']).UnifiedRunFolder.objects.all().delete()[0],
+            'posts': __import__('brightdata_integration.models', fromlist=['BrightDataScrapedPost']).BrightDataScrapedPost.objects.all().delete()[0],
+            'requests': __import__('brightdata_integration.models', fromlist=['BrightDataScraperRequest']).BrightDataScraperRequest.objects.all().delete()[0]
+        },
+        'message': 'ALL DATA STORAGE CLEANED',
+        'ready_for_new_scrapes': True
+    }), name='emergency_cleanup'),
+    
     # Webhook endpoints
     path('webhook/', views.brightdata_webhook, name='brightdata_webhook'),
     path('notify/', views.brightdata_notify, name='brightdata_notify'),
