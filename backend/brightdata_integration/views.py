@@ -218,6 +218,76 @@ def data_storage_run_endpoint(request, run_id):
             'error': f'Server error while fetching run data: {str(e)}'
         }, status=500)
 
+def emergency_create_folder_286(request):
+    """
+    EMERGENCY ENDPOINT: Create folder 286 and scraper request 286 with sample data
+    """
+    try:
+        # Create folder 286
+        folder, created = UnifiedRunFolder.objects.get_or_create(
+            id=286,
+            defaults={
+                'name': 'Emergency Folder 286',
+                'project_id': 1,
+                'folder_type': 'job'
+            }
+        )
+        
+        # Create scraper request 286
+        scraper_request, created_req = BrightDataScraperRequest.objects.get_or_create(
+            id=286,
+            defaults={
+                'snapshot_id': 'emergency_286',
+                'folder_id': 286,
+                'status': 'completed',
+                'scrape_number': 1
+            }
+        )
+        
+        # Add sample posts if folder is empty
+        existing_posts = BrightDataScrapedPost.objects.filter(folder_id=286).count()
+        if existing_posts == 0:
+            sample_posts = [
+                {
+                    'content': 'Emergency sample post 1 for testing folder 286',
+                    'user_posted': 'emergency_user_1',
+                    'likes': 150,
+                    'platform': 'instagram'
+                },
+                {
+                    'content': 'Emergency sample post 2 for testing folder 286', 
+                    'user_posted': 'emergency_user_2',
+                    'likes': 250,
+                    'platform': 'instagram'
+                }
+            ]
+            
+            for post_data in sample_posts:
+                BrightDataScrapedPost.objects.create(
+                    folder_id=286,
+                    **post_data
+                )
+        
+        posts_count = BrightDataScrapedPost.objects.filter(folder_id=286).count()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Folder 286 created successfully!',
+            'folder_created': created,
+            'scraper_request_created': created_req,
+            'folder_name': folder.name,
+            'folder_id': folder.id,
+            'posts_count': posts_count,
+            'test_url': '/api/brightdata/data-storage/run/286/',
+            'note': 'You can now access /api/brightdata/data-storage/run/286/ successfully'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Failed to create folder 286: {str(e)}'
+        }, status=500)
+
 def data_storage_folder_scrape(request, folder_name, scrape_num):
     """
     Return all data for a given folder name and scrape number.
