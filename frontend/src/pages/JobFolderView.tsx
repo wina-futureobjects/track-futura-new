@@ -87,10 +87,12 @@ const postToUniversalData = (posts: Post[]): UniversalDataItem[] => {
 };
 
 const JobFolderView = () => {
-  const { organizationId, projectId, folderId } = useParams<{ 
+  const { organizationId, projectId, folderId, folderName, scrapeNumber } = useParams<{ 
     organizationId: string; 
     projectId: string; 
-    folderId: string;
+    folderId?: string;
+    folderName?: string;
+    scrapeNumber?: string;
   }>();
   const navigate = useNavigate();
   
@@ -166,8 +168,99 @@ const JobFolderView = () => {
     setError(null);
 
     try {
-      // First, try to fetch BrightData results directly
-      const brightDataResponse = await apiFetch(`/api/brightdata/job-results/${folderId}/`);
+      // If we're using the new route format (folderName + scrapeNumber)
+      if (folderName && scrapeNumber) {
+        console.log(`Using new human-friendly route: ${folderName}/${scrapeNumber}`);
+        
+        // Use the new human-friendly endpoint directly
+        const brightDataResponse = await apiFetch(`/api/brightdata/data-storage/${encodeURIComponent(folderName)}/${scrapeNumber}/`);
+        
+        if (brightDataResponse.ok) {
+          const brightDataResults = await brightDataResponse.json();
+          console.log('BrightData results from human-friendly endpoint:', brightDataResults);
+          
+          // Process the results
+          if (brightDataResults.success && brightDataResults.data && brightDataResults.data.length > 0) {
+            // Transform and set posts
+            const transformedPosts: Post[] = brightDataResults.data.map((item: any, index: number) => ({
+              id: index + 1,
+              post_id: item.post_id || item.shortcode || item.id || `post_${index}`,
+              url: item.url || item.post_url || item.link || '',
+              user_posted: item.user_posted || item.user_username || item.username || item.ownerUsername || item.user || 'Unknown',
+              content: item.content || item.caption || item.description || item.text || '',
+              description: item.content || item.caption || item.description || item.text || '',
+              likes: parseInt(item.likes || item.likes_count || item.likesCount || '0') || 0,
+              num_comments: parseInt(item.num_comments || item.comments_count || item.commentsCount || item.comments || '0') || 0,
+              date_posted: item.date_posted || item.timestamp || item.date || new Date().toISOString(),
+              created_at: item.date_posted || item.timestamp || new Date().toISOString(),
+              is_verified: item.is_verified || false
+            }));
+            
+            setPosts(transformedPosts);
+            
+            // Create job folder data
+            const jobFolderData: JobFolder = {
+              id: 0, // Will be set if we can resolve the folder ID
+              name: brightDataResults.folder_name || folderName,
+              description: `Scraped ${brightDataResults.total_results} posts from BrightData (Scrape #${scrapeNumber})`,
+              category: 'posts',
+              category_display: 'Posts',
+              platform: 'instagram',
+              folder_type: 'job',
+              post_count: transformedPosts.length,
+              created_at: new Date().toISOString()
+            };
+            
+            setJobFolder(jobFolderData);
+            
+            // Create universal folder data
+            const universalFolderData: UniversalFolder = {
+              id: 0,
+              name: jobFolderData.name,
+              description: jobFolderData.description || 'BrightData scraped folder',
+              platform: 'instagram',
+              category: 'posts',
+              created_at: jobFolderData.created_at || new Date().toISOString(),
+              post_count: transformedPosts.length,
+              data: postToUniversalData(transformedPosts),
+              status: {
+                status: 'completed',
+                message: `Successfully loaded ${transformedPosts.length} posts from human-friendly endpoint`
+              }
+            };
+
+            setUniversalFolder(universalFolderData);
+            return; // Success with new endpoint
+          }
+        }
+      }
+
+      // Fall back to old route format (folderId)
+      if (!folderId) {
+        throw new Error('No folder identifier provided');
+      }
+
+      console.log(`Using old route format with folder ID: ${folderId}`);
+      
+      // First, get the folder information to get the folder name for human-friendly endpoints
+      const folderResponse = await apiFetch(`/api/track-accounts/unified-run-folders/${folderId}/`);
+      let fallbackFolderName = `Folder ${folderId}`; // Fallback
+      let fallbackScrapeNumber = 1; // Default scrape number
+      
+      if (folderResponse.ok) {
+        const folderData = await folderResponse.json();
+        fallbackFolderName = folderData.name;
+        console.log('Folder data:', folderData);
+      }
+
+      // Try the new human-friendly endpoint first
+      let brightDataResponse = await apiFetch(`/api/brightdata/data-storage/${encodeURIComponent(fallbackFolderName)}/${fallbackScrapeNumber}/`);
+      
+      // If that fails, fall back to the old endpoint
+      if (!brightDataResponse.ok) {
+        console.log('Human-friendly endpoint not available, trying old endpoint...');
+        brightDataResponse = await apiFetch(`/api/brightdata/job-results/${folderId}/`);
+      }
       
       if (brightDataResponse.ok) {
         const brightDataResults = await brightDataResponse.json();

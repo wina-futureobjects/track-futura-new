@@ -325,8 +325,13 @@ const DataStorage = () => {
   };
 
   const handleRunFolderClick = (runFolder: Folder) => {
-    // Navigate to run folder contents page
+    // Navigate to run folder contents page using human-friendly URL
+    // Format: /data-storage/{folder-name}/1/ (assuming scrape #1)
+    const folderName = encodeURIComponent(runFolder.name);
     navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage/run/${runFolder.id}`);
+    
+    // TODO: Update to use human-friendly URLs when frontend routing is updated
+    // navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage/${folderName}/1`);
   };
 
   const handleServiceFolderClick = (serviceFolder: Folder) => {

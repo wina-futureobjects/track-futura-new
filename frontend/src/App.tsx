@@ -283,6 +283,15 @@ function App() {
                   </Layout>
                 </ProtectedRoute>
               } />
+
+              {/* Human-friendly data storage URLs - NEW */}
+              <Route path="/organizations/:organizationId/projects/:projectId/data-storage/:folderName/:scrapeNumber" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <JobFolderView />
+                  </Layout>
+                </ProtectedRoute>
+              } />
               
               <Route path="/organizations/:organizationId/projects/:projectId/data/:platform/:folderId" element={
                 <ProtectedRoute>
