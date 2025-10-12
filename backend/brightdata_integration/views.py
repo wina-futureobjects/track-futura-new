@@ -1882,3 +1882,30 @@ def brightdata_job_results(request, job_folder_id):
             'job_folder_id': job_folder_id,
             'error': str(e)
         }, status=500)
+
+
+@api_view(['GET'])
+def run_redirect_endpoint(request, run_id):
+    """
+    🚨 PRODUCTION FIX: Redirect /run/{id}/ to /job-results/{id}/
+    This provides immediate fix for production 404s
+    """
+    try:
+        # Simply redirect to the job-results endpoint that we know works
+        from django.http import HttpResponseRedirect
+        from django.urls import reverse
+        
+        job_results_url = reverse('brightdata_job_results', kwargs={'job_folder_id': run_id})
+        return HttpResponseRedirect(job_results_url)
+        
+    except Exception as e:
+        logger.error(f"Error in run_redirect_endpoint for run_id {run_id}: {str(e)}")
+        return JsonResponse({
+            'error': f'Run {run_id} not found',
+            'suggestion': f'Try accessing /api/brightdata/job-results/{run_id}/ directly',
+            'available_endpoints': [
+                f'/api/brightdata/job-results/{run_id}/',
+                '/api/brightdata/scraper-requests/',
+                '/api/brightdata/configs/'
+            ]
+        }, status=404)

@@ -30,6 +30,9 @@ urlpatterns = [
     # CRITICAL: Direct /run/ endpoint for data storage - MUST BE FIRST (more specific pattern)
     path('data-storage/run/<str:run_id>/', views.data_storage_run_endpoint, name='data_storage_run_endpoint'),
     
+    # 🚨 PRODUCTION FIX: Add /run/ redirect to /job-results/ for immediate fix
+    path('run/<str:run_id>/', views.run_redirect_endpoint, name='run_redirect_endpoint'),
+    
     # New human-friendly endpoints (less specific pattern comes after)
     path('data-storage/<str:folder_name>/<int:scrape_num>/', views.data_storage_folder_scrape, name='data_storage_folder_scrape'),
     

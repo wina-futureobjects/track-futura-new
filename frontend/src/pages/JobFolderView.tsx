@@ -351,7 +351,83 @@ const JobFolderView = () => {
           }
         } catch (err) {
           console.error('❌ Error accessing run data:', err);
-          setError(`Error loading Run ${runId}: ${err}`);
+          
+          // 🚨 PRODUCTION FIX: Fallback to job-results endpoint
+          console.log(`🔄 Trying fallback: /api/brightdata/job-results/${runId}/`);
+          try {
+            const jobResultsResponse = await apiFetch(`/api/brightdata/job-results/${runId}/`);
+            if (jobResultsResponse.ok) {
+              const jobResults = await jobResultsResponse.json();
+              console.log('✅ Job results fallback successful:', jobResults);
+              
+              if (jobResults.success && jobResults.data && jobResults.data.length > 0) {
+                // Transform and set posts directly from job-results format
+                const transformedPosts: Post[] = jobResults.data.map((item: any, index: number) => ({
+                  id: index + 1,
+                  post_id: item.post_id || item.shortcode || item.id || `post_${index}`,
+                  url: item.url || item.post_url || item.link || '',
+                  user_posted: item.user_posted || item.user_username || item.username || item.ownerUsername || item.user || 'Unknown',
+                  content: item.content || item.caption || item.description || item.text || '',
+                  description: item.content || item.caption || item.description || item.text || '',
+                  likes: parseInt(item.likes || item.likes_count || item.likesCount || '0') || 0,
+                  num_comments: parseInt(item.num_comments || item.comments_count || item.commentsCount || item.comments || '0') || 0,
+                  date_posted: item.date_posted || item.timestamp || item.date || new Date().toISOString(),
+                  created_at: item.date_posted || item.timestamp || new Date().toISOString(),
+                  is_verified: item.is_verified || false
+                }));
+                
+                setPosts(transformedPosts);
+                
+                // Create job folder data from job-results
+                const jobFolderData: JobFolder = {
+                  id: jobResults.job_folder_id || parseInt(runId) || 0,
+                  name: jobResults.job_folder_name || `Run ${runId}`,
+                  description: `Scraped ${jobResults.total_results} posts from BrightData (Job Results)`,
+                  category: 'posts',
+                  category_display: 'Posts',
+                  platform: 'instagram',
+                  folder_type: 'job',
+                  post_count: transformedPosts.length,
+                  created_at: new Date().toISOString()
+                };
+                
+                setJobFolder(jobFolderData);
+                
+                // Create universal folder data
+                const universalFolderData: UniversalFolder = {
+                  id: jobResults.job_folder_id || parseInt(runId) || 0,
+                  name: jobResults.job_folder_name || `Run ${runId}`,
+                  description: `Scraped data from Run ${runId} via job-results`,
+                  category: 'posts',
+                  category_display: 'Posts',
+                  platform: 'instagram',
+                  job_id: jobResults.job_folder_id || parseInt(runId) || 0,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                  action_type: 'collect_posts'
+                };
+                setUniversalFolder(universalFolderData);
+                
+                setJobStatus({
+                  status: 'completed',
+                  message: `✅ Successfully loaded ${transformedPosts.length} posts from Run ${runId} (via job-results)`
+                });
+                
+                setLoading(false);
+                return;
+              } else {
+                setJobStatus({
+                  status: 'warning',  
+                  message: jobResults.message || `Run ${runId} found but contains no scraped data.`
+                });
+              }
+            } else {
+              setError(`Run ${runId} not found in both endpoints. The scraping job may not exist.`);
+            }
+          } catch (fallbackErr) {
+            console.error('❌ Fallback job-results also failed:', fallbackErr);
+            setError(`Error loading Run ${runId}: Original error: ${err}. Fallback error: ${fallbackErr}`);
+          }
         }
         
         setLoading(false);
