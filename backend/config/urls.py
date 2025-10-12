@@ -26,6 +26,9 @@ from django.shortcuts import render
 from django.template.response import TemplateResponse
 import os
 
+# EMERGENCY IMPORTS - Simple fallback endpoints
+from .emergency import emergency_root, emergency_health, emergency_favicon
+
 
 def serve_brightdata_trigger(request):
     """Serve the BrightData trigger page"""
@@ -123,6 +126,11 @@ def api_status(request):
 
 
 urlpatterns = [
+    # EMERGENCY ENDPOINTS - Simple fallbacks that always work
+    path("emergency/", emergency_root, name="emergency_root"),
+    path("emergency/health/", emergency_health, name="emergency_health"), 
+    path("emergency/favicon.ico", emergency_favicon, name="emergency_favicon"),
+    
     path("trigger/", serve_brightdata_trigger, name="brightdata_trigger"),  # BrightData trigger page at base URL
     path("brightdata-trigger/", serve_brightdata_trigger, name="brightdata_trigger_alt"),  # Alternative path
     path("", serve_frontend, name="frontend"),  # Serve frontend at root
