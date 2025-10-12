@@ -126,8 +126,8 @@ def data_storage_run_endpoint(request, run_id):
                                 folder_type='run'
                             )
                             
-                        # Special handling for folders 998/999 - CLEANUP ALL DATA STORAGE
-                        elif int(run_id) in [998, 999]:
+                        # Special handling for folders 990-999 - CLEANUP ALL DATA STORAGE
+                        elif int(run_id) >= 990 and int(run_id) <= 999:
                             # Count before cleanup
                             folders_before = UnifiedRunFolder.objects.count()
                             posts_before = BrightDataScrapedPost.objects.count()
