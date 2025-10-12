@@ -90,10 +90,30 @@ def data_storage_run_endpoint(request, run_id):
         try:
             scraper_request = BrightDataScraperRequest.objects.get(id=run_id)
         except BrightDataScraperRequest.DoesNotExist:
-            return JsonResponse({
-                'success': False,
-                'error': f'Run {run_id} not found'
-            }, status=404)
+            # FALLBACK: Try to find by snapshot ID or other identifiers
+            scraper_request = None
+            
+            # Try to find by snapshot ID
+            if not scraper_request:
+                snapshot_matches = BrightDataScraperRequest.objects.filter(snapshot_id__icontains=str(run_id))
+                if snapshot_matches.exists():
+                    scraper_request = snapshot_matches.first()
+            
+            # If still not found, show enhanced debug info
+            if not scraper_request:
+                recent_runs = BrightDataScraperRequest.objects.all().order_by('-id')[:10]
+                available_runs = [{'id': r.id, 'snapshot': r.snapshot_id, 'folder_id': r.folder_id, 'status': r.status} for r in recent_runs]
+                
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Run {run_id} not found in database',
+                    'debug_info': {
+                        'requested_run_id': run_id,
+                        'total_runs_in_db': BrightDataScraperRequest.objects.count(),
+                        'available_runs': available_runs,
+                        'suggestion': 'Check if the BrightData webhook has been received for this job. You can test with available run IDs above.'
+                    }
+                }, status=404)
         
         # Get the folder
         try:
