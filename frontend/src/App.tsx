@@ -277,7 +277,16 @@ function App() {
                   </Layout>
                 </ProtectedRoute>
               } />
-              
+
+              {/* CRITICAL FIX: Direct /data-storage/run/:runId route for scraped data access */}
+              <Route path="/organizations/:organizationId/projects/:projectId/data-storage/run/:runId" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <JobFolderView />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+
               {/* Smart Data Storage Router - handles all /data-storage/X/Y patterns intelligently */}
               <Route path="/organizations/:organizationId/projects/:projectId/data-storage/:segment1/:segment2" element={
                 <ProtectedRoute>

@@ -1,0 +1,177 @@
+================================================================================
+                    BRIGHTDATA STORAGE FIX - VISUAL DIAGRAM
+================================================================================
+
+BEFORE FIX (BROKEN) ❌
+--------------------------------------------------------------------------------
+
+User Action: Start Scrape on Workflow Page
+    ↓
+Backend: workflow/views.py start() endpoint
+    ├─ ✅ Create batch_job
+    ├─ ❌ NO UnifiedRunFolder created
+    ├─ ❌ NO BrightDataScraperRequest with folder_id
+    └─ ✅ Trigger BrightData API
+    ↓
+BrightData: Scrapes Instagram/Facebook/etc (2-5 minutes)
+    ↓
+BrightData: Sends webhook with scraped data
+    ↓
+Backend: webhook receives data
+    ├─ Finds scraper_request? ❌ NO (doesn't exist or has no folder_id)
+    ├─ Try to create BrightDataScrapedPost with folder_id? ❌ NO folder_id!
+    └─ Data is LOST or ORPHANED
+    ↓
+User: Navigates to /data-storage/run/293
+    ├─ Frontend: Route doesn't match ❌
+    └─ Error: "No folder identifier provided"
+    ↓
+Result: NO DATA VISIBLE ❌
+
+
+AFTER FIX (WORKING) ✅
+--------------------------------------------------------------------------------
+
+User Action: Start Scrape on Workflow Page
+    ↓
+Backend: workflow/views.py start() endpoint
+    ├─ ✅ Create batch_job
+    ├─ ✅ Create UnifiedRunFolder (e.g., ID 293)
+    │      name: "Instagram Data - Project Name"
+    │      folder_type: "job"
+    │      platform_code: "instagram"
+    │
+    ├─ ✅ Create BrightDataScraperRequest for each URL
+    │      platform: "instagram"
+    │      folder_id: 293  ← CRITICAL LINK!
+    │      batch_job: batch_job
+    │      status: "processing"
+    │
+    └─ ✅ Trigger BrightData API
+        └─ Returns snapshot_id
+            └─ ✅ Update scraper_request.snapshot_id
+    ↓
+BrightData: Scrapes Instagram/Facebook/etc (2-5 minutes)
+    ↓
+BrightData: Sends webhook with scraped data
+    {
+        "snapshot_id": "s_abc123",
+        "posts": [ {...}, {...}, {...} ]
+    }
+    ↓
+Backend: webhook receives data (brightdata_integration/views.py:1541)
+    ├─ ✅ Find scraper_request by snapshot_id
+    ├─ ✅ Get folder_id from scraper_request (folder_id=293)
+    ├─ ✅ Call _process_brightdata_results(data, platform, scraper_request)
+    │   └─ Calls _create_brightdata_scraped_post() for each post
+    │       └─ Creates BrightDataScrapedPost with folder_id=293
+    ├─ ✅ Updates scraper_request.status = "completed"
+    └─ ✅ All posts saved to database linked to folder 293
+    ↓
+User: Navigates to /data-storage
+    └─ Sees folder "Instagram Data - Project Name" (ID 293)
+        └─ Click → /data-storage/run/293
+    ↓
+Frontend: Route matches! (App.tsx line 282)
+    <Route path=".../data-storage/run/:runId" />
+    └─ Loads JobFolderView with runId=293
+    ↓
+JobFolderView: Fetches data (JobFolderView.tsx line 281)
+    └─ GET /api/brightdata/data-storage/run/293/
+    ↓
+Backend API: data_storage_run_endpoint() (brightdata_integration/views.py:83)
+    ├─ ✅ Finds scraper_request by run_id=293
+    ├─ ✅ Gets folder_id from scraper_request
+    ├─ ✅ Queries BrightDataScrapedPost.objects.filter(folder_id=293)
+    └─ ✅ Returns posts data
+    ↓
+Frontend: JobFolderView displays data
+    ├─ ✅ Shows folder name
+    ├─ ✅ Shows post count
+    ├─ ✅ Shows all posts with:
+    │      - Content
+    │      - User
+    │      - Likes
+    │      - Comments
+    │      - Date
+    └─ ✅ Export CSV/JSON available
+    ↓
+Result: DATA VISIBLE! ✅
+
+
+KEY CHANGES MADE
+--------------------------------------------------------------------------------
+
+Backend (workflow/views.py):
+    Line 277-284:  ✅ Create UnifiedRunFolder BEFORE scraping
+    Line 295-304:  ✅ Create BrightDataScraperRequest with folder_id
+    Line 318-322:  ✅ Update snapshot_id after trigger
+    Line 336-339:  ✅ Cleanup on error
+
+Frontend (App.tsx):
+    Line 282-288:  ✅ Add /data-storage/run/:runId route
+
+
+DATA LINK CHAIN (THE MAGIC)
+--------------------------------------------------------------------------------
+
+UnifiedRunFolder (folder_id=293)
+    ↓ linked by folder_id
+BrightDataScraperRequest (folder_id=293, snapshot_id="s_abc123")
+    ↓ linked by snapshot_id
+BrightData Webhook (snapshot_id="s_abc123")
+    ↓ creates posts with folder_id
+BrightDataScrapedPost (folder_id=293, content="...", likes=100, ...)
+    ↓ queried by folder_id
+Frontend Display (/data-storage/run/293)
+    ↓
+USER SEES DATA! 🎉
+
+
+ERROR HANDLING
+--------------------------------------------------------------------------------
+
+If BrightData API fails:
+    ✅ Backend deletes UnifiedRunFolder
+    ✅ Backend deletes BrightDataScraperRequest records
+    ✅ No orphaned data
+    ✅ Clean error message to user
+
+If webhook fails:
+    ✅ Folder stays in "processing" state
+    ✅ User can retry
+    ✅ No data loss
+
+
+DEPLOYMENT
+--------------------------------------------------------------------------------
+
+Windows:    DEPLOY_COMPLETE_FIX.bat
+Linux/Mac:  bash DEPLOY_STORAGE_FIX.sh
+
+Or manually:
+    git add backend/workflow/views.py frontend/src/App.tsx
+    git commit -m "FIX: Complete BrightData data storage integration"
+    git push upsun main
+
+
+TESTING
+--------------------------------------------------------------------------------
+
+1. Workflow Management → Start Scrape
+2. Wait 2-5 minutes
+3. Data Storage → See folder with posts
+4. Success! ✅
+
+Direct URL test:
+    /organizations/1/projects/1/data-storage/run/293
+
+Expected:
+    ✅ Posts displayed
+    ✅ Can export CSV/JSON
+    ✅ No errors
+
+
+================================================================================
+                                END OF DIAGRAM
+================================================================================
