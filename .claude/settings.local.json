@@ -13,7 +13,8 @@
       "Bash(findstr:*)",
       "Bash(taskkill:*)",
       "Bash(python:*)",
-      "Bash(tasklist)"
+      "Bash(tasklist)",
+      "Read(//c/Users/winam/OneDrive/문서/OLD/TrackFutura-main/**)"
     ],
     "deny": [],
     "ask": []

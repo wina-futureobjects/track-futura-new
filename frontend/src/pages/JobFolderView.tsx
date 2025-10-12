@@ -271,6 +271,60 @@ const JobFolderView = () => {
           }
         }
       }
+      
+      // Handle /data-storage/run/N pattern - redirect to correct folder/scrape URL
+      if (runId) {
+        console.log(`Handling run ID: ${runId}`);
+        
+        if (dataStorageIndex !== -1) {
+          const folderNameRaw = pathParts[dataStorageIndex + 1];
+          const scrapeNum = pathParts[dataStorageIndex + 2];
+          const decodedFolderName = decodeURIComponent(folderNameRaw);
+          
+          console.log('🚨 HARD OVERRIDE PARAMS:', { folderNameRaw, scrapeNum, decodedFolderName });
+          console.log('🚨 MAKING DIRECT API CALL TO:', `/api/brightdata/data-storage/${folderNameRaw}/${scrapeNum}/`);
+          
+          const response = await apiFetch(`/api/brightdata/data-storage/${folderNameRaw}/${scrapeNum}/`);
+          if (response.ok) {
+            const data = await response.json();
+            console.log('🚨 HARD OVERRIDE SUCCESS:', data);
+            
+            if (data.success && data.data && data.data.length > 0) {
+              // Transform the data
+              const transformedPosts: Post[] = data.data.map((item: any, index: number) => ({
+                id: index + 1,
+                post_id: item.post_id || item.shortcode || item.id || `post_${index}`,
+                url: item.url || item.post_url || item.link || '',
+                user_posted: item.user_posted || item.user_username || item.username || item.ownerUsername || item.user || 'Unknown',
+                content: item.content || item.caption || item.description || item.text || '',
+                description: item.content || item.caption || item.description || item.text || '',
+                likes: parseInt(item.likes || item.likes_count || item.likesCount || '0') || 0,
+                num_comments: parseInt(item.num_comments || item.comments_count || item.commentsCount || item.comments || '0') || 0,
+                date_posted: item.date_posted || item.timestamp || item.date || new Date().toISOString(),
+                created_at: item.date_posted || item.timestamp || new Date().toISOString(),
+                is_verified: item.is_verified || false
+              }));
+              
+              setPosts(transformedPosts);
+              
+              const jobFolderData: JobFolder = {
+                id: 0,
+                name: decodedFolderName,
+                description: `Scraped ${data.total_results || transformedPosts.length} posts from BrightData (Scrape #${scrapeNum})`,
+                category: 'posts',
+                category_display: 'Posts',
+                platform: 'instagram',
+                folder_type: 'job',
+                created_at: new Date().toISOString()
+              };
+              
+              setJobFolder(jobFolderData);
+              setLoading(false);
+              return; // EXIT EARLY - SUCCESS!
+            }
+          }
+        }
+      }
       // Handle /run/N pattern - DIRECTLY access scraped data via new endpoint
       if (runId) {
         console.log(`🚀 DIRECT RUN ACCESS: Handling run ID ${runId}`);
