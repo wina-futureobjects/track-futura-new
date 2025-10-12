@@ -103,10 +103,10 @@ def data_storage_run_endpoint(request, run_id):
                 'error': f'Folder for run {run_id} not found'
             }, status=404)
         
-        # Get scraped posts for this run
+        # Get scraped posts for this run - GET ALL POSTS in the folder
+        # Some older posts might not have scraper_request link, so get all folder posts
         scraped_posts = BrightDataScrapedPost.objects.filter(
-            folder_id=scraper_request.folder_id,
-            scraper_request=scraper_request
+            folder_id=scraper_request.folder_id
         ).order_by('-date_posted', '-created_at')
         
         posts_data = []

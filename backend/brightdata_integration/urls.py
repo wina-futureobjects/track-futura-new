@@ -27,11 +27,11 @@ urlpatterns = [
     path('results/<str:snapshot_id>/', views.fetch_brightdata_results, name='fetch_brightdata_results'),
     path('job-results/<int:job_folder_id>/', views.brightdata_job_results, name='brightdata_job_results'),
 
-    # New human-friendly endpoints
-    path('data-storage/<str:folder_name>/<int:scrape_num>/', views.data_storage_folder_scrape, name='data_storage_folder_scrape'),
-    
-    # CRITICAL: Direct /run/ endpoint for data storage - matches frontend expectation
+    # CRITICAL: Direct /run/ endpoint for data storage - MUST BE FIRST (more specific pattern)
     path('data-storage/run/<str:run_id>/', views.data_storage_run_endpoint, name='data_storage_run_endpoint'),
+    
+    # New human-friendly endpoints (less specific pattern comes after)
+    path('data-storage/<str:folder_name>/<int:scrape_num>/', views.data_storage_folder_scrape, name='data_storage_folder_scrape'),
     
     # Run info lookup endpoint for continuity
     path('run-info/<str:run_id>/', views.run_info_lookup, name='run_info_lookup'),
