@@ -37,6 +37,9 @@ urlpatterns = [
     # FOLDER STRUCTURE - Create complete folder structure with Instagram/Facebook
     path('setup-folders/', views.create_complete_folder_structure, name='create_folder_structure'),
     
+    # 🧹 CLEAN DATA STORAGE - Remove all folders and posts for fresh start
+    path('clean-data-storage/', views.clean_data_storage, name='clean_data_storage'),
+    
     # Webhook endpoints
     path('webhook/', views.brightdata_webhook, name='brightdata_webhook'),
     path('notify/', views.brightdata_notify, name='brightdata_notify'),

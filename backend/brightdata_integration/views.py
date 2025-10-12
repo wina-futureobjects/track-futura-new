@@ -2790,6 +2790,74 @@ def brightdata_job_results(request, job_folder_id):
         }, status=500)
 
 
+@api_view(['POST'])
+def clean_data_storage(request):
+    """
+    🧹 CLEAN ALL DATA STORAGE - Production cleanup
+    Removes ALL folders, posts, and scraper requests from data storage
+    """
+    try:
+        # Count before cleanup
+        folders_count = UnifiedRunFolder.objects.count()
+        posts_count = BrightDataScrapedPost.objects.count()
+        requests_count = BrightDataScraperRequest.objects.count()
+        
+        cleanup_log = []
+        cleanup_log.append(f"📊 BEFORE CLEANUP: Folders: {folders_count}, Posts: {posts_count}, Requests: {requests_count}")
+        
+        # Delete all scraped posts
+        cleanup_log.append("🗑️  Deleting all scraped posts...")
+        BrightDataScrapedPost.objects.all().delete()
+        
+        # Delete all folders
+        cleanup_log.append("🗑️  Deleting all folders...")
+        UnifiedRunFolder.objects.all().delete()
+        
+        # Delete all scraper requests
+        cleanup_log.append("🗑️  Deleting all scraper requests...")
+        BrightDataScraperRequest.objects.all().delete()
+        
+        # Verify cleanup
+        folders_after = UnifiedRunFolder.objects.count()
+        posts_after = BrightDataScrapedPost.objects.count()
+        requests_after = BrightDataScraperRequest.objects.count()
+        
+        cleanup_log.append(f"📊 AFTER CLEANUP: Folders: {folders_after}, Posts: {posts_after}, Requests: {requests_after}")
+        
+        success = folders_after == 0 and posts_after == 0 and requests_after == 0
+        
+        if success:
+            cleanup_log.append("✅ SUCCESS! Data storage completely cleaned!")
+            cleanup_log.append("🚀 Ready for fresh scrape jobs!")
+        else:
+            cleanup_log.append("❌ Cleanup incomplete - some items remain")
+        
+        return JsonResponse({
+            'success': success,
+            'message': 'Data storage cleanup completed',
+            'deleted': {
+                'folders': folders_count - folders_after,
+                'posts': posts_count - posts_after,
+                'requests': requests_count - requests_after
+            },
+            'remaining': {
+                'folders': folders_after,
+                'posts': posts_after,
+                'requests': requests_after
+            },
+            'cleanup_log': cleanup_log,
+            'ready_for_new_scrapes': success
+        })
+        
+    except Exception as e:
+        import traceback
+        return JsonResponse({
+            'success': False,
+            'error': f'Cleanup failed: {str(e)}',
+            'traceback': traceback.format_exc()
+        }, status=500)
+
+
 @api_view(['GET'])
 def run_redirect_endpoint(request, run_id):
     """
