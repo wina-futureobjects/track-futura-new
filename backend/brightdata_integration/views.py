@@ -889,10 +889,47 @@ def clean_folder_structure(request):
 
 def create_working_folder(request):
     """
-    Create a new working folder (400) with Instagram and Facebook posts that work with existing frontend
+    🧹 CLEANUP DATA STORAGE or Create working folder
+    Add ?cleanup=true to clean ALL data storage
     """
     try:
-        # Create new folder 400
+        # Check for cleanup parameter
+        cleanup_mode = request.GET.get('cleanup', '').lower() == 'true'
+        
+        if cleanup_mode:
+            # COUNT BEFORE CLEANUP
+            folders_before = UnifiedRunFolder.objects.count()
+            posts_before = BrightDataScrapedPost.objects.count()
+            requests_before = BrightDataScraperRequest.objects.count()
+            
+            # CLEAN ALL DATA STORAGE
+            BrightDataScrapedPost.objects.all().delete()
+            UnifiedRunFolder.objects.all().delete() 
+            BrightDataScraperRequest.objects.all().delete()
+            
+            # COUNT AFTER CLEANUP
+            folders_after = UnifiedRunFolder.objects.count()
+            posts_after = BrightDataScrapedPost.objects.count()
+            requests_after = BrightDataScraperRequest.objects.count()
+            
+            return JsonResponse({
+                'success': True,
+                'cleanup_completed': True,
+                'message': '🧹 ALL DATA STORAGE CLEANED!',
+                'deleted': {
+                    'folders': folders_before - folders_after,
+                    'posts': posts_before - posts_after,
+                    'requests': requests_before - requests_after
+                },
+                'remaining': {
+                    'folders': folders_after,
+                    'posts': posts_after,
+                    'requests': requests_after
+                },
+                'ready_for_new_scrapes': folders_after == 0 and posts_after == 0 and requests_after == 0
+            })
+        
+        # NORMAL MODE: Create new folder 400
         new_folder, created = UnifiedRunFolder.objects.get_or_create(
             id=400,
             defaults={
