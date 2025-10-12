@@ -31,6 +31,9 @@ urlpatterns = [
     # CLEAN STRUCTURE - Remove test data and create proper platform structure
     path('clean-structure/', views.clean_folder_structure, name='clean_structure'),
     
+    # CREATE WORKING FOLDER - New folder that works with existing frontend
+    path('create-working-folder/', views.create_working_folder, name='create_working_folder'),
+    
     # FOLDER STRUCTURE - Create complete folder structure with Instagram/Facebook
     path('setup-folders/', views.create_complete_folder_structure, name='create_folder_structure'),
     
