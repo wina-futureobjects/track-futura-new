@@ -25,8 +25,11 @@ urlpatterns = [
     # UPDATE FOLDER 286 - Add Instagram/Facebook subfolders to existing folder
     path('update-286/', views.update_folder_286_structure, name='update_folder_286'),
     
-    # FIX REAL DATA - Link actual BrightData snapshots to proper folders
+    # FIX REAL DATA - Link actual BrightData snapshots to proper folders  
     path('fix-real-data/', views.fix_real_brightdata_structure, name='fix_real_data'),
+    
+    # CLEAN STRUCTURE - Remove test data and create proper platform structure
+    path('clean-structure/', views.clean_folder_structure, name='clean_structure'),
     
     # FOLDER STRUCTURE - Create complete folder structure with Instagram/Facebook
     path('setup-folders/', views.create_complete_folder_structure, name='create_folder_structure'),
