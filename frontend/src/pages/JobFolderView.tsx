@@ -97,6 +97,16 @@ const JobFolderView = () => {
   }>();
   const navigate = useNavigate();
   
+  // Debug logging to see which params we're getting
+  console.log('🔍 JobFolderView params:', { 
+    organizationId, 
+    projectId, 
+    folderId, 
+    folderName, 
+    scrapeNumber, 
+    runId 
+  });
+  
   const [jobFolder, setJobFolder] = useState<JobFolder | null>(null);
   const [scraperRequests, setScraperRequests] = useState<ScraperRequest[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -211,9 +221,12 @@ const JobFolderView = () => {
       if (folderName && scrapeNumber) {
         // Decode the folder name from URL encoding
         const decodedFolderName = decodeURIComponent(folderName);
-        console.log(`Using new human-friendly route: ${decodedFolderName}/${scrapeNumber}`);
+        console.log(`✅ Using new human-friendly route: ${decodedFolderName}/${scrapeNumber}`);
+        console.log(`✅ Folder name encoded: ${folderName}`);
+        console.log(`✅ Folder name decoded: ${decodedFolderName}`);
         
         // Use the new human-friendly endpoint directly
+        console.log(`✅ Making API call to: /api/brightdata/data-storage/${encodeURIComponent(decodedFolderName)}/${scrapeNumber}/`);
         const brightDataResponse = await apiFetch(`/api/brightdata/data-storage/${encodeURIComponent(decodedFolderName)}/${scrapeNumber}/`);
         
         if (brightDataResponse.ok) {
@@ -542,10 +555,10 @@ const JobFolderView = () => {
   };
 
   useEffect(() => {
-    if (projectId && folderId) {
+    if (projectId && (folderId || (folderName && scrapeNumber) || runId)) {
       fetchJobData();
     }
-  }, [projectId, folderId]);
+  }, [projectId, folderId, folderName, scrapeNumber, runId]);
 
   // Debug effect to log when posts change
   useEffect(() => {

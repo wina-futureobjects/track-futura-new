@@ -266,26 +266,8 @@ function App() {
                 </ProtectedRoute>
               } />
               
-              {/* Folder Contents - File Explorer Style */}
-              <Route path="/organizations/:organizationId/projects/:projectId/data-storage/:folderType/:folderId" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <FolderContents />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-              
               {/* Job Folder View - Special handling for job folders */}
               <Route path="/organizations/:organizationId/projects/:projectId/data-storage/job/:folderId" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <JobFolderView />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-
-              {/* Human-friendly data storage URLs - NEW */}
-              <Route path="/organizations/:organizationId/projects/:projectId/data-storage/:folderName/:scrapeNumber" element={
                 <ProtectedRoute>
                   <Layout>
                     <JobFolderView />
@@ -298,6 +280,24 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <JobFolderView />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+
+              {/* Human-friendly data storage URLs - NEW (must be before generic folderType route) */}
+              <Route path="/organizations/:organizationId/projects/:projectId/data-storage/:folderName/:scrapeNumber" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <JobFolderView />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+
+              {/* Folder Contents - File Explorer Style (must be last as it's most generic) */}
+              <Route path="/organizations/:organizationId/projects/:projectId/data-storage/:folderType/:folderId" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <FolderContents />
                   </Layout>
                 </ProtectedRoute>
               } />
