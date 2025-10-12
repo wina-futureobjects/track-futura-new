@@ -97,6 +97,22 @@ const JobFolderView = () => {
   }>();
   const navigate = useNavigate();
   
+  // Function to extract folder info from URL if needed
+  const getActualFolderParams = () => {
+    const currentPath = window.location.pathname;
+    const pathParts = currentPath.split('/');
+    const dataStorageIndex = pathParts.findIndex(part => part === 'data-storage');
+    
+    if (!folderName && dataStorageIndex !== -1 && pathParts.length > dataStorageIndex + 2) {
+      const extractedFolderName = decodeURIComponent(pathParts[dataStorageIndex + 1]);
+      const extractedScrapeNumber = pathParts[dataStorageIndex + 2];
+      console.log('🚨 EXTRACTED FROM URL:', { extractedFolderName, extractedScrapeNumber });
+      return { folderName: extractedFolderName, scrapeNumber: extractedScrapeNumber };
+    }
+    
+    return { folderName, scrapeNumber };
+  };
+  
   // Debug logging to see which params we're getting
   console.log('🔍 JobFolderView params:', { 
     organizationId, 
@@ -217,17 +233,23 @@ const JobFolderView = () => {
         return;
       }
 
+      // Get actual folder parameters (from URL if needed)
+      const actualParams = getActualFolderParams();
+      
       // If we're using the new route format (folderName + scrapeNumber)
-      if (folderName && scrapeNumber) {
+      if (actualParams.folderName && actualParams.scrapeNumber) {
+        const finalFolderName = actualParams.folderName;
+        const finalScrapeNumber = actualParams.scrapeNumber;
+        
         // Decode the folder name from URL encoding
-        const decodedFolderName = decodeURIComponent(folderName);
-        console.log(`✅ Using new human-friendly route: ${decodedFolderName}/${scrapeNumber}`);
-        console.log(`✅ Folder name encoded: ${folderName}`);
+        const decodedFolderName = decodeURIComponent(finalFolderName);
+        console.log(`✅ Using new human-friendly route: ${decodedFolderName}/${finalScrapeNumber}`);
+        console.log(`✅ Folder name encoded: ${finalFolderName}`);
         console.log(`✅ Folder name decoded: ${decodedFolderName}`);
         
         // Use the new human-friendly endpoint directly
-        console.log(`✅ Making API call to: /api/brightdata/data-storage/${encodeURIComponent(decodedFolderName)}/${scrapeNumber}/`);
-        const brightDataResponse = await apiFetch(`/api/brightdata/data-storage/${encodeURIComponent(decodedFolderName)}/${scrapeNumber}/`);
+        console.log(`✅ Making API call to: /api/brightdata/data-storage/${encodeURIComponent(decodedFolderName)}/${finalScrapeNumber}/`);
+        const brightDataResponse = await apiFetch(`/api/brightdata/data-storage/${encodeURIComponent(decodedFolderName)}/${finalScrapeNumber}/`);
         
         if (brightDataResponse.ok) {
           const brightDataResults = await brightDataResponse.json();
@@ -555,7 +577,8 @@ const JobFolderView = () => {
   };
 
   useEffect(() => {
-    if (projectId && (folderId || (folderName && scrapeNumber) || runId)) {
+    const actualParams = getActualFolderParams();
+    if (projectId && (folderId || (actualParams.folderName && actualParams.scrapeNumber) || runId)) {
       fetchJobData();
     }
   }, [projectId, folderId, folderName, scrapeNumber, runId]);

@@ -24,11 +24,19 @@ const SmartDataStorageRouter: React.FC = () => {
   const pathParts = currentPath.split('/');
   const dataStorageIndex = pathParts.findIndex(part => part === 'data-storage');
   
+  console.log('🔍 Full path:', currentPath);
+  console.log('🔍 Path parts:', pathParts);
+  console.log('🔍 Data storage index:', dataStorageIndex);
+  
   if (dataStorageIndex !== -1 && dataStorageIndex < pathParts.length - 2) {
-    const segment1 = pathParts[dataStorageIndex + 1]; // Could be folderType or folderName
-    const segment2 = pathParts[dataStorageIndex + 2]; // Could be folderId or scrapeNumber
+    const segment1 = decodeURIComponent(pathParts[dataStorageIndex + 1]); // Decode URL encoding
+    const segment2 = pathParts[dataStorageIndex + 2];
     
-    console.log('🔍 Path segments after data-storage:', { segment1, segment2 });
+    console.log('🔍 Raw segments:', { 
+      raw1: pathParts[dataStorageIndex + 1], 
+      raw2: segment2,
+      decoded1: segment1 
+    });
     
     // Check if segment2 is a number (likely scrapeNumber for human-friendly URLs)
     const isSegment2Number = /^\d+$/.test(segment2);
@@ -42,16 +50,22 @@ const SmartDataStorageRouter: React.FC = () => {
       return <JobFolderView />;
     }
     
-    // If segment2 is a number and segment1 is not a known folder type, 
-    // assume it's a human-friendly URL (folderName/scrapeNumber)
-    if (isSegment2Number && !knownFolderTypes.includes(segment1.toLowerCase())) {
-      console.log('✅ Routing to JobFolderView (human-friendly pattern)');
+    // If segment2 is a number, assume it's a human-friendly URL (folderName/scrapeNumber)
+    if (isSegment2Number) {
+      console.log('✅ Routing to JobFolderView (human-friendly pattern - segment2 is number)');
+      console.log(`✅ Folder: "${segment1}", Scrape: ${segment2}`);
       return <JobFolderView />;
     }
     
-    // Otherwise, route to FolderContents
-    console.log('✅ Routing to FolderContents (generic folder pattern)');
-    return <FolderContents />;
+    // If segment1 is a known folder type, route to FolderContents
+    if (knownFolderTypes.includes(segment1.toLowerCase())) {
+      console.log('✅ Routing to FolderContents (known folder type)');
+      return <FolderContents />;
+    }
+    
+    // Default to JobFolderView for anything else with 2 segments
+    console.log('✅ Routing to JobFolderView (default for 2-segment pattern)');
+    return <JobFolderView />;
   }
   
   // Fallback
