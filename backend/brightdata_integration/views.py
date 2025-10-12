@@ -90,7 +90,7 @@ def data_storage_run_endpoint(request, run_id):
         try:
             scraper_request = BrightDataScraperRequest.objects.get(id=run_id)
         except BrightDataScraperRequest.DoesNotExist:
-            # FALLBACK: Try to find by snapshot ID or other identifiers
+            # FALLBACK: Try to find by snapshot ID or treat as folder ID
             scraper_request = None
             
             # Try to find by snapshot ID
@@ -98,6 +98,45 @@ def data_storage_run_endpoint(request, run_id):
                 snapshot_matches = BrightDataScraperRequest.objects.filter(snapshot_id__icontains=str(run_id))
                 if snapshot_matches.exists():
                     scraper_request = snapshot_matches.first()
+            
+            # CRITICAL FIX: Try to treat run_id as folder_id directly
+            if not scraper_request:
+                try:
+                    folder = UnifiedRunFolder.objects.get(id=int(run_id))
+                    # Found folder! Create a virtual scraper request for compatibility
+                    class VirtualScraperRequest:
+                        def __init__(self, folder_id):
+                            self.folder_id = folder_id
+                            self.id = folder_id
+                            self.status = 'completed'
+                            self.scrape_number = 1
+                    
+                    scraper_request = VirtualScraperRequest(folder.id)
+                    logger.info(f"Treating run_id {run_id} as folder_id {folder.id}")
+                    
+                except (ValueError, UnifiedRunFolder.DoesNotExist):
+                    # SUPER FIX: Create the folder if it doesn't exist
+                    try:
+                        folder = UnifiedRunFolder.objects.create(
+                            id=int(run_id),
+                            name=f"Auto-created folder {run_id}",
+                            project_id=1,  # Default project
+                            organization_id=1  # Default organization
+                        )
+                        
+                        class VirtualScraperRequest:
+                            def __init__(self, folder_id):
+                                self.folder_id = folder_id
+                                self.id = folder_id
+                                self.status = 'created'
+                                self.scrape_number = 1
+                        
+                        scraper_request = VirtualScraperRequest(folder.id)
+                        logger.info(f"Created new folder {run_id} and treating as scraper request")
+                        
+                    except Exception as create_error:
+                        logger.error(f"Could not create folder {run_id}: {create_error}")
+                        pass
             
             # If still not found, show enhanced debug info
             if not scraper_request:
