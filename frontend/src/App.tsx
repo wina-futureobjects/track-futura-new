@@ -70,6 +70,9 @@ import BrightDataNotifications from './pages/BrightDataNotifications';
 // Additional pages
 import InstagramFolderSelector from './FolderSelectionReportGenerator';
 
+// Smart routing components
+import SmartDataStorageRouter from './components/SmartDataStorageRouter';
+
 // Auth utility
 import { isAuthenticated } from './utils/auth';
 
@@ -266,38 +269,11 @@ function App() {
                 </ProtectedRoute>
               } />
               
-              {/* Job Folder View - Special handling for job folders */}
-              <Route path="/organizations/:organizationId/projects/:projectId/data-storage/job/:folderId" element={
+              {/* Smart Data Storage Router - handles all /data-storage/X/Y patterns intelligently */}
+              <Route path="/organizations/:organizationId/projects/:projectId/data-storage/:segment1/:segment2" element={
                 <ProtectedRoute>
                   <Layout>
-                    <JobFolderView />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-
-              {/* Run-based URLs for continuity - handles /data-storage/run/N patterns */}
-              <Route path="/organizations/:organizationId/projects/:projectId/data-storage/run/:runId" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <JobFolderView />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-
-              {/* Human-friendly data storage URLs - NEW (must be before generic folderType route) */}
-              <Route path="/organizations/:organizationId/projects/:projectId/data-storage/:folderName/:scrapeNumber" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <JobFolderView />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-
-              {/* Folder Contents - File Explorer Style (must be last as it's most generic) */}
-              <Route path="/organizations/:organizationId/projects/:projectId/data-storage/:folderType/:folderId" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <FolderContents />
+                    <SmartDataStorageRouter />
                   </Layout>
                 </ProtectedRoute>
               } />
