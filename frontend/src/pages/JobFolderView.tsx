@@ -209,10 +209,12 @@ const JobFolderView = () => {
 
       // If we're using the new route format (folderName + scrapeNumber)
       if (folderName && scrapeNumber) {
-        console.log(`Using new human-friendly route: ${folderName}/${scrapeNumber}`);
+        // Decode the folder name from URL encoding
+        const decodedFolderName = decodeURIComponent(folderName);
+        console.log(`Using new human-friendly route: ${decodedFolderName}/${scrapeNumber}`);
         
         // Use the new human-friendly endpoint directly
-        const brightDataResponse = await apiFetch(`/api/brightdata/data-storage/${encodeURIComponent(folderName)}/${scrapeNumber}/`);
+        const brightDataResponse = await apiFetch(`/api/brightdata/data-storage/${encodeURIComponent(decodedFolderName)}/${scrapeNumber}/`);
         
         if (brightDataResponse.ok) {
           const brightDataResults = await brightDataResponse.json();
@@ -240,7 +242,7 @@ const JobFolderView = () => {
             // Create job folder data
             const jobFolderData: JobFolder = {
               id: 0, // Will be set if we can resolve the folder ID
-              name: brightDataResults.folder_name || folderName,
+              name: brightDataResults.folder_name || decodedFolderName,
               description: `Scraped ${brightDataResults.total_results} posts from BrightData (Scrape #${scrapeNumber})`,
               category: 'posts',
               category_display: 'Posts',
@@ -292,10 +294,8 @@ const JobFolderView = () => {
         console.log('Folder data:', folderData);
       }
 
-      // Try the new human-friendly endpoint first
-      let brightDataResponse = await apiFetch(`/api/brightdata/data-storage/${encodeURIComponent(fallbackFolderName)}/${fallbackScrapeNumber}/`);
-      
-      // If that fails, fall back to the old endpoint
+        // Try the new human-friendly endpoint first with proper encoding
+        let brightDataResponse = await apiFetch(`/api/brightdata/data-storage/${encodeURIComponent(fallbackFolderName)}/${fallbackScrapeNumber}/`);      // If that fails, fall back to the old endpoint
       if (!brightDataResponse.ok) {
         console.log('Human-friendly endpoint not available, trying old endpoint...');
         brightDataResponse = await apiFetch(`/api/brightdata/job-results/${folderId}/`);

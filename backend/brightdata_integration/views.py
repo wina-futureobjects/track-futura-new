@@ -84,12 +84,16 @@ def data_storage_folder_scrape(request, folder_name, scrape_num):
     Return all data for a given folder name and scrape number.
     """
     try:
+        # URL decode the folder name to handle spaces and special characters
+        from urllib.parse import unquote
+        decoded_folder_name = unquote(folder_name)
+        
         # Find folder by name (case-insensitive)
-        folder = UnifiedRunFolder.objects.filter(name__iexact=folder_name).first()
+        folder = UnifiedRunFolder.objects.filter(name__iexact=decoded_folder_name).first()
         if not folder:
             return JsonResponse({
                 'success': False,
-                'error': f'Folder "{folder_name}" not found'
+                'error': f'Folder "{decoded_folder_name}" not found'
             }, status=404)
         
         # Find scraper request for this folder and scrape number
@@ -148,12 +152,16 @@ def data_storage_folder_scrape_platform(request, folder_name, scrape_num, platfo
     Return all data for a given folder, scrape, and platform.
     """
     try:
+        # URL decode the folder name to handle spaces and special characters
+        from urllib.parse import unquote
+        decoded_folder_name = unquote(folder_name)
+        
         # Find folder by name (case-insensitive)
-        folder = UnifiedRunFolder.objects.filter(name__iexact=folder_name).first()
+        folder = UnifiedRunFolder.objects.filter(name__iexact=decoded_folder_name).first()
         if not folder:
             return JsonResponse({
                 'success': False,
-                'error': f'Folder "{folder_name}" not found'
+                'error': f'Folder "{decoded_folder_name}" not found'
             }, status=404)
         
         # Find scraper request for this folder and scrape number
