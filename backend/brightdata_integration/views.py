@@ -79,6 +79,85 @@ def run_info_lookup(request, run_id):
             'error': f'Server error while looking up run info: {str(e)}'
         }, status=500)
 
+def data_storage_run_endpoint(request, run_id):
+    """
+    CRITICAL ENDPOINT: Handle /data-storage/run/{run_id}/ requests
+    This endpoint directly returns scraped data for a run ID without redirection
+    """
+    try:
+        # Find the scraper request by run ID
+        try:
+            scraper_request = BrightDataScraperRequest.objects.get(id=run_id)
+        except BrightDataScraperRequest.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': f'Run {run_id} not found'
+            }, status=404)
+        
+        # Get the folder
+        try:
+            folder = UnifiedRunFolder.objects.get(id=scraper_request.folder_id)
+        except UnifiedRunFolder.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': f'Folder for run {run_id} not found'
+            }, status=404)
+        
+        # Get scraped posts for this run
+        scraped_posts = BrightDataScrapedPost.objects.filter(
+            folder_id=scraper_request.folder_id,
+            scraper_request=scraper_request
+        ).order_by('-date_posted', '-created_at')
+        
+        posts_data = []
+        for post in scraped_posts:
+            posts_data.append({
+                'post_id': post.post_id,
+                'url': post.url,
+                'user_posted': post.user_posted,
+                'user_username': post.user_posted,
+                'username': post.user_posted,
+                'content': post.content,
+                'caption': post.content,
+                'description': post.description,
+                'likes': post.likes,
+                'likes_count': post.likes,
+                'likesCount': post.likes,
+                'num_comments': post.num_comments,
+                'comments_count': post.num_comments,
+                'commentsCount': post.num_comments,
+                'shares': post.shares,
+                'shares_count': post.shares,
+                'date_posted': post.date_posted.isoformat() if post.date_posted else None,
+                'timestamp': post.date_posted.isoformat() if post.date_posted else post.created_at.isoformat(),
+                'media_type': post.media_type,
+                'media_url': post.media_url,
+                'hashtags': post.hashtags,
+                'mentions': post.mentions,
+                'location': post.location,
+                'is_verified': post.is_verified,
+                'platform': post.platform,
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'folder_name': folder.name,
+            'folder_id': folder.id,
+            'run_id': run_id,
+            'scrape_number': scraper_request.scrape_number or 1,
+            'total_results': len(posts_data),
+            'data': posts_data,
+            'status': scraper_request.status,
+            'message': f'Data for run {run_id} ({folder.name})'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in data_storage_run_endpoint for run {run_id}: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': f'Server error while fetching run data: {str(e)}'
+        }, status=500)
+
 def data_storage_folder_scrape(request, folder_name, scrape_num):
     """
     Return all data for a given folder name and scrape number.
