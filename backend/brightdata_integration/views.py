@@ -4,6 +4,7 @@ from track_accounts.models import UnifiedRunFolder
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
 from .models import BrightDataScraperRequest, BrightDataScrapedPost
+from rest_framework.decorators import api_view
 import logging
 
 logger = logging.getLogger(__name__)
