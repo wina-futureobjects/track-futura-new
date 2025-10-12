@@ -16,6 +16,9 @@ urlpatterns = [
     # ViewSet URLs
     path('', include(router.urls)),
     
+    # EMERGENCY DEBUG ENDPOINT - Shows all available runs
+    path('debug/available-runs/', lambda request: __import__('brightdata_integration.emergency_run_debug', fromlist=['emergency_run_info']).emergency_run_info(request), name='available_runs_debug'),
+    
     # Webhook endpoints
     path('webhook/', views.brightdata_webhook, name='brightdata_webhook'),
     path('notify/', views.brightdata_notify, name='brightdata_notify'),
