@@ -99,38 +99,43 @@ const JobFolderView = () => {
   
   // AGGRESSIVE OVERRIDE: Always extract from URL to force correct behavior
   const getActualFolderParams = () => {
-    const currentPath = window.location.pathname;
-    const pathParts = currentPath.split('/');
-    const dataStorageIndex = pathParts.findIndex(part => part === 'data-storage');
-    
-    console.log('🔍 AGGRESSIVE OVERRIDE - URL Analysis:', { 
-      currentPath, 
-      pathParts, 
-      dataStorageIndex 
-    });
-    
-    if (dataStorageIndex !== -1 && pathParts.length > dataStorageIndex + 2) {
-      const rawSegment1 = pathParts[dataStorageIndex + 1];
-      const rawSegment2 = pathParts[dataStorageIndex + 2];
-      const extractedFolderName = decodeURIComponent(rawSegment1);
-      const extractedScrapeNumber = rawSegment2;
+    try {
+      const currentPath = window.location.pathname;
+      const pathParts = currentPath.split('/');
+      const dataStorageIndex = pathParts.findIndex(part => part === 'data-storage');
       
-      console.log('🚨 FORCED EXTRACTION:', { 
-        raw1: rawSegment1,
-        raw2: rawSegment2,
-        extractedFolderName, 
-        extractedScrapeNumber 
+      console.log('🔍 AGGRESSIVE OVERRIDE - URL Analysis:', { 
+        currentPath, 
+        pathParts, 
+        dataStorageIndex 
       });
       
-      // If segment2 is a number, force this to be treated as folderName/scrapeNumber
-      if (/^\d+$/.test(rawSegment2)) {
-        console.log('✅ FORCING JobFolderView route (number detected)');
-        return { folderName: extractedFolderName, scrapeNumber: extractedScrapeNumber };
+      if (dataStorageIndex !== -1 && pathParts.length > dataStorageIndex + 2) {
+        const rawSegment1 = pathParts[dataStorageIndex + 1];
+        const rawSegment2 = pathParts[dataStorageIndex + 2];
+        const extractedFolderName = decodeURIComponent(rawSegment1);
+        const extractedScrapeNumber = rawSegment2;
+        
+        console.log('🚨 FORCED EXTRACTION:', { 
+          raw1: rawSegment1,
+          raw2: rawSegment2,
+          extractedFolderName, 
+          extractedScrapeNumber 
+        });
+        
+        // If segment2 is a number, force this to be treated as folderName/scrapeNumber
+        if (/^\d+$/.test(rawSegment2)) {
+          console.log('✅ FORCING JobFolderView route (number detected)');
+          return { folderName: extractedFolderName, scrapeNumber: extractedScrapeNumber };
+        }
       }
+      
+      // Fallback to original params
+      return { folderName, scrapeNumber };
+    } catch (error) {
+      console.error('Error in getActualFolderParams:', error);
+      return { folderName, scrapeNumber };
     }
-    
-    // Fallback to original params
-    return { folderName, scrapeNumber };
   };
   
   // Debug logging to see which params we're getting
@@ -219,110 +224,60 @@ const JobFolderView = () => {
       const currentPath = window.location.pathname;
       if (currentPath.includes('Job%203/1') || currentPath.includes('Job%202/1')) {
         console.log('🚨🚨🚨 HARD OVERRIDE TRIGGERED FOR JOB URL');
-        const pathParts = currentPath.split('/');
-        const dataStorageIndex = pathParts.findIndex(part => part === 'data-storage');
-        
-        if (dataStorageIndex !== -1) {
-          const folderNameRaw = pathParts[dataStorageIndex + 1];
-          const scrapeNum = pathParts[dataStorageIndex + 2];
-          const decodedFolderName = decodeURIComponent(folderNameRaw);
+        try {
+          const pathParts = currentPath.split('/');
+          const dataStorageIndex = pathParts.findIndex(part => part === 'data-storage');
           
-          console.log('🚨 HARD OVERRIDE PARAMS:', { folderNameRaw, scrapeNum, decodedFolderName });
-          console.log('🚨 MAKING DIRECT API CALL TO:', `/api/brightdata/data-storage/${folderNameRaw}/${scrapeNum}/`);
-          
-          const response = await apiFetch(`/api/brightdata/data-storage/${folderNameRaw}/${scrapeNum}/`);
-          if (response.ok) {
-            const data = await response.json();
-            console.log('🚨 HARD OVERRIDE SUCCESS:', data);
+          if (dataStorageIndex !== -1 && pathParts.length > dataStorageIndex + 2) {
+            const folderNameRaw = pathParts[dataStorageIndex + 1];
+            const scrapeNum = pathParts[dataStorageIndex + 2];
+            const decodedFolderName = decodeURIComponent(folderNameRaw);
             
-            if (data.success && data.data && data.data.length > 0) {
-              // Transform the data
-              const transformedPosts: Post[] = data.data.map((item: any, index: number) => ({
-                id: index + 1,
-                post_id: item.post_id || item.shortcode || item.id || `post_${index}`,
-                url: item.url || item.post_url || item.link || '',
-                user_posted: item.user_posted || item.user_username || item.username || item.ownerUsername || item.user || 'Unknown',
-                content: item.content || item.caption || item.description || item.text || '',
-                description: item.content || item.caption || item.description || item.text || '',
-                likes: parseInt(item.likes || item.likes_count || item.likesCount || '0') || 0,
-                num_comments: parseInt(item.num_comments || item.comments_count || item.commentsCount || item.comments || '0') || 0,
-                date_posted: item.date_posted || item.timestamp || item.date || new Date().toISOString(),
-                created_at: item.date_posted || item.timestamp || new Date().toISOString(),
-                is_verified: item.is_verified || false
-              }));
+            console.log('🚨 HARD OVERRIDE PARAMS:', { folderNameRaw, scrapeNum, decodedFolderName });
+            console.log('🚨 MAKING DIRECT API CALL TO:', `/api/brightdata/data-storage/${folderNameRaw}/${scrapeNum}/`);
+            
+            const response = await apiFetch(`/api/brightdata/data-storage/${folderNameRaw}/${scrapeNum}/`);
+            if (response.ok) {
+              const data = await response.json();
+              console.log('🚨 HARD OVERRIDE SUCCESS:', data);
               
-              setPosts(transformedPosts);
-              
-              const jobFolderData: JobFolder = {
-                id: 0,
-                name: decodedFolderName,
-                description: `Scraped ${data.total_results || transformedPosts.length} posts from BrightData (Scrape #${scrapeNum})`,
-                category: 'posts',
-                category_display: 'Posts',
-                platform: 'instagram',
-                folder_type: 'job',
-                created_at: new Date().toISOString()
-              };
-              
-              setJobFolder(jobFolderData);
-              setLoading(false);
-              return; // EXIT EARLY - SUCCESS!
+              if (data.success && data.data && data.data.length > 0) {
+                // Transform the data
+                const transformedPosts: Post[] = data.data.map((item: any, index: number) => ({
+                  id: index + 1,
+                  post_id: item.post_id || item.shortcode || item.id || `post_${index}`,
+                  url: item.url || item.post_url || item.link || '',
+                  user_posted: item.user_posted || item.user_username || item.username || item.ownerUsername || item.user || 'Unknown',
+                  content: item.content || item.caption || item.description || item.text || '',
+                  description: item.content || item.caption || item.description || item.text || '',
+                  likes: parseInt(item.likes || item.likes_count || item.likesCount || '0') || 0,
+                  num_comments: parseInt(item.num_comments || item.comments_count || item.commentsCount || item.comments || '0') || 0,
+                  date_posted: item.date_posted || item.timestamp || item.date || new Date().toISOString(),
+                  created_at: item.date_posted || item.timestamp || new Date().toISOString(),
+                  is_verified: item.is_verified || false
+                }));
+                
+                setPosts(transformedPosts);
+                
+                const jobFolderData: JobFolder = {
+                  id: 0,
+                  name: decodedFolderName,
+                  description: `Scraped ${data.total_results || transformedPosts.length} posts from BrightData (Scrape #${scrapeNum})`,
+                  category: 'posts',
+                  category_display: 'Posts',
+                  platform: 'instagram',
+                  folder_type: 'job',
+                  created_at: new Date().toISOString()
+                };
+                
+                setJobFolder(jobFolderData);
+                setLoading(false);
+                return; // EXIT EARLY - SUCCESS!
+              }
             }
           }
-        }
-      }
-      
-      // Handle /data-storage/run/N pattern - redirect to correct folder/scrape URL
-      if (runId) {
-        console.log(`Handling run ID: ${runId}`);
-        
-        if (dataStorageIndex !== -1) {
-          const folderNameRaw = pathParts[dataStorageIndex + 1];
-          const scrapeNum = pathParts[dataStorageIndex + 2];
-          const decodedFolderName = decodeURIComponent(folderNameRaw);
-          
-          console.log('🚨 HARD OVERRIDE PARAMS:', { folderNameRaw, scrapeNum, decodedFolderName });
-          console.log('🚨 MAKING DIRECT API CALL TO:', `/api/brightdata/data-storage/${folderNameRaw}/${scrapeNum}/`);
-          
-          const response = await apiFetch(`/api/brightdata/data-storage/${folderNameRaw}/${scrapeNum}/`);
-          if (response.ok) {
-            const data = await response.json();
-            console.log('🚨 HARD OVERRIDE SUCCESS:', data);
-            
-            if (data.success && data.data && data.data.length > 0) {
-              // Transform the data
-              const transformedPosts: Post[] = data.data.map((item: any, index: number) => ({
-                id: index + 1,
-                post_id: item.post_id || item.shortcode || item.id || `post_${index}`,
-                url: item.url || item.post_url || item.link || '',
-                user_posted: item.user_posted || item.user_username || item.username || item.ownerUsername || item.user || 'Unknown',
-                content: item.content || item.caption || item.description || item.text || '',
-                description: item.content || item.caption || item.description || item.text || '',
-                likes: parseInt(item.likes || item.likes_count || item.likesCount || '0') || 0,
-                num_comments: parseInt(item.num_comments || item.comments_count || item.commentsCount || item.comments || '0') || 0,
-                date_posted: item.date_posted || item.timestamp || item.date || new Date().toISOString(),
-                created_at: item.date_posted || item.timestamp || new Date().toISOString(),
-                is_verified: item.is_verified || false
-              }));
-              
-              setPosts(transformedPosts);
-              
-              const jobFolderData: JobFolder = {
-                id: 0,
-                name: decodedFolderName,
-                description: `Scraped ${data.total_results || transformedPosts.length} posts from BrightData (Scrape #${scrapeNum})`,
-                category: 'posts',
-                category_display: 'Posts',
-                platform: 'instagram',
-                folder_type: 'job',
-                created_at: new Date().toISOString()
-              };
-              
-              setJobFolder(jobFolderData);
-              setLoading(false);
-              return; // EXIT EARLY - SUCCESS!
-            }
-          }
+        } catch (hardOverrideError) {
+          console.error('🚨 HARD OVERRIDE ERROR:', hardOverrideError);
         }
       }
       // Handle /run/N pattern - DIRECTLY access scraped data via new endpoint
@@ -551,13 +506,17 @@ const JobFolderView = () => {
               description: jobFolderData.description || 'BrightData scraped folder',
               platform: 'instagram',
               category: 'posts',
+              category_display: 'Posts',
+              job_id: 0,
+              updated_at: new Date().toISOString(),
+              action_type: 'collect_posts',
               created_at: jobFolderData.created_at || new Date().toISOString(),
-              post_count: transformedPosts.length,
-              data: postToUniversalData(transformedPosts),
-              status: {
-                status: 'completed',
-                message: `Successfully loaded ${transformedPosts.length} posts from human-friendly endpoint`
-              }
+              // post_count: transformedPosts.length, // Commented out as not part of UniversalFolder type
+              // data: postToUniversalData(transformedPosts), // Commented out as not part of UniversalFolder type
+              // status: { // Commented out as not part of UniversalFolder type
+              //   status: 'completed',
+              //   message: `Successfully loaded ${transformedPosts.length} posts from human-friendly endpoint`
+              // }
             };
 
             setUniversalFolder(universalFolderData);
@@ -695,7 +654,7 @@ const JobFolderView = () => {
 
       // For service folders, if BrightData failed and we have empty subfolders, show appropriate message
       if (jobFolderData.folder_type === 'service' && platformFolders.length > 0) {
-        const hasPostsInSubfolders = platformFolders.some(folder => (folder.post_count || 0) > 0);
+        const hasPostsInSubfolders = platformFolders.some((folder: any) => (folder.post_count || 0) > 0);
         if (!hasPostsInSubfolders) {
           setJobStatus({
             status: 'completed',
