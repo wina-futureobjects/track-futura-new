@@ -2975,13 +2975,17 @@ def upload_data_file(request):
         # Get form data
         folder_name = request.POST.get('folder_name', 'Uploaded Data')
         platform = request.POST.get('platform', 'instagram')
-        file = request.FILES.get('data_file')
+        file = request.FILES.get('file') or request.FILES.get('data_file')  # Support both field names
+        
+        logger.info(f"Upload request: folder_name={folder_name}, platform={platform}, file={file.name if file else 'None'}")
         
         if not file:
             return JsonResponse({
                 'success': False,
                 'error': 'No file uploaded'
             }, status=400)
+        
+        logger.info(f"Processing BrightData file: {file.name}, size: {file.size} bytes")
         
         # Validate file type
         if not file.name.endswith(('.json', '.csv')):
