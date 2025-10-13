@@ -3018,17 +3018,30 @@ def upload_data_file(request):
                 
                 # Create posts
                 for i, post_data in enumerate(posts_data):
+                    # Clean BrightData format - ensure we only use the main post data, not nested comments
+                    clean_post_data = dict(post_data)  # Create a copy
+                    
+                    # Remove nested comment data that might cause field conflicts
+                    clean_post_data.pop('latest_comments', None)
+                    clean_post_data.pop('comments_data', None)
+                    
+                    # Handle num_comments field - BrightData uses 'num_comments' directly
+                    comments_count = clean_post_data.get('num_comments', 0)
+                    if not comments_count:
+                        # Fallback to other comment count fields
+                        comments_count = clean_post_data.get('comments', clean_post_data.get('comments_count', clean_post_data.get('commentsCount', 0)))
+                    
                     BrightDataScrapedPost.objects.create(
                         folder_id=folder.id,
-                        post_id=post_data.get('post_id', post_data.get('shortcode', post_data.get('id', f'post_{i}'))),
+                        post_id=clean_post_data.get('post_id', clean_post_data.get('shortcode', clean_post_data.get('id', f'post_{i}'))),
                         platform=platform,
-                        raw_data=post_data,
-                        user_posted=post_data.get('user_posted', post_data.get('user_username', post_data.get('username', 'Unknown'))),
-                        content=post_data.get('content', post_data.get('caption', post_data.get('description', ''))),
-                        likes=int(post_data.get('likes', post_data.get('likes_count', post_data.get('likesCount', 0))) or 0),
-                        num_comments=int(post_data.get('comments', post_data.get('comments_count', post_data.get('commentsCount', 0))) or 0),
-                        url=post_data.get('url', post_data.get('post_url', post_data.get('link', ''))),
-                        date_posted=post_data.get('date_posted', post_data.get('timestamp', datetime.now().isoformat())),
+                        raw_data=clean_post_data,
+                        user_posted=clean_post_data.get('user_posted', clean_post_data.get('user_username', clean_post_data.get('username', 'Unknown'))),
+                        content=clean_post_data.get('content', clean_post_data.get('caption', clean_post_data.get('description', ''))),
+                        likes=int(clean_post_data.get('likes', clean_post_data.get('likes_count', clean_post_data.get('likesCount', 0))) or 0),
+                        num_comments=int(comments_count or 0),
+                        url=clean_post_data.get('url', clean_post_data.get('post_url', clean_post_data.get('link', ''))),
+                        date_posted=clean_post_data.get('date_posted', clean_post_data.get('timestamp', datetime.now().isoformat())),
                     )
                     posts_created += 1
                     
@@ -3044,6 +3057,11 @@ def upload_data_file(request):
                 csv_reader = csv.DictReader(io.StringIO(file_content))
                 
                 for i, row in enumerate(csv_reader):
+                    # Handle num_comments field for CSV data
+                    comments_count = row.get('num_comments', 0)
+                    if not comments_count:
+                        comments_count = row.get('comments', row.get('comments_count', 0))
+                    
                     BrightDataScrapedPost.objects.create(
                         folder_id=folder.id,
                         post_id=row.get('post_id', row.get('id', f'post_{i}')),
@@ -3052,7 +3070,7 @@ def upload_data_file(request):
                         user_posted=row.get('user_posted', row.get('username', 'Unknown')),
                         content=row.get('content', row.get('caption', row.get('description', ''))),
                         likes=int(row.get('likes', row.get('likes_count', 0)) or 0),
-                        num_comments=int(row.get('comments', row.get('comments_count', 0)) or 0),
+                        num_comments=int(comments_count or 0),
                         url=row.get('url', row.get('post_url', '')),
                         date_posted=row.get('date_posted', row.get('timestamp', datetime.now().isoformat())),
                     )
