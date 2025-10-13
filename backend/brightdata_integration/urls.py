@@ -77,4 +77,8 @@ urlpatterns = [
     path('data-storage/<str:folder_name>/<int:scrape_num>/<str:platform>/', views.data_storage_folder_scrape_platform, name='data_storage_folder_scrape_platform'),
     path('data-storage/<str:folder_name>/<int:scrape_num>/<str:platform>/post/', views.data_storage_folder_scrape_platform_post, name='data_storage_folder_scrape_platform_post'),
     path('data-storage/<str:folder_name>/<int:scrape_num>/<str:platform>/post/<str:account>/', views.data_storage_folder_scrape_platform_post_account, name='data_storage_folder_scrape_platform_post_account'),
+    
+    # File upload endpoints
+    path('upload-data/', views.upload_data_file, name='upload_data_file'),
+    path('list-folders/', views.list_uploaded_folders, name='list_uploaded_folders'),
 ]

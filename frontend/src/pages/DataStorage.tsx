@@ -45,6 +45,7 @@ import {
   SelectAll as SelectAllIcon,
   Clear as ClearIcon,
 } from '@mui/icons-material';
+import UploadDataDialog from '../components/UploadDataDialog';
 import { apiFetch } from '../utils/api';
 
 interface Folder {
@@ -139,6 +140,9 @@ const DataStorage = () => {
   // Batch selection state
   const [selectedFolders, setSelectedFolders] = useState<Set<number>>(new Set());
   const [isDeleteMode, setIsDeleteMode] = useState(false);
+
+  // Upload dialog state
+  const [openUploadDialog, setOpenUploadDialog] = useState(false);
 
   const platforms = [
     { key: 'instagram', label: 'Instagram', icon: <InstagramIcon />, color: '#E4405F' },
@@ -750,6 +754,22 @@ const DataStorage = () => {
         <Typography variant="h4" component="h1" fontWeight="500" mt={2}>
           Data Storage
         </Typography>
+        <Box display="flex" gap={2}>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setOpenUploadDialog(true)}
+          >
+            Upload Data File
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={fetchAllFolders}
+          >
+            Refresh
+          </Button>
+        </Box>
       </Box>
 
       {/* Tabs */}
@@ -1236,6 +1256,19 @@ const DataStorage = () => {
           <ListItemText sx={{ color: 'error.main' }}>Delete Folder</ListItemText>
         </MenuItem>
       </Menu>
+
+      {/* Upload Data Dialog */}
+      <UploadDataDialog
+        open={openUploadDialog}
+        onClose={() => setOpenUploadDialog(false)}
+        onSuccess={(folderId, folderName) => {
+          setSnackbarMessage(`Successfully created folder "${folderName}" with uploaded data!`);
+          setSnackbarOpen(true);
+          fetchAllFolders(); // Refresh the folders list
+          // Navigate to the new folder
+          navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage/run/${folderId}`);
+        }}
+      />
      </Box>
    );
  };
