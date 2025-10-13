@@ -2994,8 +2994,7 @@ def upload_data_file(request):
         folder = UnifiedRunFolder.objects.create(
             name=folder_name,
             project_id=1,  # Default project
-            folder_type='run',
-            platform=platform
+            folder_type='run'
         )
         
         # Process the file
