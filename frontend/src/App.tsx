@@ -5,6 +5,8 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import React from 'react';
 import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 
+// FORCE REBUILD: 2025-10-13 - Frontend route fix deployment
+
 // Component imports
 import Layout from './components/layout/Layout';
 import NoSidebarLayout from './components/NoSidebarLayout';
