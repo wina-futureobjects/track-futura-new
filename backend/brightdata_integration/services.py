@@ -232,6 +232,9 @@ class BrightDataAutomatedBatchScraper:
             params = {
                 "dataset_id": dataset_id,
                 "include_errors": "true",
+                # 🚨 CRITICAL FIX: Add webhook configuration
+                "notify": "https://main-bvxea6i-inhoolfrqniuu.eu-5.platformsh.site/api/brightdata/webhook/",
+                "format": "json",
             }
             
             # Add platform-specific parameters
@@ -405,6 +408,14 @@ class BrightDataAutomatedBatchScraper:
             print(f"📋 Headers: {headers}")
             print(f"📋 Params: {params}")
             print(f"📋 Payload: {json.dumps(payload, indent=2)}")
+            
+            # 🚨 CRITICAL FIX: Log webhook configuration for debugging
+            webhook_url = params.get('notify')
+            if webhook_url:
+                print(f"🌐 WEBHOOK CONFIGURED: {webhook_url}")
+                print(f"✅ BrightData will send results to your webhook when scraping completes!")
+            else:
+                print(f"⚠️ WARNING: No webhook configured - you won't receive automatic notifications!")
             
             # Show expected format comparison
             print(f"🎯 Expected CSV format would be:")

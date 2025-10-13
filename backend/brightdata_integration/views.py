@@ -1904,6 +1904,7 @@ def _create_brightdata_scraped_post(item_data, platform, folder_id=None, scraper
             'description': item_data.get('description', ''),
             'folder_id': folder_id,
             'scraper_request': scraper_request,  # Now optional due to model fix
+            'webhook_delivered': True,  # 🎯 MARK AS WEBHOOK-DELIVERED (no polling)
             'date_posted': timezone.now()
         }
         
@@ -3280,4 +3281,257 @@ def list_uploaded_folders(request):
         return JsonResponse({
             'success': False,
             'error': f'Error listing folders: {str(e)}'
+        }, status=500)
+
+@require_http_methods(["GET"])
+def webhook_results_by_folder_scrape(request, folder_name, scrape_number):
+    """
+    🎯 WEBHOOK-BASED DATA LOADING: Get results delivered via webhook
+    This endpoint only returns data that was delivered via BrightData webhook
+    NO POLLING - only webhook-delivered results
+    """
+    try:
+        # Decode folder name
+        decoded_folder_name = folder_name.replace('%20', ' ').replace('+', ' ')
+        
+        logger.info(f"🎯 WEBHOOK RESULTS REQUEST: {decoded_folder_name}, scrape #{scrape_number}")
+        
+        # Find folder by name
+        try:
+            folder = UnifiedRunFolder.objects.filter(name=decoded_folder_name).first()
+            if not folder:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Folder "{decoded_folder_name}" not found',
+                    'available_folders': list(UnifiedRunFolder.objects.values_list('name', flat=True))
+                }, status=404)
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': f'Error finding folder: {str(e)}'
+            }, status=400)
+        
+        # Get webhook-delivered posts ONLY (posts that came via webhook)
+        webhook_posts = BrightDataScrapedPost.objects.filter(
+            folder_id=folder.id,
+            webhook_delivered=True  # 🎯 ONLY webhook-delivered posts (no polling)
+        ).order_by('-created_at')
+        
+        if not webhook_posts.exists():
+            # Check if there are any scraper requests for this folder
+            scraper_requests = BrightDataScraperRequest.objects.filter(folder_id=folder.id)
+            
+            if scraper_requests.exists():
+                latest_request = scraper_requests.order_by('-created_at').first()
+                
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Scraping job exists but no webhook results received yet',
+                    'status': 'waiting_for_webhook',
+                    'scraper_status': latest_request.status,
+                    'folder_name': decoded_folder_name,
+                    'scrape_number': scrape_number,
+                    'job_id': latest_request.snapshot_id,
+                    'hint': 'Data will appear here automatically when BrightData webhook delivers results'
+                }, status=202)  # 202 = Accepted but processing
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'No scraping jobs found for this folder',
+                    'status': 'no_jobs',
+                    'folder_name': decoded_folder_name
+                }, status=404)
+        
+        # Transform webhook-delivered posts to expected format
+        posts_data = []
+        for post in webhook_posts:
+            posts_data.append({
+                'post_id': post.post_id,
+                'url': post.url,
+                'user_posted': post.user_posted,
+                'content': post.content,
+                'likes': post.likes,
+                'num_comments': post.num_comments,
+                'date_posted': post.date_posted,
+                'platform': post.platform,
+                'id': post.id,
+                'webhook_delivered': True,  # Mark as webhook-delivered
+                'created_at': post.created_at.isoformat() if post.created_at else None,
+                'raw_data': post.raw_data
+            })
+        
+        logger.info(f"✅ WEBHOOK RESULTS: Found {len(posts_data)} webhook-delivered posts")
+        
+        return JsonResponse({
+            'success': True,
+            'data': posts_data,
+            'total_results': len(posts_data),
+            'folder_name': decoded_folder_name,
+            'folder_id': folder.id,
+            'scrape_number': scrape_number,
+            'delivery_method': 'webhook',
+            'message': f'Successfully loaded {len(posts_data)} webhook-delivered posts'
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ WEBHOOK RESULTS ERROR: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': f'Error loading webhook results: {str(e)}'
+        }, status=500)
+
+@require_http_methods(["GET"])
+def webhook_results_by_run_id(request, run_id):
+    """
+    🎯 WEBHOOK-BASED DATA LOADING: Get results by run ID from webhook delivery
+    """
+    try:
+        logger.info(f"🎯 WEBHOOK RESULTS BY RUN ID: {run_id}")
+        
+        # Find scraper request by run ID
+        scraper_request = BrightDataScraperRequest.objects.filter(
+            id=run_id
+        ).first()
+        
+        if not scraper_request:
+            return JsonResponse({
+                'success': False,
+                'error': f'Run {run_id} not found',
+                'status': 'not_found'
+            }, status=404)
+        
+        # Get the folder
+        if not scraper_request.folder_id:
+            return JsonResponse({
+                'success': False,
+                'error': f'Run {run_id} has no associated folder',
+                'status': 'no_folder'
+            }, status=404)
+        
+        folder = UnifiedRunFolder.objects.get(id=scraper_request.folder_id)
+        
+        # Get webhook-delivered posts for this folder
+        webhook_posts = BrightDataScrapedPost.objects.filter(
+            folder_id=folder.id,
+            webhook_delivered=True  # 🎯 ONLY webhook-delivered posts
+        ).order_by('-created_at')
+        
+        if not webhook_posts.exists():
+            return JsonResponse({
+                'success': False,
+                'message': f'Run {run_id} exists but no webhook results received yet',
+                'status': 'waiting_for_webhook',
+                'scraper_status': scraper_request.status,
+                'folder_name': folder.name,
+                'job_id': scraper_request.snapshot_id,
+                'hint': 'Data will appear here automatically when BrightData webhook delivers results'
+            }, status=202)
+        
+        # Transform posts data
+        posts_data = []
+        for post in webhook_posts:
+            posts_data.append({
+                'post_id': post.post_id,
+                'url': post.url,
+                'user_posted': post.user_posted,
+                'content': post.content,
+                'likes': post.likes,
+                'num_comments': post.num_comments,
+                'date_posted': post.date_posted,
+                'platform': post.platform,
+                'id': post.id,
+                'webhook_delivered': True,
+                'created_at': post.created_at.isoformat() if post.created_at else None,
+                'raw_data': post.raw_data
+            })
+        
+        logger.info(f"✅ WEBHOOK RESULTS BY RUN: Found {len(posts_data)} posts for run {run_id}")
+        
+        return JsonResponse({
+            'success': True,
+            'data': posts_data,
+            'total_results': len(posts_data),
+            'folder_name': folder.name,
+            'folder_id': folder.id,
+            'run_id': run_id,
+            'delivery_method': 'webhook',
+            'message': f'Successfully loaded {len(posts_data)} webhook-delivered posts from run {run_id}'
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ WEBHOOK RESULTS BY RUN ERROR: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': f'Error loading webhook results for run {run_id}: {str(e)}'
+        }, status=500)
+
+@require_http_methods(["GET"])
+def webhook_results_by_job_id(request, job_id):
+    """
+    🎯 WEBHOOK-BASED DATA LOADING: Get results by job/folder ID from webhook delivery
+    """
+    try:
+        logger.info(f"🎯 WEBHOOK RESULTS BY JOB ID: {job_id}")
+        
+        # Find folder by job ID
+        folder = UnifiedRunFolder.objects.filter(id=job_id).first()
+        
+        if not folder:
+            return JsonResponse({
+                'success': False,
+                'error': f'Job/Folder {job_id} not found',
+                'status': 'not_found'
+            }, status=404)
+        
+        # Get webhook-delivered posts for this folder
+        webhook_posts = BrightDataScrapedPost.objects.filter(
+            folder_id=folder.id,
+            webhook_delivered=True  # 🎯 ONLY webhook-delivered posts
+        ).order_by('-created_at')
+        
+        if not webhook_posts.exists():
+            return JsonResponse({
+                'success': False,
+                'message': f'Job {job_id} exists but no webhook results received yet',
+                'status': 'waiting_for_webhook',
+                'folder_name': folder.name,
+                'hint': 'Data will appear here automatically when BrightData webhook delivers results'
+            }, status=202)
+        
+        # Transform posts data
+        posts_data = []
+        for post in webhook_posts:
+            posts_data.append({
+                'post_id': post.post_id,
+                'url': post.url,
+                'user_posted': post.user_posted,
+                'content': post.content,
+                'likes': post.likes,
+                'num_comments': post.num_comments,
+                'date_posted': post.date_posted,
+                'platform': post.platform,
+                'id': post.id,
+                'webhook_delivered': True,
+                'created_at': post.created_at.isoformat() if post.created_at else None,
+                'raw_data': post.raw_data
+            })
+        
+        logger.info(f"✅ WEBHOOK RESULTS BY JOB: Found {len(posts_data)} posts for job {job_id}")
+        
+        return JsonResponse({
+            'success': True,
+            'data': posts_data,
+            'total_results': len(posts_data),
+            'folder_name': folder.name,
+            'folder_id': folder.id,
+            'job_id': job_id,
+            'delivery_method': 'webhook',
+            'message': f'Successfully loaded {len(posts_data)} webhook-delivered posts from job {job_id}'
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ WEBHOOK RESULTS BY JOB ERROR: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': f'Error loading webhook results for job {job_id}: {str(e)}'
         }, status=500)

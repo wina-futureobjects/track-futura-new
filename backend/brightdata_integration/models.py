@@ -107,10 +107,7 @@ class BrightDataScraperRequest(models.Model):
     source_name = models.CharField(max_length=200, default='Unknown')
     
     # Job linking fields  
-    folder_id = models.IntegerField(null=True, blank=True, help_text='Associated job folder ID (deprecated - use run_folder)')
-    run_folder = models.ForeignKey('track_accounts.UnifiedRunFolder', on_delete=models.CASCADE, 
-                                  related_name='scraper_requests', null=True, blank=True,
-                                  help_text='Associated job folder for this scrape request')
+    folder_id = models.IntegerField(null=True, blank=True, help_text='Associated job folder ID')
     scrape_number = models.IntegerField(default=1, help_text='Incremental scrape number for this folder')
     user_id = models.IntegerField(null=True, blank=True, help_text='User who triggered the job')
     
@@ -135,8 +132,7 @@ class BrightDataScraperRequest(models.Model):
         verbose_name = "BrightData Scraper Request"
         verbose_name_plural = "BrightData Scraper Requests"
         indexes = [
-            models.Index(fields=['folder_id', 'scrape_number'], name='bd_folder_id_scrape_idx'),
-            models.Index(fields=['run_folder', 'scrape_number'], name='bd_run_folder_scrape_idx'),
+            models.Index(fields=['folder_id', 'scrape_number']),
         ]
 
     def __str__(self):
@@ -209,6 +205,9 @@ class BrightDataScrapedPost(models.Model):
     
     # Raw data backup
     raw_data = models.JSONField(default=dict, help_text='Original BrightData response')
+    
+    # 🎯 WEBHOOK DELIVERY TRACKING: Mark posts delivered via webhook vs polling
+    webhook_delivered = models.BooleanField(default=False, help_text='True if delivered via BrightData webhook, False if fetched via polling')
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)

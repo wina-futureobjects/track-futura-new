@@ -93,4 +93,9 @@ urlpatterns = [
     # File upload endpoints (fallback)
     path('upload-data/', views.upload_data_file, name='upload_data_file'),
     path('list-folders/', views.list_uploaded_folders, name='list_uploaded_folders'),
+    
+    # 🎯 WEBHOOK-BASED RESULTS ENDPOINTS (No Polling - Only Webhook Delivered Data)
+    path('webhook-results/<str:folder_name>/<int:scrape_number>/', views.webhook_results_by_folder_scrape, name='webhook_results_folder_scrape'),
+    path('webhook-results/run/<str:run_id>/', views.webhook_results_by_run_id, name='webhook_results_run'),
+    path('webhook-results/job/<int:job_id>/', views.webhook_results_by_job_id, name='webhook_results_job'),
 ]

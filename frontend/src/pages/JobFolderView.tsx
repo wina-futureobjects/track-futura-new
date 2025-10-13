@@ -236,13 +236,16 @@ const JobFolderView = () => {
             console.log('🚨 HARD OVERRIDE PARAMS:', { folderNameRaw, scrapeNum, decodedFolderName });
             console.log('🚨 MAKING DIRECT API CALL TO:', `/api/brightdata/data-storage/${folderNameRaw}/${scrapeNum}/`);
             
-            const response = await apiFetch(`/api/brightdata/data-storage/${folderNameRaw}/${scrapeNum}/`);
+            // 🎯 WEBHOOK-BASED DATA LOADING: No polling, wait for webhook delivery
+            console.log('🎯 Using webhook-based data loading - checking for delivered results');
+            
+            const response = await apiFetch(`/api/brightdata/webhook-results/${folderNameRaw}/${scrapeNum}/`);
             if (response.ok) {
               const data = await response.json();
-              console.log('🚨 HARD OVERRIDE SUCCESS:', data);
+              console.log('🎯 WEBHOOK DATA SUCCESS:', data);
               
               if (data.success && data.data && data.data.length > 0) {
-                // Transform the data
+                // Transform the webhook-delivered data
                 const transformedPosts: Post[] = data.data.map((item: any, index: number) => ({
                   id: index + 1,
                   post_id: item.post_id || item.shortcode || item.id || `post_${index}`,
@@ -262,7 +265,7 @@ const JobFolderView = () => {
                 const jobFolderData: JobFolder = {
                   id: 0,
                   name: decodedFolderName,
-                  description: `Scraped ${data.total_results || transformedPosts.length} posts from BrightData (Scrape #${scrapeNum})`,
+                  description: `Webhook-delivered results: ${data.total_results || transformedPosts.length} posts from BrightData (Scrape #${scrapeNum})`,
                   category: 'posts',
                   category_display: 'Posts',
                   platform: 'instagram',
@@ -284,10 +287,10 @@ const JobFolderView = () => {
       if (runId) {
         console.log(`🚀 DIRECT RUN ACCESS: Handling run ID ${runId}`);
         
-        // Use the new direct data-storage/run endpoint - NO REDIRECTS!
+        // 🎯 WEBHOOK-BASED: Use webhook-results endpoint instead of polling
         try {
-          console.log(`📡 Making direct API call to: /api/brightdata/data-storage/run/${runId}/`);
-          const runDataResponse = await apiFetch(`/api/brightdata/data-storage/run/${runId}/`);
+          console.log(`🎯 Checking webhook-delivered results for run: ${runId}`);
+          const runDataResponse = await apiFetch(`/api/brightdata/webhook-results/run/${runId}/`);
           
           if (runDataResponse.ok) {
             const runResults = await runDataResponse.json();
@@ -485,9 +488,9 @@ const JobFolderView = () => {
         console.log(`✅ Folder name encoded: ${finalFolderName}`);
         console.log(`✅ Folder name decoded: ${decodedFolderName}`);
         
-        // Use the new human-friendly endpoint directly
-        console.log(`✅ Making API call to: /api/brightdata/data-storage/${encodeURIComponent(decodedFolderName)}/${finalScrapeNumber}/`);
-        const brightDataResponse = await apiFetch(`/api/brightdata/data-storage/${encodeURIComponent(decodedFolderName)}/${finalScrapeNumber}/`);
+        // 🎯 WEBHOOK-BASED: Use webhook-results endpoint for delivered data
+        console.log(`🎯 Checking webhook-delivered results: ${encodeURIComponent(decodedFolderName)}/${finalScrapeNumber}`);
+        const brightDataResponse = await apiFetch(`/api/brightdata/webhook-results/${encodeURIComponent(decodedFolderName)}/${finalScrapeNumber}/`);
         
         if (brightDataResponse.ok) {
           const brightDataResults = await brightDataResponse.json();
@@ -571,11 +574,11 @@ const JobFolderView = () => {
         console.log('Folder data:', folderData);
       }
 
-        // Try the new human-friendly endpoint first with proper encoding
-        let brightDataResponse = await apiFetch(`/api/brightdata/data-storage/${encodeURIComponent(fallbackFolderName)}/${fallbackScrapeNumber}/`);      // If that fails, fall back to the old endpoint
+        // 🎯 WEBHOOK-BASED: Try webhook-results first, then fallback to old endpoint
+        let brightDataResponse = await apiFetch(`/api/brightdata/webhook-results/${encodeURIComponent(fallbackFolderName)}/${fallbackScrapeNumber}/`);
       if (!brightDataResponse.ok) {
-        console.log('Human-friendly endpoint not available, trying old endpoint...');
-        brightDataResponse = await apiFetch(`/api/brightdata/job-results/${folderId}/`);
+        console.log('🎯 Webhook results not available, trying fallback endpoint...');
+        brightDataResponse = await apiFetch(`/api/brightdata/webhook-results/job/${folderId}/`);
       }
       
       if (brightDataResponse.ok) {
