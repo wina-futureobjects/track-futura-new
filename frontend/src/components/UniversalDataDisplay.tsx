@@ -976,6 +976,9 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
         case 'content':
           return (
             <TextField
+              id={`edit-content-${item.id}`}
+              name={`editContent${item.id}`}
+              label="Content"
               multiline
               rows={3}
               value={currentValue as string || ''}
@@ -995,6 +998,9 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
         case 'posts_count':
           return (
             <TextField
+              id={`edit-${field.key}-${item.id}`}
+              name={`edit${field.key.charAt(0).toUpperCase() + field.key.slice(1)}${item.id}`}
+              label={field.key.charAt(0).toUpperCase() + field.key.slice(1)}
               type="number"
               value={currentValue as number || 0}
               onChange={(e) => handleFieldEdit(item.id, field.key, parseInt(e.target.value) || 0)}
@@ -1010,6 +1016,9 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
                                       (editedValue?.shares || item.shares || 0));
           return (
             <TextField
+              id={`edit-engagement-${item.id}`}
+              name={`editEngagement${item.id}`}
+              label="Engagement"
               value={editEngagementValue.toLocaleString()}
               size="small"
               sx={{ width: '100%' }}
@@ -1027,12 +1036,14 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
             <FormControlLabel
               control={
                 <Switch
+                  id={`edit-${field.key}-${item.id}`}
+                  name={`edit${field.key.charAt(0).toUpperCase() + field.key.slice(1)}${item.id}`}
                   checked={currentValue as boolean || false}
                   onChange={(e) => handleFieldEdit(item.id, field.key, e.target.checked)}
                   size="small"
                 />
               }
-              label=""
+              label={field.key === 'is_verified' ? 'Verified' : 'Paid Partnership'}
               sx={{ margin: 0, justifyContent: 'center' }}
             />
           );
@@ -1041,6 +1052,9 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
         case 'date':
           return (
             <TextField
+              id={`edit-${field.key}-${item.id}`}
+              name={`edit${field.key.charAt(0).toUpperCase() + field.key.slice(1)}${item.id}`}
+              label={field.key === 'date' ? 'Date' : 'Post User'}
               value={currentValue as string || ''}
               onChange={(e) => handleFieldEdit(item.id, field.key, e.target.value)}
               size="small"
@@ -1053,6 +1067,9 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
         default:
           return (
             <TextField
+              id={`edit-${field.key}-${item.id}`}
+              name={`edit${field.key.charAt(0).toUpperCase() + field.key.slice(1)}${item.id}`}
+              label={field.key.charAt(0).toUpperCase() + field.key.slice(1)}
               value={currentValue as string || ''}
               onChange={(e) => handleFieldEdit(item.id, field.key, e.target.value)}
               size="small"
@@ -1600,7 +1617,10 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
           {/* Search and Filter Controls */}
           <Box sx={{ display: 'flex', gap: 2, mb: 3, alignItems: 'center' }}>
             <TextField
+              id="universal-search-field"
+              name="searchField"
               placeholder="Search content, users, or keywords..."
+              label="Search"
               variant="outlined"
               size="small"
               value={searchTerm}
@@ -1629,6 +1649,8 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
                 Sort by:
               </Typography>
               <Select
+                id="sort-by-select"
+                name="sortBy"
                 value={sortBy}
                 onChange={handleSortSelectChange}
                 size="small"
@@ -1686,6 +1708,8 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
               
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr' }, gap: 2 }}>
                 <TextField
+                  id="start-date-filter"
+                  name="startDate"
                   label="Start Date"
                   type="date"
                   value={startDate}
@@ -1702,6 +1726,8 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
                 />
                 
                 <TextField
+                  id="end-date-filter"
+                  name="endDate"
                   label="End Date"
                   type="date"
                   value={endDate}
@@ -1718,6 +1744,8 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
                 />
                 
                 <TextField
+                  id="min-likes-filter"
+                  name="minLikes"
                   label="Min Likes"
                   type="number"
                   value={minLikes}
@@ -1734,6 +1762,8 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
                 />
                 
                 <TextField
+                  id="max-likes-filter"
+                  name="maxLikes"
                   label="Max Likes"
                   type="number"
                   value={maxLikes}
@@ -1938,9 +1968,11 @@ const UniversalDataDisplay: React.FC<UniversalDataDisplayProps> = ({
                   accept=".csv"
                   style={{ display: 'none' }}
                   id="csv-file-upload"
+                  name="csvFileUpload"
                   type="file"
                   onChange={handleFileChange}
                   disabled={uploadLoading}
+                  aria-label="Select CSV file for upload"
                 />
                 <label htmlFor="csv-file-upload">
                   <Button
