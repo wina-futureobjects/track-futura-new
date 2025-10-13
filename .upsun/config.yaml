@@ -1,4 +1,4 @@
-# TrackFutura deployment with integrated React frontend - Force rebuild v3
+# TrackFutura deployment with integrated React frontend - Force rebuild v4 BRIGHTDATA
 applications:
   trackfutura:
     type: python:3.12
