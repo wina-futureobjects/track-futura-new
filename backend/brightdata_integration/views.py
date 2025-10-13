@@ -1644,8 +1644,10 @@ def brightdata_webhook(request):
             raw_data=data
         )
         
-        # Find associated scraper request
+        # 🔥 CRITICAL FIX: Enhanced scraper request lookup with folder creation
         scraper_request = None
+        target_folder_id = None
+        
         if snapshot_id:
             try:
                 scraper_request = BrightDataScraperRequest.objects.filter(
@@ -1655,7 +1657,8 @@ def brightdata_webhook(request):
                 if scraper_request:
                     webhook_event.platform = scraper_request.platform
                     webhook_event.save()
-                    logger.info(f"Found associated scraper request by snapshot_id: {scraper_request.id}")
+                    target_folder_id = scraper_request.folder_id
+                    logger.info(f"✅ Found scraper request by snapshot_id: {scraper_request.id} -> Folder {target_folder_id}")
             except Exception as e:
                 logger.error(f"Error finding scraper request by snapshot_id: {str(e)}")
         
@@ -1671,20 +1674,53 @@ def brightdata_webhook(request):
                 
                 if recent_processing:
                     scraper_request = recent_processing
-                    logger.info(f"Found associated scraper request by platform: {scraper_request.id}")
+                    target_folder_id = scraper_request.folder_id
+                    logger.info(f"✅ Found scraper request by platform: {scraper_request.id} -> Folder {target_folder_id}")
                     
                     # Update with snapshot_id if we have it
                     if snapshot_id and not scraper_request.snapshot_id:
                         scraper_request.snapshot_id = snapshot_id
                         scraper_request.save()
-                        logger.info(f"Updated scraper request {scraper_request.id} with snapshot_id: {snapshot_id}")
+                        logger.info(f"🔄 Updated scraper request {scraper_request.id} with snapshot_id: {snapshot_id}")
                         
             except Exception as e:
                 logger.error(f"Error finding scraper request by platform: {str(e)}")
         
+        # 🚨 EMERGENCY FALLBACK: Create folder and scraper request if none found
+        if not scraper_request:
+            logger.warning(f"⚠️ No scraper request found for snapshot_id: {snapshot_id}, creating emergency fallback...")
+            
+            # Create emergency folder for orphaned data
+            from track_accounts.models import UnifiedRunFolder
+            try:
+                # Create emergency folder
+                emergency_folder = UnifiedRunFolder.objects.create(
+                    name=f"Emergency Scrape {snapshot_id or 'Unknown'}",
+                    project_id=1,
+                    folder_type='job'
+                )
+                target_folder_id = emergency_folder.id
+                
+                # Create emergency scraper request
+                scraper_request = BrightDataScraperRequest.objects.create(
+                    platform=platform,
+                    target_url=f"Emergency webhook data for {platform}",
+                    snapshot_id=snapshot_id or f"emergency_{int(time.time())}",
+                    status='processing',
+                    folder_id=target_folder_id,
+                    scrape_number=1
+                )
+                
+                logger.info(f"🆘 Created emergency folder {target_folder_id} and scraper request {scraper_request.id}")
+                
+            except Exception as e:
+                logger.error(f"❌ Failed to create emergency fallback: {str(e)}")
+                # Use default folder as last resort
+                target_folder_id = 1
+        
         # Process the webhook data
         try:
-            success = _process_brightdata_results(data, platform, scraper_request)
+            success = _process_brightdata_results(data, platform, scraper_request, target_folder_id)
             
             if success:
                 webhook_event.status = 'completed'
@@ -1818,15 +1854,24 @@ def _create_brightdata_scraped_post(item_data, platform, folder_id=None, scraper
         logger.info(f"   folder_id param: {folder_id}")
         logger.info(f"   scraper_request: {scraper_request}")
         
-        # Extract folder_id from various sources
+        # 🔥 ENHANCED FOLDER_ID EXTRACTION - Multiple fallbacks for reliability
         if not folder_id:
             folder_id = item_data.get('folder_id')
             logger.info(f"   folder_id from item_data: {folder_id}")
         if not folder_id and scraper_request:
             folder_id = scraper_request.folder_id
             logger.info(f"   folder_id from scraper_request: {folder_id}")
+        if not folder_id:
+            # CRITICAL FALLBACK: Use default folder 1 (Nike) if no folder specified
+            folder_id = 1
+            logger.warning(f"   ⚠️ Using default folder_id: {folder_id}")
             
-        logger.info(f"   final folder_id: {folder_id}")
+        logger.info(f"   🎯 FINAL folder_id: {folder_id}")
+        
+        # 🚨 PRODUCTION CRITICAL: Ensure folder_id is valid
+        if not folder_id:
+            logger.error(f"❌ No valid folder_id found - cannot save post!")
+            return None
         
         # ENHANCED: Verify folder exists and create UnifiedRunFolder if needed
         if folder_id:
@@ -1897,29 +1942,38 @@ def _create_brightdata_scraped_post(item_data, platform, folder_id=None, scraper
 
 
 
-def _process_brightdata_results(data: list, platform: str, scraper_request=None):
+def _process_brightdata_results(data: list, platform: str, scraper_request=None, target_folder_id=None):
     """
     Process BrightData results and store them in appropriate models
     PRODUCTION FIX: Now creates BrightDataScrapedPost records for job folder linking
     ENHANCED: Updates scraper request status when processing data
+    CRITICAL: Now accepts target_folder_id parameter for proper folder linking
     """
     try:
-        logger.info(f"Processing {len(data)} items for platform {platform}")
+        logger.info(f"📊 Processing {len(data)} items for platform {platform}")
+        logger.info(f"📁 Target folder ID: {target_folder_id}")
         
         # CRITICAL FIX: Process each item and create BrightDataScrapedPost records
         processed_count = 0
         
         for item in data:
-            # Extract folder_id from the webhook data
-            folder_id = item.get('folder_id')
-            if not folder_id and scraper_request:
-                folder_id = scraper_request.folder_id
+            # 🔥 ENHANCED FOLDER_ID DETECTION - Priority order for folder assignment
+            item_folder_id = target_folder_id  # Use webhook-determined folder first
+            if not item_folder_id:
+                item_folder_id = item.get('folder_id')  # Check item data
+            if not item_folder_id and scraper_request:
+                item_folder_id = scraper_request.folder_id  # Use scraper request folder
+            if not item_folder_id:
+                item_folder_id = 1  # Final fallback
+            
+            logger.info(f"📁 Processing item for folder_id: {item_folder_id} (platform: {platform})")
             
             # CREATE THE MISSING BrightDataScrapedPost RECORD
-            scraped_post = _create_brightdata_scraped_post(item, platform, folder_id, scraper_request)
+            scraped_post = _create_brightdata_scraped_post(item, platform, item_folder_id, scraper_request)
             
             if scraped_post:
                 processed_count += 1
+                logger.info(f"✅ Created post {scraped_post.id} in folder {item_folder_id}: {scraped_post.user_posted}")
         
         logger.info(f"Created {processed_count} BrightDataScrapedPost records with folder links")
         
@@ -2324,6 +2378,15 @@ def trigger_scraper_endpoint(request):
                             except Exception as e:
                                 logger.warning(f"Could not get real URL for folder {folder_id}: {e}")
                             
+                            # 🔥 CRITICAL FIX: Get next scrape number for this folder
+                            from django.db import models
+                            next_scrape_number = BrightDataScraperRequest.objects.filter(
+                                folder_id=folder_id
+                            ).aggregate(
+                                max_scrape=models.Max('scrape_number')
+                            )['max_scrape'] or 0
+                            next_scrape_number += 1
+
                             # Create a scraper request record linked to the folder
                             scraper_request = BrightDataScraperRequest.objects.create(
                                 platform=platform,
@@ -2332,11 +2395,33 @@ def trigger_scraper_endpoint(request):
                                 snapshot_id=snapshot_id,
                                 request_id=job_id,
                                 status='processing',
-                                folder_id=folder_id,  # Link to the job folder
+                                folder_id=folder_id,  # 🔥 CRITICAL: Link to the job folder
+                                scrape_number=next_scrape_number,  # 🔥 CRITICAL: Set scrape number
                                 user_id=user_id,
                                 started_at=timezone.now()  # Set start time
                             )
-                            logger.info(f"Created scraper request {scraper_request.id} for folder {folder_id} with URL: {target_url}")
+                            logger.info(f"🔗 Created scraper request {scraper_request.id} for folder {folder_id} scrape #{next_scrape_number} with URL: {target_url}")
+                            
+                            # 🚀 PRODUCTION FIX: Ensure folder exists in UnifiedRunFolder
+                            from track_accounts.models import UnifiedRunFolder
+                            try:
+                                unified_folder = UnifiedRunFolder.objects.get(id=folder_id)
+                                logger.info(f"✅ Confirmed folder {folder_id} exists: {unified_folder.name}")
+                            except UnifiedRunFolder.DoesNotExist:
+                                # Create the folder if it doesn't exist
+                                unified_folder = UnifiedRunFolder.objects.create(
+                                    id=folder_id,
+                                    name=f"Scrape Job {folder_id}",
+                                    project_id=1,  # Default project
+                                    folder_type='job'
+                                )
+                                logger.info(f"🆕 Created new UnifiedRunFolder {folder_id}: {unified_folder.name}")
+                                
+                            # 🔄 Update folder type for scraping workflow
+                            if unified_folder.folder_type != 'job':
+                                unified_folder.folder_type = 'job'
+                                unified_folder.save()
+                                logger.info(f"🔄 Updated folder {folder_id} type to 'job' for scraping workflow")
                             
             except Exception as e:
                 logger.warning(f"Failed to create job tracking record: {str(e)}")
