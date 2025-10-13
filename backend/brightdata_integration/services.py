@@ -228,13 +228,22 @@ class BrightDataAutomatedBatchScraper:
                 "Content-Type": "application/json",
             }
             
-            # Base parameters
+            # Base parameters with webhook delivery configuration
             params = {
                 "dataset_id": dataset_id,
-                "include_errors": "true",
-                # 🚨 CRITICAL FIX: Add webhook configuration
-                "notify": "https://trackfutura.futureobjects.io/api/brightdata/webhook/",
+                "delivery_method": "webhook",  # 🚨 CRITICAL FIX: Force webhook delivery
+                "webhook": {
+                    "url": "https://trackfutura.futureobjects.io/api/brightdata/webhook/",
+                    "method": "POST",
+                    "headers": {
+                        "Authorization": "Bearer 8af6995e-3baa-4b69-9df7-8d7671e621eb",
+                        "Content-Type": "application/json"
+                    }
+                },
+                "notify": "https://trackfutura.futureobjects.io/api/brightdata/notify/",
                 "format": "json",
+                "include_errors": True,
+                "uncompressed_webhook": True
             }
             
             # Add platform-specific parameters
@@ -410,12 +419,21 @@ class BrightDataAutomatedBatchScraper:
             print(f"📋 Payload: {json.dumps(payload, indent=2)}")
             
             # 🚨 CRITICAL FIX: Log webhook configuration for debugging
-            webhook_url = params.get('notify')
-            if webhook_url:
-                print(f"🌐 WEBHOOK CONFIGURED: {webhook_url}")
-                print(f"✅ BrightData will send results to your webhook when scraping completes!")
+            delivery_method = params.get('delivery_method')
+            webhook_config = params.get('webhook', {})
+            webhook_url = webhook_config.get('url') if webhook_config else params.get('notify')
+            
+            print(f"🔥 WEBHOOK DELIVERY CONFIGURATION:")
+            print(f"   Delivery Method: {delivery_method}")
+            print(f"   Webhook URL: {webhook_url}")
+            print(f"   Notify URL: {params.get('notify')}")
+            
+            if delivery_method == 'webhook' and webhook_url:
+                print(f"✅ WEBHOOK DELIVERY PROPERLY CONFIGURED!")
+                print(f"✅ BrightData will send results directly via webhook!")
             else:
-                print(f"⚠️ WARNING: No webhook configured - you won't receive automatic notifications!")
+                print(f"⚠️ WARNING: Webhook delivery not properly configured!")
+                print(f"   This will cause 'api_fetch' instead of 'webhook' delivery!")
             
             # Show expected format comparison
             print(f"🎯 Expected CSV format would be:")
