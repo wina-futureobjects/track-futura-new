@@ -72,7 +72,7 @@ const UploadToFolderDialog: React.FC<UploadToFolderDialogProps> = ({
   const fetchFolders = async () => {
     setLoadingFolders(true);
     try {
-      const response = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&folder_type=run`);
+      const response = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&folder_type=run&filter_empty=false`);
       if (response.ok) {
         const data = await response.json();
         setFolders(data.results || data || []);

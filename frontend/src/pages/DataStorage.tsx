@@ -202,7 +202,7 @@ const DataStorage = () => {
       // Fetch run folders with complete hierarchy from track_accounts
       let runFolders: any[] = [];
       try {
-        const runFoldersResponse = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&folder_type=run`);
+        const runFoldersResponse = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&folder_type=run&filter_empty=false`);
         if (runFoldersResponse.ok) {
           const runData = await runFoldersResponse.json();
           // The API returns the complete nested hierarchy with subfolders populated
