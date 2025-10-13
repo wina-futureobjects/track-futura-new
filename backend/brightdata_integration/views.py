@@ -3800,7 +3800,8 @@ def emergency_create_run_data(request, run_id):
                 'snapshot_id': f'emergency_snap_{run_id}',
                 'status': 'completed',
                 'platform': 'instagram',
-                'source_urls': ['https://instagram.com/nike/']
+                'target_url': 'https://instagram.com/nike/',
+                'source_name': 'Nike Instagram'
             }
         )
         
