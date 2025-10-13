@@ -98,4 +98,7 @@ urlpatterns = [
     path('webhook-results/<str:folder_name>/<int:scrape_number>/', views.webhook_results_by_folder_scrape, name='webhook_results_folder_scrape'),
     path('webhook-results/run/<str:run_id>/', views.webhook_results_by_run_id, name='webhook_results_run'),
     path('webhook-results/job/<int:job_id>/', views.webhook_results_by_job_id, name='webhook_results_job'),
+    
+    # 🔧 FOLDER AGGREGATION FIX - Handles folders with subfolders (like folder 1)
+    path('webhook-results/folder/<int:folder_id>/', views.webhook_results_by_folder_id, name='webhook_results_folder_id'),
 ]
