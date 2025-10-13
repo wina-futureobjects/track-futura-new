@@ -8,7 +8,7 @@
     <form id="uploadForm">
         <div>
             <label>Folder Name:</label>
-            <input type="text" id="folderName" value="TEST_UPLOAD" required>
+            <input type="text" id="folderName" value="NIKE_BRIGHTDATA_UPLOAD" required>
         </div>
         <div>
             <label>Platform:</label>
@@ -52,7 +52,8 @@
                 
                 const response = await fetch('https://main-bvxea6i-inhoolfrqniuu.eu-5.platformsh.site/api/brightdata/upload-data/', {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    mode: 'cors'
                 });
                 
                 console.log('Response status:', response.status);

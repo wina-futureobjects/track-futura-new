@@ -3014,12 +3014,40 @@ def upload_data_file(request):
                 'error': 'Only JSON and CSV files are supported'
             }, status=400)
         
-        # Create new folder
-        folder = UnifiedRunFolder.objects.create(
+        # Create hierarchical folder structure: MAIN_FOLDER -> PLATFORM_SUBFOLDER
+        
+        # Step 1: Find or create the main folder (e.g., "NIKE")
+        main_folder, main_created = UnifiedRunFolder.objects.get_or_create(
             name=folder_name,
-            project_id=1,  # Default project
-            folder_type='run'
+            project_id=1,
+            folder_type='run',  # Main brand/company folder
+            parent_folder=None,
+            defaults={}
         )
+        
+        if main_created:
+            logger.info(f"Created main folder: {main_folder.name} (ID: {main_folder.id})")
+        else:
+            logger.info(f"Using existing main folder: {main_folder.name} (ID: {main_folder.id})")
+        
+        # Step 2: Create platform subfolder inside main folder (e.g., "INSTAGRAM", "FACEBOOK")
+        platform_folder_name = platform.upper()
+        platform_folder, platform_created = UnifiedRunFolder.objects.get_or_create(
+            name=platform_folder_name,
+            project_id=1,
+            folder_type='platform',  # Platform-specific subfolder
+            platform_code=platform.lower(),
+            parent_folder=main_folder,
+            defaults={}
+        )
+        
+        if platform_created:
+            logger.info(f"Created platform subfolder: {platform_folder.name} inside {main_folder.name}")
+        else:
+            logger.info(f"Using existing platform subfolder: {platform_folder.name} inside {main_folder.name}")
+        
+        # Use the platform subfolder for storing posts
+        folder = platform_folder
         
         # Process the file
         file_content = file.read().decode('utf-8')
@@ -3110,8 +3138,13 @@ def upload_data_file(request):
             'success': True,
             'folder_id': folder.id,
             'folder_name': folder.name,
+            'main_folder_id': main_folder.id,
+            'main_folder_name': main_folder.name,
+            'platform_folder_id': platform_folder.id,
+            'platform_folder_name': platform_folder.name,
             'posts_created': posts_created,
-            'message': f'Successfully created folder "{folder.name}" with {posts_created} posts',
+            'message': f'Successfully uploaded {posts_created} posts to {main_folder.name} → {platform_folder.name}',
+            'hierarchy': f'{main_folder.name} → {platform_folder.name}',
             'redirect_url': f'/organizations/1/projects/1/data-storage/run/{folder.id}/'
         })
         
