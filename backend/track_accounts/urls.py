@@ -1,6 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
+from .views.fix_folder_4_view import fix_folder_4_api
 
 router = DefaultRouter()
 router.register(r'sources', views.TrackSourceViewSet, basename='track-source')
@@ -12,4 +13,5 @@ router.register(r'report-folders', views.UnifiedRunFolderViewSet, basename='unif
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('fix-folder-4/', fix_folder_4_api, name='fix-folder-4'),
 ] 
