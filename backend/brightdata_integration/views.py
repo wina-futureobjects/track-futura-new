@@ -2452,6 +2452,65 @@ def trigger_scraper_endpoint(request):
         return response
 
 
+@csrf_exempt
+@require_http_methods(["POST", "OPTIONS"])
+def trigger_system_endpoint(request):
+    """🚀 SIMPLIFIED SYSTEM TRIGGER - Works with corrected webhook configuration"""
+    
+    # Handle CORS preflight OPTIONS request
+    if request.method == 'OPTIONS':
+        response = JsonResponse({'status': 'ok'})
+        response['Access-Control-Allow-Origin'] = '*'
+        response['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        response['Access-Control-Max-Age'] = '86400'
+        return response
+    
+    try:
+        data = json.loads(request.body)
+        
+        # Extract parameters
+        folder_id = data.get('folder_id', 4)  # Default to folder 4
+        num_of_posts = data.get('num_of_posts', 10)
+        date_range = data.get('date_range')
+        
+        logger.info(f"🚀 SYSTEM TRIGGER: folder_id={folder_id}, num_of_posts={num_of_posts}")
+        
+        # Use the working webhook configuration
+        from .services import BrightDataAutomatedBatchScraper
+        scraper = BrightDataAutomatedBatchScraper()
+        
+        result = scraper.trigger_scraper_from_system(
+            folder_id=folder_id,
+            date_range=date_range,
+            num_of_posts=num_of_posts
+        )
+        
+        logger.info(f"✅ System trigger result: {result}")
+        
+        # Create CORS-friendly response
+        response = JsonResponse(result)
+        response['Access-Control-Allow-Origin'] = '*'
+        response['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"❌ System trigger failed: {str(e)}")
+        
+        response = JsonResponse({
+            'success': False, 
+            'error': str(e),
+            'message': 'System trigger failed - check webhook configuration'
+        }, status=500)
+        response['Access-Control-Allow-Origin'] = '*'
+        response['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        
+        return response
+
+
 def _handle_platform_setup(data):
     """Handle platform and service setup requests"""
     try:
