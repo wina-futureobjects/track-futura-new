@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Upload</title>
+</head>
+<body>
+    <h1>Test Upload to Production</h1>
+    <form id="uploadForm">
+        <div>
+            <label>Folder Name:</label>
+            <input type="text" id="folderName" value="TEST_UPLOAD" required>
+        </div>
+        <div>
+            <label>Platform:</label>
+            <select id="platform" required>
+                <option value="instagram">Instagram</option>
+                <option value="facebook">Facebook</option>
+            </select>
+        </div>
+        <div>
+            <label>File:</label>
+            <input type="file" id="fileInput" accept=".json,.csv" required>
+        </div>
+        <button type="submit">Upload to Production</button>
+    </form>
+    
+    <div id="result"></div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            formData.append('folder_name', document.getElementById('folderName').value);
+            formData.append('platform', document.getElementById('platform').value);
+            formData.append('file', document.getElementById('fileInput').files[0]);
+            
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>Uploading...</p>';
+            
+            try {
+                const response = await fetch('https://main-bvxea6i-inhoolfrqniuu.eu-5.platformsh.site/api/brightdata/upload-data/', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <h3>✅ Upload Successful!</h3>
+                        <p><strong>Folder ID:</strong> ${result.folder_id}</p>
+                        <p><strong>Posts Created:</strong> ${result.posts_created}</p>
+                        <p><strong>Message:</strong> ${result.message}</p>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <h3>❌ Upload Failed</h3>
+                        <p><strong>Error:</strong> ${result.error}</p>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <h3>❌ Network Error</h3>
+                    <p><strong>Error:</strong> ${error.message}</p>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>
