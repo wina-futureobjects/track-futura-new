@@ -3454,6 +3454,7 @@ def webhook_results_by_folder_scrape(request, folder_name, scrape_number):
 def webhook_results_by_run_id(request, run_id):
     """
     🎯 WEBHOOK-BASED DATA LOADING: Get results by run ID from webhook delivery
+    🔧 FIXED: Fallback to data-storage if no webhook data found
     """
     try:
         logger.info(f"🎯 WEBHOOK RESULTS BY RUN ID: {run_id}")
@@ -3464,11 +3465,17 @@ def webhook_results_by_run_id(request, run_id):
         ).first()
         
         if not scraper_request:
-            return JsonResponse({
-                'success': False,
-                'error': f'Run {run_id} not found',
-                'status': 'not_found'
-            }, status=404)
+            # 🔧 FIX: Try data-storage endpoint instead
+            logger.info(f"🔄 No scraper request found for run {run_id}, trying data-storage fallback...")
+            try:
+                return data_storage_run_endpoint(request, run_id)
+            except Exception as fallback_error:
+                logger.error(f"❌ Fallback to data-storage failed: {fallback_error}")
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Run {run_id} not found in webhook or data-storage',
+                    'status': 'not_found'
+                }, status=404)
         
         # Get the folder
         if not scraper_request.folder_id:
