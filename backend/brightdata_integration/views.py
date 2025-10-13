@@ -3134,17 +3134,27 @@ def upload_data_file(request):
                     'error': f'Error processing CSV: {str(e)}'
                 }, status=400)
         
+        # Ensure variables exist before return
+        try:
+            main_id = main_folder.id if 'main_folder' in locals() else None
+            main_name = main_folder.name if 'main_folder' in locals() else None
+            platform_id = platform_folder.id if 'platform_folder' in locals() else None
+            platform_name = platform_folder.name if 'platform_folder' in locals() else None
+            hierarchy_text = f'{main_name} → {platform_name}' if main_name and platform_name else None
+        except:
+            main_id = main_name = platform_id = platform_name = hierarchy_text = None
+        
         return cors_response({
             'success': True,
             'folder_id': folder.id,
             'folder_name': folder.name,
-            'main_folder_id': main_folder.id,
-            'main_folder_name': main_folder.name,
-            'platform_folder_id': platform_folder.id,
-            'platform_folder_name': platform_folder.name,
+            'main_folder_id': main_id,
+            'main_folder_name': main_name,
+            'platform_folder_id': platform_id,
+            'platform_folder_name': platform_name,
             'posts_created': posts_created,
-            'message': f'Successfully uploaded {posts_created} posts to {main_folder.name} → {platform_folder.name}',
-            'hierarchy': f'{main_folder.name} → {platform_folder.name}',
+            'message': f'Successfully uploaded {posts_created} posts' + (f' to {hierarchy_text}' if hierarchy_text else ''),
+            'hierarchy': hierarchy_text,
             'redirect_url': f'/organizations/1/projects/1/data-storage/run/{folder.id}/'
         })
         
