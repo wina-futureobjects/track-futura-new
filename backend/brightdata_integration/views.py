@@ -4026,3 +4026,67 @@ def emergency_create_run_data(request, run_id):
             'success': False,
             'error': f'Failed to create emergency data: {str(e)}'
         }, status=500)
+
+@api_view(['GET'])
+def snapshots_list(request):
+    """
+    List all BrightData snapshots/scraped posts
+    """
+    try:
+        # Get query parameters
+        limit = int(request.GET.get('limit', 50))
+        offset = int(request.GET.get('offset', 0))
+        platform = request.GET.get('platform', None)
+        snapshot_id = request.GET.get('snapshot_id', None)
+        
+        # Build query
+        queryset = BrightDataScrapedPost.objects.all().order_by('-created_at')
+        
+        if platform:
+            queryset = queryset.filter(platform__icontains=platform)
+        
+        if snapshot_id:
+            queryset = queryset.filter(snapshot_id=snapshot_id)
+        
+        # Get total count
+        total_count = queryset.count()
+        
+        # Apply pagination
+        posts = queryset[offset:offset + limit]
+        
+        # Format response
+        posts_data = []
+        for post in posts:
+            post_data = {
+                'id': post.id,
+                'snapshot_id': post.snapshot_id,
+                'post_id': post.post_id,
+                'url': post.url,
+                'user_posted': post.user_posted,
+                'content': post.content,
+                'likes': post.likes,
+                'num_comments': post.num_comments,
+                'shares': post.shares,
+                'hashtags': json.loads(post.hashtags) if post.hashtags else [],
+                'is_verified': post.is_verified,
+                'platform': post.platform,
+                'posted_date': post.posted_date,
+                'created_at': post.created_at
+            }
+            posts_data.append(post_data)
+        
+        return Response({
+            'success': True,
+            'total_count': total_count,
+            'count': len(posts_data),
+            'offset': offset,
+            'limit': limit,
+            'results': posts_data
+        })
+        
+    except Exception as e:
+        logger.error(f"Snapshots list error: {str(e)}")
+        return Response({
+            'success': False,
+            'error': f'Failed to fetch snapshots: {str(e)}'
+        }, status=500)

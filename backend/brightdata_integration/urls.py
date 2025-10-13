@@ -16,6 +16,9 @@ urlpatterns = [
     # ViewSet URLs
     path('', include(router.urls)),
     
+    # BrightData Snapshots endpoint
+    path('snapshots/', views.snapshots_list, name='snapshots_list'),
+    
     # EMERGENCY DEBUG ENDPOINT - Shows all available runs
     path('debug/available-runs/', lambda request: __import__('brightdata_integration.emergency_run_debug', fromlist=['emergency_run_info']).emergency_run_info(request), name='available_runs_debug'),
     
