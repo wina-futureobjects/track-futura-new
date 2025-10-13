@@ -881,7 +881,7 @@ def fix_folder_4_api(request):
         logger.info(f"Folder 4: {'created' if created else 'exists'}")
         
         # Check if folder already has sources
-        existing_sources = TrackSource.objects.filter(source_folder=folder).count()
+        existing_sources = TrackSource.objects.filter(folder=folder).count()
         
         if existing_sources > 0:
             return JsonResponse({
@@ -896,14 +896,13 @@ def fix_folder_4_api(request):
         
         # Nike Instagram
         nike_instagram, created = TrackSource.objects.get_or_create(
-            source_folder=folder,
-            platform='instagram',
-            identifier='nike',
+            folder=folder,
+            name='Nike Instagram',
             defaults={
                 'project_id': 1,
-                'name': 'Nike Instagram',
-                'is_active': True,
-                'description': 'Nike official Instagram account'
+                'platform': 'instagram',
+                'instagram_link': 'https://instagram.com/nike',
+                'service_name': 'Instagram Account Tracking'
             }
         )
         if created:
@@ -911,14 +910,13 @@ def fix_folder_4_api(request):
         
         # Nike Facebook  
         nike_facebook, created = TrackSource.objects.get_or_create(
-            source_folder=folder,
-            platform='facebook',
-            identifier='nike',
+            folder=folder,
+            name='Nike Facebook',
             defaults={
                 'project_id': 1,
-                'name': 'Nike Facebook',
-                'is_active': True,
-                'description': 'Nike official Facebook page'
+                'platform': 'facebook',
+                'facebook_link': 'https://facebook.com/nike',
+                'service_name': 'Facebook Page Tracking'
             }
         )
         if created:
@@ -926,21 +924,20 @@ def fix_folder_4_api(request):
             
         # Adidas Instagram
         adidas_instagram, created = TrackSource.objects.get_or_create(
-            source_folder=folder,
-            platform='instagram', 
-            identifier='adidas',
+            folder=folder,
+            name='Adidas Instagram',
             defaults={
                 'project_id': 1,
-                'name': 'Adidas Instagram',
-                'is_active': True,
-                'description': 'Adidas official Instagram account'
+                'platform': 'instagram',
+                'instagram_link': 'https://instagram.com/adidas',
+                'service_name': 'Instagram Account Tracking'
             }
         )
         if created:
             sources_created.append('Adidas Instagram')
         
         # Get final count
-        total_sources = TrackSource.objects.filter(source_folder=folder).count()
+        total_sources = TrackSource.objects.filter(folder=folder).count()
         
         return JsonResponse({
             'success': True,
