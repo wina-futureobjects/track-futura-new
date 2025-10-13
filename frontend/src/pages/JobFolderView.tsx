@@ -972,8 +972,8 @@ const JobFolderView = () => {
               </Typography>
             </Box>
             
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid item xs={12} md={6}>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, mb: 3 }}>
+              <Box sx={{ flex: 1 }}>
                 <Card sx={{ p: 2, backgroundColor: '#f8f9fa' }}>
                   <CardContent>
                     <Box display="flex" alignItems="center" mb={1}>
@@ -991,9 +991,9 @@ const JobFolderView = () => {
                     </Typography>
                   </CardContent>
                 </Card>
-              </Grid>
+              </Box>
               
-              <Grid item xs={12} md={6}>
+              <Box sx={{ flex: 1 }}>
                 <Card sx={{ p: 2, backgroundColor: '#f8f9fa' }}>
                   <CardContent>
                     <Box display="flex" alignItems="center" mb={1}>
@@ -1011,8 +1011,8 @@ const JobFolderView = () => {
                     </Typography>
                   </CardContent>
                 </Card>
-              </Grid>
-            </Grid>
+              </Box>
+            </Box>
             
             <Box sx={{ textAlign: 'center' }}>
               <Typography variant="body1" gutterBottom>
