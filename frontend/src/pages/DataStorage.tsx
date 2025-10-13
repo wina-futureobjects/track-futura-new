@@ -46,6 +46,7 @@ import {
   Clear as ClearIcon,
 } from '@mui/icons-material';
 import UploadDataDialog from '../components/UploadDataDialog';
+import UploadToFolderDialog from '../components/UploadToFolderDialog';
 import { apiFetch } from '../utils/api';
 
 interface Folder {
@@ -143,6 +144,7 @@ const DataStorage = () => {
 
   // Upload dialog state
   const [openUploadDialog, setOpenUploadDialog] = useState(false);
+  const [openUploadToFolderDialog, setOpenUploadToFolderDialog] = useState(false);
 
   const platforms = [
     { key: 'instagram', label: 'Instagram', icon: <InstagramIcon />, color: '#E4405F' },
@@ -380,14 +382,14 @@ const DataStorage = () => {
       const folderData = {
         name: folderName.trim(),
         description: folderDescription.trim() || null,
-        category: selectedCategory,
-        project: projectId
+        folder_type: 'run', // Create as run folder - main container
+        project_id: projectId
       };
 
-      console.log('Creating folder with data:', folderData);
-      console.log('Platform:', selectedPlatform);
+      console.log('Creating empty folder with data:', folderData);
 
-      const response = await apiFetch(`/api/${selectedPlatform}-data/folders/`, {
+      // Create unified run folder using track-accounts API
+      const response = await apiFetch(`/api/track-accounts/report-folders/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -414,9 +416,9 @@ const DataStorage = () => {
       }
 
       const data = await response.json();
-      console.log('Folder created successfully:', data);
+      console.log('Empty folder created successfully:', data);
       
-      setSnackbarMessage('Folder created successfully!');
+      setSnackbarMessage('Empty folder created successfully! You can now upload data files to organize them by platform.');
       setSnackbarOpen(true);
       setOpenNewFolderDialog(false);
       
@@ -424,7 +426,7 @@ const DataStorage = () => {
       fetchAllFolders();
       
     } catch (error) {
-      console.error('Error creating folder:', error);
+      console.error('Error creating empty folder:', error);
       setSnackbarMessage(error instanceof Error ? error.message : 'Failed to create folder. Please try again.');
       setSnackbarOpen(true);
     } finally {
@@ -756,11 +758,25 @@ const DataStorage = () => {
         </Typography>
         <Box display="flex" gap={2}>
           <Button
+            variant="outlined"
+            startIcon={<FolderIcon />}
+            onClick={handleNewFolder}
+          >
+            Create Empty Folder
+          </Button>
+          <Button
             variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setOpenUploadToFolderDialog(true)}
+          >
+            Upload to Folder
+          </Button>
+          <Button
+            variant="outlined"
             startIcon={<AddIcon />}
             onClick={() => setOpenUploadDialog(true)}
           >
-            Upload Data File
+            Quick Upload (Auto-Create)
           </Button>
           <Button
             variant="outlined"
@@ -1031,12 +1047,13 @@ const DataStorage = () => {
          fullWidth
          maxWidth="sm"
        >
-         <DialogTitle>Create New Folder</DialogTitle>
+         <DialogTitle>Create Empty Folder</DialogTitle>
          <DialogContent>
            <TextField
              autoFocus
              margin="dense"
              id="name"
+             name="folderName"
              label="Folder Name"
              type="text"
              fullWidth
@@ -1044,10 +1061,12 @@ const DataStorage = () => {
              value={folderName}
              onChange={(e) => setFolderName(e.target.value)}
              sx={{ mb: 2 }}
+             placeholder="e.g., Nike Campaign Data, Q4 Social Media Posts"
            />
            <TextField
              margin="dense"
              id="description"
+             name="folderDescription"
              label="Description (Optional)"
              type="text"
              fullWidth
@@ -1057,44 +1076,23 @@ const DataStorage = () => {
              value={folderDescription}
              onChange={(e) => setFolderDescription(e.target.value)}
              sx={{ mb: 2 }}
+             placeholder="Brief description of what data this folder will contain"
            />
-           <FormControl fullWidth sx={{ mb: 2 }}>
-             <InputLabel id="platform-select-label">Platform</InputLabel>
-             <Select
-               labelId="platform-select-label"
-               id="platform-select"
-               value={selectedPlatform}
-               label="Platform"
-               onChange={(e) => setSelectedPlatform(e.target.value)}
-             >
-               {platforms.map((platform) => (
-                 <MenuItem key={platform.key} value={platform.key}>
-                   <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                     <Box sx={{ color: platform.color, mr: 1 }}>
-                       {platform.icon}
-                     </Box>
-                     {platform.label}
-                   </Box>
-                 </MenuItem>
-               ))}
-             </Select>
-           </FormControl>
-           <FormControl fullWidth>
-             <InputLabel id="category-select-label">Category</InputLabel>
-             <Select
-               labelId="category-select-label"
-               id="category-select"
-               value={selectedCategory}
-               label="Category"
-               onChange={(e) => setSelectedCategory(e.target.value)}
-             >
-               {categories.filter(cat => cat.value !== 'all').map((category) => (
-                 <MenuItem key={category.value} value={category.value}>
-                   {category.label}
-                 </MenuItem>
-               ))}
-             </Select>
-           </FormControl>
+           
+           <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1, mt: 2 }}>
+             <Typography variant="body2" color="text.secondary" gutterBottom>
+               <strong>How it works:</strong>
+             </Typography>
+             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+               • This creates an empty main folder for organizing your data
+             </Typography>
+             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+               • When you upload data files, platform subfolders (Instagram, Facebook, etc.) will be automatically created
+             </Typography>
+             <Typography variant="body2" color="text.secondary">
+               • Example: "Nike Campaign" → "Instagram" → uploaded Instagram posts
+             </Typography>
+           </Box>
          </DialogContent>
          <DialogActions>
            <Button onClick={() => setOpenNewFolderDialog(false)}>Cancel</Button>
@@ -1103,7 +1101,7 @@ const DataStorage = () => {
              variant="contained"
              disabled={isCreatingFolder || !folderName.trim()}
            >
-             {isCreatingFolder ? 'Creating...' : 'Create'}
+             {isCreatingFolder ? 'Creating...' : 'Create Empty Folder'}
            </Button>
          </DialogActions>
        </Dialog>
@@ -1266,6 +1264,20 @@ const DataStorage = () => {
           setSnackbarOpen(true);
           fetchAllFolders(); // Refresh the folders list
           // Navigate to the new folder
+          navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage/run/${folderId}`);
+        }}
+      />
+
+      {/* Upload to Folder Dialog */}
+      <UploadToFolderDialog
+        open={openUploadToFolderDialog}
+        onClose={() => setOpenUploadToFolderDialog(false)}
+        projectId={projectId || ''}
+        onSuccess={(folderId, folderHierarchy, platform) => {
+          setSnackbarMessage(`Successfully uploaded data to "${folderHierarchy}" → "${platform.charAt(0).toUpperCase() + platform.slice(1)}"!`);
+          setSnackbarOpen(true);
+          fetchAllFolders(); // Refresh the folders list
+          // Navigate to the folder
           navigate(`/organizations/${organizationId}/projects/${projectId}/data-storage/run/${folderId}`);
         }}
       />
