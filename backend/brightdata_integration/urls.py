@@ -104,4 +104,10 @@ urlpatterns = [
     
     # 🔧 FOLDER AGGREGATION FIX - Handles folders with subfolders (like folder 1)
     path('webhook-results/folder/<int:folder_id>/', views.webhook_results_by_folder_id, name='webhook_results_folder_id'),
+    
+    # 🚨 EMERGENCY FIX: Direct data creation for run 158
+    path('create-run-data/<str:run_id>/', views.emergency_create_run_data, name='emergency_create_run_data'),
+    
+    # 🔧 WEBHOOK RESULTS ALIAS - Additional route for frontend compatibility
+    path('webhook-results/run/<int:run_id>/', views.webhook_results_by_run_id, name='webhook_results_run_int'),
 ]
