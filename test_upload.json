@@ -1,0 +1,20 @@
+[
+  {
+    "post_id": "test_upload_001",
+    "user_posted": "test_user",
+    "content": "This is a test post to verify upload functionality works",
+    "likes": 150,
+    "comments": 25,
+    "url": "https://instagram.com/p/test_upload_001/",
+    "date_posted": "2025-10-13T12:30:00Z"
+  },
+  {
+    "post_id": "test_upload_002", 
+    "user_posted": "another_test_user",
+    "content": "Second test post with different engagement metrics",
+    "likes": 300,
+    "comments": 45,
+    "url": "https://instagram.com/p/test_upload_002/",
+    "date_posted": "2025-10-13T11:45:00Z"
+  }
+]

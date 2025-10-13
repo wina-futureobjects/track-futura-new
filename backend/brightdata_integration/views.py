@@ -3026,7 +3026,7 @@ def upload_data_file(request):
                         user_posted=post_data.get('user_posted', post_data.get('user_username', post_data.get('username', 'Unknown'))),
                         content=post_data.get('content', post_data.get('caption', post_data.get('description', ''))),
                         likes=int(post_data.get('likes', post_data.get('likes_count', post_data.get('likesCount', 0))) or 0),
-                        comments=int(post_data.get('comments', post_data.get('comments_count', post_data.get('commentsCount', 0))) or 0),
+                        num_comments=int(post_data.get('comments', post_data.get('comments_count', post_data.get('commentsCount', 0))) or 0),
                         url=post_data.get('url', post_data.get('post_url', post_data.get('link', ''))),
                         date_posted=post_data.get('date_posted', post_data.get('timestamp', datetime.now().isoformat())),
                     )
@@ -3052,7 +3052,7 @@ def upload_data_file(request):
                         user_posted=row.get('user_posted', row.get('username', 'Unknown')),
                         content=row.get('content', row.get('caption', row.get('description', ''))),
                         likes=int(row.get('likes', row.get('likes_count', 0)) or 0),
-                        comments=int(row.get('comments', row.get('comments_count', 0)) or 0),
+                        num_comments=int(row.get('comments', row.get('comments_count', 0)) or 0),
                         url=row.get('url', row.get('post_url', '')),
                         date_posted=row.get('date_posted', row.get('timestamp', datetime.now().isoformat())),
                     )
