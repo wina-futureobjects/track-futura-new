@@ -48,7 +48,7 @@ applications:
         cd backend
         python manage.py migrate --noinput
         echo "🚀 Deploying BrightData snapshots to production..."
-        python manage.py deploy_brightdata_production
+        python ../direct_production_deploy.py
     
     relationships:
       database: postgresql:postgresql
