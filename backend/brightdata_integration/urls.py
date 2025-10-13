@@ -52,6 +52,10 @@ urlpatterns = [
         'ready_for_new_scrapes': True
     }), name='emergency_cleanup'),
     
+    # 🚀 UPLOAD ENDPOINTS - File upload for JSON/CSV data
+    path('upload-data/', views.upload_data_file, name='upload_data_file'),
+    path('list-folders/', views.list_uploaded_folders, name='list_uploaded_folders'),
+    
     # Webhook endpoints
     path('webhook/', views.brightdata_webhook, name='brightdata_webhook'),
     path('notify/', views.brightdata_notify, name='brightdata_notify'),
@@ -78,7 +82,15 @@ urlpatterns = [
     path('data-storage/<str:folder_name>/<int:scrape_num>/<str:platform>/post/', views.data_storage_folder_scrape_platform_post, name='data_storage_folder_scrape_platform_post'),
     path('data-storage/<str:folder_name>/<int:scrape_num>/<str:platform>/post/<str:account>/', views.data_storage_folder_scrape_platform_post_account, name='data_storage_folder_scrape_platform_post_account'),
     
-    # File upload endpoints
+    # 🚀 EMERGENCY UPLOAD - Simple test endpoint for immediate deployment
+    path('emergency-upload/', lambda request: __import__('django.http', fromlist=['JsonResponse']).JsonResponse({
+        'success': True,
+        'message': 'Emergency upload endpoint is working',
+        'method': request.method,
+        'ready_for_upload': True
+    }), name='emergency_upload_test'),
+    
+    # File upload endpoints (fallback)
     path('upload-data/', views.upload_data_file, name='upload_data_file'),
     path('list-folders/', views.list_uploaded_folders, name='list_uploaded_folders'),
 ]
