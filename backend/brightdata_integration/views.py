@@ -1688,37 +1688,43 @@ def brightdata_webhook(request):
             except Exception as e:
                 logger.error(f"Error finding scraper request by platform: {str(e)}")
         
-        # 🚨 EMERGENCY FALLBACK: Create folder and scraper request if none found
+        # 🎯 WORKFLOW MANAGEMENT INTEGRATION: Create proper data storage folder if none found
         if not scraper_request:
-            logger.warning(f"⚠️ No scraper request found for snapshot_id: {snapshot_id}, creating emergency fallback...")
+            logger.warning(f"⚠️ No scraper request found for snapshot_id: {snapshot_id}, creating workflow-compatible folder...")
             
-            # Create emergency folder for orphaned data
+            # 🚀 CRITICAL: Create Data Storage compatible folder structure
             from track_accounts.models import UnifiedRunFolder
             try:
-                # Create emergency folder
-                emergency_folder = UnifiedRunFolder.objects.create(
-                    name=f"Emergency Scrape {snapshot_id or 'Unknown'}",
-                    project_id=1,
-                    folder_type='job'
+                # Create workflow-compatible folder that appears in Data Storage
+                workflow_folder = UnifiedRunFolder.objects.create(
+                    name=f"Workflow Scrape - {platform.title()} - {timezone.now().strftime('%d/%m/%Y %H:%M:%S')}",
+                    project_id=2,  # 🎯 PROJECT 2 for Workflow Management
+                    folder_type='job',
+                    platform_code=platform,
+                    service_code='posts',
+                    description=f"Scraped data from Workflow Management - {platform} posts"
                 )
-                target_folder_id = emergency_folder.id
+                target_folder_id = workflow_folder.id
                 
-                # Create emergency scraper request
+                # Create scraper request linked to workflow
                 scraper_request = BrightDataScraperRequest.objects.create(
                     platform=platform,
-                    target_url=f"Emergency webhook data for {platform}",
-                    snapshot_id=snapshot_id or f"emergency_{int(time.time())}",
+                    target_url=f"Workflow Management: {platform} scraping",
+                    snapshot_id=snapshot_id or f"workflow_{int(time.time())}",
                     status='processing',
                     folder_id=target_folder_id,
-                    scrape_number=1
+                    scrape_number=1,
+                    # 🎯 WORKFLOW CONTEXT
+                    batch_job_id=None  # Will be linked to workflow system
                 )
                 
-                logger.info(f"🆘 Created emergency folder {target_folder_id} and scraper request {scraper_request.id}")
+                logger.info(f"� WORKFLOW: Created data storage folder {target_folder_id} and scraper request {scraper_request.id}")
+                logger.info(f"📁 DATA STORAGE PATH: /organizations/1/projects/2/data-storage (Job {workflow_folder.name})")
                 
             except Exception as e:
-                logger.error(f"❌ Failed to create emergency fallback: {str(e)}")
-                # Use default folder as last resort
-                target_folder_id = 1
+                logger.error(f"❌ Failed to create workflow folder: {str(e)}")
+                # Use project 2 default folder as fallback for workflow management
+                target_folder_id = 2
         
         # Process the webhook data
         try:
@@ -1733,18 +1739,21 @@ def brightdata_webhook(request):
                     scraper_request.completed_at = timezone.now()
                     scraper_request.save()
                     
-                    # 🚀 AUTOMATIC JOB CREATION - Trigger job creation from webhook
+                    # 🎯 WORKFLOW MANAGEMENT: Create job that appears in Data Storage
                     try:
                         from .services import BrightDataAutomatedBatchScraper
                         scraper_service = BrightDataAutomatedBatchScraper()
-                        job_result = scraper_service.create_automatic_job_for_completed_scraper(scraper_request)
+                        
+                        # 🚀 CRITICAL: Create job specifically for Workflow Management Data Storage
+                        job_result = scraper_service.create_workflow_management_job(scraper_request)
                         if job_result:
-                            logger.info(f"🎉 WEBHOOK: Auto-created Job {job_result['job_number']} with {job_result['moved_posts']} posts")
-                            logger.info(f"🌐 Data storage URL: {job_result['data_storage_url']}")
+                            logger.info(f"🎉 WORKFLOW: Created Data Storage job {job_result['job_number']} with {job_result['moved_posts']} posts")
+                            logger.info(f"🌐 ACCESSIBLE AT: https://trackfutura.futureobjects.io/organizations/1/projects/2/data-storage")
+                            logger.info(f"📁 JOB FOLDER: {job_result.get('job_folder_name', 'Unknown')}")
                         else:
-                            logger.warning("⚠️ WEBHOOK: Automatic job creation failed, but data was processed")
+                            logger.warning("⚠️ WORKFLOW: Job creation failed, but data was processed")
                     except Exception as job_error:
-                        logger.error(f"❌ WEBHOOK: Error in automatic job creation: {job_error}")
+                        logger.error(f"❌ WORKFLOW: Error in job creation: {job_error}")
                     
                     # Update batch job status
                     _update_batch_job_status(scraper_request.batch_job)

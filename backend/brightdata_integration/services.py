@@ -228,13 +228,23 @@ class BrightDataAutomatedBatchScraper:
                 "Content-Type": "application/json",
             }
             
-            # GUARANTEED WORKING WEBHOOK DELIVERY - Uses notify parameter
+            # 🔥 WORKFLOW MANAGEMENT INTEGRATED WEBHOOK DELIVERY
+            # This ensures data flows from Workflow Management → BrightData → Data Storage
             params = {
                 "dataset_id": dataset_id,
-                "notify": "https://trackfutura.futureobjects.io/api/brightdata/webhook/",  # 🎯 WORKING: notify delivers to webhook endpoint
+                "notify": "https://trackfutura.futureobjects.io/api/brightdata/webhook/",  # 🎯 WORKFLOW: delivers to webhook endpoint
                 "format": "json",
                 "uncompressed_webhook": "true",
-                "include_errors": "true"
+                "include_errors": "true",
+                # 🚀 CRITICAL: Add workflow context to ensure proper data storage routing
+                "workflow_context": json.dumps({
+                    "organization_id": 1,
+                    "project_id": 2, 
+                    "folder_id": folder_id if 'folder_id' in locals() else None,
+                    "platform": platform,
+                    "triggered_from": "workflow_management",
+                    "data_storage_path": f"/organizations/1/projects/2/data-storage"
+                })
             }
             
             # Add platform-specific parameters
@@ -926,6 +936,61 @@ class BrightDataAutomatedBatchScraper:
                 'snapshot_id': snapshot_id
             }
 
+    def create_workflow_management_job(self, scraper_request):
+        """
+        🎯 WORKFLOW MANAGEMENT JOB CREATION - Create job that appears in Data Storage
+        This ensures scraped data from Workflow Management appears in the Data Storage interface
+        """
+        try:
+            from django.db import transaction
+            from track_accounts.models import UnifiedRunFolder
+            
+            print(f"🎯 WORKFLOW: Creating job for Workflow Management scraper request {scraper_request.id}")
+            
+            # Check if we have scraped data
+            from .models import BrightDataScrapedPost
+            scraped_count = BrightDataScrapedPost.objects.filter(scraper_request=scraper_request).count()
+            if scraped_count == 0:
+                print(f"⚠️ WORKFLOW: No scraped posts found for request {scraper_request.id}")
+                return None
+            
+            print(f"📊 WORKFLOW: Found {scraped_count} scraped posts to organize into Data Storage")
+            
+            # Get next job number for Workflow Management (Project 2)
+            job_number = self._get_next_workflow_job_number()
+            
+            # Create job folder hierarchy with transaction for Project 2
+            with transaction.atomic():
+                job_folder = self._create_workflow_job_folder_hierarchy(job_number, scraper_request.platform)
+                if not job_folder:
+                    return None
+                
+                # Create platform-specific folder for Data Storage
+                platform_folder = self._create_workflow_platform_folder(job_folder, scraper_request.platform)
+                
+                # Move scraped data to Data Storage job folder
+                moved_count = self._move_scraped_data_to_workflow_folder(job_folder, platform_folder, scraper_request)
+                
+                # Update scraper request with job folder reference
+                scraper_request.folder_id = job_folder.id
+                scraper_request.save()
+                
+                print(f"✅ WORKFLOW: Job created and accessible in Data Storage!")
+                print(f"🌐 URL: https://trackfutura.futureobjects.io/organizations/1/projects/2/data-storage")
+                
+                return {
+                    'job_number': job_number,
+                    'job_folder_id': job_folder.id,
+                    'job_folder_name': job_folder.name,
+                    'moved_posts': moved_count,
+                    'data_storage_url': f'/organizations/1/projects/2/data-storage',
+                    'workflow_management_compatible': True
+                }
+                
+        except Exception as e:
+            print(f"❌ WORKFLOW: Error creating workflow job: {e}")
+            return None
+
     def create_automatic_job_for_completed_scraper(self, scraper_request):
         """
         🚀 AUTOMATIC JOB CREATION - Create job folder when BrightData scraping completes
@@ -975,6 +1040,46 @@ class BrightDataAutomatedBatchScraper:
         except Exception as e:
             print(f"❌ Error creating automatic job: {e}")
             return None
+
+    def _get_next_workflow_job_number(self, project_id=2):
+        """
+        🎯 WORKFLOW MANAGEMENT: Get next job number for Project 2 (Workflow Management)
+        Uses simple incrementing pattern for workflow jobs: WF-001, WF-002, etc.
+        """
+        try:
+            from track_accounts.models import UnifiedRunFolder
+            import re
+            
+            # Find all workflow job folders for Project 2
+            job_folders = UnifiedRunFolder.objects.filter(
+                project_id=project_id,
+                folder_type='job',
+                name__startswith='WF-'
+            ).values_list('name', flat=True)
+            
+            # Extract workflow job numbers
+            job_numbers = []
+            for name in job_folders:
+                match = re.search(r'WF-(\d+)', name)
+                if match:
+                    job_numbers.append(int(match.group(1)))
+            
+            if not job_numbers:
+                # Start workflow numbering
+                next_number = 1
+                print(f"📊 WORKFLOW: Starting workflow job numbering: WF-{next_number:03d}")
+                return f"WF-{next_number:03d}"
+            
+            max_number = max(job_numbers)
+            next_number = max_number + 1
+            
+            workflow_job_number = f"WF-{next_number:03d}"
+            print(f"📊 WORKFLOW: Next job number: {workflow_job_number}")
+            return workflow_job_number
+            
+        except Exception as e:
+            print(f"❌ WORKFLOW: Error getting next job number: {e}")
+            return "WF-001"  # Safe fallback
 
     def _get_next_job_number(self, project_id=1):
         """
@@ -1033,6 +1138,80 @@ class BrightDataAutomatedBatchScraper:
         except Exception as e:
             print(f"❌ Error getting next job number: {e}")
             return 196  # Safe fallback
+
+    def _create_workflow_job_folder_hierarchy(self, job_number, platform, project_id=2):
+        """
+        🎯 WORKFLOW MANAGEMENT: Create folder hierarchy for Project 2 (Data Storage)
+        This ensures jobs appear in the Workflow Management Data Storage interface
+        """
+        try:
+            from track_accounts.models import UnifiedRunFolder
+            from users.models import Project
+            
+            project = Project.objects.get(id=project_id)
+            
+            print(f"🎯 WORKFLOW: Creating folder hierarchy for Project {project_id}")
+            
+            # 1. Get or create Workflow Management Run folder for Project 2
+            run_folder, created = UnifiedRunFolder.objects.get_or_create(
+                project=project,
+                folder_type='run',
+                name=f'Workflow Management - Scraping Runs',
+                defaults={
+                    'description': 'Workflow Management automated scraping runs',
+                    'category': 'posts'
+                }
+            )
+            print(f"📁 WORKFLOW: Run folder: {run_folder.name} (Created: {created})")
+            
+            # 2. Get or create Platform folder under Run for Project 2
+            platform_folder, created = UnifiedRunFolder.objects.get_or_create(
+                project=project,
+                folder_type='platform',
+                platform_code=platform,
+                parent_folder=run_folder,
+                name=f'Workflow - {platform.title()} Platform',
+                defaults={
+                    'description': f'Workflow Management - {platform} data collection',
+                    'category': 'posts'
+                }
+            )
+            print(f"📁 WORKFLOW: Platform folder: {platform_folder.name} (Created: {created})")
+            
+            # 3. Get or create Service folder under Platform for Project 2
+            service_folder, created = UnifiedRunFolder.objects.get_or_create(
+                project=project,
+                folder_type='service',
+                platform_code=platform,
+                service_code='posts',
+                parent_folder=platform_folder,
+                name=f'Workflow - {platform.title()} Posts Service',
+                defaults={
+                    'description': f'Workflow Management - {platform} posts scraping service',
+                    'category': 'posts'
+                }
+            )
+            print(f"📁 WORKFLOW: Service folder: {service_folder.name} (Created: {created})")
+            
+            # 4. Create new Job folder for Project 2 with workflow-compatible naming
+            job_folder = UnifiedRunFolder.objects.create(
+                project=project,
+                folder_type='job',
+                platform_code=platform,
+                service_code='posts',
+                parent_folder=service_folder,
+                name=f'Job {job_number}',
+                description=f'Workflow Management job {job_number} - {platform} posts scraping',
+                category='posts'
+            )
+            print(f"🎯 WORKFLOW: Created Job folder: {job_folder.name} (ID: {job_folder.id}) for Project {project_id}")
+            print(f"🌐 ACCESSIBLE AT: /organizations/1/projects/2/data-storage")
+            
+            return job_folder
+            
+        except Exception as e:
+            print(f"❌ WORKFLOW: Error creating folder hierarchy: {e}")
+            return None
 
     def _create_job_folder_hierarchy(self, job_number, platform, project_id=1):
         """Create the complete folder hierarchy for a new job"""
@@ -1099,6 +1278,70 @@ class BrightDataAutomatedBatchScraper:
             print(f"❌ Error creating folder hierarchy: {e}")
             return None
 
+    def _create_workflow_platform_folder(self, job_folder, platform):
+        """
+        🎯 WORKFLOW MANAGEMENT: Create platform-specific folder for Data Storage
+        This ensures data appears in the correct platform section of Data Storage
+        """
+        try:
+            if platform == 'instagram':
+                from instagram_data.models import Folder as IGFolder
+                ig_folder = IGFolder.objects.create(
+                    name=f'Workflow Job {job_folder.name.split()[-1]} - Instagram Posts',
+                    description=f'Workflow Management - Instagram posts for {job_folder.name}',
+                    category='posts',
+                    project=job_folder.project,  # Project 2 for Workflow Management
+                    folder_type='run',
+                    unified_job_folder=job_folder
+                )
+                print(f"✅ WORKFLOW: Created Instagram folder: {ig_folder.name} (ID: {ig_folder.id}) for Project {job_folder.project.id}")
+                return ig_folder
+                
+            elif platform == 'facebook':
+                from facebook_data.models import Folder as FBFolder
+                fb_folder = FBFolder.objects.create(
+                    name=f'Workflow Job {job_folder.name.split()[-1]} - Facebook Posts',
+                    description=f'Workflow Management - Facebook posts for {job_folder.name}',
+                    category='posts',
+                    project=job_folder.project,  # Project 2 for Workflow Management
+                    folder_type='run',
+                    unified_job_folder=job_folder
+                )
+                print(f"✅ WORKFLOW: Created Facebook folder: {fb_folder.name} (ID: {fb_folder.id}) for Project {job_folder.project.id}")
+                return fb_folder
+                
+            elif platform == 'linkedin':
+                from linkedin_data.models import Folder as LinkedInFolder
+                linkedin_folder = LinkedInFolder.objects.create(
+                    name=f'Workflow Job {job_folder.name.split()[-1]} - LinkedIn Posts',
+                    description=f'Workflow Management - LinkedIn posts for {job_folder.name}',
+                    category='posts',
+                    project=job_folder.project,
+                    folder_type='run',
+                    unified_job_folder=job_folder
+                )
+                print(f"✅ WORKFLOW: Created LinkedIn folder: {linkedin_folder.name} (ID: {linkedin_folder.id})")
+                return linkedin_folder
+                
+            elif platform == 'tiktok':
+                from tiktok_data.models import Folder as TikTokFolder
+                tiktok_folder = TikTokFolder.objects.create(
+                    name=f'Workflow Job {job_folder.name.split()[-1]} - TikTok Posts',
+                    description=f'Workflow Management - TikTok posts for {job_folder.name}',
+                    category='posts',
+                    project=job_folder.project,
+                    folder_type='run',
+                    unified_job_folder=job_folder
+                )
+                print(f"✅ WORKFLOW: Created TikTok folder: {tiktok_folder.name} (ID: {tiktok_folder.id})")
+                return tiktok_folder
+                
+            return None
+            
+        except Exception as e:
+            print(f"❌ WORKFLOW: Error creating platform-specific folder: {e}")
+            return None
+
     def _create_platform_specific_folder(self, job_folder, platform):
         """Create platform-specific folder linked to the unified job folder"""
         try:
@@ -1133,6 +1376,150 @@ class BrightDataAutomatedBatchScraper:
         except Exception as e:
             print(f"❌ Error creating platform-specific folder: {e}")
             return None
+
+    def _move_scraped_data_to_workflow_folder(self, job_folder, platform_folder, scraper_request):
+        """
+        🎯 WORKFLOW MANAGEMENT: Move scraped posts to Data Storage folder
+        This ensures data appears in the Workflow Management Data Storage interface
+        """
+        try:
+            from .models import BrightDataScrapedPost
+            scraped_posts = BrightDataScrapedPost.objects.filter(scraper_request=scraper_request)
+            
+            if not scraped_posts.exists():
+                print(f"⚠️ WORKFLOW: No scraped posts found for scraper request {scraper_request.id}")
+                return 0
+            
+            moved_count = 0
+            print(f"📊 WORKFLOW: Moving {scraped_posts.count()} posts to Data Storage folder...")
+            
+            if scraper_request.platform == 'instagram' and platform_folder:
+                from instagram_data.models import InstagramPost
+                
+                for scraped_post in scraped_posts:
+                    try:
+                        # Create Instagram post in the Data Storage folder
+                        instagram_post, created = InstagramPost.objects.get_or_create(
+                            post_id=scraped_post.post_id,
+                            folder=platform_folder,
+                            defaults={
+                                'url': scraped_post.url or '',
+                                'user_posted': scraped_post.user_posted or 'Unknown',
+                                'description': scraped_post.content or '',
+                                'hashtags': scraped_post.hashtags or [],
+                                'num_comments': scraped_post.num_comments or 0,
+                                'date_posted': scraped_post.date_posted,
+                                'likes': scraped_post.likes or 0,
+                                'shortcode': scraped_post.post_id,
+                                'content_type': scraped_post.media_type or 'post',
+                                'views': 0,
+                                'video_play_count': 0,
+                            }
+                        )
+                        
+                        if created:
+                            moved_count += 1
+                            print(f"✅ WORKFLOW: Moved Instagram post {scraped_post.post_id} by {scraped_post.user_posted}")
+                        
+                    except Exception as e:
+                        print(f"❌ WORKFLOW: Error moving Instagram post {scraped_post.post_id}: {e}")
+                        continue
+            
+            elif scraper_request.platform == 'facebook' and platform_folder:
+                from facebook_data.models import FacebookPost
+                
+                for scraped_post in scraped_posts:
+                    try:
+                        # Create Facebook post in the Data Storage folder
+                        facebook_post, created = FacebookPost.objects.get_or_create(
+                            post_id=scraped_post.post_id,
+                            folder=platform_folder,
+                            defaults={
+                                'url': scraped_post.url or '',
+                                'user_posted': scraped_post.user_posted or 'Unknown',
+                                'content': scraped_post.content or '',
+                                'description': scraped_post.content or '',
+                                'hashtags': ', '.join(scraped_post.hashtags) if scraped_post.hashtags else '',
+                                'date_posted': scraped_post.date_posted,
+                                'num_comments': scraped_post.num_comments or 0,
+                                'num_shares': scraped_post.shares or 0,
+                                'likes': scraped_post.likes or 0,
+                                'page_name': scraped_post.user_posted or 'Unknown',
+                                'video_view_count': 0,
+                            }
+                        )
+                        
+                        if created:
+                            moved_count += 1
+                            print(f"✅ WORKFLOW: Moved Facebook post {scraped_post.post_id} by {scraped_post.user_posted}")
+                        
+                    except Exception as e:
+                        print(f"❌ WORKFLOW: Error moving Facebook post {scraped_post.post_id}: {e}")
+                        continue
+            
+            elif scraper_request.platform == 'linkedin' and platform_folder:
+                from linkedin_data.models import LinkedInPost
+                
+                for scraped_post in scraped_posts:
+                    try:
+                        # Create LinkedIn post in the Data Storage folder
+                        linkedin_post, created = LinkedInPost.objects.get_or_create(
+                            post_id=scraped_post.post_id,
+                            folder=platform_folder,
+                            defaults={
+                                'url': scraped_post.url or '',
+                                'user_posted': scraped_post.user_posted or 'Unknown',
+                                'content': scraped_post.content or '',
+                                'description': scraped_post.content or '',
+                                'date_posted': scraped_post.date_posted,
+                                'num_comments': scraped_post.num_comments or 0,
+                                'likes': scraped_post.likes or 0,
+                            }
+                        )
+                        
+                        if created:
+                            moved_count += 1
+                            print(f"✅ WORKFLOW: Moved LinkedIn post {scraped_post.post_id} by {scraped_post.user_posted}")
+                        
+                    except Exception as e:
+                        print(f"❌ WORKFLOW: Error moving LinkedIn post {scraped_post.post_id}: {e}")
+                        continue
+            
+            elif scraper_request.platform == 'tiktok' and platform_folder:
+                from tiktok_data.models import TikTokPost
+                
+                for scraped_post in scraped_posts:
+                    try:
+                        # Create TikTok post in the Data Storage folder
+                        tiktok_post, created = TikTokPost.objects.get_or_create(
+                            post_id=scraped_post.post_id,
+                            folder=platform_folder,
+                            defaults={
+                                'url': scraped_post.url or '',
+                                'user_posted': scraped_post.user_posted or 'Unknown',
+                                'content': scraped_post.content or '',
+                                'description': scraped_post.content or '',
+                                'date_posted': scraped_post.date_posted,
+                                'num_comments': scraped_post.num_comments or 0,
+                                'likes': scraped_post.likes or 0,
+                            }
+                        )
+                        
+                        if created:
+                            moved_count += 1
+                            print(f"✅ WORKFLOW: Moved TikTok post {scraped_post.post_id} by {scraped_post.user_posted}")
+                        
+                    except Exception as e:
+                        print(f"❌ WORKFLOW: Error moving TikTok post {scraped_post.post_id}: {e}")
+                        continue
+            
+            print(f"📊 WORKFLOW: Moved {moved_count} posts to Data Storage folder {job_folder.name}")
+            print(f"🌐 ACCESSIBLE AT: https://trackfutura.futureobjects.io/organizations/1/projects/2/data-storage")
+            return moved_count
+            
+        except Exception as e:
+            print(f"❌ WORKFLOW: Error moving scraped data: {e}")
+            return 0
 
     def _move_scraped_data_to_job_folder(self, job_folder, platform_folder, scraper_request):
         """Move scraped posts from BrightData to the new job folder"""
