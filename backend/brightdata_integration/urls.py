@@ -98,16 +98,15 @@ urlpatterns = [
     path('list-folders/', views.list_uploaded_folders, name='list_uploaded_folders'),
     
     # 🎯 WEBHOOK-BASED RESULTS ENDPOINTS (No Polling - Only Webhook Delivered Data)
-    path('webhook-results/<str:folder_name>/<int:scrape_number>/', views.webhook_results_by_folder_scrape, name='webhook_results_folder_scrape'),
+    # CRITICAL FIX: More specific patterns MUST come first to avoid URL collision
     path('webhook-results/run/<str:run_id>/', views.webhook_results_by_run_id, name='webhook_results_run'),
+    path('webhook-results/run/<int:run_id>/', views.webhook_results_by_run_id, name='webhook_results_run_int'),
     path('webhook-results/job/<int:job_id>/', views.webhook_results_by_job_id, name='webhook_results_job'),
-    
-    # 🔧 FOLDER AGGREGATION FIX - Handles folders with subfolders (like folder 1)
     path('webhook-results/folder/<int:folder_id>/', views.webhook_results_by_folder_id, name='webhook_results_folder_id'),
     
     # 🚨 EMERGENCY FIX: Direct data creation for run 158
     path('create-run-data/<str:run_id>/', views.emergency_create_run_data, name='emergency_create_run_data'),
     
-    # 🔧 WEBHOOK RESULTS ALIAS - Additional route for frontend compatibility
-    path('webhook-results/run/<int:run_id>/', views.webhook_results_by_run_id, name='webhook_results_run_int'),
+    # Generic pattern LAST (catches everything else)
+    path('webhook-results/<str:folder_name>/<int:scrape_number>/', views.webhook_results_by_folder_scrape, name='webhook_results_folder_scrape'),
 ]
