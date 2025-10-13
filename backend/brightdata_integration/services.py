@@ -55,9 +55,9 @@ class BrightDataAutomatedBatchScraper:
             self.logger.info(f"📅 Date Range: {date_range}")
             self.logger.info(f"👤 User ID: {user_id}")
             
-            # Get sources from the system - CRITICAL FIX: Use 'folder' field not 'folder_id'
+            # Get sources from the system - CRITICAL FIX: Use 'folder_id' for foreign key ID filtering
             if folder_id:
-                sources = TrackSource.objects.filter(folder=folder_id, folder__project_id=1)
+                sources = TrackSource.objects.filter(folder_id=folder_id, folder__project_id=1)
                 self.logger.info(f"📋 Found {sources.count()} sources in folder {folder_id}")
             else:
                 sources = TrackSource.objects.filter(folder__project_id=1)
