@@ -199,6 +199,22 @@ const DataStorage = () => {
     setError(null);
     
     try {
+      // 🎯 FIRST: Fetch BrightData folders (SIMPLE & DIRECT)
+      let brightDataFolders: any[] = [];
+      try {
+        console.log('🎯 Fetching BrightData scraped jobs...');
+        const brightDataResponse = await apiFetch('/api/brightdata/simple-jobs/');
+        if (brightDataResponse.ok) {
+          const brightDataResult = await brightDataResponse.json();
+          if (brightDataResult.success) {
+            brightDataFolders = brightDataResult.results || [];
+            console.log('🎉 Found BrightData folders:', brightDataFolders.length);
+          }
+        }
+      } catch (error) {
+        console.warn('Could not fetch BrightData folders:', error);
+      }
+
       // Fetch run folders and job folders (including BrightData folders) with complete hierarchy from track_accounts
       let runFolders: any[] = [];
       let jobFolders: any[] = [];
@@ -253,8 +269,9 @@ const DataStorage = () => {
         (pf: any) => !pf.unified_job_folder_id && !pf.unified_job_folder
       );
 
-      // Combine hierarchical folders + standalone platform folders
+      // Combine BrightData folders + hierarchical folders + standalone platform folders
       const allFolders = [
+        ...brightDataFolders,
         ...allFoldersFromHierarchy,
         ...standalonePlatformFolders,
       ];
