@@ -2966,21 +2966,41 @@ def run_redirect_endpoint(request, run_id):
 
 
 @csrf_exempt
-@require_http_methods(["POST"])
 def upload_data_file(request):
     """
     Upload JSON or CSV file and create a new folder with the data
     """
+    # Handle CORS preflight request
+    if request.method == 'OPTIONS':
+        response = HttpResponse()
+        response['Access-Control-Allow-Origin'] = '*'
+        response['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        response['Access-Control-Allow-Headers'] = 'Content-Type'
+        return response
+    
+    if request.method != 'POST':
+        response = JsonResponse({'success': False, 'error': 'Only POST method allowed'}, status=405)
+        response['Access-Control-Allow-Origin'] = '*'
+        return response
+    
     try:
         # Get form data
         folder_name = request.POST.get('folder_name', 'Uploaded Data')
         platform = request.POST.get('platform', 'instagram')
         file = request.FILES.get('file') or request.FILES.get('data_file')  # Support both field names
         
+        # Helper function to add CORS headers
+        def cors_response(data, status=200):
+            response = JsonResponse(data, status=status)
+            response['Access-Control-Allow-Origin'] = '*'
+            response['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+            response['Access-Control-Allow-Headers'] = 'Content-Type'
+            return response
+        
         logger.info(f"Upload request: folder_name={folder_name}, platform={platform}, file={file.name if file else 'None'}")
         
         if not file:
-            return JsonResponse({
+            return cors_response({
                 'success': False,
                 'error': 'No file uploaded'
             }, status=400)
@@ -2989,7 +3009,7 @@ def upload_data_file(request):
         
         # Validate file type
         if not file.name.endswith(('.json', '.csv')):
-            return JsonResponse({
+            return cors_response({
                 'success': False,
                 'error': 'Only JSON and CSV files are supported'
             }, status=400)
@@ -3050,7 +3070,7 @@ def upload_data_file(request):
                     posts_created += 1
                     
             except json.JSONDecodeError as e:
-                return JsonResponse({
+                return cors_response({
                     'success': False,
                     'error': f'Invalid JSON format: {str(e)}'
                 }, status=400)
@@ -3081,12 +3101,12 @@ def upload_data_file(request):
                     posts_created += 1
                     
             except Exception as e:
-                return JsonResponse({
+                return cors_response({
                     'success': False,
                     'error': f'Error processing CSV: {str(e)}'
                 }, status=400)
         
-        return JsonResponse({
+        return cors_response({
             'success': True,
             'folder_id': folder.id,
             'folder_name': folder.name,
@@ -3096,7 +3116,7 @@ def upload_data_file(request):
         })
         
     except Exception as e:
-        return JsonResponse({
+        return cors_response({
             'success': False,
             'error': f'Server error: {str(e)}'
         }, status=500)
