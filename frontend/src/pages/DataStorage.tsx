@@ -199,20 +199,31 @@ const DataStorage = () => {
     setError(null);
     
     try {
-      // Fetch run folders with complete hierarchy from track_accounts
+      // Fetch run folders and job folders (including BrightData folders) with complete hierarchy from track_accounts
       let runFolders: any[] = [];
+      let jobFolders: any[] = [];
       try {
+        // Fetch run folders
         const runFoldersResponse = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&folder_type=run&filter_empty=false`);
         if (runFoldersResponse.ok) {
           const runData = await runFoldersResponse.json();
-          // The API returns the complete nested hierarchy with subfolders populated
           runFolders = (runData.results || runData).map((folder: any) => ({
             ...folder,
             platform: 'unified'
           }));
         }
+
+        // Fetch job folders (including BrightData folders)
+        const jobFoldersResponse = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&folder_type=job&filter_empty=false`);
+        if (jobFoldersResponse.ok) {
+          const jobData = await jobFoldersResponse.json();
+          jobFolders = (jobData.results || jobData).map((folder: any) => ({
+            ...folder,
+            platform: folder.platform_code || 'unified'
+          }));
+        }
       } catch (error) {
-        console.warn('Could not fetch run folders from track_accounts:', error);
+        console.warn('Could not fetch folders from track_accounts:', error);
       }
 
       // Flatten the hierarchy to a single array for filtering/searching
@@ -227,7 +238,9 @@ const DataStorage = () => {
         return result;
       };
 
-      const allFoldersFromHierarchy = runFolders.flatMap(flattenFolders);
+      const allRunFolders = runFolders.flatMap(flattenFolders);
+      const allJobFolders = jobFolders.flatMap(flattenFolders);
+      const allFoldersFromHierarchy = [...allRunFolders, ...allJobFolders];
 
       // Also fetch standalone platform-specific folders (not linked to unified structure)
       const platformFolders = await Promise.all(
