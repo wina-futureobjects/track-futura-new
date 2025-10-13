@@ -233,7 +233,7 @@ class BrightDataAutomatedBatchScraper:
                 "dataset_id": dataset_id,
                 "include_errors": "true",
                 # 🚨 CRITICAL FIX: Add webhook configuration
-                "notify": "https://main-bvxea6i-inhoolfrqniuu.eu-5.platformsh.site/api/brightdata/webhook/",
+                "notify": "https://trackfutura.futureobjects.io/api/brightdata/webhook/",
                 "format": "json",
             }
             
