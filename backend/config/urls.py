@@ -151,6 +151,8 @@ urlpatterns = [
     path("api/tiktok-data/", include("tiktok_data.urls")),
     path("api/apify/", include("apify_integration.urls")),
     path("api/brightdata/", include("brightdata_integration.urls")),  # New BrightData API
+    # Web Unlocker API - Direct endpoint for better accessibility
+    path("api/web-unlocker/", include("views.web_unlocker_urls")),  # Web Unlocker Direct API
     path("api/chat/", include("chat.urls")),
     path("api/workflow/", include("workflow.urls")),
     path("api/dashboard/", include("dashboard.urls")),
