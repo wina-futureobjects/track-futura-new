@@ -47,6 +47,7 @@ import {
 } from '@mui/icons-material';
 import UploadDataDialog from '../components/UploadDataDialog';
 import UploadToFolderDialog from '../components/UploadToFolderDialog';
+import WebUnlockerScraper from '../components/WebUnlockerScraper';
 import { apiFetch } from '../utils/api';
 
 interface Folder {
@@ -885,6 +886,9 @@ const DataStorage = () => {
           </Button>
         </Box>
       </Box>
+
+      {/* Web Unlocker Scraper */}
+      <WebUnlockerScraper />
 
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>

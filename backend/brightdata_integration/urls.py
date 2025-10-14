@@ -66,6 +66,9 @@ urlpatterns = [
     path('webhook/', views.brightdata_webhook, name='brightdata_webhook'),
     path('notify/', views.brightdata_notify, name='brightdata_notify'),
     
+    # Web Unlocker API endpoint
+    path('web-unlocker/scrape/', views.WebUnlockerAPIView.as_view(), name='web_unlocker_scrape'),
+    
     # Direct trigger endpoint (function-based view for better production compatibility)
     path('trigger-scraper/', views.trigger_scraper_endpoint, name='trigger_scraper'),
     
