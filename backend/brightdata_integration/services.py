@@ -450,7 +450,11 @@ class BrightDataAutomatedBatchScraper:
                 print(f"✅ BrightData will send results to: {notify_url}")
                 print(f"✅ This is CONFIRMED WORKING configuration!")
             else:
-                print(f"⚠️ WARNING: Notify URL missing!")
+                # 🚨 EMERGENCY FIX: Raise exception if webhook not configured
+                error_msg = "🚨 CRITICAL ERROR: WEBHOOK NOTIFY URL MISSING!"
+                print(f"⚠️ {error_msg}")
+                self.logger.error(error_msg)
+                raise Exception(error_msg)
             
             # Show expected format comparison
             print(f"🎯 Expected CSV format would be:")

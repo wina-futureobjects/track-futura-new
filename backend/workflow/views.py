@@ -56,8 +56,25 @@ class WorkflowViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Create input collection and trigger workflow"""
         try:
-            # Create input collection with proper user
-            input_collection = serializer.save(created_by=self.request.user if self.request.user.is_authenticated else None)
+            # 🚨 EMERGENCY FIX: Remove duplicate URLs before saving
+            validated_data = serializer.validated_data
+            urls = validated_data.get('urls', [])
+            
+            # Remove duplicates while preserving order
+            unique_urls = list(dict.fromkeys(urls))
+            
+            if len(unique_urls) != len(urls):
+                logger.warning(f"🚨 REMOVED URL DUPLICATES: {len(urls)} -> {len(unique_urls)}")
+                logger.warning(f"Original URLs: {urls}")
+                logger.warning(f"Deduplicated URLs: {unique_urls}")
+            
+            validated_data['urls'] = unique_urls
+            
+            # Create input collection with proper user and deduplicated URLs
+            input_collection = serializer.save(
+                created_by=self.request.user if self.request.user.is_authenticated else None,
+                urls=unique_urls
+            )
             
             # Create workflow task using service
             workflow_service = WorkflowService()

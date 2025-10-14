@@ -14,7 +14,9 @@
       "Bash(taskkill:*)",
       "Bash(python:*)",
       "Bash(tasklist)",
-      "Read(//c/Users/winam/OneDrive/문서/OLD/TrackFutura-main/**)"
+      "Read(//c/Users/winam/OneDrive/문서/OLD/TrackFutura-main/**)",
+      "Read(//c/Users/winam/Music/TrackFutura-main/backend/**)",
+      "Read(//c/Users/winam/Music/TrackFutura-main/**)"
     ],
     "deny": [],
     "ask": []

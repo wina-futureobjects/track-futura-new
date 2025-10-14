@@ -69,6 +69,9 @@ urlpatterns = [
     # Web Unlocker API endpoint
     path('web-unlocker/scrape/', views.WebUnlockerAPIView.as_view(), name='web_unlocker_scrape'),
     
+    # 🚨 EMERGENCY FIX: Add missing trigger endpoint that production diagnostic expects
+    path('trigger/', views.trigger_scraper_endpoint, name='brightdata_trigger'),
+    
     # Direct trigger endpoint (function-based view for better production compatibility)
     path('trigger-scraper/', views.trigger_scraper_endpoint, name='trigger_scraper'),
     
