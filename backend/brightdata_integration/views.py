@@ -4232,9 +4232,8 @@ class WebUnlockerAPIView(View):
                 # Create UnifiedRunFolder entry
                 folder = UnifiedRunFolder.objects.create(
                     project_id=2,  # Your project ID
-                    folder_name=f"Web Unlocker - {scraper_name}",
-                    folder_emoji="🔓",
-                    created_by="Web Unlocker API",
+                    name=f"Web Unlocker - {scraper_name}",
+                    folder_type="run",
                     description=f"Scraped from: {target_url}"
                 )
                 
