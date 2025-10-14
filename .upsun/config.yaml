@@ -3,10 +3,8 @@ applications:
   trackfutura:
     type: python:3.12
     
-    # Increase memory allocation for heavy dependencies
-    resources:
-      base_memory: 256
-      memory_ratio: 256
+    # Set larger container size for heavy dependencies
+    size: S
     
     dependencies:
       python3:
