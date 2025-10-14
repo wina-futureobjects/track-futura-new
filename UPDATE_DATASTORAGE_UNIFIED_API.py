@@ -1,4 +1,35 @@
-import { useState, useEffect } from 'react';
+#!/usr/bin/env python3
+"""
+UPDATE DATASTORAGE TO USE UNIFIED API
+===================================
+
+This script updates DataStorage.tsx to use the new unified API endpoint
+instead of fragmented platform-specific endpoints.
+
+Key Changes:
+1. Replace fragmented API calls with single /unified-folders/ endpoint
+2. Remove hardcoded BrightData folder handling
+3. Simplify folder fetching logic
+4. Improve error handling and loading states
+"""
+
+import os
+import shutil
+from datetime import datetime
+
+def backup_and_update_datastorage():
+    """Update DataStorage.tsx to use unified API"""
+    
+    frontend_path = r"C:\Users\winam\OneDrive\문서\PREVIOUS\TrackFutura - Copy\frontend\src\pages"
+    datastorage_file = os.path.join(frontend_path, "DataStorage.tsx")
+    
+    # Backup original
+    backup_file = os.path.join(frontend_path, f"DataStorage.tsx.backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+    shutil.copy2(datastorage_file, backup_file)
+    print(f"✅ Backed up original to: {backup_file}")
+    
+    # Create updated DataStorage.tsx
+    updated_content = '''import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -1084,3 +1115,15 @@ const DataStorage = () => {
 };
 
 export default DataStorage;
+'''
+    
+    # Write updated content
+    with open(datastorage_file, 'w', encoding='utf-8') as f:
+        f.write(updated_content)
+    
+    print(f"✅ Updated DataStorage.tsx to use unified API")
+    print(f"📁 Original backed up to: {backup_file}")
+    print(f"🚀 Frontend now uses: /api/track-accounts/unified-folders/")
+
+if __name__ == "__main__":
+    backup_and_update_datastorage()
