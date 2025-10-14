@@ -258,12 +258,16 @@ class BrightDataAutomatedBatchScraper:
             # BrightData discovery phase needs PAST dates only (no current/future dates)
             today = datetime.now()
             
-            # Default to past 30 days ending 2 days ago (safe range)
-            default_end = today - timedelta(days=2)  # 2 days ago to be safe
-            default_start = default_end - timedelta(days=30)  # 30 days before that
+            # 🚨 FIX FOR DISCOVERY ERRORS: Use safer past dates (5+ days ago)
+            default_end = today - timedelta(days=7)  # 1 week ago to be safe
+            default_start = default_end - timedelta(days=14)  # 2 weeks before that
             
             start_date = default_start.strftime("%d-%m-%Y")
             end_date = default_end.strftime("%d-%m-%Y")
+            
+            print(f"🔧 DISCOVERY FIX: Using safe past dates")
+            print(f"   Start: {start_date} ({(today - default_start).days} days ago)")
+            print(f"   End: {end_date} ({(today - default_end).days} days ago)")
             
             if date_range:
                 try:
@@ -336,12 +340,12 @@ class BrightDataAutomatedBatchScraper:
                     start_date, end_date = end_date, start_date
                     start_dt, end_dt = end_dt, start_dt
                 
-                # Future date check
-                if end_dt.date() >= today_dt.date():
-                    print(f"⚠️ CRITICAL: End date {end_date} is today/future - adjusting!")
-                    end_dt = today_dt - timedelta(days=1)
+                # 🚨 CRITICAL FIX: Future date check - use safer margin
+                if end_dt.date() >= (today_dt - timedelta(days=3)).date():
+                    print(f"⚠️ CRITICAL: End date {end_date} is too recent - adjusting!")
+                    end_dt = today_dt - timedelta(days=7)  # Use 1 week ago for safety
                     end_date = end_dt.strftime("%d-%m-%Y")
-                    print(f"🔧 ADJUSTED END DATE: {end_date}")
+                    print(f"🔧 ADJUSTED END DATE: {end_date} (1 week ago for safety)")
                 
                 # Very large range check
                 days_diff = (end_dt - start_dt).days
@@ -360,9 +364,12 @@ class BrightDataAutomatedBatchScraper:
                 
             except Exception as e:
                 print(f"⚠️ Date validation failed: {e}, using emergency safe dates")
-                # Emergency fallback to known good dates
-                start_date = "01-09-2025"
-                end_date = "30-09-2025"
+                # 🚨 FIX: Use safe past dates for emergency fallback
+                emergency_end = today - timedelta(days=10)  # 10 days ago
+                emergency_start = emergency_end - timedelta(days=14)  # 2 weeks before
+                start_date = emergency_start.strftime("%d-%m-%Y")
+                end_date = emergency_end.strftime("%d-%m-%Y")
+                print(f"🚨 EMERGENCY DATES: {start_date} to {end_date}")
             
             print(f"📅 Final dates: {start_date} to {end_date}")
             
@@ -413,6 +420,16 @@ class BrightDataAutomatedBatchScraper:
                     }
                 
                 payload.append(item)
+            
+            # 🚨 DEBUG: Check for double URL issue
+            print(f"🔍 INPUT URLS COUNT: {len(urls)}")
+            print(f"🔍 PAYLOAD ITEMS COUNT: {len(payload)}")
+            if len(urls) == 1 and len(payload) == 1:
+                print(f"✅ SINGLE URL CORRECTLY PROCESSED")
+            elif len(urls) == 1 and len(payload) > 1:
+                print(f"❌ DOUBLE URL BUG DETECTED! Input 1 URL, payload has {len(payload)} items")
+            else:
+                print(f"⚠️ Multiple URLs input: {len(urls)} URLs → {len(payload)} payload items")
             
             print(f"🔥 Making SYSTEM API request to: {self.api_url}")
             print(f"📋 Headers: {headers}")
