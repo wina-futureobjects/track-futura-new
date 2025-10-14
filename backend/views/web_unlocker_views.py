@@ -65,28 +65,51 @@ class WebUnlockerAPIView(View):
     def scrape_with_web_unlocker(self, target_url, scraper_name):
         """Execute Web Unlocker API request"""
         try:
-            # Get or create a default project
+            # Get or create a default project with detailed logging
             from users.models import Project
             from django.contrib.auth import get_user_model
             
-            User = get_user_model()
-            project = Project.objects.first()
+            logger.info("🔍 Checking for existing project...")
             
-            if not project:
-                # Create default user and project if none exist
-                user = User.objects.filter(is_superuser=True).first()
-                if not user:
-                    user = User.objects.create_superuser(
-                        username='admin',
-                        email='admin@trackfutura.com',
-                        password='admin123'
-                    )
+            User = get_user_model()
+            
+            # Use transaction to ensure atomicity
+            from django.db import transaction
+            
+            with transaction.atomic():
+                project = Project.objects.first()
                 
-                project = Project.objects.create(
-                    name="TrackFutura Main Project",
-                    description="Main project for BrightData Web Unlocker integration",
-                    owner=user
-                )
+                if not project:
+                    logger.info("📋 No project found, creating default project...")
+                    
+                    # Create default user and project if none exist
+                    user = User.objects.filter(is_superuser=True).first()
+                    if not user:
+                        logger.info("👤 Creating superuser...")
+                        user = User.objects.create_superuser(
+                            username='admin',
+                            email='admin@trackfutura.com',
+                            password='admin123'
+                        )
+                        logger.info(f"✅ Created superuser: {user.username} (ID: {user.id})")
+                    else:
+                        logger.info(f"✅ Found superuser: {user.username} (ID: {user.id})")
+                    
+                    logger.info("🏗️ Creating project...")
+                    project = Project.objects.create(
+                        name="TrackFutura Main Project",
+                        description="Main project for BrightData Web Unlocker integration",
+                        owner=user
+                    )
+                    logger.info(f"✅ Created project: {project.name} (ID: {project.id})")
+                else:
+                    logger.info(f"✅ Found existing project: {project.name} (ID: {project.id})")
+                
+                # Verify project exists before proceeding
+                if not project or not project.id:
+                    raise Exception("Failed to create or retrieve project")
+                
+                logger.info(f"🎯 Using project ID: {project.id} for Web Unlocker integration")
             
             # BrightData Web Unlocker API configuration
             api_url = "https://api.brightdata.com/request"
@@ -172,7 +195,13 @@ class WebUnlockerAPIView(View):
             }
         except Exception as e:
             error_msg = f"Unexpected error: {str(e)}"
-            logger.error(error_msg)
+            logger.error(f"❌ Web Unlocker error: {error_msg}")
+            logger.error(f"📍 Error type: {type(e).__name__}")
+            
+            # Log stack trace for debugging
+            import traceback
+            logger.error(f"📚 Stack trace: {traceback.format_exc()}")
+            
             return {
                 'success': False,
                 'error': error_msg
