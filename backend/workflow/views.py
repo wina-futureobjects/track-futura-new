@@ -68,12 +68,41 @@ class WorkflowViewSet(viewsets.ModelViewSet):
                 logger.warning(f"Original URLs: {urls}")
                 logger.warning(f"Deduplicated URLs: {unique_urls}")
             
-            validated_data['urls'] = unique_urls
+            # 🚨 ADDITIONAL FIX: Check if URLs already exist in database
+            platform_service = validated_data.get('platform_service')
+            project = validated_data.get('project')
             
-            # Create input collection with proper user and deduplicated URLs
+            existing_collections = InputCollection.objects.filter(
+                project=project,
+                platform_service=platform_service
+            )
+            
+            existing_urls = set()
+            for collection in existing_collections:
+                if isinstance(collection.urls, list):
+                    existing_urls.update(collection.urls)
+            
+            # Filter out URLs that already exist
+            new_urls = [url for url in unique_urls if url not in existing_urls]
+            
+            if len(new_urls) != len(unique_urls):
+                removed_count = len(unique_urls) - len(new_urls)
+                logger.warning(f"🚨 REMOVED {removed_count} EXISTING URLs from database")
+                logger.warning(f"Existing URLs in system: {existing_urls}")
+                logger.warning(f"New URLs to process: {new_urls}")
+            
+            if not new_urls:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({
+                    'urls': 'All provided URLs already exist in the system for this project and platform.'
+                })
+            
+            validated_data['urls'] = new_urls
+            
+            # Create input collection with proper user and filtered URLs
             input_collection = serializer.save(
                 created_by=self.request.user if self.request.user.is_authenticated else None,
-                urls=unique_urls
+                urls=new_urls
             )
             
             # Create workflow task using service
