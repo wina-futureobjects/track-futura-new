@@ -73,43 +73,45 @@ class WebUnlockerAPIView(View):
             
             User = get_user_model()
             
-            # Use transaction to ensure atomicity
+            # Use transaction to ensure atomicity and get/create project
             from django.db import transaction
             
             with transaction.atomic():
-                project = Project.objects.first()
+                # Try to get any existing project first
+                project = Project.objects.filter(id=1).first() or Project.objects.first()
                 
                 if not project:
                     logger.info("📋 No project found, creating default project...")
                     
-                    # Create default user and project if none exist
+                    # Get or create superuser
                     user = User.objects.filter(is_superuser=True).first()
                     if not user:
                         logger.info("👤 Creating superuser...")
                         user = User.objects.create_superuser(
-                            username='admin',
-                            email='admin@trackfutura.com',
-                            password='admin123'
+                            username='webunlocker_admin',
+                            email='webunlocker@trackfutura.com',
+                            password='WebUnlocker2024!'
                         )
                         logger.info(f"✅ Created superuser: {user.username} (ID: {user.id})")
                     else:
-                        logger.info(f"✅ Found superuser: {user.username} (ID: {user.id})")
+                        logger.info(f"✅ Using existing superuser: {user.username} (ID: {user.id})")
                     
-                    logger.info("🏗️ Creating project...")
+                    logger.info("🏗️ Creating Web Unlocker project...")
                     project = Project.objects.create(
-                        name="TrackFutura Main Project",
-                        description="Main project for BrightData Web Unlocker integration",
-                        owner=user
+                        name="Web Unlocker Project",
+                        description="Project for BrightData Web Unlocker integration",
+                        owner=user,
+                        is_public=False
                     )
                     logger.info(f"✅ Created project: {project.name} (ID: {project.id})")
                 else:
-                    logger.info(f"✅ Found existing project: {project.name} (ID: {project.id})")
+                    logger.info(f"✅ Using existing project: {project.name} (ID: {project.id})")
                 
-                # Verify project exists before proceeding
-                if not project or not project.id:
-                    raise Exception("Failed to create or retrieve project")
+                # Verify project exists
+                if not project:
+                    raise Exception("Failed to get or create project for Web Unlocker")
                 
-                logger.info(f"🎯 Using project ID: {project.id} for Web Unlocker integration")
+                logger.info(f"🎯 Web Unlocker will use project ID: {project.id}")
             
             # BrightData Web Unlocker API configuration
             api_url = "https://api.brightdata.com/request"
