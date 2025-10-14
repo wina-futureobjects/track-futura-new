@@ -169,8 +169,8 @@ const DataStorage = () => {
     try {
       console.log('🚀 Fetching unified folder data...');
       
-      // Use the new unified API endpoint
-      const response = await apiFetch(`/api/track-accounts/unified-folders/?project=${projectId}`);
+      // Use the correct report-folders API endpoint with proper parameters
+      const response = await apiFetch(`/api/track-accounts/report-folders/?project=${projectId}&folder_type=run&include_hierarchy=true`);
       
       if (!response.ok) {
         throw new Error(`Failed to fetch folders: ${response.status}`);

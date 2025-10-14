@@ -145,14 +145,22 @@ class BrightDataWebhookEvent(models.Model):
         ('pending', 'Pending'),
         ('processing', 'Processing'),
         ('completed', 'Completed'),
+        ('processed', 'Processed'),
         ('failed', 'Failed'),
+        ('json_error', 'JSON Error'),
+        ('test_webhook', 'Test Webhook'),
+        ('test_processed', 'Test Processed'),
+        ('file_url_error', 'File URL Error'),
+        ('processing_error', 'Processing Error'),
+        ('error', 'Error'),
     ]
-    
+
     event_id = models.CharField(max_length=255, unique=True)
     snapshot_id = models.CharField(max_length=255, blank=True, null=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='pending')
     platform = models.CharField(max_length=50, blank=True)
     raw_data = models.JSONField(default=dict)
+    error_message = models.TextField(blank=True, null=True)
     processed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

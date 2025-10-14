@@ -62,8 +62,8 @@ urlpatterns = [
     path('upload-data/', views.upload_data_file, name='upload_data_file'),
     path('list-folders/', views.list_uploaded_folders, name='list_uploaded_folders'),
     
-    # Webhook endpoints
-    path('webhook/', views.brightdata_webhook, name='brightdata_webhook'),
+    # Webhook endpoints - Updated to use clean webhook handler
+    path('webhook/', lambda request: __import__('brightdata_integration.webhook_handler', fromlist=['brightdata_webhook']).brightdata_webhook(request), name='brightdata_webhook'),
     path('notify/', views.brightdata_notify, name='brightdata_notify'),
     
     # Web Unlocker API endpoint
