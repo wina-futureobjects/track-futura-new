@@ -135,12 +135,11 @@ class WebUnlockerAPIView(View):
                 # Create UnifiedRunFolder entry with correct field names
                 folder = UnifiedRunFolder.objects.create(
                     name=f"Web Unlocker - {scraper_name}",
-                    folder_type='web_scraping',
-                    platform_code='brightdata',
-                    service_code='web_unlocker',
-                    project_id=project.id,
-                    parent=None,
-                    is_active=True,
+                    folder_type='job',  # Use valid choice from FOLDER_TYPE_CHOICES
+                    platform_code=None,  # Web Unlocker is not a social platform
+                    service_code=None,   # Web Unlocker is not a social service
+                    project=project,     # Use project object, not project_id
+                    parent_folder=None,  # Top-level folder
                     description=f"Scraped from: {target_url}"
                 )
                 
