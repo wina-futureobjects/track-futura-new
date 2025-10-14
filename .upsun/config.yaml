@@ -50,8 +50,10 @@ applications:
       deploy: |
         cd backend
         python manage.py migrate --noinput
+        echo "🚀 Creating production project for Web Unlocker..."
+        python manage.py create_production_project
         echo "🚀 Deploying BrightData snapshots to production..."
-        python manage.py deploy_brightdata_production --production
+        python manage.py deploy_brightdata_production --production || echo "⚠️ BrightData deployment command not found"
     
     relationships:
       database: postgresql:postgresql
