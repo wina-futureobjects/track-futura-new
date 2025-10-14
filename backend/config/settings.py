@@ -548,3 +548,47 @@ APIFY_API_TOKEN = os.getenv('APIFY_API_TOKEN', '')
 PINECONE_API_KEY = os.getenv('PINECONE_API_KEY', '')
 BRIGHTDATA_API_KEY = os.getenv('BRIGHTDATA_API_KEY', '')
 BRIGHTDATA_WEBHOOK_TOKEN = os.getenv('BRIGHTDATA_WEBHOOK_TOKEN', '')
+
+# Production Memory Optimization Settings
+import os
+
+# Configure matplotlib to use less memory
+if not DEBUG:
+    os.environ['MPLCONFIGDIR'] = '/tmp/matplotlib'
+    # Force matplotlib to use non-interactive backend
+    import matplotlib
+    matplotlib.use('Agg')
+
+# Database connection optimization for production
+if not DEBUG:
+    DATABASES['default'].update({
+        'CONN_MAX_AGE': 60,  # Keep connections alive for 60 seconds
+        'OPTIONS': {
+            'MAX_CONNS': 5,  # Limit database connections
+            'charset': 'utf8mb4',
+        }
+    })
+
+# Logging configuration for production
+if not DEBUG:
+    LOGGING = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'handlers': {
+            'console': {
+                'class': 'logging.StreamHandler',
+                'level': 'INFO',
+            },
+        },
+        'root': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+        'loggers': {
+            'django': {
+                'handlers': ['console'],
+                'level': 'WARNING',
+                'propagate': False,
+            },
+        },
+    }
